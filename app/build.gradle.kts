@@ -13,8 +13,8 @@ android {
         applicationId = "com.ashkb.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.3.0-p3"
+        versionCode = 4
+        versionName = "0.4.0-p4"
     }
 
     buildTypes {

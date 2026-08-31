@@ -38,7 +38,7 @@ import com.ashkb.app.data.entity.Medication
 import kotlinx.coroutines.launch
 
 @Composable
-fun MeScreen(vm: MeViewModel) {
+fun MeScreen(vm: MeViewModel, onOpenBackup: () -> Unit = {}) {
     val profile by vm.profile.collectAsState()
     val meds by vm.meds.collectAsState()
     val context = LocalContext.current
@@ -116,6 +116,19 @@ fun MeScreen(vm: MeViewModel) {
         // ---- M10 提醒与权限自检 ----
         item {
             ReminderSelfCheckCard()
+        }
+
+        // ---- P4 R20 备份与数据自主 ----
+        item {
+            SectionCard(title = "备份与数据") {
+                Text(
+                    "全量加密备份（AES-256-GCM）· 恢复自证 · WebDAV 远程备份 · 档案 JSON 导出导入",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = onOpenBackup) { Text("进入备份与数据") }
+            }
         }
         item { Spacer(Modifier.height(24.dp)) }
     }

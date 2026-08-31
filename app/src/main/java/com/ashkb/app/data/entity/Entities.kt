@@ -545,3 +545,33 @@ data class EmergencyContact(
     @ColumnInfo(name = "created_at") val createdAt: String,
     @ColumnInfo(name = "updated_at") val updatedAt: String,
 )
+
+// ===========================================================================
+// P4：R20 备份台账（sync_state 裁剪语义：backup / restore / export）
+// ===========================================================================
+
+enum class LedgerType(val label: String) {
+    BACKUP("备份"), RESTORE("恢复"), EXPORT("导出"), DRILL("演练");
+
+    companion object { fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: BACKUP }
+}
+
+enum class LedgerStatus(val label: String) {
+    SUCCESS("成功"), FAILED("失败");
+
+    companion object { fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: FAILED }
+}
+
+/** 备份台账：每次备份 / 恢复 / 演练 / 导出的登记记录（协议 §4/§6 台账要求）。 */
+@Entity(tableName = "backup_ledger", indices = [Index("created_at")])
+data class BackupLedger(
+    @PrimaryKey val id: String,
+    @ColumnInfo(name = "ledger_type") val ledgerType: String,   // backup / restore / export / drill
+    @ColumnInfo(name = "status") val status: String,            // success / failed
+    @ColumnInfo(name = "target") val target: String,            // local / webdav / restore
+    @ColumnInfo(name = "file_name") val fileName: String? = null,
+    @ColumnInfo(name = "row_total") val rowTotal: Int? = null,
+    @ColumnInfo(name = "verify_ok") val verifyOk: Boolean? = null, // checksum 双校验结论
+    @ColumnInfo(name = "detail") val detail: String? = null,
+    @ColumnInfo(name = "created_at") val createdAt: String,
+)

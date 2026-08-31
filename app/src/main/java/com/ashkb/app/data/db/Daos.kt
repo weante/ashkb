@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
 import com.ashkb.app.data.entity.Alert
+import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.entity.BasdaiRecord
 import com.ashkb.app.data.entity.BodyMeasure
 import com.ashkb.app.data.entity.CheckupItem
@@ -76,6 +77,10 @@ interface MedicationLogDao {
 
     @Query("SELECT COUNT(*) FROM medication_logs WHERE date BETWEEN :from AND :to")
     suspend fun countBetween(from: String, to: String): Int
+
+    /** P4 M9 依从统计：区间内指定状态的打卡数（done / partial / skipped） */
+    @Query("SELECT COUNT(*) FROM medication_logs WHERE date BETWEEN :from AND :to AND status = :status")
+    suspend fun countBetweenStatus(from: String, to: String, status: String): Int
 }
 
 @Dao
@@ -174,6 +179,10 @@ interface FlareDao {
     @Query("SELECT * FROM flare_events WHERE status = 'active' ORDER BY start_date DESC LIMIT 1")
     suspend fun activeFlare(): FlareEvent?
 
+    /** P4 M9：区间发作记录 */
+    @Query("SELECT * FROM flare_events WHERE start_date BETWEEN :from AND :to ORDER BY start_date")
+    suspend fun between(from: String, to: String): List<FlareEvent>
+
     @Insert
     suspend fun insert(event: FlareEvent)
 
@@ -198,6 +207,10 @@ interface ExerciseLogDao {
 
     @Upsert
     suspend fun upsert(log: ExerciseLog)
+
+    /** P4 M9：区间运动打卡（依从统计） */
+    @Query("SELECT * FROM exercise_logs WHERE date BETWEEN :from AND :to ORDER BY date")
+    suspend fun between(from: String, to: String): List<ExerciseLog>
 }
 
 @Dao
@@ -277,6 +290,10 @@ interface WeightLogDao {
 
     @Query("SELECT * FROM weight_logs ORDER BY date DESC LIMIT :limit")
     fun observeRecent(limit: Int = 30): Flow<List<WeightLog>>
+
+    /** P4 M9：近期体重（趋势图） */
+    @Query("SELECT * FROM weight_logs ORDER BY date DESC LIMIT :limit")
+    suspend fun recent(limit: Int = 90): List<WeightLog>
 
     @Upsert
     suspend fun upsert(log: WeightLog)
@@ -409,4 +426,20 @@ interface ContactDao {
 
     @Query("DELETE FROM contacts WHERE id = :id")
     suspend fun delete(id: String)
+}
+
+// ===========================================================================
+// P4 DAO：备份台账
+// ===========================================================================
+
+@Dao
+interface BackupLedgerDao {
+    @Query("SELECT * FROM backup_ledger ORDER BY created_at DESC LIMIT :limit")
+    fun observeRecent(limit: Int = 30): Flow<List<BackupLedger>>
+
+    @Query("SELECT * FROM backup_ledger WHERE ledger_type = :type ORDER BY created_at DESC LIMIT 1")
+    suspend fun latestByType(type: String): BackupLedger?
+
+    @Insert
+    suspend fun insert(ledger: BackupLedger)
 }

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ashkb.app.ui.backup.BackupScreen
+import com.ashkb.app.ui.backup.BackupViewModel
 import com.ashkb.app.ui.checkup.CheckupScreen
 import com.ashkb.app.ui.checkup.CheckupViewModel
 import com.ashkb.app.ui.emergency.EmergencyScreen
@@ -43,6 +46,8 @@ import com.ashkb.app.ui.knowledge.KnowledgeScreen
 import com.ashkb.app.ui.knowledge.KnowledgeViewModel
 import com.ashkb.app.ui.me.MeScreen
 import com.ashkb.app.ui.me.MeViewModel
+import com.ashkb.app.ui.report.ReportScreen
+import com.ashkb.app.ui.report.ReportViewModel
 import com.ashkb.app.ui.symptom.SymptomScreen
 import com.ashkb.app.ui.symptom.SymptomViewModel
 import com.ashkb.app.ui.today.TodayScreen
@@ -51,7 +56,7 @@ import com.ashkb.app.ui.wellness.WellnessScreen
 import com.ashkb.app.ui.wellness.WellnessViewModel
 
 private enum class Tab(val label: String) {
-    TODAY("今日"), HEALTH("健康"), KNOWLEDGE("知识"), ME("我的")
+    TODAY("今日"), HEALTH("健康"), REPORT("报表"), KNOWLEDGE("知识"), ME("我的")
 }
 
 /** 今日 Tab 子页 */
@@ -60,11 +65,15 @@ private enum class TodaySub { SYMPTOM, EXERCISE }
 /** 健康 Tab 子页 */
 private enum class HealthSub { WELLNESS, CHECKUP, EMERGENCY }
 
+/** 我的 Tab 子页（P4：备份与数据） */
+private enum class MeSub { BACKUP }
+
 @Composable
 fun AppShell() {
     var tab by remember { mutableStateOf(Tab.TODAY) }
     var todaySub by remember { mutableStateOf<TodaySub?>(null) }
     var healthSub by remember { mutableStateOf<HealthSub?>(null) }
+    var meSub by remember { mutableStateOf<MeSub?>(null) }
 
     val todayVm: TodayViewModel = viewModel(factory = TodayViewModel.Factory)
     val meVm: MeViewModel = viewModel(factory = MeViewModel.Factory)
@@ -74,12 +83,15 @@ fun AppShell() {
     val wellnessVm: WellnessViewModel = viewModel(factory = WellnessViewModel.Factory)
     val checkupVm: CheckupViewModel = viewModel(factory = CheckupViewModel.Factory)
     val emergencyVm: EmergencyViewModel = viewModel(factory = EmergencyViewModel.Factory)
+    val reportVm: ReportViewModel = viewModel(factory = ReportViewModel.Factory)
+    val backupVm: BackupViewModel = viewModel(factory = BackupViewModel.Factory)
 
     // 返回键处理
-    BackHandler(enabled = todaySub != null || healthSub != null) {
+    BackHandler(enabled = todaySub != null || healthSub != null || meSub != null) {
         when {
             todaySub != null -> todaySub = null
             healthSub != null -> healthSub = null
+            meSub != null -> meSub = null
         }
     }
 
@@ -102,6 +114,14 @@ fun AppShell() {
         return
     }
 
+    // 我的子页
+    meSub?.let { s ->
+        when (s) {
+            MeSub.BACKUP -> BackupScreen(vm = backupVm, onBack = { meSub = null })
+        }
+        return
+    }
+
     Scaffold(
         bottomBar = {
             NavigationBar {
@@ -114,6 +134,7 @@ fun AppShell() {
                                 when (t) {
                                     Tab.TODAY -> Icons.Filled.Home
                                     Tab.HEALTH -> Icons.Filled.Favorite
+                                    Tab.REPORT -> Icons.Filled.QueryStats
                                     Tab.KNOWLEDGE -> Icons.Filled.MenuBook
                                     Tab.ME -> Icons.Filled.Person
                                 }, contentDescription = t.label
@@ -138,8 +159,9 @@ fun AppShell() {
                     onOpenCheckup = { healthSub = HealthSub.CHECKUP },
                     onOpenEmergency = { healthSub = HealthSub.EMERGENCY },
                 )
+                Tab.REPORT -> ReportScreen(vm = reportVm)
                 Tab.KNOWLEDGE -> KnowledgeScreen(vm = knowledgeVm)
-                Tab.ME -> MeScreen(meVm)
+                Tab.ME -> MeScreen(meVm, onOpenBackup = { meSub = MeSub.BACKUP })
             }
         }
     }

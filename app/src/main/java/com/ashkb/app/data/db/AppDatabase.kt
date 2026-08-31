@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ashkb.app.data.entity.Alert
+import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.entity.BasdaiRecord
 import com.ashkb.app.data.entity.BodyMeasure
 import com.ashkb.app.data.entity.CheckupItem
@@ -36,9 +37,9 @@ import com.ashkb.app.data.entity.WeightLog
         SymptomDaily::class, BasdaiRecord::class, FlareEvent::class, ExerciseLog::class, Alert::class,
         Supplement::class, SupplementLog::class, Vitals::class, WeightLog::class, BodyMeasure::class,
         DietProfile::class, FoodAvoidItem::class, CheckupItem::class, CheckupRecord::class, LabResult::class,
-        VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class,
+        VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class, BackupLedger::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -65,6 +66,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun vaccineRecordDao(): VaccineRecordDao
     abstract fun emergencyEventDao(): EmergencyEventDao
     abstract fun contactDao(): ContactDao
+    abstract fun backupLedgerDao(): BackupLedgerDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
@@ -253,11 +255,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v5：P4 备份台账（R20 台账登记语义） */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `backup_ledger` (" +
+                        "`id` TEXT NOT NULL, `ledger_type` TEXT NOT NULL, `status` TEXT NOT NULL, " +
+                        "`target` TEXT NOT NULL, `file_name` TEXT, `row_total` INTEGER, " +
+                        "`verify_ok` INTEGER, `detail` TEXT, `created_at` TEXT NOT NULL, PRIMARY KEY(`id`))"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_backup_ledger_created_at` ON `backup_ledger` (`created_at`)")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext, AppDatabase::class.java, "ashkb.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
             }
     }
 }

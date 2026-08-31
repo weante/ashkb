@@ -4,7 +4,9 @@ import android.app.Application
 import android.content.Context
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.entity.KbEntry
+import com.ashkb.app.data.repo.BackupRepository
 import com.ashkb.app.data.repo.HealthRepository
+import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
@@ -22,6 +24,8 @@ class AshkbApplication : Application() {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val medicationRepository: MedicationRepository by lazy { MedicationRepository(this) }
     val healthRepository: HealthRepository by lazy { HealthRepository(this) }
+    val backupRepository: BackupRepository by lazy { BackupRepository(this) }
+    val reportRepository: ReportRepository by lazy { ReportRepository(this) }
 
     override fun onCreate() {
         super.onCreate()
