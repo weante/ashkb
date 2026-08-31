@@ -234,6 +234,7 @@ class BackupRepository(private val context: Context) {
                 put("frequency", m.frequency)
                 m.takeTimes?.let { put("take_times", it) }
                 m.weeklyWeekday?.let { put("weekly_weekday", it) }
+                m.weeklyWeekday2?.let { put("weekly_weekday2", it) }
                 put("start_date", m.startDate)
                 m.endDate?.let { put("end_date", it) }
                 m.injCycleDays?.let { put("inj_cycle_days", it) }
@@ -279,6 +280,7 @@ class BackupRepository(private val context: Context) {
                         frequency = m.optString("frequency", "DAILY"),
                         takeTimes = m.optString("take_times").ifBlank { null },
                         weeklyWeekday = if (m.has("weekly_weekday")) m.getInt("weekly_weekday") else null,
+                        weeklyWeekday2 = if (m.has("weekly_weekday2")) m.getInt("weekly_weekday2") else null,
                         startDate = m.optString("start_date", LocalDate.now().toString()),
                         endDate = m.optString("end_date").ifBlank { null },
                         injCycleDays = if (m.has("inj_cycle_days")) m.getInt("inj_cycle_days") else null,

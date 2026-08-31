@@ -1,5 +1,6 @@
 package com.ashkb.app.ui.me
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -31,6 +33,7 @@ import com.ashkb.app.data.entity.MedClass
 import com.ashkb.app.data.entity.MedFrequency
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.DrugKeyCatalog
 import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -61,6 +64,8 @@ fun MedFormDialog(
     var times by remember { mutableStateOf(listOf("08:00")) }
     var customTime by remember { mutableStateOf("") }
     var weekday by remember { mutableStateOf(1) }
+    var weekday2 by remember { mutableStateOf(4) }
+    var biwError by remember { mutableStateOf(false) }
     var cycleDays by remember { mutableStateOf("14") }
     var food by remember { mutableStateOf("any") }
     var prnReason by remember { mutableStateOf("") }
@@ -85,7 +90,8 @@ fun MedFormDialog(
         takeTimes = if (frequency == MedFrequency.PRN || route == "injection")
             times.take(1).let { if (it.isEmpty()) null else JSONArray(it).toString() }
         else JSONArray(times).toString(),
-        weeklyWeekday = if (frequency == MedFrequency.WEEKLY) weekday else null,
+        weeklyWeekday = if (frequency == MedFrequency.WEEKLY || frequency == MedFrequency.BIW) weekday else null,
+        weeklyWeekday2 = if (frequency == MedFrequency.BIW) weekday2 else null,
         startDate = startDate,
         injCycleDays = if (route == "injection") cycleDays.toIntOrNull() ?: 14 else null,
         storage = storage.trim().ifBlank { null },
@@ -105,7 +111,28 @@ fun MedFormDialog(
                 if (step == 1) {
                     OutlinedTextField(name, { name = it }, label = { Text("药品名（必填，如：阿达木单抗）") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(brand, { brand = it }, label = { Text("商品名（选填，如：修美乐）") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(nameKey, { nameKey = it }, label = { Text("通用名键（必填，小写英文，如 adalimumab；类别药可填 nsaid）") }, modifier = Modifier.fillMaxWidth(), supportingText = { Text("用于知识库相互作用检索") })
+                    OutlinedTextField(nameKey, { nameKey = it }, label = { Text("通用名键（必填，小写英文，如 adalimumab）") }, modifier = Modifier.fillMaxWidth(), supportingText = { Text("用于知识库相互作用检索；输入中英文自动匹配") })
+                    // P5 R8：自动匹配——键为空时按药品名检索建议
+                    val keySuggestions = DrugKeyCatalog.suggest(if (nameKey.isBlank()) name else nameKey)
+                    if (keySuggestions.isNotEmpty() && !DrugKeyCatalog.isExactKey(nameKey)) {
+                        keySuggestions.forEach { s ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable {
+                                    nameKey = s.key
+                                    if (name.isBlank()) name = s.display
+                                    if (brand.isBlank() && !s.brand.isNullOrBlank()) brand = s.brand
+                                    if (medClass == MedClass.OTHER) medClass = s.medClass
+                                }.padding(vertical = 4.dp),
+                            ) {
+                                Text(
+                                    "${s.key} · ${s.display}${s.brand?.let { "（$it）" } ?: ""}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    }
                     Spacer(Modifier.height(8.dp))
                     Text("药物类别", style = MaterialTheme.typography.labelMedium)
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
@@ -147,19 +174,43 @@ fun MedFormDialog(
                                 }) { Text("添加") }
                             }
                             times.sorted().forEach { t -> Text("· $t", style = MaterialTheme.typography.bodySmall) }
-                        } else {
+                        } else if (frequency == MedFrequency.Q2W || frequency == MedFrequency.CUSTOM) {
                             OutlinedTextField(cycleDays, { cycleDays = it.filter { c -> c.isDigit() }.take(3) },
                                 label = { Text("注射周期（天，如 14 = 每两周）") }, modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(startDate, { startDate = it }, label = { Text("周期锚点日期（YYYY-MM-DD，本期注射日）") }, modifier = Modifier.fillMaxWidth())
+                        } else {
+                            Text(
+                                "注射日按下方选择的固定星期自动出卡（默认 09:00 提醒）。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     } else {
                         OutlinedTextField(prnReason, { prnReason = it }, label = { Text("按需原因（如：备用镇痛）") }, modifier = Modifier.fillMaxWidth())
                     }
-                    if (frequency == MedFrequency.WEEKLY) {
-                        Text("每周第几天（甲氨蝶呤常选固定 weekday）", style = MaterialTheme.typography.labelMedium)
+                    if (frequency == MedFrequency.WEEKLY || frequency == MedFrequency.BIW) {
+                        Text(
+                            if (frequency == MedFrequency.BIW) "每周两针——两个注射星期"
+                            else "每周固定星期（如甲氨蝶呤）",
+                            style = MaterialTheme.typography.labelMedium,
+                        )
                         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
                             listOf(1 to "一", 2 to "二", 3 to "三", 4 to "四", 5 to "五", 6 to "六", 7 to "日").forEach { (d, l) ->
-                                FilterChip(selected = weekday == d, onClick = { weekday = d }, label = { Text(l) })
+                                FilterChip(selected = weekday == d, onClick = { weekday = d; biwError = false }, label = { Text(l) })
+                            }
+                        }
+                        if (frequency == MedFrequency.BIW) {
+                            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                                listOf(1 to "一", 2 to "二", 3 to "三", 4 to "四", 5 to "五", 6 to "六", 7 to "日").forEach { (d, l) ->
+                                    FilterChip(selected = weekday2 == d, onClick = { weekday2 = d; biwError = false }, label = { Text(l) })
+                                }
+                            }
+                            if (biwError && weekday == weekday2) {
+                                Text(
+                                    "两针星期需不同（如周一 / 周四），请调整",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
                             }
                         }
                     }
@@ -219,6 +270,9 @@ fun MedFormDialog(
                 TextButton(
                     onClick = {
                         if (name.isBlank() || nameKey.isBlank() || dose.isBlank()) return@TextButton
+                        if (frequency == MedFrequency.BIW && weekday == weekday2) {
+                            biwError = true; return@TextButton
+                        }
                         val draft = buildMed()
                         scope.launch {
                             hits = vm.interactionsFor(draft)

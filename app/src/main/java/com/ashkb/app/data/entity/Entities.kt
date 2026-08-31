@@ -29,6 +29,7 @@ enum class MedFrequency(val label: String) {
     BID("每日两次"),
     Q8H("每 8 小时"),
     WEEKLY("每周一次（如甲氨蝶呤）"),
+    BIW("每周两次（如依那西普，选两个星期）"),
     Q2W("每两周一次"),
     PRN("按需服用"),
     CUSTOM("自定义周期");
@@ -90,6 +91,8 @@ data class Medication(
     @ColumnInfo(name = "take_times") val takeTimes: String? = null,
     /** 实现层增补 D-1：WEEKLY 时的星期（1=周一 … 7=周日） */
     @ColumnInfo(name = "weekly_weekday") val weeklyWeekday: Int? = null,
+    /** P5 修订 R7：BIW（每周两次）第二针星期（1=周一 … 7=周日），如恩利 周一/周四 */
+    @ColumnInfo(name = "weekly_weekday2") val weeklyWeekday2: Int? = null,
     @ColumnInfo(name = "duration") val duration: String? = null,
     @ColumnInfo(name = "start_date") val startDate: String, // YYYY-MM-DD，注射周期锚点
     @ColumnInfo(name = "end_date") val endDate: String? = null,

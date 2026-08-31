@@ -17,7 +17,7 @@ object BackupEngine {
 
     class BackupException(msg: String, cause: Throwable? = null) : Exception(msg, cause)
 
-    const val SCHEMA_VERSION = 5
+    const val SCHEMA_VERSION = 6
 
     /** 表清单：用户表（排除 Room 元数据 / 系统表），固定字典序保证备份文件确定性。 */
     fun tableNames(db: SupportSQLiteDatabase): List<String> =
@@ -123,21 +123,35 @@ object BackupEngine {
         } finally {
             db.endTransaction()
         }
-        return verifyAgainst(db, root.getJSONObject("manifest"))
+        return verifyAgainst(db, root.getJSONObject("manifest"), root.optJSONObject("tables"))
     }
 
-    /** 双校验：行数快速核对 + 逐表排序序列化 SHA-256 精确比对（协议 §5）。 */
-    fun verifyAgainst(db: SupportSQLiteDatabase, manifest: JSONObject): VerifyResult {
+    /**
+     * 双校验：行数快速核对 + 逐表排序序列化 SHA-256 精确比对（协议 §5）。
+     * P5 修订 R9：跨 schema 恢复兼容——低版本备份缺少新列（如 v6 的 weekly_weekday2），
+     * 按「备份自身的列集」重算摘要而非当前库全列，避免列增迁移后旧备份被误判损坏。
+     */
+    fun verifyAgainst(db: SupportSQLiteDatabase, manifest: JSONObject, tablesJson: JSONObject? = null): VerifyResult {
         val rowsBad = mutableListOf<String>()
         val shaBad = mutableListOf<String>()
         var total = 0
         val keys = manifest.keys().asSequence().toList()
         for (t in keys) {
-            val m = manifest.getJSONObject(t)
             val rows = readTable(db, t)
+            // 备份列集（按行内出现顺序——与导出时 readTable 的列序一致，保证 toString 字节一致）
+            val backupCols = tablesJson?.optJSONArray(t)?.let { arr ->
+                val seen = linkedSetOf<String>()
+                for (i in 0 until arr.length()) arr.getJSONObject(i).keys().forEach { seen.add(it) }
+                seen
+            }
+            val compare = if (backupCols != null && backupCols.isNotEmpty() && rows.isNotEmpty() &&
+                rows.first().keys().asSequence().toList() != backupCols.toList()
+            ) {
+                rows.map { r -> JSONObject().apply { backupCols.forEach { c -> put(c, r.opt(c) ?: JSONObject.NULL) } } }
+            } else rows
             total += rows.size
-            if (rows.size != m.getInt("rows")) rowsBad.add("$t: 期望 ${m.getInt("rows")} 实际 ${rows.size}")
-            if (tableSha(rows) != m.getString("sha256")) shaBad.add(t)
+            if (rows.size != m_rows(manifest, t)) rowsBad.add("$t: 期望 ${m_rows(manifest, t)} 实际 ${rows.size}")
+            if (tableSha(compare) != m_sha(manifest, t)) shaBad.add(t)
         }
         return VerifyResult(
             rowsOk = rowsBad.isEmpty() && shaBad.isEmpty(),
@@ -146,6 +160,9 @@ object BackupEngine {
             totalRows = total,
         )
     }
+
+    private fun m_rows(manifest: JSONObject, t: String): Int = manifest.getJSONObject(t).getInt("rows")
+    private fun m_sha(manifest: JSONObject, t: String): String = manifest.getJSONObject(t).getString("sha256")
 
     private fun insertTable(db: SupportSQLiteDatabase, table: String, rows: JSONArray) {
         db.execSQL("DELETE FROM `$table`")

@@ -39,6 +39,19 @@ object ScheduleCalc {
         val freq = MedFrequency.fromKey(med.frequency)
         if (freq == MedFrequency.PRN) return emptyList()
 
+        // 固定星期给药（WEEKLY 一天 / BIW 两天）：口服按时刻出多槽；注射按默认/首选时刻出一针
+        if (freq == MedFrequency.WEEKLY || freq == MedFrequency.BIW) {
+            val wds = if (freq == MedFrequency.BIW) listOfNotNull(med.weeklyWeekday, med.weeklyWeekday2)
+            else listOfNotNull(med.weeklyWeekday)
+            if (wds.isEmpty() || date.dayOfWeek.value !in wds) return emptyList()
+            if (med.route == "injection") {
+                val t = takeTimesOf(med).firstOrNull() ?: "09:00"
+                return listOf(PlanSlot("inj", t, "注射"))
+            }
+            val times = takeTimesOf(med)
+            return times.map { PlanSlot(it, it, slotLabel(it, med)) }
+        }
+
         if (med.route == "injection") {
             return if (isInjectionDay(med, date) && (freq == MedFrequency.Q2W || freq == MedFrequency.CUSTOM)) {
                 val t = takeTimesOf(med).firstOrNull() ?: "09:00"
@@ -47,15 +60,7 @@ object ScheduleCalc {
         }
 
         val times = takeTimesOf(med)
-        return when (freq) {
-            MedFrequency.WEEKLY -> {
-                val wd = med.weeklyWeekday
-                if (wd != null && date.dayOfWeek.value == wd && times.isNotEmpty())
-                    times.map { PlanSlot(it, it, slotLabel(it, med)) }
-                else emptyList()
-            }
-            else -> times.map { PlanSlot(it, it, slotLabel(it, med)) }
-        }
+        return times.map { PlanSlot(it, it, slotLabel(it, med)) }
     }
 
     /** 晨起空腹药（itx-015 双膦酸盐类）槽位标签加提示 */
