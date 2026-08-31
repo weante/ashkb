@@ -1,0 +1,186 @@
+[
+  {
+    "id": "fdg-001",
+    "category": "food_drug",
+    "title": "服 NSAIDs 期间避免饮酒（消化道出血）",
+    "summary": "NSAIDs 与酒精叠加显著增加胃出血风险；饮酒前后 8–10 小时内避免使用。",
+    "severity_level": "high",
+    "applicable_scene": "新增 NSAIDs 药品；忌口清单初始化（种子供给）；饮食打卡选含酒餐次时提示",
+    "source_name": "上海市卫生健康委员会《这些药物不可与酒同服》（2021，内容摘自瑞金医院）；美国胃肠病学会（ACG）患者教育资料",
+    "source_url": "https://wsjkw.sh.gov.cn/jtyx/20210429/5bcfe9992bb6481fa073eaf33cec6e24.html",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-04",
+    "review_due": "2027-03-04",
+    "version": 1,
+    "payload": {
+      "food": "alcohol",
+      "drug_or_class": "nsaid",
+      "risk": "两者均损伤胃黏膜，叠加增加胃肠道出血风险",
+      "timing": "饮酒前后 8–10 小时内避免使用 NSAIDs",
+      "evidence": [
+        "上海市卫健委：喝酒的前后8～10个小时应避免使用NSAIDs，以免增加胃肠道出血风险。",
+        "ACG 患者资料：They should not be taken with alcohol, as the combination can increase the risk of GI bleeding."
+      ],
+      "action": [
+        "长期服 NSAIDs 者：忌口清单默认含「酒精（strict）」",
+        "应酬饮酒日：当次镇痛改用咨询医生后的替代方案，勿临时加服 NSAID",
+        "饮食打卡标记饮酒后，当日药卡显示错峰提示"
+      ],
+      "app_link": "food_avoid_items(seed: alcohol×strict)；diet_logs.avoid_hit_keys 联动提示"
+    }
+  },
+  {
+    "id": "fdg-002",
+    "category": "food_drug",
+    "title": "服激素期间：限盐 + 补钾补钙，注意葡萄柚",
+    "summary": "泼尼松等激素治疗期间医生可能建议低盐、高钾 / 高钙饮食并补充钙剂；葡萄柚汁需先咨询医生。",
+    "severity_level": "medium",
+    "applicable_scene": "新增糖皮质激素；激素长期治疗期的饮食打卡参考；营养素方案建议",
+    "source_name": "MedlinePlus 泼尼松（prednisone）患者用药信息（美国国家医学图书馆）",
+    "source_url": "https://medlineplus.gov/druginfo/meds/a601102.html",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-06",
+    "review_due": "2027-03-06",
+    "version": 1,
+    "payload": {
+      "food": "sodium",
+      "drug_or_class": "glucocorticoid",
+      "risk": "不限钠方向：水肿与血压升高风险；钙流失（长期）",
+      "timing": "激素疗程全程",
+      "evidence": [
+        "MedlinePlus：Your doctor may instruct you to follow a low-salt, high potassium, or high calcium diet. Your doctor may also prescribe or recommend a calcium or potassium supplement.",
+        "MedlinePlus：Talk to your doctor about eating grapefruit and drinking grapefruit juice while you are taking this medication."
+      ],
+      "action": [
+        "低盐饮食（清淡口味，减少腌制 / 外卖重盐餐）",
+        "高钾食物（香蕉 / 橙子 / 菠菜等）与高钙食物（奶制品 / 豆制品）纳入食谱标签",
+        "葡萄柚 / 西柚汁：服用激素期间先咨询医生再食用",
+        "营养素方案与复诊确认：钙 + 维 D 是否需补充以医嘱为准"
+      ],
+      "app_link": "recipes 标签体系（high_calcium / low_salt）；supplements(钙 / 维D) 建议；忌口清单可加葡萄柚（避）"
+    }
+  },
+  {
+    "id": "fdg-003",
+    "category": "food_drug",
+    "title": "服甲氨蝶呤期间建议避免饮酒",
+    "summary": "甲氨蝶呤与酒精均有肝毒性，两者叠加风险；患者教育建议服 MTX 者戒酒，饮用量与医生讨论。",
+    "severity_level": "high",
+    "applicable_scene": "新增甲氨蝶呤时忌口清单种子供给；饮食打卡饮酒标记时提示",
+    "source_name": "Price S et al. Clin Exp Rheumatol 2010；EMA 甲氨蝶呤口服液药品信息",
+    "source_url": "https://www.clinexprheumatol.org/article.asp?a=4149",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "food": "alcohol",
+      "drug_or_class": "methotrexate",
+      "risk": "肝毒性叠加（两者均致肝损伤）；文献示每周 >100g 酒精时重度肝病风险约 3%，有其他肝病风险因素时更高",
+      "timing": "治疗全程",
+      "evidence": [
+        "Clin Exp Rheumatol：Hepatotoxicity is associated with both alcohol and methotrexate.",
+        "GoodRx 患者教育：It's a standard recommendation to stop drinking alcohol if you've been prescribed methotrexate.",
+        "EMA 药品信息：甲氨蝶呤最严重不良反应包括 hepatotoxicity，常见异常肝功能检查。"
+      ],
+      "action": [
+        "忌口清单默认含「酒精（strict）」（与 fdg-001 合并展示）",
+        "无法完全戒断时与医生讨论可接受量（英国风湿病学家建议存在差异——个体化）",
+        "肝功能监测（checkup_items lab 联动）"
+      ],
+      "app_link": "food_avoid_items(seed: alcohol×strict)；itx-001 周一次条目组内互链"
+    }
+  },
+  {
+    "id": "fdg-004",
+    "category": "food_drug",
+    "title": "来氟米特治疗期间：说明书建议戒酒，肝酶定期监测",
+    "summary": "来氟米特中文说明书明确「治疗期间戒酒」；ALT 前 6 个月每 2 周监测、之后每 8 周。",
+    "severity_level": "high",
+    "applicable_scene": "新增来氟米特时提示；肝酶复查到期提醒",
+    "source_name": "来氟米特片说明书（药智数据收录）；EMA Leflunomide Mylan 药品信息；Health Canada Product Monograph",
+    "source_url": "https://db.yaozh.com/instruct/7716935030000034.html",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "food": "alcohol",
+      "drug_or_class": "leflunomide",
+      "risk": "肝毒性效应叠加（说明书原文）；ALT 超 2 倍持续 / 超 3 倍需停药 + 清洗程序",
+      "timing": "治疗全程（监测：前 6 月 q2w → 之后 q8w）",
+      "evidence": [
+        "中文说明书：由于可能存在肝毒性效应的叠加，因此建议在来氟米特治疗期间戒酒。",
+        "EMA：ALT (SGPT) must be checked before initiation... every two weeks during the first six months of treatment and every 8 weeks thereafter.",
+        "Health Canada：肝功能障碍患者禁用；HBV/HCV 阳性或既往肝病患者不建议使用。"
+      ],
+      "action": [
+        "新增来氟米特 → checkup_items 自动建议 ALT 监测项（q2w × 6 月 → q8w）",
+        "忌口清单默认含酒精（strict）",
+        "肝病既往史 / 乙肝丙肝阳性者录入时提示本条 red_flag 给医生"
+      ],
+      "app_link": "checkup_items(ALT 周期自动建议)；food_avoid_items(seed: alcohol×strict)；与 itx-005 柳氮条目同为 csDMARD 用药要点组"
+    }
+  },
+  {
+    "id": "fdg-005",
+    "category": "food_drug",
+    "title": "葡萄柚（西柚）与部分药物相互作用：服药前核对",
+    "summary": "葡萄柚汁阻断肠道 CYP3A4 酶，可使部分药物血药浓度异常升高；服 JAK 抑制剂等明确提示避免，其他药物以说明书为准。",
+    "severity_level": "medium",
+    "applicable_scene": "新增 JAK 抑制剂 / 他克莫司等 CYP3A4 底物药物时；忌口清单种子供给",
+    "source_name": "FDA 消费者信息《Grapefruit Juice and Some Drugs Don't Mix》（2021）；Upadacitinib 患者教育（NCBI Bookshelf）",
+    "source_url": "https://www.fda.gov/consumers/consumer-updates/grapefruit-juice-and-some-drugs-dont-mix",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "food": "grapefruit",
+      "drug_or_class": "cyp3a4_substrates",
+      "risk": "葡萄柚阻断肠道 CYP3A4 → 部分口服药吸收增加、血药浓度升高（too much drug in your body）；苦橙（塞维利亚橙）/ 柚子 / 橘柚同类风险",
+      "timing": "服用相关药物期间全程（非仅服药同刻）",
+      "evidence": [
+        "FDA：Grapefruit juice can block the action of intestinal CYP3A4, so instead of being metabolized, more of the drug enters the blood and stays in the body longer.",
+        "FDA：Seville oranges, pomelos, and tangelos might have the same effect as grapefruit juice.",
+        "Upadacitinib 患者教育：Patients should avoid consuming grapefruit or grapefruit-containing products during upadacitinib treatment."
+      ],
+      "action": [
+        "新增 JAK 抑制剂（upadacitinib 等）→ 忌口清单默认含葡萄柚（strict）",
+        "其他药物：核对药品说明书「相互作用」节 / 咨询药师（不预设所有风湿药都受影响）",
+        "含柚成分食品（柚子茶 / 果酱）一并注意"
+      ],
+      "app_link": "medications(risk_tags) cyp3a4 标记药品新增触发；food_avoid_items 种子供给；与 fdg-002 激素葡萄柚提示合并展示"
+    }
+  },
+  {
+    "id": "fdg-006",
+    "category": "food_drug",
+    "title": "长期糖皮质激素：蛋白质与钙摄入同步关注",
+    "summary": "长期激素治疗下蛋白质分解增加、钙流失加速——饮食中优质蛋白与钙摄入需同步关注（MedlinePlus 饮食建议的补充层）。",
+    "severity_level": "low",
+    "applicable_scene": "激素长期治疗（>3 月）用户食谱推荐标签；营养素方案建议",
+    "source_name": "MedlinePlus 泼尼松患者信息（fdg-002 同源）；营养综述（钙 1000–1200 mg/日、维 D 600–800 IU/日，研究摘要）",
+    "source_url": "https://medlineplus.gov/druginfo/meds/a601102.html",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "food": "calcium_protein",
+      "drug_or_class": "glucocorticoid",
+      "risk": "长期激素：蛋白分解 / 钙流失（骨质疏松方向）——非禁忌提示，是补充方向",
+      "timing": "长期治疗（>3 月）",
+      "evidence": [
+        "MedlinePlus：Your doctor may also prescribe or recommend a calcium or potassium supplement.（fdg-002 联动）",
+        "营养综述摘要：长期糖皮质激素者建议优化钙摄入 1000–1200 mg/日、维生素 D 600–800 IU/日，维持适宜蛋白质摄入。"
+      ],
+      "action": [
+        "食谱标签：high_calcium / high_protein 优先推荐（激素长期用户）",
+        "营养素方案：钙 + 维 D 是否补充遵医嘱（复诊议题）",
+        "体重管理并行（weight_logs 关联）"
+      ],
+      "app_link": "recipes 标签联动；supplements(钙/维D) 建议项；fdg-002 组内互链"
+    }
+  }
+]

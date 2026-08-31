@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 脊柱柱体 + 左右横突（中央 72dp 安全区内） -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,28 h8 a2,2 0 0 1 2,2 v48 a2,2 0 0 1 -2,2 h-8 a2,2 0 0 1 -2,-2 v-48 a2,2 0 0 1 2,-2 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,48 h13 v6 h-13 z M59,48 h13 v6 h-13 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,62 h28 v6 h-28 z" />
+</vector>

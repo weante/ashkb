@@ -1,0 +1,532 @@
+[
+  {
+    "id": "exc-001",
+    "category": "exercise",
+    "title": "游泳与水中运动：低冲击全身活动",
+    "summary": "温水浮力减轻脊柱负荷，是改善体能 / 灵活性 / 力量的安全低冲击环境；泳姿有讲究（颈椎受限者看黑榜蛙泳条）。",
+    "severity_level": "low",
+    "applicable_scene": "运动计划有氧项配置；缓解期常规；发作期温和水中活动咨询康复科",
+    "source_name": "NASS 游泳与水中运动页；2025 患者版运动指南（水中运动条目）",
+    "source_url": "https://nass.co.uk/managing-my-as/exercise/swimming/",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["自由泳", "仰泳", "混合泳姿"],
+      "intensity": "low",
+      "stage_fit": "stable",
+      "grade": "L2",
+      "grade_matrix": { "active": "pause", "stable": "allow" },
+      "cervical_condition": "breaststroke_block",
+      "dose": "无统一固定处方（NASS 未给出频率时长）；2025 指南定位「有条件者可选择」，计入有氧总量",
+      "benefit": "NASS：improves your general fitness, flexibility and strength in a safe, low impact environment；温水浮力使拉伸更有效、疼痛更低、更易保持直立",
+      "evidence": [
+        "NASS：Swimming can be great for axial SpA. It improves your general fitness, flexibility and strength in a safe, low impact environment.",
+        "NASS：Front crawl is a great stroke for many people with axial SpA. The body position remains extended throughout, including the neck, and the spine rotates gently.",
+        "NASS：Try to include some back crawl in every swimming session. This helps with opening the chest.",
+        "2025 指南：建议 axSpA/AS 患者优先选择地面运动（2C）；有条件者可选择水中运动。",
+        "NASS：Start gently. Shorter sessions or an easier pace can still bring real benefits, especially during flare-ups."
+      ],
+      "action": [
+        "泳姿：自由泳（身体延展含颈部）+ 每次包含仰泳（开胸）；蛙泳注意颈部对齐（颈椎受限者见 exb-004）",
+        "起始温和短时长；发作期减量或暂停（exb-002 联动）",
+        "2025 指南优先地面运动的定位如实告知：地面 / 水中均可，按条件选择"
+      ],
+      "alternative_hint": "无泳池条件 → 快走（exc-003）；水中运动科（康复科水疗）咨询",
+      "app_link": "运动计划有氧类可选项目；发作期自动过滤（stage_fit）；与 exb-004 泳姿校验联动"
+    }
+  },
+  {
+    "id": "exc-002",
+    "category": "exercise",
+    "title": "有氧运动：每周 3–5 次、每次 30–60 分钟",
+    "summary": "2025 指南处方：每周 3–5 次、每次 30–60 分钟，中等强度（40%–59% 心率储备）；可用「说话试验」自测强度。",
+    "severity_level": "low",
+    "applicable_scene": "运动计划有氧项生成；强度自测教育；进展期调整",
+    "source_name": "《中轴脊柱关节炎/强直性脊柱炎运动指南 患者版（2025）》",
+    "source_url": "http://www.ddzxhospital.com/library/up_f/file/20251029/202510291330317969.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["快走", "慢跑（稳定期）", "游泳", "踏车", "划船", "舞蹈", "非竞赛球类"],
+      "intensity": "moderate",
+      "stage_fit": "stable",
+      "grade": "L2",
+      "grade_matrix": { "active": "pause", "stable": "recommend" },
+      "cervical_condition": "none",
+      "dose": "每周 3–5 次 × 每次 30–60 min；中等强度 = 40%–59% 心率储备",
+      "benefit": "2025 指南有氧练习定义：大肌肉群周期性节律性动力性练习，心率与能量消耗明显增加",
+      "evidence": [
+        "2025 指南：推荐 axSpA/AS 患者进行包括有氧练习、灵活性和力量练习的常规多模式练习（1B）。",
+        "2025 指南：有氧运动量：每周进行 3~5 次，每次 30~60min。",
+        "2025 指南：中等强度指 40%~59% 的心率储备，高强度指 60%~79% 的心率储备。",
+        "2025 指南（说话试验）：运动中能自如地说话提示为中等运动强度，患者说话有点费力提示为高强度，不能舒服地说话提示为超高强度。"
+      ],
+      "action": [
+        "强度自测主用说话试验（简便反映乳酸阈值）——无需心率设备",
+        "慢跑属有氧形式之一但冲击高：活动期按 exb-002 排除，晚期 / 明显骨量问题者首选快走游泳",
+        "起始量减半（进展原则见 exc-010）"
+      ],
+      "alternative_hint": "每次可拆 2 段（NASS：≥10 分钟分段仍有效）",
+      "app_link": "运动计划模板生成默认量；强度选择器附说话试验提示文案"
+    }
+  },
+  {
+    "id": "exc-003",
+    "category": "exercise",
+    "title": "快走：最易坚持的低冲击有氧",
+    "summary": "NASS 将快走列为有氧范例（30 分钟 × 每周 5 次，可分段）；按当日状态自主调速。",
+    "severity_level": "low",
+    "applicable_scene": "运动计划有氧默认项；初建计划起步项；体重管理期（关联 weight_logs）",
+    "source_name": "NASS Back to Action；NASS AS News 2017",
+    "source_url": "https://nass.co.uk/wp-content/uploads/2018/08/Back-to-Action-low-resolution-version.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["户外快走", "走廊往返快走"],
+      "intensity": "low-moderate",
+      "stage_fit": "stable",
+      "grade": "L2",
+      "grade_matrix": { "active": "downgrade", "stable": "recommend" },
+      "cervical_condition": "none",
+      "dose": "NASS 有氧处方：30 min × 每周 5 次；可按 ≥10 分钟分段（分段仍有效）",
+      "benefit": "NASS：Walking is an excellent, low impact way of toning your muscles；自定节奏按日状态调整",
+      "evidence": [
+        "NASS：We recommend that you do 30 minutes of aerobic exercise 5 times a week. It only needs to be vigorous enough to make you slightly breathless. Fast walking is a good example.",
+        "NASS：For convenience, you can split it into segments of 10 minutes or more and this will still be good for you.",
+        "NASS 居家版：快走时摆臂以活动肩部提升心率；起始每次至多 1 分钟走廊往返，随体能渐增。"
+      ],
+      "action": [
+        "摆臂走（激活肩部）",
+        "分段累积法：3 × 10 分钟也达标——通勤族友好",
+        "鞋子缓冲好、路线平坦（髋膝受累者）"
+      ],
+      "alternative_hint": "雨天 / 体能低 → 室内走廊快走（NASS 居家版原文支持）",
+      "app_link": "运动计划默认有氧项；与 exc-002 总则联动计数"
+    }
+  },
+  {
+    "id": "exc-004",
+    "category": "exercise",
+    "title": "肋间呼吸训练：维持胸廓活动度",
+    "summary": "仰卧双手触肋，吸气顶手呼气彻底——每天数次的胸廓扩张训练（2023 指南推荐呼吸练习，证据支持改善胸廓扩张）。",
+    "severity_level": "low",
+    "applicable_scene": "每日计划常规项（低成本高价值）；晨僵序列；胸廓扩张度低于同年龄正常值用户置顶提示",
+    "source_name": "Versus Arthritis《Keeping active with ankylosing spondylitis》练习册；2023 康复实践指南",
+    "source_url": "https://www.versusarthritis.org/media/12818/ankylosing-spondylitis-exercise-section.pdf",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["侧肋呼吸", "上胸呼吸"],
+      "intensity": "low",
+      "stage_fit": "both",
+      "grade": "L1",
+      "grade_matrix": { "active": "recommend", "stable": "recommend" },
+      "cervical_condition": "none",
+      "dose": "每式重复 5 次（Versus Arthritis 原文）；每日 1 次起步渐增",
+      "benefit": "维持胸廓活动度与呼吸功能；研究支持组合练习改善 AS 胸廓扩张",
+      "evidence": [
+        "Versus Arthritis：Lie on your back with your knees bent. Put your hands on your ribs at the sides of your chest. Breathe in deeply through your nose and out through your mouth, pushing your ribs out against your hands as you breathe in. Repeat five times.",
+        "Versus Arthritis：it's as important to breathe out fully as it is to breathe in deeply（呼气彻底同样重要）。",
+        "2023 康复实践指南：推荐呼吸练习的常规练习（1C）。",
+        "Daginfrud 2011：组合运动对改善 AS 患者胸廓扩张有效。"
+      ],
+      "action": [
+        "动作 a（侧肋）：仰卧屈膝，双手置胸侧——吸气顶手，呼气彻底，重复 5 次",
+        "动作 b（上胸）：双手置前胸上部——深吸气后尽量呼气，肋骨推手，重复 5 次（可坐位）",
+        "与晨僵管理合并做（起床序列）",
+        "body_measures.chest_expansion_cm 定期测关联追踪效果"
+      ],
+      "alternative_hint": "卧位困难 → 坐位完成（原文支持）",
+      "app_link": "每日计划默认项；与 body_measures 胸廓扩张度趋势联动"
+    }
+  },
+  {
+    "id": "exc-005",
+    "category": "exercise",
+    "title": "脊柱活动度训练：NASS 称之为保持脊柱灵活最重要的部分",
+    "summary": "缓慢活动脊柱各节段至活动度末端，每天做（NASS Back to Action：This is the most important section for keeping the spine mobile）。",
+    "severity_level": "low",
+    "applicable_scene": "每日计划核心项；含躯干扭转等具体动作模板",
+    "source_name": "NASS Back to Action；Versus Arthritis 练习册",
+    "source_url": "https://nass.co.uk/wp-content/uploads/2018/08/Back-to-Action-low-resolution-version.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["站姿躯干扭转", "颈胸腰分段活动"],
+      "intensity": "low",
+      "stage_fit": "stable",
+      "grade": "L1",
+      "grade_matrix": { "active": "downgrade", "stable": "recommend" },
+      "cervical_condition": "amplitude_half",
+      "dose": "每日（NASS：We would recommend that you do these every day）；每次含热身 5 分钟；躯干扭转每侧 5 次保持 5 秒",
+      "benefit": "脊柱各节段活动度维持——AS 长期功能核心",
+      "evidence": [
+        "NASS：The mobility section consists of exercises that slowly move the different parts of the spine to the limit of their movement. This is the most important section for keeping the spine mobile. We would recommend that you do these every day.",
+        "NASS：You should start every session of exercise or sport with a warm-up which lasts about 5 minutes.",
+        "Versus Arthritis（躯干扭转）：Stand with your feet apart. Place your hands on your hips. Turn from the waist to look behind you, keeping your knees and feet facing the front. Hold for five seconds. Repeat to the other side, five times each side."
+      ],
+      "action": [
+        "躯干扭转：分腿站、手置髋、膝脚朝前仅转腰回头看——保持 5 秒每侧 5 次（可坐位）",
+        "每次训练前 5 分钟热身（NASS 规则）",
+        "活动度末端有紧张感即可，不强求幅度（与黑榜 exb-005 颈部条目边界：颈椎段幅度由颈部症状决定）"
+      ],
+      "alternative_hint": "发作期 → 幅度减半 + 温水浴后做（NASS 灵活性条：热身或热敷后拉伸更有效）",
+      "app_link": "每日计划模板核心区；exercise_plans.week_structure 默认注入"
+    }
+  },
+  {
+    "id": "exc-006",
+    "category": "exercise",
+    "title": "力量训练：每周 2–3 次，低重量高重复，间隔 48 小时",
+    "summary": "NASS：力量训练不可每天做（肌肉需 48h 适应）；低重量至每组 ≥12 次；2025 指南：60%–80% 1RM、2–4 组 × 8–12 次。",
+    "severity_level": "low",
+    "applicable_scene": "运动计划力量项生成；与黑榜 exb-003（大重量脊柱负荷）对照教育",
+    "source_name": "NASS Back to Action；2025 患者版运动指南",
+    "source_url": "https://nass.co.uk/wp-content/uploads/2018/08/Back-to-Action-low-resolution-version.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["弹力带划船", "器械固定轨迹推举", "自重深蹲（浅幅度）", "桥式"],
+      "intensity": "moderate",
+      "stage_fit": "stable",
+      "grade": "L2",
+      "grade_matrix": { "active": "pause", "stable": "recommend" },
+      "cervical_condition": "none",
+      "dose": "NASS：每周 2–3 次、间隔 ≥48h、重量低到每组 ≥12 次；2025 指南：负荷 60%–80% 1RM（初学 50%–60%），2–4 组 × 每组 8–12 次",
+      "benefit": "2023 指南推荐力量练习（1C）；脊柱旁肌肉维持姿势与保护",
+      "evidence": [
+        "NASS：Strength training should not be done every day. There must be at least a 48 hour gap to allow the muscle to adapt or it will not work. We suggest 2 or 3 weight sessions per week with at least a day between each.",
+        "NASS：We strongly recommend that you keep the weights setting quite low so that you can manage at least 12 repetitions in each set.",
+        "2025 指南：肌力练习负荷为 60%~80% 的 1RM（刚开始为 50%~60% 的 1RM），每周进行 2~3 次，2~4 组/次，每组重复 8~12 个练习。"
+      ],
+      "action": [
+        "排程规则硬约束：计划生成器强制力量日间隔 ≥48h（周三 / 周六型排布）",
+        "形态优先：弹力带 / 器械固定轨迹 / 自重——避开自由大重量（exb-003）",
+        "初学从 50%–60% 1RM 起步"
+      ],
+      "alternative_hint": "发作期 → 仅保留桥式 / 核心静态（低负荷），力量负重暂停",
+      "app_link": "运动计划生成器间隔校验；强度 high + 力量类触发 exb-003 弹窗"
+    }
+  },
+  {
+    "id": "exc-007",
+    "category": "exercise",
+    "title": "普拉提 / 瑜伽：呼吸控制下的低强度肌力与脊柱灵活性",
+    "summary": "2025 指南推荐普拉提瑜伽并结合其他练习（1C）；研究表明较其他治疗更有效改善疾病活动、功能与生活质量。",
+    "severity_level": "low",
+    "applicable_scene": "运动计划灵活性 / 力量替代项；远程瑜伽选项",
+    "source_name": "《中轴脊柱关节炎/强直性脊柱炎运动指南 患者版（2025）》",
+    "source_url": "http://www.ddzxhospital.com/library/up_f/file/20251029/202510291330317969.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["垫上普拉提核心序列", "哈他瑜伽基础体式（非倒立类）", "远程跟练瑜伽"],
+      "intensity": "low-moderate",
+      "stage_fit": "stable",
+      "grade": "L2",
+      "grade_matrix": { "active": "conditional", "stable": "recommend" },
+      "cervical_condition": "pose_filter",
+      "dose": "2025 指南：普拉提、瑜伽结合其他练习（具体频率未单列，计入多模式总量）",
+      "benefit": "呼吸控制 + 小强度肌力 + 拉伸 + 脊柱灵活性复合；研究示更有效改善疾病活动 / 身体功能 / 生活质量，可作常规运动替代",
+      "evidence": [
+        "2025 指南：推荐 axSpA/AS 患者进行普拉提、瑜伽并结合其他练习（1C）。",
+        "2025 指南：普拉提、瑜伽是在呼吸控制的同时进行小强度的肌力练习、肌肉拉伸练习，尤其是脊柱灵活性练习和肌力、肌耐力练习。",
+        "2025 指南：相关研究表明普拉提、瑜伽练习均较其他治疗能更有效改善 AS 患者疾病活动、身体功能、生活质量……因而可作为常规运动的替代运动。",
+        "2025 指南：远程瑜伽能对 AS 患者进行安全、适当的干预，也被建议视为疾病全面管理的一部分。"
+      ],
+      "action": [
+        "体式选择边界：倒立 / 深度颈部后仰类避免（exb-005）",
+        "课程前告知教练病情与禁忌；跟练视频选 AS 友好型",
+        "与有氧 / 呼吸训练组合为「多模式练习」（指南推荐形态）"
+      ],
+      "alternative_hint": "无课程条件 → 远程瑜伽（指南认可安全干预）",
+      "app_link": "计划模板灵活性区可选；与 exb-005 倒立体式校验联动"
+    }
+  },
+  {
+    "id": "exc-008",
+    "category": "exercise",
+    "title": "灵活性拉伸：静态 10–30 秒 × 2–4 次，每天 1–2 次",
+    "summary": "2025 指南量化：静态拉伸维持 10–30 s、重复 2–4 次、每天 1–2 次；牵拉感无疼痛为度；重点腘绳肌与髋屈肌（锚定脊柱的大肌群）。",
+    "severity_level": "low",
+    "applicable_scene": "每日计划常规项；含具体动作模板（腘绳肌伸展）",
+    "source_name": "2025 患者版运动指南；NASS Living well with axial SpA",
+    "source_url": "http://www.ddzxhospital.com/library/up_f/file/20251029/202510291330317969.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["靠椅腘绳肌/髋部伸展", "静态拉伸（各主要肌群）"],
+      "intensity": "low",
+      "stage_fit": "stable",
+      "grade": "L1",
+      "grade_matrix": { "active": "recommend", "stable": "recommend" },
+      "cervical_condition": "amplitude_half",
+      "dose": "2025 指南：每天练习 1~2 次，静态拉伸维持 10~30s、每次重复 2~4 个；动态练习每次重复 10 个；NASS 示例动作：每侧保持 10 s × 重复 2 次",
+      "benefit": "脊柱锚定大肌群（腘绳 / 股四头）不缩短 → 防止脊柱被拉向错误姿势（NASS 原文）",
+      "evidence": [
+        "2025 指南：静态拉伸动作维持 10~30s，每次重复练习 2~4 个，运动强度以感觉末端有紧张感、牵拉时无疼痛为宜。",
+        "NASS：These exercises stretch the large muscle groups such as the hamstrings and quadriceps that are anchored around the spine. It is important that these muscles do not shorten or the spine can be pulled into wrong postures. We recommend that you do these exercises every day.",
+        "NASS 靠椅伸展：右小腿放椅面，左脚尽量前移屈膝保持背部平直——髋前部牵拉感，保持数 10 秒，放松后重复 2 次，每次再伸远一点；换侧同。"
+      ],
+      "action": [
+        "靠椅腘绳肌伸展（NASS 原文动作）：每侧 10 秒 × 2 次",
+        "强度自判：末端紧张感 ✓、牵拉疼痛 ✗（减幅度）",
+        "拉伸前轻中度有氧热身或热敷（NASS：肌肉热身后拉伸更有效）"
+      ],
+      "alternative_hint": "温水浴后拉伸（疼痛日友好）",
+      "app_link": "每日计划模板；与 exc-005 活动度区分（活动度=关节，灵活性=肌肉——计划模板分两区）"
+    }
+  },
+  {
+    "id": "exc-009",
+    "category": "exercise",
+    "title": "核心稳定：腹式张力下的四肢交替抬离",
+    "summary": "俯卧 / 四足位，腹部轻收维持平衡下交替抬手抬膝——NASS 居家版具体动作，每肢体 2 次、每天最多 2 轮。",
+    "severity_level": "low",
+    "applicable_scene": "居家计划核心区；骨盆稳定性（AS 姿势管理基础）",
+    "source_name": "NASS《Exercising at Home》",
+    "source_url": "https://nass.co.uk/wp-content/uploads/2020/06/Exercising-at-home.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["四足交替抬手", "交替抬膝", "仰卧桥式（骨盆抬离）"],
+      "intensity": "low",
+      "stage_fit": "stable",
+      "grade": "L1",
+      "grade_matrix": { "active": "downgrade", "stable": "recommend" },
+      "cervical_condition": "none",
+      "dose": "NASS：每侧肢体 2 次、每天最多 2 次；桥式：抬离保持 5 秒缓慢放下（Versus Arthritis 原文）",
+      "benefit": "核心稳定支撑脊柱姿势；骨盆抬离动作同时是髋伸肌力训练",
+      "evidence": [
+        "NASS：Gently tense your stomach muscles, then slowly lift one hand about 1cm off the mat, while maintaining your balance. Place your hand back down, then repeat with the other hand and each knee in turn. Repeat 2 times per limb in total, up to 2 times daily.",
+        "Versus Arthritis（桥式）：Lie on your back with your knees bent. Lift your pelvis and lower back off the floor. Hold for five seconds and then lower down slowly."
+      ],
+      "action": [
+        "抬离幅度小（约 1 cm）重控制不重幅度——AS 核心训练特征",
+        "桥式：保持 5 秒缓放，腰痛日减保持时长"
+      ],
+      "alternative_hint": "腕膝不适 → 垫厚毛巾",
+      "app_link": "居家计划模板核心区默认项"
+    }
+  },
+  {
+    "id": "exc-010",
+    "category": "exercise",
+    "title": "进展原则与「运动后 2 小时疼痛规则」",
+    "summary": "前 4–6 周每 1–2 周加 5–10 分钟再加频率强度；运动后 2h 疼痛评分高于运动前 → 下次减时减强。",
+    "severity_level": "medium",
+    "applicable_scene": "计划进展设置；exercise_logs 次日反馈（R21）判读规则；新手起始量",
+    "source_name": "《中轴脊柱关节炎/强直性脊柱炎运动指南 患者版（2025）》",
+    "source_url": "http://www.ddzxhospital.com/library/up_f/file/20251029/202510291330317969.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": [],
+      "intensity": "n/a",
+      "stage_fit": "both",
+      "grade": "L1",
+      "grade_matrix": { "active": "recommend", "stable": "recommend" },
+      "cervical_condition": "none",
+      "dose": "前 4–6 周：每 1–2 周增加 5–10 min → 后增频率与强度",
+      "benefit": "渐进加量防发作；疼痛规则是「运动是否过量」的客观判据",
+      "evidence": [
+        "2025 指南：在运动训练计划的前 4~6 周，每次运动持续时间可每 1~2 周增加 5~10min，然后增加运动频率、强度。",
+        "2025 指南：如果运动后 2h 的疼痛评分高于运动前，则后续训练中应减少运动持续时间和/或强度。"
+      ],
+      "action": [
+        "APP 运动次日反馈（fb_pain_change）判读规则：worse → 自动建议下次减量（时长 -20% 或强度降一档）——本条目是 R21 反馈功能的判读依据",
+        "新手起始量 = 处方量 50%（如 15 min 快走）",
+        "加量顺序：时长 → 频率 → 强度（严格顺序）"
+      ],
+      "alternative_hint": "连续 2 次 worse → 建议咨询康复科调整方案",
+      "app_link": "exercise_logs.fb_pain_change 联动自动建议；运动计划进展配置页规则文案"
+    }
+  },
+  {
+    "id": "exb-001",
+    "category": "exercise",
+    "title": "对抗性碰撞性运动：脊柱骨折风险（颈椎受累者完全避免）",
+    "summary": "AS 患者多伴骨质疏松与脊柱僵硬 / 融合，对抗性运动的撞击可致骨折；颈椎骨折占 AS 脊柱骨折过半且后果严重。",
+    "severity_level": "high",
+    "applicable_scene": "运动库浏览；配置运动计划时误选拼抢类项目；颈椎活动明显受限用户（profile 联动提示）",
+    "source_name": "NASS（英国脊柱关节炎学会）Safety First；Liu B et al. Orthopaedic Surgery 2023（PMC10235179）",
+    "source_url": "https://nass.co.uk/managing-my-as/exercise/safety-first/",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "list_type": "black",
+      "movements": ["橄榄球", "篮球拼抢", "足球对抗", "柔道摔跤", "冰球"],
+      "intensity": "high",
+      "stage_fit": "none",
+      "grade": "L3",
+      "grade_matrix": { "active": "block", "stable": "block" },
+      "cervical_condition": "always",
+      "block_rule": { "stage": ["active", "stable"], "cervical": false },
+      "risk": "撞击致脊柱骨折（尤其椎体）；AS 颈椎骨折 disproportionate fatal",
+      "evidence": [
+        "NASS：Having axial SpA can put you at greater risk of having thinner bones (osteoporosis). During contact sports you may experience hard knocks and blows that may cause a bone to break.",
+        "NASS：Some people with axial SpA may also have stiffening or fusion of the spine. This means that you may be at risk of breaking one of the bones in your spine during contact sports.",
+        "Liu 2023：AS 脊柱骨折中颈椎骨折占 54%–73%。"
+      ],
+      "alternative_hint": "兴趣类运动需求可咨询康复科寻找低冲击替代（如非对抗性球类活动）",
+      "app_link": "exercise_plans 配置校验（选拼抢类项目弹本条）；spine_mobility≥moderate 用户浏览运动库时置顶提示"
+    }
+  },
+  {
+    "id": "exb-002",
+    "category": "exercise",
+    "title": "炎症活动期避免高冲击运动（跑跳类）",
+    "summary": "跑步等高冲击动作给下肢关节和脊柱额外应力；多数患者在发作期倾向避免高冲击运动。",
+    "severity_level": "medium",
+    "applicable_scene": "flare_events 活跃期配置 / 执行运动计划时；极简模式下运动卡自动过滤",
+    "source_name": "NASS Safety First",
+    "source_url": "https://nass.co.uk/managing-my-as/exercise/safety-first/",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "list_type": "black",
+      "movements": ["跑步", "跳绳", "高强度间歇（HIIT）", "有氧操高强度课"],
+      "intensity": "high",
+      "stage_fit": "flare",
+      "grade": "L3",
+      "grade_matrix": { "active": "block", "stable": "advise_against" },
+      "cervical_condition": "none",
+      "block_rule": { "stage": ["active"], "cervical": false },
+      "risk": "活动期高冲击加剧关节应力与疼痛；NASS 明示发作期应寻求专业建议、勿超极限",
+      "evidence": [
+        "NASS：High impact sports involve pounding actions, including running, which can cause extra stress on the joints of the legs and the spine.",
+        "NASS：Many people prefer to avoid high impact sports during a flare.",
+        "NASS：Don't overdo it. Keep within your limits."
+      ],
+      "alternative_hint": "发作期转向低冲击：游泳 / 温水中活动 / 呼吸训练（红榜条目联动）",
+      "app_link": "flare active 时 exercise_plans(stage_mode=flare) 自动排除 high intensity；运动卡强度选择器上限提示"
+    }
+  },
+  {
+    "id": "exb-003",
+    "category": "exercise",
+    "title": "大重量杠铃 / 直接压脊柱肩部的负重动作",
+    "summary": "大重量将巨大压力传导至脊柱，晚期骨质疏松 + 强直结构下易发椎体压缩性骨折；负重训练应低重量高次数。",
+    "severity_level": "high",
+    "applicable_scene": "力量类运动配置；用户自建运动计划选大重量项目时",
+    "source_name": "NASS Safety First；myHealthcare AS Exercise and PT Protocol",
+    "source_url": "https://nass.co.uk/managing-my-as/exercise/safety-first/",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "list_type": "black",
+      "movements": ["大重量杠铃深蹲", "大重量硬拉", "颈后推举", "仰卧负重屈颈"],
+      "intensity": "high",
+      "stage_fit": "none",
+      "grade": "L3",
+      "grade_matrix": { "active": "block", "stable": "block" },
+      "cervical_condition": "always",
+      "block_rule": { "stage": ["active", "stable"], "cervical": false },
+      "risk": "脊柱压缩性骨折；直接压脊柱 / 肩部动作增加脊柱压迫，加重疼痛与僵硬",
+      "evidence": [
+        "NASS：If you use weights — use a regime involving low weights and high repetitions.",
+        "myHealthcare：Avoid any exercise that involves placing weight directly on the spine and shoulders.（该增加脊柱压迫）"
+      ],
+      "alternative_hint": "力量练习保留（2023 指南推荐级）但形态改变：低重量高重复、器械固定轨迹、弹力带——详见红榜力量条目",
+      "app_link": "运动计划强度校验（强度选 high + 力量类 → 弹本条）；与红榜力量条目互链"
+    }
+  },
+  {
+    "id": "exb-004",
+    "category": "exercise",
+    "title": "蛙泳：颈椎受累 / 颈部僵硬者慎用",
+    "summary": "蛙泳需要反复大幅颈椎屈伸，可能加重已僵硬的颈部；颈椎活动受限者建议改仰泳。",
+    "severity_level": "medium",
+    "applicable_scene": "选游泳为运动计划内容时；spine_mobility 含颈段受限用户",
+    "source_name": "myHealthcare AS Exercise and PT Protocol",
+    "source_url": "https://www.myhealthcare.com/Diseases/Rheumatology/Ankylosing-Spondylitis/Exercise-and-PT-Protocol.html",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "list_type": "black",
+      "movements": ["蛙泳（颈椎受限者）"],
+      "intensity": "low",
+      "stage_fit": "stable",
+      "grade": "L3",
+      "grade_matrix": { "active": "block", "stable": "conditional" },
+      "cervical_condition": "cervical_only",
+      "block_rule": { "stage": ["active"], "cervical": true },
+      "risk": "蛙泳颈椎屈伸循环加重颈部僵硬；颈椎融合状态下颈部动作风险放大",
+      "evidence": [
+        "myHealthcare：Breaststroke — demands heavy cervical flexion and extension cycling that can aggravate an already stiff neck.",
+        "myHealthcare：Best strokes: Backstroke — the single best AS stroke.（仰泳被列为最适合 AS 的泳姿）"
+      ],
+      "alternative_hint": "同池换泳姿：仰泳（红榜 exc-001 联动）；游泳本身是推荐运动，仅泳姿选择问题",
+      "app_link": "游泳计划配置弹泳姿选择提示；颈椎受限用户自动推荐仰泳"
+    }
+  },
+  {
+    "id": "exb-005",
+    "category": "exercise",
+    "title": "颈椎受累者：剧烈颈部屈伸、扭转与倒立类动作",
+    "summary": "颈椎受累或活动明显受限者应避免剧烈颈部动作；存在颈椎不稳等特异病理时活动应个体化（EULAR 框架）。",
+    "severity_level": "high",
+    "applicable_scene": "瑜伽 / 普拉提课程内容自建时（肩倒立 / 头倒立类）；颈部症状用户",
+    "source_name": "EULAR 2018 运动建议（个体化禁忌框架，德语验证文核验）；myHealthcare Protocol",
+    "source_url": "https://ard.bmj.com/content/77/9/1251",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "list_type": "black",
+      "movements": ["头倒立", "肩倒立", "深度颈部后仰（瑜伽轮式颈部段）", "快速头部旋转"],
+      "intensity": "high",
+      "stage_fit": "none",
+      "grade": "L3",
+      "grade_matrix": { "active": "block", "stable": "block" },
+      "cervical_condition": "cervical_only",
+      "block_rule": { "stage": ["active"], "cervical": true },
+      "risk": "融合颈椎在冲击 / 极端活动下骨折而非缓冲（myHealthcare：A fused cervical spine fractures rather than flexes）；AS 颈椎骨折占比过半（Liu 2023）",
+      "evidence": [
+        "EULAR 2018 框架：活动促进应个体化进行，当存在心脏受累、颈椎不稳等疾病特异性个体病理时（德语验证文表 1 核验）。",
+        "myHealthcare：Contact sports — avoid entirely if cervical spine is involved. A fused cervical spine fractures rather than flexes under impact."
+      ],
+      "alternative_hint": "瑜伽 / 普拉提整体是红榜方向（2025 患者版指南支持）——仅避免颈部极端体位；课程前告知教练病情",
+      "app_link": "自建运动项目关键词校验（倒立 / 颈部后仰类弹本条）；与 2025 指南红榜普拉提瑜伽条目互链"
+    }
+  }
+]

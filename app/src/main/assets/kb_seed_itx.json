@@ -1,0 +1,480 @@
+[
+  {
+    "id": "itx-001",
+    "category": "interaction",
+    "title": "甲氨蝶呤必须每周一次，误当每日服用可致死",
+    "summary": "甲氨蝶呤片用于风湿病时为每周一次给药；国内外均有误用为每日一次导致死亡的中毒通报。",
+    "severity_level": "high",
+    "applicable_scene": "新增或调整甲氨蝶呤；设置频次为 weekly 时弹强提示；任何修改频次操作",
+    "source_name": "国家药品监督管理局《药品不良反应信息通报（第75期）·关注甲氨蝶呤片的误用风险》（2017）",
+    "source_url": "https://www.nmpa.gov.cn/xxgk/yjjsh/ypblfytb/20170505153001254.html",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-04",
+    "review_due": "2027-03-04",
+    "version": 1,
+    "payload": {
+      "drug_a": "methotrexate",
+      "drug_b": null,
+      "risk_level": "high",
+      "effect": "每日误服导致药物蓄积中毒：粒细胞缺乏、血小板减少等，已有致死病例",
+      "mechanism": "甲氨蝶呤低剂量抗风湿给药与抗肿瘤给药的频次方案完全不同，抗风湿方案为每周一次",
+      "evidence": [
+        "通报引述瑞士治疗产品局数据：1997年1月至2015年7月共收到18例误将甲氨蝶呤每日使用导致中毒的病例，大部分口服给药，其中4例死亡。",
+        "国内案例：国家药品不良反应监测中心数据库 2004–2016 年间 1 名风湿病患者误将甲氨蝶呤片每日服用共5天（正确用法应为每周1次、1次7.5mg），出现粒细胞缺乏、血小板减少等中毒表现，最终死亡。"
+      ],
+      "action": [
+        "服药日固定每周同一天（建议选好记的一天并设置周提醒）",
+        "每次领药 / 换规格时核对说明书用法用量",
+        "本 APP 设置甲氨蝶呤时频次只能选 weekly，选其他值弹出本条目强提示"
+      ],
+      "app_link": "medications.frequency='weekly' 强制引导；medication_logs 周打卡"
+    }
+  },
+  {
+    "id": "itx-002",
+    "category": "interaction",
+    "title": "阿达木单抗：严重感染与结核风险（黑框警告）",
+    "summary": "TNF 抑制剂治疗可增加严重感染（含结核、机会性感染）风险；治疗前后需结核筛查与持续监测。",
+    "severity_level": "high",
+    "applicable_scene": "新增阿达木单抗等生物制剂；发热或感染症状出现时；结核筛查到期提醒",
+    "source_name": "修美乐（阿达木单抗）中文处方信息（艾伯维）·警告：严重感染和恶性肿瘤；FDA HUMIRA 标签 Boxed Warning",
+    "source_url": "https://www.rxabbvie.com/content/dam/rxabbvie/pdf/humira_CHI.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-04",
+    "review_due": "2027-03-04",
+    "version": 1,
+    "payload": {
+      "drug_a": "adalimumab",
+      "drug_b": null,
+      "risk_level": "high",
+      "effect": "严重感染（包括结核、细菌性脓毒症、侵袭性真菌感染及其他机会性感染）风险升高，可致住院或死亡；儿童青少年中另有淋巴瘤等恶性肿瘤报告",
+      "mechanism": "TNF 是机体抗感染防御的重要介质，阻断后潜伏感染（尤其结核）可复燃",
+      "evidence": [
+        "中文 PI 黑框（警告：严重感染和恶性肿瘤）：严重感染包括结核病(TB)、细菌脓毒症、侵袭性真菌感染(如组织胞浆菌病)以及其他机会性病原体导致的感染。",
+        "中文 PI：应停用 HUMIRA；如果结果为阳性，应在开始使用 HUMIRA 之前开始结核治疗。",
+        "中文 PI：即使初始潜伏性结核检查结果为阴性，也要进行监测。",
+        "FDA Boxed Warning：HUMIRA should be discontinued if a patient develops a serious infection or sepsis during treatment."
+      ],
+      "action": [
+        "开始 / 续用生物制剂前完成结核筛查（T-SPOT 或 PPD）——对应 checkup_items 的 tb_screen 周期项",
+        "发热（≥38.5℃ 或持续发热）时暂停注射前先联系医生——联动应急流程 infection_fever",
+        "出现持续咳嗽、盗汗、体重下降等结核可疑症状及时就医",
+        "本 APP 在注射卡发热日自动弹「先联系医生」提示"
+      ],
+      "app_link": "checkup_items(tb_screen)；应急卡 infection_fever 联动；vitals.temperature 阈值触发"
+    }
+  },
+  {
+    "id": "itx-003",
+    "category": "interaction",
+    "title": "NSAIDs 与华法林合用出血风险增加",
+    "summary": "华法林说明书将 NSAIDs 列入「增加出血风险的药物」；合用期间需密切监测 INR。",
+    "severity_level": "high",
+    "applicable_scene": "新增华法林或任何 NSAIDs 时核对；两药共存期间出现瘀斑、黑便、异常出血时",
+    "source_name": "FDA 华法林钠（warfarin sodium）标签 · Table 3: Drugs that Can Increase the Risk of Bleeding；COUMADIN 标签（2017）",
+    "source_url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=2384f45e-ad8e-4367-b99d-a2c670f99d02",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-05",
+    "review_due": "2027-03-05",
+    "version": 1,
+    "payload": {
+      "drug_a": "nsaid",
+      "drug_b": "warfarin",
+      "risk_level": "high",
+      "effect": "出血风险协同增加（华法林本身可致重大或致命出血，NSAIDs 为其出血风险药物清单成员）",
+      "mechanism": "华法林抗凝 + NSAIDs 抑制血小板功能并损伤胃肠黏膜，两条路径叠加",
+      "evidence": [
+        "华法林钠标签 Table 3（Drugs that Can Increase the Risk of Bleeding）将 Nonsteroidal Anti-Inflammatory Agents 整类列入，具体提及 celecoxib、diclofenac、ibuprofen、naproxen、piroxicam 等。",
+        "COUMADIN 标签 Highlights：COUMADIN can cause major or fatal bleeding. Perform regular monitoring of INR in all treated patients."
+      ],
+      "action": [
+        "两药共存期间按医嘱监测 INR（对应 checkup_items 的 lab 周期项）",
+        "观察出血征象：瘀斑、牙龈出血、黑便、血尿——任一出现立即联系医生",
+        "新增任何 NSAIDs（包括非处方布洛芬）前触发本核对提示"
+      ],
+      "app_link": "medications 新增 nsaid/warfarin 互检；lab_results INR 趋势视图关联"
+    }
+  },
+  {
+    "id": "itx-004",
+    "category": "interaction",
+    "title": "NSAIDs 联用糖皮质激素：消化道出血风险成倍放大",
+    "summary": "研究数据显示两药合用者上消化道出血风险较不用者高约 12 倍；避免长期自行叠加。",
+    "severity_level": "high",
+    "applicable_scene": "新增激素（如泼尼松）时已长期服 NSAIDs，或反向；两药共存期间胃部不适时",
+    "source_name": "García Rodríguez LA, Hernández-Díaz S. Arthritis Res 2000（PMC128885）；Venerito M et al. Pharmaceuticals 2010（PMC4036660）",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC128885/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-05",
+    "review_due": "2027-03-05",
+    "version": 1,
+    "payload": {
+      "drug_a": "nsaid",
+      "drug_b": "glucocorticoid",
+      "risk_level": "high",
+      "effect": "上消化道出血 / 穿孔风险显著叠加：口服激素单用约 2 倍、非阿司匹林 NSAIDs 单用约 4 倍，两药合用风险升至 12 倍以上（相对非使用者）",
+      "mechanism": "激素延缓黏膜修复、NSAIDs 抑制黏膜保护性前列腺素合成，双重损伤胃肠黏膜屏障",
+      "evidence": [
+        "PMC128885：The use of oral steroids has been found to reinforce the risk of UGIC associated with NA-NSAIDs. The risk was shown to be more than 12 times higher for concomitant users of both steroids and NA-NSAIDs.",
+        "PMC128885 摘要：风险呈剂量依赖，同时使用多种抗炎药时风险更高。",
+        "PMC4036660：meta 分析（16 项研究）示 NSAIDs + 糖皮质激素合用与胃十二指肠出血风险升高相关（OR 1.83, 95% CI 1.20–2.78）。"
+      ],
+      "action": [
+        "两药是否需要同时使用、激素疗程多长——复诊时明确问医生，不自行延长",
+        "共存期间警惕胃部警示症状：上腹痛、黑便、呕血——立即就医",
+        "本 APP 在两药共存时于药卡显示「护胃关注」提示，不替代医嘱"
+      ],
+      "app_link": "medications 风险标签 gi_bleed 联动；与 fdg-001（酒精）共同构成护胃提示组"
+    }
+  },
+  {
+    "id": "itx-005",
+    "category": "interaction",
+    "title": "柳氮磺吡啶：随餐服用、多饮水、定期查血常规",
+    "summary": "磺胺类成分：过敏者禁用；治疗初期每 2 周需查血常规；足量饮水防结晶尿。",
+    "severity_level": "medium",
+    "applicable_scene": "新增柳氮磺吡啶；血常规复查到期提醒；出现皮疹 / 咽痛 / 发热时（粒细胞缺乏警示症状）",
+    "source_name": "FDA AZULFIDINE EN-tabs（柳氮磺吡啶缓释片）标签；国内柳氮磺吡啶肠溶片说明书（东莞市人民医院页）",
+    "source_url": "https://dailymed.nlm.nih.gov/dailymed/archives/fdaDrugInfo.cfm?archiveid=119335",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-05",
+    "review_due": "2027-03-05",
+    "version": 1,
+    "payload": {
+      "drug_a": "sulfasalazine",
+      "drug_b": null,
+      "risk_level": "medium",
+      "effect": "不规范使用风险：结晶尿 / 结石（饮水不足）、粒细胞缺乏等血液异常（漏监测）、磺胺类过敏反应",
+      "mechanism": "本品含磺胺结构，过敏交叉风险；长期治疗影响血象与肝肾功能",
+      "evidence": [
+        "DailyMed：Patients should be instructed to take AZULFIDINE EN-tabs in evenly divided doses, preferably after meals, and to swallow the tablets whole.",
+        "DailyMed：Adequate fluid intake must be maintained in order to prevent crystalluria and stone formation.",
+        "DailyMed：Complete blood counts... should be performed before starting AZULFIDINE EN-tabs and every second week during the first three months of therapy.",
+        "国内说明书：对磺胺类药物过敏者禁用；用药期间多饮水保持高尿流量，以防结晶尿。"
+      ],
+      "action": [
+        "餐后整片吞服（勿掰碎）；分次均匀服用",
+        "每日足量饮水；出现排尿不适及时告知医生",
+        "治疗前与头三个月每 2 周查血常规——对应 checkup_items 建 lab 周期项（本 APP 自动排提醒）",
+        "已知磺胺 / 水杨酸过敏者禁用——录入时药物过敏史交叉提示",
+        "出现不明皮疹、咽痛、发热（血液异常警示组合）立即就医查血"
+      ],
+      "app_link": "checkup_items(血常规 q2w×3月 自动建议)；profile.allergies 磺胺交叉核对"
+    }
+  },
+  {
+    "id": "itx-006",
+    "category": "interaction",
+    "title": "服甲氨蝶呤需每周补充叶酸（医嘱配合）",
+    "summary": "多国指南强烈推荐甲氨蝶呤治疗期间每周补充至少 5 mg 叶酸以降低副作用——具体方案以医嘱为准。",
+    "severity_level": "medium",
+    "applicable_scene": "新增甲氨蝶呤时提示补充叶酸；副作用（口腔溃疡 / 恶心）出现时关联提示",
+    "source_name": "3E Initiative 多国标准化建议（Ann Rheum Dis 2008）；英国风湿病学会（BSR）建议",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2689523/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-06",
+    "review_due": "2027-03-06",
+    "version": 1,
+    "payload": {
+      "drug_a": "methotrexate",
+      "drug_b": "folic_acid",
+      "risk_level": "medium",
+      "effect": "不补叶酸方向：口腔溃疡、恶心等副作用风险升高（本条目为「配合补充」型警示，非风险叠加型）",
+      "mechanism": "甲氨蝶呤拮抗叶酸代谢，补充叶酸可缓解其对增殖组织（黏膜 / 骨髓）的影响",
+      "evidence": [
+        "3E Initiative Recommendation 3：Prescription of at least 5 mg folic acid per week with methotrexate therapy is strongly recommended.（证据等级 1a / A）",
+        "BSR 建议：patients on methotrexate are coprescribed a minimum dose of 5 mg folic acid once a week."
+      ],
+      "action": [
+        "录入甲氨蝶呤时，APP 建议在营养素中登记「叶酸」（剂量与服用日遵医嘱，常见为避开甲氨蝶呤服药日）",
+        "复诊时确认叶酸方案（是否 / 剂量 / 哪天服）",
+        "本条目不给出具体剂量建议——以医嘱为准"
+      ],
+      "app_link": "supplements 建议项；medications(methotrexate) 新增流程联动"
+    }
+  },
+  {
+    "id": "itx-007",
+    "category": "interaction",
+    "title": "柳氮磺吡啶长期服可致叶酸缺乏",
+    "summary": "柳氮磺吡啶抑制叶酸吸收与代谢，可能引起叶酸缺乏相关血液异常；是否补叶酸遵医嘱。",
+    "severity_level": "medium",
+    "applicable_scene": "柳氮磺吡啶长期治疗（>3 月）；血常规提示巨幼红细胞改变时",
+    "source_name": "英国 Salazopyrin（柳氮磺吡啶）说明书 Section 4.4",
+    "source_url": "https://www.medicines.org.uk/emc/product/3838/smpc/print",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-06",
+    "review_due": "2027-03-06",
+    "version": 1,
+    "payload": {
+      "drug_a": "sulfasalazine",
+      "drug_b": "folic_acid",
+      "risk_level": "medium",
+      "effect": "叶酸缺乏可致巨幼红细胞性贫血、全血细胞减少等严重血液异常",
+      "mechanism": "口服柳氮磺吡啶抑制叶酸的吸收与代谢",
+      "evidence": [
+        "说明书 4.4：Oral sulfasalazine inhibits the absorption and metabolism of folic acid and may cause folic acid deficiency, potentially resulting in serious blood disorders (e.g., macrocytosis and pancytopenia), this can be normalised by administration of folic acid or folinic acid (leucovorin)."
+      ],
+      "action": [
+        "与 itx-005 的血常规监测同轨：长期治疗定期查血象",
+        "复诊时询问是否需要补叶酸（说明书示可经叶酸 / 亚叶酸纠正）",
+        "录入柳氮磺吡啶时联动提示本条与 itx-005"
+      ],
+      "app_link": "与 itx-005 组成柳氮用药要点组；checkup_items(血常规)"
+    }
+  },
+  {
+    "id": "itx-008",
+    "category": "interaction",
+    "title": "SSRI 类抗抑郁药与 NSAIDs 合用出血风险大幅升高",
+    "summary": "研究显示 SSRI + NSAID 组合的胃十二指肠出血风险显著升高（OR 约 12）；共病用药时主动告知医生。",
+    "severity_level": "high",
+    "applicable_scene": "新增 SSRI（舍曲林 / 艾司西酞普兰等）时已服 NSAIDs，或反向；共病抑郁症患者药单核对",
+    "source_name": "Venerito M et al. Pharmaceuticals 2010（PMC4036660）",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4036660/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-06",
+    "review_due": "2027-03-06",
+    "version": 1,
+    "payload": {
+      "drug_a": "nsaid",
+      "drug_b": "ssri",
+      "risk_level": "high",
+      "effect": "胃十二指肠出血风险大幅升高（观察性研究 OR 12.2, 95% CI 7.1–19.5）",
+      "mechanism": "SSRI 减少血小板 5-HT（削弱血小板聚集功能）+ NSAIDs 黏膜损伤双路径",
+      "evidence": [
+        "PMC4036660：SSRI 与 NSAID（或低剂量阿司匹林）合用可进一步增加胃十二指肠出血风险，合并风险 OR 12.2（95% CI 7.1–19.5）。"
+      ],
+      "action": [
+        "两药共存期间警惕黑便 / 呕血 / 异常瘀斑，出现立即就医",
+        "需持续两药时复诊确认护胃方案（是否加胃保护药属医嘱范围）",
+        "录入 SSRI 类药品时触发本核对"
+      ],
+      "app_link": "medications 新增互检；与 itx-004 / fdg-001 同属护胃提示组"
+    }
+  },
+  {
+    "id": "itx-009",
+    "category": "interaction",
+    "title": "同时使用多种抗炎镇痛药：风险成倍放大",
+    "summary": "研究显示同时使用 3–4 种抗炎药的上消化道并发症相对风险可达 18 倍——勿自行叠加「止痛药」。",
+    "severity_level": "high",
+    "applicable_scene": "medications 中 NSAIDs / 激素 / 阿司匹林类合计 ≥2 种时；自感「止痛不够」想加药时",
+    "source_name": "García Rodríguez LA, Hernández-Díaz S. Arthritis Res 2000（PMC128885）",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC128885/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "drug_a": "nsaid",
+      "drug_b": "anti_inflammatory_multi",
+      "risk_level": "high",
+      "effect": "上消化道出血 / 穿孔风险随叠加抗炎药种数陡增（2 种联合 >8 倍；3–4 种 RR 18.0, 95% CI 9.0–36.1）",
+      "mechanism": "同类黏膜损伤机制叠加无获益上限；剂量依赖且种类依赖",
+      "evidence": [
+        "PMC128885：Overall, the risk is dose dependent and is greater with more than one anti-inflammatory drug taken simultaneously.",
+        "PMC128885：The use of NA-NSAIDs concomitantly with oral steroids, aspirin, or high doses of acetaminophen increases the risk of UGIC greater than eightfold.",
+        "PMC128885（补充段）：同时使用 3 种或 4 种抗炎药相对风险 18.0。"
+      ],
+      "action": [
+        "「一种不够」是复诊议题不是加药理由——疼痛控制不佳本身就是复诊指征（联动 R08）",
+        "含 OTC 止痛药（药店自购布洛芬等）也要计入药单",
+        "护胃提示组（fdg-001 / itx-004 / itx-008 / 本条）任一触发时整组显示"
+      ],
+      "app_link": "medications 抗炎药计数（≥2 药同 active 触发整组提示）；「我的-药品」页组级警示条"
+    }
+  },
+  {
+    "id": "itx-010",
+    "category": "interaction",
+    "title": "生物制剂治疗期间避免活疫苗：接种前需暂停 1 个给药间隔、接种后继续暂停 4 周",
+    "summary": "TNF 抑制剂治疗期间活疫苗禁忌；ACR 2022 疫苗指南给出明确时间窗（接种前 Hold 1 dosing interval / 接种后 Hold 4 weeks）——接种计划须与主治医生协调。",
+    "severity_level": "high",
+    "applicable_scene": "medications 含 TNF 抑制剂（生物制剂类）用户新增疫苗计划时（vaccine_records 录入活疫苗）；医生确认复选框逻辑",
+    "source_name": "2022 ACR 疫苗指南（PMC10291822）；FDA 阿达木单抗说明书（2024）",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10291822/",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-10",
+    "review_due": "2027-03-10",
+    "version": 1,
+    "payload": {
+      "drug_a": "tnf_inhibitor",
+      "drug_b": "live_vaccine",
+      "risk_level": "high",
+      "effect": "活疫苗（减毒株）在免疫抑制状态下可致播散性感染；FDA 标签：Live vaccines: Avoid use",
+      "mechanism": "TNF 阻断削弱对减毒活病原体的免疫限制",
+      "evidence": [
+        "ACR 2022：bDMARDs（含 etanercept、adalimumab、certolizumab、golimumab、infliximab）Hold before live attenuated virus vaccine administration: 1 dosing interval；Hold after: 4 weeks。",
+        "FDA 阿达木单抗说明书：Live vaccines: Avoid use with Adalimumab-aaty (5.10, 7.3)。",
+        "2015 综述：One thing that is definite is that live vaccines are contraindicated during treatment with these agents."
+      ],
+      "action": [
+        "新增活疫苗记录（vaccine_records.type=live）→ 若药单含生物制剂：弹本条 + 医生确认必选（R25 doctor_confirm 状态）",
+        "非活疫苗（灭活 / 重组）不受本条限制（ACR：可正常接种）",
+        "接种计划时间窗计算提示：末次注射 → 隔 1 个给药间隔 → 接种 → 4 周后恢复注射"
+      ],
+      "app_link": "vaccine_records 录入校验（live × 生物制剂 active → 强制 doctor_confirm）；checkup_items 疫苗项；复诊准备页疫苗议题"
+    }
+  },
+  {
+    "id": "itx-011",
+    "category": "interaction",
+    "title": "甲氨蝶呤与 NSAIDs 可合用但需按医嘱监测",
+    "summary": "低剂量 MTX（抗风湿用途）与 NSAIDs 合用常见且非绝对禁忌，但 FDA 说明书明确要求谨慎并监测；高剂量合用已有严重毒性报告。",
+    "severity_level": "medium",
+    "applicable_scene": "药单同时含 MTX 与 NSAIDs 时的核对提示；血常规 / 肝肾功能复查到期",
+    "source_name": "FDA 甲氨蝶呤注射液说明书（DailyMed 档案）；NHS SATH 甲氨蝶呤安全管理资料",
+    "source_url": "https://dailymed.nlm.nih.gov/dailymed/archives/fdaDrugInfo.cfm?archiveid=10507",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-10",
+    "review_due": "2027-03-10",
+    "version": 1,
+    "payload": {
+      "drug_a": "methotrexate",
+      "drug_b": "nsaid",
+      "risk_level": "medium",
+      "effect": "NSAIDs 可减少 MTX 肾小管分泌、增强毒性（动物模型证据 + FDA 警告）；低剂量合用临床常见、按监测规范管理",
+      "mechanism": "肾小管分泌竞争——低剂量下风险可控",
+      "evidence": [
+        "FDA：Unexpectedly severe (sometimes fatal) bone marrow suppression, aplastic anemia, and gastrointestinal toxicity have been reported with concomitant administration of methotrexate (usually in high dosage) along with some NSAIDs.",
+        "FDA：Caution should be used when NSAIDs or salicylates are administered concomitantly with lower doses of methotrexate. These drugs have been reported to reduce the tubular secretion of methotrexate.",
+        "NHS SATH：NSAIDs 与小剂量阿司匹林（<300mg）合用 unlikely to cause any clinically significant adverse effects and treatment can be continued。"
+      ],
+      "action": [
+        "药单同含两药 → 提示「合用常见，遵医嘱监测血常规与肝肾功能」——不渲染恐慌也不隐藏警告",
+        "checkup_items 联动：MTX 用户的血常规 / 肝肾周期照常排（itx-005 柳氮同型）",
+        "本条不作为「避免合用」建议——AS 临床 MTX+NSAIDs 并存常见，APP 不替医生决策"
+      ],
+      "app_link": "medications 双药检测（MTX active + NSAID active → medium 提示卡）；checkup_items(lab) 联动"
+    }
+  },
+  {
+    "id": "itx-012",
+    "category": "interaction",
+    "title": "泼尼松 ≥20 mg/天 超过 2 周：活疫苗应暂缓",
+    "summary": "ACR 2022 分层：激素 ≥20 mg/天（≥14 天）时活疫苗 Defer；<20 mg/天 或短期 <2 周通常不构成活疫苗禁忌。",
+    "severity_level": "medium",
+    "applicable_scene": "激素冲击 / 高剂量期间录入活疫苗计划；疫苗记录与药单激素剂量校验",
+    "source_name": "2022 ACR 疫苗指南（PMC10291822）",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10291822/",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-10",
+    "review_due": "2027-03-10",
+    "version": 1,
+    "payload": {
+      "drug_a": "glucocorticoid_high_dose",
+      "drug_b": "live_vaccine",
+      "risk_level": "medium",
+      "effect": "高剂量激素免疫抑制下活疫苗致播散风险；阈值：≥20 mg/天泼尼松等效 × ≥14 天",
+      "mechanism": "系统性免疫抑制阈值效应（ACR 剂量分层依据）",
+      "evidence": [
+        "ACR 2022：Prednisone ≥20 mg daily：非活疫苗 Give，活疫苗 Defer。",
+        "ACR 2022：Prednisone ≤10 mg 与 10–20 mg：Give（含活疫苗通常可给——以指南表格为准，具体遵医嘱）。"
+      ],
+      "action": [
+        "APP 校验逻辑：medications 激素 current_dose ≥20 mg/天 且持续 ≥14 天 → vaccine_records 活疫苗录入弹本条 + 医生确认",
+        "剂量与时长自动从药单取（患者免算）；非活疫苗不受限",
+        "激素减量至 <20 mg 后由医生评估恢复接种"
+      ],
+      "app_link": "vaccine_records × medications 激素剂量联合校验；与 itx-010 组成疫苗组双条（生物制剂 / 高剂量激素两触发条件）"
+    }
+  },
+  {
+    "id": "itx-013",
+    "category": "interaction",
+    "title": "NSAIDs 可减弱降压药效果，合用需监测血压与肾功能",
+    "summary": "NSAIDs 可削弱 ACEI / ARB / β 阻滞剂降压效果；老年 / 容量不足 / 肾功能不全者合用 NSAID+ACEI/ARB 有急性肾衰竭风险——AS 合并高血压患者（关联 edu-001 心血管议题）注意。",
+    "severity_level": "medium",
+    "applicable_scene": "药单同时含 NSAIDs 与降压药（ACEI/ARB/利尿剂/β 阻滞剂）时；血压记录异常趋势提示",
+    "source_name": "FDA 萘普生 / 双氯芬酸 / 依那普利标签",
+    "source_url": "https://dailymed.nlm.nih.gov/dailymed/fda/fdaDrugXsl.cfm?setid=12202ef3-c65e-45a6-88ed-5d945d8fd41c",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "drug_a": "nsaid",
+      "drug_b": "antihypertensive",
+      "risk_level": "medium",
+      "effect": "降压药效果减弱（血压升高）；特定人群肾功能恶化风险（possible acute renal failure）",
+      "mechanism": "前列腺素抑制 → 血管舒张减弱 + 肾血流调节受损",
+      "evidence": [
+        "FDA 萘普生标签：NSAIDs may diminish the antihypertensive effect of angiotensin converting enzyme (ACE) inhibitors, angiotensin receptor blockers (ARBs), or beta-blockers.",
+        "FDA 萘普生标签：In patients who are elderly, volume-depleted (including those on diuretic therapy), or have renal impairment, co-administration of an NSAID with ACE inhibitors or ARBs may result in deterioration of renal function, including possible acute renal failure.",
+        "FDA 双氯芬酸标签：Monitor blood pressure (BP) during the initiation of NSAID treatment and throughout the course of therapy."
+      ],
+      "action": [
+        "药单双类检测 → 提示「NSAID 起始期间加强血压监测」（FDA 原文要求）",
+        "vitals 血压项与药单联动：新增 NSAID 或新增降压药时生成血压加密监测建议（复诊议题）",
+        "老年 / 肾功能不全用户（profile 标记）→ 风险升级为 high 展示"
+      ],
+      "app_link": "medications 双类检测；vitals(bp) 监测建议；复诊议题生成（与 edu-001 心血管组联动）"
+    }
+  },
+  {
+    "id": "itx-014",
+    "category": "interaction",
+    "title": "长期 / 高危 NSAID 使用：与医生讨论是否加用 PPI 胃保护",
+    "summary": "NSAID 相关溃疡高风险特征明确（高龄 / 既往溃疡 / 高剂量 / 合用抗凝或激素）；ACG 胃保护策略中 PPI 是选项之一——是否联用由医生判断。",
+    "severity_level": "low",
+    "applicable_scene": "NSAIDs 长期用户药单提示；护胃提示组联动（itx-009 多药 / itx-004 激素 / itx-008 SSRI 同组成员）",
+    "source_name": "ACG NSAID 溃疡防治指南（PMC11657060 综述引述）；AAFP PUD 综述",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11657060/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "drug_a": "nsaid_longterm",
+      "drug_b": "ppi",
+      "risk_level": "low",
+      "positive_interaction": true,
+      "effect": "正向联用：PPI 降低 NSAID 相关胃十二指肠溃疡风险（高危人群获益明确）",
+      "mechanism": "抑酸 → NSAID 黏膜损伤修复环境改善",
+      "evidence": [
+        "ACG 综述引述：Older age, previous upper gastrointestinal events, concurrent use of warfarin or corticosteroids, and high-dose NSAID therapy have been identified as high-risk characteristics.",
+        "AAFP：Recommended therapies for preventing PUD in these patients include misoprostol and proton pump inhibitors."
+      ],
+      "action": [
+        "命中高危特征（年龄 / 溃疡史 / 合用激素抗凝 / 高剂量）→ 复诊议题自动生成「是否需要胃保护方案」",
+        "APP 不建议自行购 PPI 长期服——由医生处方（PPI 长期使用本身有 deprescribing 议题）",
+        "本条为正向条目：联用是保护，不是风险——payload.risk_level=low 且标注 positive_interaction"
+      ],
+      "app_link": "复诊议题生成；护胃组联动展示（组内正向条目）；medications 高危特征计算"
+    }
+  },
+  {
+    "id": "itx-015",
+    "category": "interaction",
+    "title": "阿仑膦酸盐：晨起空腹白水送服，直立 30 分钟，钙与食物间隔",
+    "summary": "AS 骨质疏松共病常用双膦酸盐——服用规则严格（空腹白水 / 直立 30 min / 食物钙剂间隔 30 min）；误服规则直接降低药效并增加食管刺激。",
+    "severity_level": "medium",
+    "applicable_scene": "新增阿仑膦酸盐时服药规则种子；打卡计划生成（晨起独立时段）；钙剂补充时间冲突检测",
+    "source_name": "FDA FOSAMAX 标签（患者信息节）",
+    "source_url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2004/20560slr030,21575slr002_fosamax_lbl.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "drug_a": "alendronate",
+      "drug_b": "food_calcium",
+      "risk_level": "medium",
+      "effect": "与食物 / 钙 / 其他药同服 → 吸收显著降低（FOSAMAX is effective only if it is taken when your stomach is empty）；卧床 → 食管刺激风险",
+      "mechanism": "双膦酸盐口服生物利用度极低且受食物干扰；食管黏膜直接刺激",
+      "evidence": [
+        "FDA：After getting up for the day and before taking your first food, drink, or other medicine, swallow your FOSAMAX tablet with a full glass (6-8 oz) of plain water only.",
+        "FDA：After swallowing your FOSAMAX tablet, do not lie down – stay fully upright (sitting, standing, or walking) for at least 30 minutes.",
+        "FDA：wait at least 30 minutes before taking your first food, drink, or other medicine of the day, including antacids, calcium, and other supplements and vitamins.",
+        "FDA：Do not take FOSAMAX at bedtime or before getting up for the day."
+      ],
+      "action": [
+        "medication_plans 生成规则：阿仑膦酸盐打卡排「晨起起床后」独立槽位（早于早餐与晨药）",
+        "与 supplements 钙剂打卡时间冲突自动检测（间隔 <30 min 弹提示）",
+        "FDA 警示同步：服药后胸痛 / 新发加重烧心 / 吞咽困难 → 停药联系医生（red_flag）"
+      ],
+      "app_link": "medication_plans 晨起槽位规则；supplements 冲突检测；medications(osteoporosis 标签组)"
+    }
+  }
+]

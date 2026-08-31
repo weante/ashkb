@@ -1,0 +1,158 @@
+[
+  {
+    "id": "emr-001",
+    "category": "emergency",
+    "title": "眼红眼痛畏光视力模糊：警惕急性葡萄膜炎，尽快眼科就诊",
+    "summary": "AS 最常见眼并发症为急性前葡萄膜炎（眼红 / 眼痛 / 畏光 / 视物模糊）；需当天或次日眼科就诊，及时治疗防虹膜后粘连。",
+    "severity_level": "high",
+    "applicable_scene": "symptom_daily 眼部症状勾选；应急中心场景卡；checkup_items 眼科周期项到期未查提示",
+    "source_name": "Gupta A et al. Management of Uveitis in Spondyloarthropathy（PMC5741284）；Iatrox UKMLA Anterior Uveitis 临床资料",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5741284/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "scene": "uveitis",
+      "symptoms": ["眼红", "眼痛", "畏光", "视物模糊", "瞳孔小或不规则"],
+      "urgency": "当天或次日眼科就诊（UKMLA：Same-day or next-day ophthalmology referral）",
+      "steps": [
+        "识别症状（四主征）——本 APP 眼部症状勾选即弹本卡",
+        "停止当前活动，避免强光（畏光时戴墨镜缓解）",
+        "当天 / 次日眼科就诊（挂眼科急诊或葡萄膜炎专科）",
+        "向医生说明 AS 病史与用药（激素滴眼液治疗需规范足疗程，勿自行停）",
+        "就诊后行动登记（emergency_events）+ 复查提醒设置"
+      ],
+      "red_flag": [
+        "强剧痛 / 视力骤降——立即急诊（非次日）",
+        "拖延风险：虹膜后粘连 → 瞳孔阻滞 → 继发性青光眼（UKMLA）",
+        "反复发作需向风湿科反馈（可能与疾病活动度相关，复诊议题）"
+      ],
+      "app_link": "应急卡 uveitis 渲染；symptom_daily 眼部字段触发；checkup_items(eye) 周期；emergency_events 登记"
+    }
+  },
+  {
+    "id": "emr-002",
+    "category": "emergency",
+    "title": "发热或感染征象：生物制剂用户联系医生，勿自行续注",
+    "summary": "发热、持续咳嗽、皮肤红肿痛、流感样症状时及时联系医生；严重感染或脓毒血症时医生会停用生物制剂——不是自行停药议题。",
+    "severity_level": "high",
+    "applicable_scene": "vitals.temperature ≥ 38.5（阈值条目联动）；symptom_daily.feverish=1；注射日发热（itx-002 联动）",
+    "source_name": "FDA Enbrel 标签；EMA Inflectra 药品信息；Inflectra 患者信息（Pfizer）",
+    "source_url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/103795s5600lbl.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "scene": "infection_fever",
+      "symptoms": ["发热 ≥38.5℃", "持续咳嗽", "皮肤红肿热痛", "流感样症状", "异常疲乏"],
+      "urgency": "出现感染征象 → 当日联系医生；高热 / 意识改变 → 急诊",
+      "steps": [
+        "测体温并记录（vitals）——≥38.5 自动弹本卡",
+        "生物制剂用户：下一次注射日期前联系主治医生（是否延期由医生判断，勿自行续注也勿自行决定永久停药）",
+        "回顾近 2 周接触史（感冒 / 家属感染 / 外出旅行）告知医生",
+        "就诊后登记 emergency_events + 药物暂停状态（medication_changes：pause，source=hospital）"
+      ],
+      "red_flag": [
+        "高热不退 / 寒战 / 意识模糊——立即急诊",
+        "生物制剂感染征象可能被部分掩盖（免疫抑制状态，症状与感染严重度可不一致）——保守判断",
+        "FDA/EMA 口径：发生严重感染或脓毒血症时应停用（Enbrel：should be discontinued if a patient develops a serious infection or sepsis）——停药决定在医生"
+      ],
+      "app_link": "阈值联动（edu-th-001）；itx-002 黑框联动；注射卡发热日提示；medication_changes(pause) 快捷登记"
+    }
+  },
+  {
+    "id": "emr-003",
+    "category": "emergency",
+    "title": "跌倒后即使「感觉没事」也要就医检查：AS 脊柱脆性骨折易漏诊",
+    "summary": "AS 脊柱僵硬 + 骨质疏松使低能量跌倒即可致骨折，且常被漏诊延误；颈椎受累者尤须警惕，跌倒后勿自行搬动颈部。",
+    "severity_level": "high",
+    "applicable_scene": "应急中心场景卡；emergency_events(fall_fracture) 登记；profile.spine_mobility≥moderate 用户置顶提示",
+    "source_name": "Chaudhary SB et al. Management of Acute Spinal Fractures in Ankylosing Spondylitis（PMC3263739）",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3263739/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "scene": "fall_fracture",
+      "symptoms": ["跌倒后颈 / 背 / 腰新发疼痛", "肢体麻木无力", "「感觉没事」但 AS 骨折常无痛感不对称"],
+      "urgency": "跌倒后一律就医评估（即使无明确疼痛）；颈痛 / 肢体麻木——急诊",
+      "steps": [
+        "跌倒后不自行起身搬动（先自查四肢感觉与活动）",
+        "颈椎受累者保持颈部中立位等待救护（传统颈托可能加重损伤——专科评估后再固定）",
+        "就医时主动说明 AS 病史（「我有强直性脊柱炎，脊柱脆，请拍片」——患者自述是防漏诊关键）",
+        "就诊后登记 emergency_events + 影像结果（lab_results 附件路径可关联）"
+      ],
+      "red_flag": [
+        "颈部剧痛 / 四肢麻木无力 / 大小便异常——立即急诊勿移动",
+        "AS 骨折诊断 frequently missed or delayed（文献原文）——「没事感觉」不可作判断依据",
+        "传统颈托可能经骨折点造成过伸加重损伤（Traditional collars may cause hyperextension through the fracture site）——不要自行佩戴颈托"
+      ],
+      "app_link": "应急卡 fall_fracture 渲染；spine_mobility 用户置顶；emergency_events 登记"
+    }
+  },
+  {
+    "id": "emr-004",
+    "category": "emergency",
+    "title": "下肢麻木无力 / 大小便障碍：警惕马尾综合征，急诊就医",
+    "summary": "长期 AS 罕见但明确的神经并发症；出现下肢进行性麻木无力、大小便功能障碍、会阴部感觉异常（鞍区麻木）应尽快急诊评估——不等待不观察。",
+    "severity_level": "high",
+    "applicable_scene": "symptom_daily 神经症状勾选（新增红旗字段）；应急中心场景卡",
+    "source_name": "Ann Rheum Dis 神经并发症综述；J Rheumatol CES in AS 综述；BJR 病例报告",
+    "source_url": "https://www.jrheum.org/content/46/12/1582.long",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "scene": "cauda_equina",
+      "symptoms": ["下肢进行性麻木无力", "大小便功能障碍", "会阴部（鞍区）感觉异常"],
+      "urgency": "急诊（红旗症状级——罕见但不可延迟）",
+      "steps": [
+        "识别三联症状（任一出现即触发本卡）",
+        "立即急诊（神经外科 / 脊柱外科评估）——不采取观察等待",
+        "就医时说明 AS 病史（长期 AS 患者 CES 已知关联，帮助医生定位）",
+        "登记 emergency_events"
+      ],
+      "red_flag": [
+        "大小便障碍 + 鞍区麻木是经典急诊指征——等待即延误",
+        "CES 对生活质量影响重大（J Rheumatol：extremely important effect on physical function and quality of life）"
+      ],
+      "note": "罕见并发症教育口径：作为红旗症状条目呈现，不作为常见症状渲染（避免焦虑）——症状勾选页置于「需立即就医」分区",
+      "app_link": "symptom_daily 神经红旗字段触发；应急中心第四场景卡；与 emr-003 跌倒条目互链（跌倒后出现神经症状优先本条）"
+    }
+  },
+  {
+    "id": "emr-005",
+    "category": "emergency",
+    "title": "长期激素不可自行骤停：肾上腺功能不全风险",
+    "summary": "激素使用超 3–4 周可抑制 HPA 轴，骤停有肾上腺功能不全乃至危象风险（乏力 / 恶心 / 低血压）；漏服多日或自行停药后不适需就医。",
+    "severity_level": "high",
+    "applicable_scene": "medication_changes 停药登记（激素类 source 非 hospital）；激素用户漏服 2 日以上警报",
+    "source_name": "Aust Prescr 停用糖皮质激素实用指导（PMC12378006）；Endocrine Society 肾上腺功能不全指南资源",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12378006/",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "scene": "steroid_adrenal",
+      "symptoms": ["异常乏力", "恶心呕吐", "头晕低血压", "发热", "意识改变"],
+      "urgency": "漏服多日后出现症状 → 当日就医；严重（休克征象）→ 急诊",
+      "steps": [
+        "长期（>3–4 周）激素用户漏服 ≥2 日 → 自动弹本卡（提醒联系医生补服方案，勿自行双倍补）",
+        "自行停药登记（source=patient）→ 警报 + 建议联系医生制定减量计划",
+        "出现症状群 → 就医说明「长期服激素最近停了」（关键病史信息）",
+        "登记 emergency_events / medication_changes"
+      ],
+      "red_flag": [
+        "Failure to recognise adrenal crisis can lead to shock and eventual death（Aust Prescr 原文）",
+        "3–4 周内短期使用可骤停 / 长期使用必须减量（原文明确分界）——剂量时长从药单自动判断",
+        "应激状态（手术 / 感染 / 重病）下激素需求可能上调——就诊时主动告知激素用药史"
+      ],
+      "app_link": "medication_logs 漏服计数（激素类 ×2 日触发）；medication_changes 停药来源检测；与 fdg-002 / emr-002 感染条目互链（应激升剂量场景）"
+    }
+  }
+]

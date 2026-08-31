@@ -1,0 +1,162 @@
+[
+  {
+    "id": "edu-001",
+    "category": "edu",
+    "title": "AS 是全身炎症：心血管风险高于常人，复诊关注血压血脂",
+    "summary": "研究示 AS 患者主要动脉粥样硬化事件风险 HR 1.36（校正传统危险因素后）；心肌梗死与卒中风险尤需关注——复诊时血压 / 血脂 / 血糖是应查项。",
+    "severity_level": "medium",
+    "applicable_scene": "知识库教育类置顶；复诊准备页议题生成；checkup_items 心血管指标项建议",
+    "source_name": "Agca R et al. Heart 2021（PMC8666803）；Frontiers in Medicine 2026 综述",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8666803/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-10",
+    "review_due": "2027-03-10",
+    "version": 1,
+    "payload": {
+      "key": "as_cardiovascular_risk",
+      "content": "AS 是全身性炎症疾病，与心肌梗死、卒中等主要心血管事件风险升高相关（HR 1.36, 95% CI 1.13–1.65）。复诊时应关注血压、血脂、血糖等心血管危险因素，并在医生指导下进行干预。",
+      "evidence": [
+        "Agca 2021：HR of 1.36 (95% CI 1.13 to 1.65) in patients with AS for major atherosclerotic events after adjustment for traditional CV risk factors.",
+        "Agca 2021：AS 表——Increased mortality rate. CVD main cause of death. Both atherosclerotic disease and specific cardiac manifestations.",
+        "Agca 2021：炎症活动期脂质水平可能受影响，血脂评估更适合在稳定期或缓解期进行。"
+      ],
+      "action": [
+        "复诊准备页自动生成议题：「血压 / 血脂 / 血糖近 3 个月是否查过」（checkup_items 心血管组）",
+        "吸烟用户强化提示（ASAS-EULAR 戒烟 + 心血管双重理由）",
+        "血脂检测建议安排在病情稳定期（Agca 2021 细节）"
+      ],
+      "app_link": "复诊准备页议题；checkup_items(blood_pressure / lipid_panel)；与戒烟条目联动"
+    }
+  },
+  {
+    "id": "edu-002",
+    "category": "edu",
+    "title": "症状加重何时联系医生：7–10 天无改善 / 夜间痛醒加重 / 晨僵延长",
+    "summary": "自我管理有限度：发作期自我处理 7–10 天无改善应联系风湿科；夜间痛醒加重、晨僵延长、活动受限加重是复诊指征；反复频繁发作提示复诊调药议题。",
+    "severity_level": "medium",
+    "applicable_scene": "flare_events 记录后第 7–10 天提示；症状趋势恶化检测（BASDAI 阈值联动）；极简模式延续超过阈值的升级提示",
+    "source_name": "Kingston & Richmond NHS axSpA flare self-management 患者教育；炎症性腰背痛识别（北京新闻 / NBK539753 参考）",
+    "source_url": "https://www.kingstonandrichmond.nhs.uk/patients-and-families/patient-leaflets/axial-spondyloarthritis-flare-self-management",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-10",
+    "review_due": "2027-03-10",
+    "version": 1,
+    "payload": {
+      "key": "flare_relapse_indicators",
+      "content": "发作期自我处理（休息调整 / 温和活动 / 热敷）后 7–10 天症状无改善 → 联系风湿科；夜间痛醒加重、晨僵时间延长、活动受限加重 → 复诊指征；频繁反复发作 → 医生可能需要调整用药方案（原文：your GP or rheumatology team may decide to review your medicines）。",
+      "evidence": [
+        "Kingston NHS：If you have tried all of these and your symptoms show no signs of improvement after 7 to 10 days, you may need to contact your rheumatology team.",
+        "Kingston NHS：If you experience regular flares, your GP or rheumatology team may decide to review your medicines.",
+        "炎症性腰背痛识别（参考）：腰背疼痛持续三个月以上且夜间加重、晨起僵硬、休息不减轻活动后缓解。"
+      ],
+      "action": [
+        "flare_events 活跃第 7 天 → medium 警报（「发作第 7 天，若无改善建议联系风湿科」）",
+        "与 edu-th-002 BASDAI 阈值形成双通道复诊触发（症状时长通道 + 评分通道）",
+        "极简模式连续 >10 天 → 升级提示（超出自我管理合理窗口）"
+      ],
+      "app_link": "flare_events 日计数警报；basdai_records 阈值联动；极简模式第 3 天 Q 页文案依据"
+    }
+  },
+  {
+    "id": "edu-003",
+    "category": "edu",
+    "title": "吸烟是 AS 疾病进展风险因素：建议戒烟",
+    "summary": "ASAS-EULAR 2022 明确：吸烟已被证明是 axSpA 脊柱炎症与疾病进展的风险因素；戒烟基于全健康风险理由被推荐。",
+    "severity_level": "medium",
+    "applicable_scene": "profile 吸烟状态登记后知识库置顶；复诊议题；与 edu-001 心血管条目联动展示",
+    "source_name": "ASAS-EULAR 2022 axSpA 管理建议（原文 PDF）",
+    "source_url": "https://kclpure.kcl.ac.uk/portal/files/188036338/ASAS_EULAR_recommendations_RAMIRO_Accepted5October2022_GREEN_AAM.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "key": "smoking_cessation",
+      "content": "吸烟已被证明是 axSpA 脊柱炎症和疾病进展的风险因素；ASAS-EULAR 2022 基于吸烟的已知健康风险推荐戒烟。戒烟同时降低心血管风险（AS 患者心血管风险本身升高）。",
+      "evidence": [
+        "ASAS-EULAR 2022：Smoking has been shown as a risk factor for spinal inflammation and disease progression in axSpA.",
+        "ASAS-EULAR 2022：Though no formal investigation has been conducted on the benefits of smoking cessation on axSpA outcomes, it seemed reasonable to recommend it, on the basis of all well-known health risks associated with smoking."
+      ],
+      "action": [
+        "profile.smoking 状态登记 → 知识库教育区置顶本条 + 心血管条目双联展示",
+        "诚实口径：戒烟对 axSpA 结局的专项获益尚无正式研究（指南原文如此）——不夸大戒烟的疾病特异性获益",
+        "戒烟支持就医议题（复诊时讨论戒烟辅助方案）"
+      ],
+      "app_link": "profile(smoking) 联动；复诊议题；与 edu-001 组成「可改变风险因素」双条目组"
+    }
+  },
+  {
+    "id": "edu-004",
+    "category": "edu",
+    "title": "生物制剂不要自行停药或减量：反弹风险明确",
+    "summary": "ACR/SAA/SPARTAN 指南有条件推荐反对自行停用与常规减量；停药研究显示 53% 患者在 24–104 周内复发——任何调整由风湿科医生评估。",
+    "severity_level": "high",
+    "applicable_scene": "medication_changes 停药 / 减量登记时（source=patient 自动弹）；知识库教育区；复诊议题",
+    "source_name": "ACR/SAA/SPARTAN 2019 建议；Front Med 2025 系统综述（停药 vs 减量）；ixekizumab 停药研究",
+    "source_url": "https://acrjournals.onlinelibrary.wiley.com/doi/full/10.1002/art.41042",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "key": "no_self_discontinuation",
+      "content": "指南有条件推荐反对停用生物制剂（也不建议常规减量）；系统综述示停药显著损害缓解维持，减量相对更安全但仍需医生指导。擅自停药可能导致病情反弹。",
+      "evidence": [
+        "ACR/SAA/SPARTAN 2019：In adults receiving treatment with a biologic, we conditionally recommend against discontinuation of the biologic.",
+        "ACR/SAA/SPARTAN 2019：we conditionally recommend against tapering of the biologic dose as a standard approach.",
+        "Front Med 2025：withdrawal significantly compromises the ability to sustain remission, whereas tapering appears to be a potentially safer alternative.",
+        "Ixekizumab 研究：停药后 53% 患者 24–104 周内出现复发。"
+      ],
+      "action": [
+        "medication_changes(source=patient 且涉及生物制剂) → 强提示本条 + 引导联系医生",
+        "「感觉好了想停药」是患者最常见自决策——知识库教育区固定展示",
+        "与 R17 停药原因分类联动（self_assessment 类停药标记为需医生复核场景）"
+      ],
+      "app_link": "medication_changes 登记校验；R17 停药流程；复诊议题生成"
+    }
+  },
+  {
+    "id": "edu-th-001",
+    "category": "edu",
+    "title": "发热预警阈值：38.5 ℃",
+    "summary": "体温 ≥ 38.5 ℃ 时系统触发感染发热应急卡提示（生物制剂用户尤其重要）。",
+    "severity_level": "medium",
+    "applicable_scene": "vitals.temperature 录入 ≥ 阈值；symptom_daily.feverish=1 且后续录体温；阈值设置页展示",
+    "source_name": "系统内置阈值（参考感染发热应急流程通用医学口径；本条目为系统行为依据，非治疗建议）",
+    "source_url": "",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "key": "threshold_fever",
+      "value": 38.5,
+      "unit": "℃",
+      "condition": "vitals.temperature >= value 触发 alert(symptom_abnormal, high) + 应急卡 infection_fever",
+      "note": "用户可收紧（如 38.0）不可放宽——收紧即更敏感，放宽需咨询医生（裁决 G）",
+      "app_link": "我的-阈值设置页；alert_records 触发逻辑；应急中心 infection_fever 卡"
+    }
+  },
+  {
+    "id": "edu-th-002",
+    "category": "edu",
+    "title": "BASDAI 活动度预警阈值：≥4.0 持续 2 周",
+    "summary": "BASDAI 总分 ≥ 4.0 且持续 2 周时提示复诊（疾病活动度可能需要治疗调整——由医生判断）。",
+    "severity_level": "medium",
+    "applicable_scene": "basdai_records 连续记录判定；阈值设置页展示",
+    "source_name": "系统内置阈值（BASDAI≥4 为临床常用疾病活动度界值口径；持续 2 周规则参考发作判定通行口径）",
+    "source_url": "",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "key": "threshold_basdai_flare",
+      "value": 4.0,
+      "unit": "分",
+      "condition": "连续 14 日内 ≥2 次 BASDAI 记录均 ≥4.0 → alert(basdai_high, medium) + 复诊建议卡",
+      "note": "收紧可调（如 3.5）；BASDAI 是患者自评工具，判定为提示性非诊断性",
+      "app_link": "我的-阈值设置页；basdai_records 趋势联动（数据 Tab 趋势页超阈值标记）"
+    }
+  }
+]
