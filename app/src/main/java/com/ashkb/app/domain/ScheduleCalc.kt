@@ -10,13 +10,16 @@ data class PlanSlot(val key: String, val time: String?, val label: String)
 
 object ScheduleCalc {
 
-    /** 解析 take_times JSON → List<"HH:mm">，空安全 */
+    /** 解析 take_times JSON → List<"HH:mm">，空安全；过滤非法时刻（如 25:99——防 LocalTime.parse 崩溃） */
     fun takeTimesOf(med: Medication): List<String> {
         val raw = med.takeTimes ?: return emptyList()
         return runCatching {
             JSONArray(raw).let { arr -> (0 until arr.length()).map { arr.getString(it) } }
-        }.getOrDefault(emptyList()).filter { Regex("\\d{2}:\\d{2}").matches(it) }
+        }.getOrDefault(emptyList()).filter { TIME_PATTERN.matches(it) }
     }
+
+    /** 合法时刻：00:00–23:59（P5 修订：原 \d{2}:\d{2} 会放行 25:99 → 提醒重排崩溃） */
+    val TIME_PATTERN = Regex("([01]\\d|2[0-3]):[0-5]\\d")
 
     /**
      * 判定药品在某日是否有注射任务：
@@ -66,12 +69,12 @@ object ScheduleCalc {
 
     fun isLate(scheduledTime: String?, takenAtIso: String?, date: LocalDate): Boolean {
         if (scheduledTime == null || takenAtIso == null) return false
-        val scheduled = runCatching {
-            java.time.LocalDateTime.parse(takenAtIso).toLocalDate().atTime(
-                scheduledTime.split(":")[0].toInt(), scheduledTime.split(":")[1].toInt()
-            )
-        }.getOrNull() ?: return false
         val taken = runCatching { java.time.LocalDateTime.parse(takenAtIso) }.getOrNull() ?: return false
+        // P5 修订：计划时刻必须锚定在归属日 date 上（原实现用打卡日重建，
+        // 次日补打卡差值恒为 0，late 判定失效污染依从统计）
+        val scheduled = runCatching {
+            date.atTime(scheduledTime.split(":")[0].toInt(), scheduledTime.split(":")[1].toInt())
+        }.getOrNull() ?: return false
         return java.time.Duration.between(scheduled, taken).toMinutes() > LATE_TOLERANCE_MIN
     }
 }

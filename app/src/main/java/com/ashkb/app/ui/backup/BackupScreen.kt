@@ -271,6 +271,18 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                 }
             }
 
+            // ---- 恢复演练 ----
+            SectionCard(title = "恢复演练（一键自证）") {
+                Text(
+                    "备份 → 加密 → 解密 → 覆盖恢复 → 行数+SHA 双校验 → 复核一致，全链路自动跑一遍。" +
+                        "写入的正是刚导出的当前数据（可逆无损），无需口令、不落盘，结果记入台账（DRILL）。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { vm.drill() }, enabled = !busy) { Text("执行恢复演练") }
+            }
+
             // ---- 档案 JSON ----
             SectionCard(title = "健康档案 JSON（换机建档）") {
                 Text(

@@ -13,14 +13,22 @@ android {
         applicationId = "com.ashkb.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "0.4.0-p4"
+        versionCode = 5
+        versionName = "1.0.0"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            // 1.0 定版：自用场景优先稳定（暂不裁剪），debug 签名保证可直接安装
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+    testOptions {
+        unitTests {
+            // 未 mock 的 android.* 调用返回默认值而非抛异常（P5 单测可跑纯逻辑）
+            isReturnDefaultValues = true
         }
     }
     compileOptions {
@@ -53,4 +61,8 @@ dependencies {
 
     // JSON（种子 payload 解析，org.json 亦可用，此处统一 kotlinx）
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+
+    // P5 单元测试：org.json 桥接（Android stub 的 org.json 在 JVM 单测中不可用）
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

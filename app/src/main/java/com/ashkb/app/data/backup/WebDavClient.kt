@@ -1,10 +1,10 @@
 package com.ashkb.app.data.backup
 
-import android.util.Base64
 import java.io.ByteArrayOutputStream
 import java.lang.reflect.Field
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Base64
 import javax.net.ssl.HttpsURLConnection
 
 /**
@@ -34,7 +34,7 @@ class WebDavClient(
         val conn = url(path).openConnection() as HttpURLConnection
         conn.connectTimeout = 15_000
         conn.readTimeout = 30_000
-        val auth = Base64.encodeToString("$username:$password".toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        val auth = Base64.getEncoder().encodeToString("$username:$password".toByteArray(Charsets.UTF_8))
         conn.setRequestProperty("Authorization", "Basic $auth")
         conn.setRequestProperty("User-Agent", "ASHKB-Backup/1.0")
         if (depth != null) conn.setRequestProperty("Depth", depth.toString())
@@ -74,7 +74,7 @@ class WebDavClient(
         try {
             conn.connectTimeout = 10_000
             conn.readTimeout = 10_000
-            val auth = Base64.encodeToString("$username:$password".toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+            val auth = Base64.getEncoder().encodeToString("$username:$password".toByteArray(Charsets.UTF_8))
             conn.setRequestProperty("Authorization", "Basic $auth")
             try { conn.requestMethod = "MKCOL" } catch (_: java.net.ProtocolException) {
                 runCatching {

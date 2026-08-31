@@ -74,7 +74,7 @@ object BackupEngine {
                         Cursor.FIELD_TYPE_INTEGER -> o.put(c.getColumnName(i), c.getLong(i))
                         Cursor.FIELD_TYPE_FLOAT -> o.put(c.getColumnName(i), c.getDouble(i))
                         Cursor.FIELD_TYPE_BLOB -> o.put(c.getColumnName(i),
-                            android.util.Base64.encodeToString(c.getBlob(i), android.util.Base64.NO_WRAP))
+                            java.util.Base64.getEncoder().encodeToString(c.getBlob(i)))
                         else -> o.put(c.getColumnName(i), c.getString(i))
                     }
                 }

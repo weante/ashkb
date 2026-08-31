@@ -1,8 +1,8 @@
 package com.ashkb.app.data.backup
 
-import android.util.Base64
 import org.json.JSONObject
 import java.security.SecureRandom
+import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
@@ -42,8 +42,8 @@ object VaultCipher {
         val header = JSONObject().apply {
             put("kdf", KDF)
             put("iter", ITER)
-            put("salt", Base64.encodeToString(salt, Base64.NO_WRAP))
-            put("iv", Base64.encodeToString(iv, Base64.NO_WRAP))
+            put("salt", Base64.getEncoder().encodeToString(salt))
+            put("iv", Base64.getEncoder().encodeToString(iv))
             put("schema_version", schemaVersion)
             put("created_at", nowIso)
             put("cipher", "aes-256-gcm")
@@ -77,8 +77,8 @@ object VaultCipher {
         if (header.optString("cipher") != "aes-256-gcm") throw VaultException("不支持的加密算法 ${header.optString("cipher")}")
         val kdf = header.optString("kdf")
         if (kdf != KDF) throw VaultException("不支持的 KDF：$kdf")
-        val salt = Base64.decode(header.getString("salt"), Base64.NO_WRAP)
-        val iv = Base64.decode(header.getString("iv"), Base64.NO_WRAP)
+        val salt = Base64.getDecoder().decode(header.getString("salt"))
+        val iv = Base64.getDecoder().decode(header.getString("iv"))
         val iter = header.getInt("iter")
         val key = deriveKey(password, salt, iter)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")

@@ -164,6 +164,45 @@ class BackupRepository(private val context: Context) {
             }
         }
 
+    // ======================= 恢复演练（协议 §7 首次恢复演练） =======================
+
+    data class DrillReport(
+        val rowTotal: Int, val tableCount: Int,
+        val roundtripOk: Boolean,   // 演练后库与演练前逐字节一致
+        val detail: String,
+    )
+
+    /**
+     * 一键恢复演练：导出 → 加密 → 解密 → 覆盖恢复 → 双校验 → 复核导出一致。
+     * 全程内存态、可逆（恢复写入的正是刚导出的当前数据）；
+     * 演练口令随机即弃，不落盘——证明的是加密链路 + 恢复链路本身可用。
+     * 台账登记为 DRILL 类型。
+     */
+    suspend fun drill(): DrillReport = withContext(Dispatchers.IO) {
+        val now = nowIso()
+        // 1. 导出当前全库
+        val before = BackupEngine.export(supportDb(), now)
+        // 2. 加密 → 解密（证明加密链路）
+        val drillPass = "drill-${java.util.UUID.randomUUID()}"
+        val bytes = VaultCipher.encrypt(drillPass.toCharArray(), before.payload, BackupEngine.SCHEMA_VERSION, now)
+        val decrypted = VaultCipher.decrypt(drillPass.toCharArray(), bytes)
+        // 3. 恢复写入（写入的即刚导出的当前数据——可逆）+ 双校验
+        val verify = BackupEngine.restore(supportDb(), decrypted.payload)
+        // 4. 复核：重新导出与演练前逐字节比对（此时尚未写台账行，故应严格一致）
+        val after = BackupEngine.export(supportDb(), now)
+        val roundtripOk = before.payload == after.payload
+        val detail = buildString {
+            append("加密链路✓ 解密✓ 恢复双校验${if (verify.rowsOk) "✓" else "✗"}" +
+                " 复核一致${if (roundtripOk) "✓" else "✗"}；" +
+                "${before.tableCount} 表 ${before.rowTotal} 行")
+            if (!verify.rowsOk) append("；异常：${verify.rowDetails.take(3).joinToString("；")}")
+        }
+        // 5. 台账登记（放在比对之后——台账行本身会改变库内容）
+        log(LedgerType.DRILL, verify.rowsOk && roundtripOk, "drill", null,
+            before.rowTotal, verify.rowsOk, detail)
+        DrillReport(before.rowTotal, before.tableCount, roundtripOk, detail)
+    }
+
     // ======================= 档案 JSON（模块导出） =======================
 
     /** 健康档案明文 JSON（换机建档导入用，协议 §3 模块导出）。 */

@@ -130,6 +130,21 @@ class BackupViewModel(
         (restoreResult as MutableStateFlow).value = null
     }
 
+    /** 一键恢复演练（协议 §7 首次恢复演练）。 */
+    fun drill() {
+        viewModelScope.launch {
+            (busy as MutableStateFlow).value = true
+            try {
+                val r = repo.drill()
+                info(if (r.roundtripOk)
+                    "恢复演练通过：$r.detail。备份→加密→解密→恢复→双校验全链路可用。"
+                else "演练未完全通过：$r.detail")
+            } catch (e: Exception) {
+                fail("恢复演练失败：${e.message}")
+            } finally { (busy as MutableStateFlow).value = false }
+        }
+    }
+
     // ======================= 档案 JSON =======================
 
     fun exportProfileJson(onShare: (Intent) -> Unit) {

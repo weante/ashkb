@@ -29,7 +29,9 @@ data class TodayItem(
 ) {
     val isPrn: Boolean get() = slotKey == null
     val isLate: Boolean get() = log?.let {
-        it.status == "done" && ScheduleCalc.isLate(slotTime, it.takenAt, LocalDate.now())
+        // P5 修订：锚定日志归属日（log.date），次日补打卡才能正确判 late
+        val ownDate = runCatching { LocalDate.parse(it.date) }.getOrDefault(LocalDate.now())
+        it.status == "done" && ScheduleCalc.isLate(slotTime, it.takenAt, ownDate)
     } ?: false
     val done: Boolean get() = log?.status == "done"
     val skipped: Boolean get() = log?.status == "skipped"
