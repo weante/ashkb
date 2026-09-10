@@ -75,3 +75,8 @@ cd ashkb
 ## 版本
 
 当前 `v1.0.1`（versionCode 6）。P0~P5 阶段开发完成，处于自用验证（dogfooding）阶段。
+
+## License
+
+[MIT](LICENSE) © 2026 ASHKB Dev
+
