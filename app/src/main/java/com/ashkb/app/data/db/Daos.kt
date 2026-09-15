@@ -17,6 +17,7 @@ import com.ashkb.app.data.entity.EmergencyEvent
 import com.ashkb.app.data.entity.ExerciseLog
 import com.ashkb.app.data.entity.FlareEvent
 import com.ashkb.app.data.entity.FoodAvoidItem
+import com.ashkb.app.data.entity.ImagingRecord
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.entity.LabResult
 import com.ashkb.app.data.entity.Medication
@@ -389,8 +390,20 @@ interface LabResultDao {
     @Query("SELECT * FROM lab_results WHERE date BETWEEN :from AND :to ORDER BY date DESC, test_name")
     suspend fun between(from: String, to: String): List<LabResult>
 
+    @Query("SELECT * FROM lab_results ORDER BY date DESC LIMIT :limit")
+    fun observeRecent(limit: Int = 100): Flow<List<LabResult>>
+
     @Upsert
     suspend fun upsert(result: LabResult)
+}
+
+@Dao
+interface ImagingDao {
+    @Query("SELECT * FROM imaging_records ORDER BY exam_date DESC LIMIT :limit")
+    fun observeAll(limit: Int = 50): Flow<List<ImagingRecord>>
+
+    @Upsert
+    suspend fun upsert(record: ImagingRecord)
 }
 
 @Dao

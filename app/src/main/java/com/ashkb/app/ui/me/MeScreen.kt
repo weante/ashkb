@@ -89,7 +89,7 @@ fun MeScreen(vm: MeViewModel, onOpenBackup: () -> Unit = {}) {
                             Modifier.fillMaxWidth().padding(vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
-                            Column(Modifier.weight(1f)) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text("${med.name} ${med.dose}", style = MaterialTheme.typography.bodyLarge)
                                 Text(
                                     buildString {
@@ -295,7 +295,7 @@ private fun ReminderSelfCheckCard() {
 @Composable
 private fun CheckRow(label: String, desc: String, ok: Boolean) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(label, style = MaterialTheme.typography.bodyMedium)
             Text(desc, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)

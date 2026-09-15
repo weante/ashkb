@@ -3,14 +3,10 @@ package com.ashkb.app.ui.me
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -53,18 +49,21 @@ fun ProfileFormDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (initial == null) "健康档案建档" else "编辑健康档案") },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 OutlinedTextField(name, { name = it }, label = { Text("称呼（必填）") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(diagnosis, { diagnosis = it }, label = { Text("诊断（必填）") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(year, { year = it.filter { c -> c.isDigit() }.take(4) },
                     label = { Text("确诊年份") }, modifier = Modifier.fillMaxWidth())
-                Row(Modifier.padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("positive" to "阳性", "negative" to "阴性", "unknown" to "未知").forEach { (k, l) ->
                         FilterChip(selected = hla == k, onClick = { hla = k }, label = { Text("B27 $l") })
                     }
                 }
-                Text("病情分期（运动处方与预警灵敏度依据）", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 4.dp))
-                Row(Modifier.padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("病情分期（运动处方与预警灵敏度依据）", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(
                         "active" to "活动期（疼痛晨僵加重）",
                         "stable" to "缓解期",
@@ -73,13 +72,13 @@ fun ProfileFormDialog(
                         FilterChip(selected = stage == k, onClick = { stage = k }, label = { Text(l) })
                     }
                 }
-                Text("脊柱活动度受限程度", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 4.dp))
+                Text("脊柱活动度受限程度", style = MaterialTheme.typography.labelMedium)
                 Text(
                     "颈椎受累（中度以上）将自动收紧泳姿与颈部动作条目",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(Modifier.padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(
                         "none" to "无受限", "mild" to "轻度",
                         "moderate" to "中度", "severe" to "重度",
@@ -94,7 +93,6 @@ fun ProfileFormDialog(
                     "档案数据仅存本机；血型与过敏史将用于紧急信息卡。分期可随病情变化随时更新——运动处方即时重算。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
         },

@@ -474,7 +474,7 @@ private fun FlareStatusCard(flare: FlareEvent?, days: Long?, onResolve: () -> Un
 @Composable
 private fun FlareHistoryRow(f: FlareEvent) {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 "${f.startDate} → ${f.endDate ?: "进行中"}",
                 style = MaterialTheme.typography.bodySmall,
@@ -496,7 +496,7 @@ private fun FlareHistoryRow(f: FlareEvent) {
 @Composable
 private fun BasdaiRow(r: BasdaiRecord) {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(r.date + if (r.backfill) "（补）" else "", style = MaterialTheme.typography.bodySmall)
             Text(
                 "Q1 ${r.q1Fatigue} · Q2 ${r.q2SpinePain} · Q3 ${r.q3PeripheralPain} · Q4 ${r.q4TenderPoints} · Q5 ${r.q5StiffnessDegree} · Q6 ${r.q6StiffnessDuration}",
@@ -530,26 +530,28 @@ private fun FlareStartDialog(
         onDismissRequest = onDismiss,
         title = { Text("登记发作") },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("诱因", style = MaterialTheme.typography.labelLarge)
-                FlareTrigger.entries.forEach { t ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = trigger == t, onClick = { trigger = t })
-                        Text(t.label, style = MaterialTheme.typography.bodySmall)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    FlareTrigger.entries.forEach { t ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = trigger == t, onClick = { trigger = t })
+                            Text(t.label, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
                 Text("已采取的处理（可多选）", style = MaterialTheme.typography.labelLarge)
-                FlareAction.entries.forEach { a ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = a in actions,
-                            onCheckedChange = { checked -> actions = if (checked) actions + a else actions - a },
-                        )
-                        Text(a.label, style = MaterialTheme.typography.bodySmall)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    FlareAction.entries.forEach { a ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = a in actions,
+                                onCheckedChange = { checked -> actions = if (checked) actions + a else actions - a },
+                            )
+                            Text(a.label, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
                 ScoreRow("本次峰值疼痛", peak) { peak = it }
                 OutlinedTextField(
                     value = note, onValueChange = { note = it },

@@ -120,7 +120,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
 
             // ---- 加密说明 ----
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
-                Column(Modifier.padding(14.dp)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("备份加密（AES-256-GCM）", fontWeight = FontWeight.Bold)
                     Text(
                         "备份文件 = 全库 27 表快照 + 逐表 SHA-256 清单，经口令派生密钥加密。" +

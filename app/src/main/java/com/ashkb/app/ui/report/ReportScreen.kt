@@ -132,7 +132,7 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
                         },
                     )
                     Spacer(Modifier.padding(start = 16.dp))
-                    Column {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("完成 ${o.adherence.medDone} · 部分 ${o.adherence.medPartial} · 跳过 ${o.adherence.medSkipped}",
                             style = MaterialTheme.typography.bodyMedium)
                         Text("共 ${o.adherence.medTotal} 次打卡（部分完成按 0.5 计）",
@@ -214,7 +214,7 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
 
 @Composable
 private fun StatCell(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Text(label, style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -363,6 +363,7 @@ private fun TrendChart(
                     isFakeBoldText = true
                 })
         }
+        Spacer(Modifier.height(4.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(points.first().first.takeLast(5), style = MaterialTheme.typography.labelSmall, color = labelColor)
             Text("${points.size} 点", style = MaterialTheme.typography.labelSmall, color = labelColor)

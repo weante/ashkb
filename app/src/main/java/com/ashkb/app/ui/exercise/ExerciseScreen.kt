@@ -158,12 +158,14 @@ fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
 
             // ---- 当日处方（红榜） ----
             item {
-                Text("今日处方", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "按 R27 矩阵（L1/L2/L3 × 活动期/缓解期）过滤生成",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("今日处方", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "按 R27 矩阵（L1/L2/L3 × 活动期/缓解期）过滤生成",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             items2(ui.plan) { card ->
                 PlanCard(
@@ -175,13 +177,14 @@ fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
 
             // ---- 黑榜拦截区 ----
             item {
-                Spacer(Modifier.height(6.dp))
-                Text("黑榜 · 条件化拦截", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
-                Text(
-                    "默认拦截非禁止——条件化规则详见各条目",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("黑榜 · 条件化拦截", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+                    Text(
+                        "默认拦截非禁止——条件化规则详见各条目",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             items2(ui.blocked) { card ->
                 BlockedCard(card = card, onDetail = { kbDetail = card.entry })
@@ -377,8 +380,9 @@ private fun FeedbackDialog(
                 Spacer(Modifier.height(4.dp))
                 FeedbackRadio("运动后疼痛", pain) { pain = it }
                 FeedbackRadio("次日晨僵", stiffness) { stiffness = it }
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(4.dp))
                 Text("加重时：更像哪种？", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = soreness == true, onClick = { soreness = true },
@@ -415,7 +419,7 @@ private fun FeedbackDialog(
 
 @Composable
 private fun FeedbackRadio(label: String, value: String?, onChange: (String) -> Unit) {
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("better" to "好转", "same" to "不变", "worse" to "加重").forEach { (k, l) ->

@@ -1,6 +1,7 @@
 package com.ashkb.app.ui.knowledge
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,7 +54,7 @@ fun KbDetailDialog(entry: KbEntry, onDismiss: () -> Unit) {
                     Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 ) {
-                    Column(Modifier.padding(10.dp)) {
+                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
                             "来源：${entry.sourceName}",
                             style = MaterialTheme.typography.labelSmall,
@@ -114,7 +115,8 @@ private fun PayloadSection(title: String, arr: JSONArray?) {
 @Composable
 private fun LabeledText(label: String, content: String?) {
     if (content == null) return
-    Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(bottom = 2.dp))
     Text(content, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(8.dp))
 }

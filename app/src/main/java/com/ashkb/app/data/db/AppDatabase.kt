@@ -18,6 +18,7 @@ import com.ashkb.app.data.entity.EmergencyEvent
 import com.ashkb.app.data.entity.ExerciseLog
 import com.ashkb.app.data.entity.FlareEvent
 import com.ashkb.app.data.entity.FoodAvoidItem
+import com.ashkb.app.data.entity.ImagingRecord
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.entity.LabResult
 import com.ashkb.app.data.entity.Medication
@@ -37,9 +38,9 @@ import com.ashkb.app.data.entity.WeightLog
         SymptomDaily::class, BasdaiRecord::class, FlareEvent::class, ExerciseLog::class, Alert::class,
         Supplement::class, SupplementLog::class, Vitals::class, WeightLog::class, BodyMeasure::class,
         DietProfile::class, FoodAvoidItem::class, CheckupItem::class, CheckupRecord::class, LabResult::class,
-        VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class, BackupLedger::class,
+        ImagingRecord::class, VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class, BackupLedger::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -63,6 +64,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun checkupItemDao(): CheckupItemDao
     abstract fun checkupRecordDao(): CheckupRecordDao
     abstract fun labResultDao(): LabResultDao
+    abstract fun imagingDao(): ImagingDao
     abstract fun vaccineRecordDao(): VaccineRecordDao
     abstract fun emergencyEventDao(): EmergencyEventDao
     abstract fun contactDao(): ContactDao
@@ -275,11 +277,26 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v7：v1.0.4 M6 影像记录（MRI/CT/X线，AI 导入） */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `imaging_records` (" +
+                        "`id` TEXT NOT NULL, `exam_date` TEXT NOT NULL, `recorded_at` TEXT NOT NULL, " +
+                        "`backfill` INTEGER NOT NULL, `modality` TEXT NOT NULL, `body_part` TEXT NOT NULL, " +
+                        "`hospital` TEXT, `findings` TEXT, `conclusion` TEXT, `notes` TEXT, PRIMARY KEY(`id`))"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_imaging_records_exam_date` ON `imaging_records` (`exam_date`)")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext, AppDatabase::class.java, "ashkb.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
+                ).addMigrations(
+                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7
+                ).build().also { instance = it }
             }
     }
 }

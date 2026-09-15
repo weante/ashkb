@@ -16,6 +16,7 @@ import com.ashkb.app.data.entity.FlareAction
 import com.ashkb.app.data.entity.FlareEvent
 import com.ashkb.app.data.entity.FlareTrigger
 import com.ashkb.app.data.entity.FoodAvoidItem
+import com.ashkb.app.data.entity.ImagingRecord
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.entity.LabResult
 import com.ashkb.app.data.entity.Profile
@@ -25,6 +26,8 @@ import com.ashkb.app.data.entity.SymptomDaily
 import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.entity.WeightLog
+import com.ashkb.app.domain.ImagingImport
+import com.ashkb.app.domain.LabImport
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import org.json.JSONArray
@@ -53,6 +56,7 @@ class HealthRepository(private val context: Context) {
     private val checkupItemDao = db.checkupItemDao()
     private val checkupRecordDao = db.checkupRecordDao()
     private val labResultDao = db.labResultDao()
+    private val imagingDao = db.imagingDao()
     private val vaccineDao = db.vaccineRecordDao()
     private val emergencyDao = db.emergencyEventDao()
     private val contactDao = db.contactDao()
@@ -358,6 +362,58 @@ class HealthRepository(private val context: Context) {
         } else result
         val toSave = if (withAbnormal.id.isBlank()) withAbnormal.copy(id = Ids.new("lab")) else withAbnormal
         labResultDao.upsert(toSave)
+    }
+
+    /** 化验结果总览（化验 Tab：按日期倒序，含 AI 导入的独立化验单） */
+    fun observeLabRecent(limit: Int = 100): Flow<List<LabResult>> = labResultDao.observeRecent(limit)
+
+    // ---- M6 影像记录（v1.0.4 AI 导入） ----
+    fun observeImagingRecords(): Flow<List<ImagingRecord>> = imagingDao.observeAll()
+
+    suspend fun saveImagingRecord(record: ImagingRecord) {
+        val toSave = if (record.id.isBlank()) record.copy(id = Ids.new("img")) else record
+        imagingDao.upsert(toSave)
+    }
+
+    // ---- M6 AI 导入：ReportImportParser 解析结果 → 实体入库 ----
+
+    /** 化验单导入：逐行写入 lab_results（无关联复诊记录，checkupId = null；医院并入备注） */
+    suspend fun importLabReport(import: LabImport) {
+        val date = import.date ?: LocalDate.now().toString()
+        val backfill = date != LocalDate.now().toString()
+        val note = listOfNotNull(
+            import.hospital?.let { "医院：$it" },
+            import.note,
+        ).joinToString(" · ").ifBlank { null }
+        import.rows.forEach { row ->
+            saveLabResult(
+                LabResult(
+                    id = "", date = date, recordedAt = nowIso(), backfill = backfill,
+                    checkupId = null, testName = row.testName,
+                    value = row.value, valueText = row.valueText,
+                    unit = row.unit, refLow = row.refLow, refHigh = row.refHigh,
+                    abnormal = row.abnormal, notes = note,
+                )
+            )
+        }
+    }
+
+    /** 影像报告导入：AI 解析结果 → imaging_records，「对比」并入备注 */
+    suspend fun importImagingReport(import: ImagingImport) {
+        val examDate = import.date ?: LocalDate.now().toString()
+        val notesParts = buildList {
+            import.compare?.takeIf { it.isNotBlank() && it != "无" }?.let { add("对比：$it") }
+        }
+        imagingDao.upsert(
+            ImagingRecord(
+                id = Ids.new("img"), examDate = examDate, recordedAt = nowIso(),
+                backfill = examDate != LocalDate.now().toString(),
+                modality = import.modality, bodyPart = import.bodyPart,
+                hospital = import.hospital, findings = import.findings,
+                conclusion = import.conclusion,
+                notes = notesParts.joinToString("\n").ifBlank { null },
+            )
+        )
     }
 
     // ---- 疫苗记录 ----

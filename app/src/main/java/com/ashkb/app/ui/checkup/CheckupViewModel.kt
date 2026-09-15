@@ -8,9 +8,12 @@ import com.ashkb.app.AshkbApplication
 import com.ashkb.app.data.entity.CheckupItem
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.data.entity.CheckupType
+import com.ashkb.app.data.entity.ImagingRecord
 import com.ashkb.app.data.entity.LabResult
 import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.repo.HealthRepository
+import com.ashkb.app.domain.ImagingImport
+import com.ashkb.app.domain.LabImport
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -27,6 +30,12 @@ class CheckupViewModel(private val repo: HealthRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val vaccineRecords: StateFlow<List<VaccineRecord>> = repo.observeVaccinesAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val labRecent: StateFlow<List<LabResult>> = repo.observeLabRecent()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val imagingRecords: StateFlow<List<ImagingRecord>> = repo.observeImagingRecords()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // ---- 复诊项目 ----
@@ -48,6 +57,19 @@ class CheckupViewModel(private val repo: HealthRepository) : ViewModel() {
 
     fun saveLabResult(result: LabResult) {
         viewModelScope.launch { repo.saveLabResult(result) }
+    }
+
+    fun importLabReport(import: LabImport) {
+        viewModelScope.launch { repo.importLabReport(import) }
+    }
+
+    // ---- 影像记录（v1.0.4 AI 导入） ----
+    fun saveImagingRecord(record: ImagingRecord) {
+        viewModelScope.launch { repo.saveImagingRecord(record) }
+    }
+
+    fun importImagingReport(import: ImagingImport) {
+        viewModelScope.launch { repo.importImagingReport(import) }
     }
 
     // ---- 疫苗记录 ----

@@ -5,10 +5,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -107,7 +104,10 @@ fun MedFormDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (step == 1) "添加药品" else "用药核对清单") },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 if (step == 1) {
                     OutlinedTextField(name, { name = it }, label = { Text("药品名（必填，如：阿达木单抗）") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(brand, { brand = it }, label = { Text("商品名（选填，如：修美乐）") }, modifier = Modifier.fillMaxWidth())
@@ -115,25 +115,25 @@ fun MedFormDialog(
                     // P5 R8：自动匹配——键为空时按药品名检索建议
                     val keySuggestions = DrugKeyCatalog.suggest(if (nameKey.isBlank()) name else nameKey)
                     if (keySuggestions.isNotEmpty() && !DrugKeyCatalog.isExactKey(nameKey)) {
-                        keySuggestions.forEach { s ->
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    nameKey = s.key
-                                    if (name.isBlank()) name = s.display
-                                    if (brand.isBlank() && !s.brand.isNullOrBlank()) brand = s.brand
-                                    if (medClass == MedClass.OTHER) medClass = s.medClass
-                                }.padding(vertical = 4.dp),
-                            ) {
-                                Text(
-                                    "${s.key} · ${s.display}${s.brand?.let { "（$it）" } ?: ""}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            keySuggestions.forEach { s ->
+                                Row(
+                                    Modifier.fillMaxWidth().clickable {
+                                        nameKey = s.key
+                                        if (name.isBlank()) name = s.display
+                                        if (brand.isBlank() && !s.brand.isNullOrBlank()) brand = s.brand
+                                        if (medClass == MedClass.OTHER) medClass = s.medClass
+                                    },
+                                ) {
+                                    Text(
+                                        "${s.key} · ${s.display}${s.brand?.let { "（$it）" } ?: ""}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
                             }
                         }
-                        Spacer(Modifier.height(4.dp))
                     }
-                    Spacer(Modifier.height(8.dp))
                     Text("药物类别", style = MaterialTheme.typography.labelMedium)
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
                         MedClass.entries.forEach { c ->
@@ -173,7 +173,13 @@ fun MedFormDialog(
                                     }
                                 }) { Text("添加") }
                             }
-                            times.sorted().forEach { t -> Text("· $t", style = MaterialTheme.typography.bodySmall) }
+                            if (times.isNotEmpty()) {
+                                Text(
+                                    "已选时刻：${times.sorted().joinToString("、")}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
                         } else if (frequency == MedFrequency.Q2W || frequency == MedFrequency.CUSTOM) {
                             OutlinedTextField(cycleDays, { cycleDays = it.filter { c -> c.isDigit() }.take(3) },
                                 label = { Text("注射周期（天，如 14 = 每两周）") }, modifier = Modifier.fillMaxWidth())
@@ -235,20 +241,19 @@ fun MedFormDialog(
                         )
                     } else {
                         Text("知识库命中 ${h.size} 条相关提示：", style = MaterialTheme.typography.titleSmall)
-                        Spacer(Modifier.height(4.dp))
-                        h.take(5).forEach { e ->
-                            Text(
-                                "· ${if (e.severityLevel == "high") "【高危】" else "【提示】"}${e.title}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (e.severityLevel == "high") MaterialTheme.colorScheme.error
-                                else MaterialTheme.colorScheme.onSurface,
-                            )
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            h.take(5).forEach { e ->
+                                Text(
+                                    "· ${if (e.severityLevel == "high") "【高危】" else "【提示】"}${e.title}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (e.severityLevel == "high") MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                            if (h.size > 5) Text("…其余 ${h.size - 5} 条可在知识库查看", style = MaterialTheme.typography.bodySmall)
                         }
-                        if (h.size > 5) Text("…其余 ${h.size - 5} 条可在知识库查看", style = MaterialTheme.typography.bodySmall)
                     }
-                    Spacer(Modifier.height(8.dp))
                     HorizontalDivider()
-                    Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         Checkbox(checked = doctorTold, onCheckedChange = { doctorTold = it })
                         Text("已告知风湿科医生我在使用此药")

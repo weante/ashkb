@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -178,12 +179,13 @@ private fun HealthHub(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("健康管理", style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold)
-            Text("骨健康、营养、复诊与应急——全方位守护你的健康",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(8.dp))
+            Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("健康管理", style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold)
+                Text("骨健康、营养、复诊与应急——全方位守护你的健康",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
 
         // M2/M3 营养与骨健康
@@ -236,7 +238,7 @@ private fun HealthEntryCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(icon, style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold)

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -108,11 +109,13 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
 
             // ---- 五应急场景卡 ----
             item {
-                Text("应急处理卡", style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 4.dp))
-                Text("出现以下情况时快速查阅，严重情况请立即就医",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("应急处理卡", style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(top = 4.dp))
+                    Text("出现以下情况时快速查阅，严重情况请立即就医",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
 
             items(cards) { card ->
@@ -129,7 +132,7 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                     ) {
                         Text("⚠", style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.error)
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text(card.title, fontWeight = FontWeight.Medium)
                             Text(card.summary, maxLines = 2,
@@ -161,7 +164,7 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                                     Modifier.fillMaxWidth().padding(vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Column(Modifier.weight(1f)) {
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                         Text(c.name, fontWeight = FontWeight.Medium)
                                         c.relation?.let {
                                             Text(it, style = MaterialTheme.typography.bodySmall,
@@ -184,10 +187,9 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
             // ---- 个人信息卡 ----
             item {
                 Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(14.dp)) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text("我的信息（供急救人员参考）",
                             style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(6.dp))
                         profile?.let { p ->
                             Text("姓名：${p.displayName}")
                             Text("诊断：${p.diagnosis}")
@@ -219,7 +221,7 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Text(e.date, fontWeight = FontWeight.Medium)
-                                    Spacer(Modifier.height(8.dp))
+                                    Spacer(Modifier.width(8.dp))
                                     Text(EmergencyScene.fromKey(e.scene).label,
                                         Modifier.weight(1f),
                                         style = MaterialTheme.typography.bodySmall,

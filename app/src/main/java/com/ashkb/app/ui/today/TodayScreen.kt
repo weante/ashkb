@@ -325,7 +325,7 @@ private fun SkipDialog(
         onDismissRequest = onDismiss,
         title = { Text("跳过 $medName") },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("请选择原因（跳过会如实记录，不计入漏服）", style = MaterialTheme.typography.bodySmall)
                 SkipReason.entries.forEach { r ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -363,7 +363,7 @@ private fun InjSiteDialog(
         onDismissRequest = onDismiss,
         title = { Text("注射 $medName") },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (lastSite != null) {
                     val lastLabel = INJ_SITES.firstOrNull { it.first == lastSite }?.second ?: lastSite
                     Text("上次部位：$lastLabel——建议轮换", style = MaterialTheme.typography.bodySmall)

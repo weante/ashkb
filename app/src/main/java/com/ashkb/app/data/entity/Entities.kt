@@ -478,6 +478,25 @@ data class LabResult(
     @ColumnInfo(name = "notes") val notes: String? = null,
 )
 
+/** M6 影像记录（imaging_records）——MRI/CT/X线检查报告，支持 AI 导入（v1.0.4）。 */
+@Entity(tableName = "imaging_records", indices = [Index("exam_date")])
+data class ImagingRecord(
+    @PrimaryKey val id: String, // img-xxxx
+    @ColumnInfo(name = "exam_date") val examDate: String,
+    @ColumnInfo(name = "recorded_at") val recordedAt: String,
+    @ColumnInfo(name = "backfill") val backfill: Boolean = false,
+    @ColumnInfo(name = "modality") val modality: String, // MRI / CT / XRAY
+    @ColumnInfo(name = "body_part") val bodyPart: String,
+    @ColumnInfo(name = "hospital") val hospital: String? = null,
+    @ColumnInfo(name = "findings") val findings: String? = null,
+    @ColumnInfo(name = "conclusion") val conclusion: String? = null,
+    @ColumnInfo(name = "notes") val notes: String? = null,
+) {
+    companion object {
+        fun modalityLabel(m: String) = when (m) { "MRI" -> "MRI"; "CT" -> "CT"; "XRAY" -> "X 线"; else -> m }
+    }
+}
+
 /** M6 疫苗记录（vaccine_records）——活疫苗需医生确认。 */
 enum class VaccineType(val label: String) {
     LIVE("活疫苗 / 减毒"), INACTIVATED("灭活 / 重组"), UNKNOWN("不详");
