@@ -18,22 +18,38 @@ import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.nowIso
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SymptomViewModel(private val repo: HealthRepository) : ViewModel() {
 
-    val date: LocalDate = LocalDate.now()
-    private val dateStr = date.toString()
+    val today: LocalDate = LocalDate.now()
+
+    /** 自评记录日期：今天 / 昨天（补写漏记） */
+    private val _selectedDate = MutableStateFlow(today)
+    val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
+
+    fun selectDate(date: LocalDate) {
+        if (date == today || date == today.minusDays(1)) _selectedDate.value = date
+    }
+
+    private val dateStr: String get() = _selectedDate.value.toString()
 
     val profile: StateFlow<Profile?> =
         repo.observeProfile().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    /** null = 今日未记录（与「实际为 0」严格区分） */
+    /** null = 当日未记录（与「实际为 0」严格区分） */
     val symptom: StateFlow<SymptomDaily?> =
-        repo.observeSymptom(dateStr).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        _selectedDate
+            .flatMapLatest { repo.observeSymptom(it.toString()) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val basdaiHistory: StateFlow<List<BasdaiRecord>> =
         repo.observeBasdai().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -48,9 +64,9 @@ class SymptomViewModel(private val repo: HealthRepository) : ViewModel() {
         repo.observeUnackedAlerts().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun flareDays(): Long? =
-        activeFlare.value?.let { ChronoUnit.DAYS.between(LocalDate.parse(it.startDate), date) + 1 }
+        activeFlare.value?.let { ChronoUnit.DAYS.between(LocalDate.parse(it.startDate), today) + 1 }
 
-    /** 保存每日症状：date 为今日（编辑已有行时仓库层复用主键） */
+    /** 保存每日症状：写入当前所选日期（编辑已有行时仓库层复用主键） */
     fun saveSymptom(
         morningStiffnessMin: Int?,
         nightPain: Int?,
@@ -84,14 +100,14 @@ class SymptomViewModel(private val repo: HealthRepository) : ViewModel() {
 
     fun startFlare(trigger: FlareTrigger, actions: List<FlareAction>, severityPeak: Int?, notes: String?) {
         viewModelScope.launch {
-            repo.startFlare(dateStr, trigger, actions, severityPeak, notes)
+            repo.startFlare(today.toString(), trigger, actions, severityPeak, notes)
             // 发作开始当日即查第 7 天规则（自愈性幂等）
-            repo.checkFlareDayAlert(date)
+            repo.checkFlareDayAlert(today)
         }
     }
 
     fun resolveFlare(notes: String?) {
-        viewModelScope.launch { repo.resolveFlare(dateStr, notes) }
+        viewModelScope.launch { repo.resolveFlare(today.toString(), notes) }
     }
 
     fun ackAlert(id: String) {

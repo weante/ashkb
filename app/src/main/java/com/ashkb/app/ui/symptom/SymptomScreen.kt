@@ -57,10 +57,12 @@ import kotlinx.coroutines.launch
 @Composable
 fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
     val symptom by vm.symptom.collectAsState()
+    val selectedDate by vm.selectedDate.collectAsState()
     val alerts by vm.alerts.collectAsState()
     val activeFlare by vm.activeFlare.collectAsState()
     val basdaiHistory by vm.basdaiHistory.collectAsState()
     val flareHistory by vm.flareHistory.collectAsState()
+    val isToday = selectedDate == vm.today
 
     var showFlareStart by remember { mutableStateOf(false) }
     var showResolve by remember { mutableStateOf(false) }
@@ -112,8 +114,43 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
             // ---- 发作状态 ----
             item { FlareStatusCard(activeFlare, vm.flareDays(), onResolve = { showResolve = true }, onStart = { showFlareStart = true }) }
 
+            // ---- 自评记录日期（今天 / 昨天补写） ----
+            item {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("记录日期", style = MaterialTheme.typography.bodySmall)
+                    FilterChip(
+                        selected = isToday,
+                        onClick = { vm.selectDate(vm.today) },
+                        label = { Text("今天") },
+                    )
+                    FilterChip(
+                        selected = !isToday,
+                        onClick = { vm.selectDate(vm.today.minusDays(1)) },
+                        label = { Text("昨天（补写）") },
+                    )
+                    if (!isToday) {
+                        Text(
+                            "漏记可补写，已记可修改",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
             // ---- 每日症状 ----
-            item { SymptomFormCard(symptom, onSave = { f -> vm.saveSymptom(f.morningStiffnessMin, f.nightPain, f.painScore, f.feverish, f.feverTemp, f.eyeSymptom, f.neuroRedFlag, f.mood, f.sleep, f.fatigue, f.notes) }) }
+            item {
+                SymptomFormCard(
+                    existing = symptom,
+                    dateLabel = if (isToday) "今日" else "昨日",
+                    dateKey = selectedDate,
+                    onSave = { f -> vm.saveSymptom(f.morningStiffnessMin, f.nightPain, f.painScore, f.feverish, f.feverTemp, f.eyeSymptom, f.neuroRedFlag, f.mood, f.sleep, f.fatigue, f.notes) },
+                )
+            }
 
             // ---- BASDAI ----
             item {
@@ -124,7 +161,7 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
-                    Button(onClick = { showBasdai = true }) { Text("开始今日自评") }
+                    Button(onClick = { showBasdai = true }) { Text(if (isToday) "开始今日自评" else "补写昨日自评") }
                     Spacer(Modifier.height(8.dp))
                     if (basdaiHistory.isEmpty()) {
                         Text("尚无记录", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -172,7 +209,7 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
     }
     if (showBasdai) {
         BasdaiDialog(
-            date = vm.date,
+            date = selectedDate,
             onConfirm = { q1, q2, q3, q4, q5, q6, note ->
                 vm.saveBasdai(q1, q2, q3, q4, q5, q6, note)
                 showBasdai = false
@@ -202,21 +239,26 @@ data class SymptomFormState(
 )
 
 @Composable
-private fun SymptomFormCard(existing: com.ashkb.app.data.entity.SymptomDaily?, onSave: (SymptomFormState) -> Unit) {
-    // 编辑已有记录时回显（有值才回显；无行则全空——不预填 0）
-    var stiffnessMin by remember(existing?.id) { mutableStateOf(existing?.morningStiffnessMin?.toString() ?: "") }
-    var nightPain by remember(existing?.id) { mutableStateOf(existing?.nightPain) }
-    var painScore by remember(existing?.id) { mutableStateOf(existing?.painScore) }
-    var feverish by remember(existing?.id) { mutableStateOf(existing?.feverish ?: false) }
-    var feverTemp by remember(existing?.id) { mutableStateOf(existing?.feverTemp?.toString() ?: "") }
-    var eye by remember(existing?.id) { mutableStateOf(existing?.eyeSymptom ?: false) }
-    var neuro by remember(existing?.id) { mutableStateOf(existing?.neuroRedFlag ?: false) }
-    var mood by remember(existing?.id) { mutableStateOf(existing?.mood) }
-    var sleepScore by remember(existing?.id) { mutableStateOf(existing?.sleep) }
-    var fatigue by remember(existing?.id) { mutableStateOf(existing?.fatigue) }
-    var notes by remember(existing?.id) { mutableStateOf(existing?.notes ?: "") }
+private fun SymptomFormCard(
+    existing: com.ashkb.app.data.entity.SymptomDaily?,
+    dateLabel: String,
+    dateKey: LocalDate,
+    onSave: (SymptomFormState) -> Unit,
+) {
+    // 编辑已有记录时回显（有值才回显；无行则全空——不预填 0）；dateKey 让切换记录日期时重置草稿
+    var stiffnessMin by remember(existing?.id, dateKey) { mutableStateOf(existing?.morningStiffnessMin?.toString() ?: "") }
+    var nightPain by remember(existing?.id, dateKey) { mutableStateOf(existing?.nightPain) }
+    var painScore by remember(existing?.id, dateKey) { mutableStateOf(existing?.painScore) }
+    var feverish by remember(existing?.id, dateKey) { mutableStateOf(existing?.feverish ?: false) }
+    var feverTemp by remember(existing?.id, dateKey) { mutableStateOf(existing?.feverTemp?.toString() ?: "") }
+    var eye by remember(existing?.id, dateKey) { mutableStateOf(existing?.eyeSymptom ?: false) }
+    var neuro by remember(existing?.id, dateKey) { mutableStateOf(existing?.neuroRedFlag ?: false) }
+    var mood by remember(existing?.id, dateKey) { mutableStateOf(existing?.mood) }
+    var sleepScore by remember(existing?.id, dateKey) { mutableStateOf(existing?.sleep) }
+    var fatigue by remember(existing?.id, dateKey) { mutableStateOf(existing?.fatigue) }
+    var notes by remember(existing?.id, dateKey) { mutableStateOf(existing?.notes ?: "") }
 
-    SectionCard(title = if (existing == null) "今日症状（未记录）" else "今日症状") {
+    SectionCard(title = if (existing == null) "$dateLabel 症状（未记录）" else "$dateLabel 症状") {
         if (existing != null) {
             Text(
                 "已记录于 ${existing.recordedAt.take(16).replace("T", " ")}，再次保存将覆盖",
@@ -269,7 +311,7 @@ private fun SymptomFormCard(existing: com.ashkb.app.data.entity.SymptomDaily?, o
                         notes = notes.ifBlank { null },
                     )
                 )
-            }) { Text(if (existing == null) "保存今日症状" else "更新今日症状") }
+            }) { Text(if (existing == null) "保存$dateLabel 症状" else "更新$dateLabel 症状") }
         }
     }
 }
