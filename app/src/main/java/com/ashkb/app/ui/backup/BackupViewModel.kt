@@ -36,6 +36,14 @@ class BackupViewModel(
     val pendingFileName: StateFlow<String?> = MutableStateFlow(null)
     val restoreResult: StateFlow<BackupEngine.VerifyResult?> = MutableStateFlow(null)
 
+    /** 恢复口令（内存暂存，用毕清零；pre-restore 快照复用同一口令）。 */
+    private var restorePassword: CharArray? = null
+
+    private fun wipeRestorePassword() {
+        restorePassword?.fill('0')
+        restorePassword = null
+    }
+
     fun clearMessage() { (message as MutableStateFlow).value = null }
     private fun info(msg: String) { (message as MutableStateFlow).value = msg }
     private fun fail(msg: String) { (message as MutableStateFlow).value = msg }
@@ -96,6 +104,8 @@ class BackupViewModel(
                 (pendingRestore as MutableStateFlow).value = d
                 (pendingFileName as MutableStateFlow).value = fileName
                 (restoreResult as MutableStateFlow).value = null
+                wipeRestorePassword()
+                restorePassword = password.toCharArray()
                 val rows = org.json.JSONObject(d.payload).getJSONObject("manifest")
                     .keys().asSequence().map { k ->
                     org.json.JSONObject(d.payload).getJSONObject("tables")
@@ -110,13 +120,18 @@ class BackupViewModel(
 
     fun doRestore() {
         val d = pendingRestore.value ?: return
+        val pass = restorePassword ?: run {
+            fail("恢复口令已失效，请重新选择备份文件并输入口令")
+            return
+        }
         viewModelScope.launch {
             (busy as MutableStateFlow).value = true
             try {
-                val v = repo.restore(d)
+                val v = repo.restore(d, pass)
+                wipeRestorePassword()
                 (restoreResult as MutableStateFlow).value = v
                 if (v.rowsOk) info("恢复完成：双校验（行数 + SHA-256）全部通过，共 ${v.totalRows} 行。" +
-                    "误恢复退路快照已留存。请重启应用以刷新界面数据。")
+                    "误恢复退路快照已留存（口令与本次备份口令相同）。请重启应用以刷新界面数据。")
                 else info("恢复已写入，但双校验未全部通过：${v.rowDetails.take(5).joinToString("；")}")
             } catch (e: Exception) {
                 fail("恢复失败：${e.message}")
@@ -125,6 +140,7 @@ class BackupViewModel(
     }
 
     fun cancelRestore() {
+        wipeRestorePassword()
         (pendingRestore as MutableStateFlow).value = null
         (pendingFileName as MutableStateFlow).value = null
         (restoreResult as MutableStateFlow).value = null

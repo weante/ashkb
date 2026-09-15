@@ -3,6 +3,7 @@ package com.ashkb.app.data.repo
 import android.content.Context
 import android.content.SharedPreferences
 import com.ashkb.app.data.backup.BackupEngine
+import com.ashkb.app.data.backup.KeystoreCipher
 import com.ashkb.app.data.backup.VaultCipher
 import com.ashkb.app.data.backup.WebDavClient
 import com.ashkb.app.data.db.AppDatabase
@@ -34,15 +35,31 @@ class BackupRepository(private val context: Context) {
 
     fun observeLedger(): Flow<List<BackupLedger>> = ledgerDao.observeRecent()
 
-    // ---- WebDAV 配置 ----
-    fun webdavConfig(): Triple<String, String, String> = Triple(
-        prefs.getString("url", "") ?: "",
-        prefs.getString("user", "") ?: "",
-        prefs.getString("pass", "") ?: "",
-    )
+    // ---- WebDAV 配置（凭据经 Android Keystore AES-256-GCM 加密落盘，审查 P0） ----
+    fun webdavConfig(): Triple<String, String, String> {
+        // 一次性迁移：v1.0.5 及以前明文存储的凭据 → Keystore 加密后删除旧键
+        if (prefs.contains("url") || prefs.contains("user") || prefs.contains("pass")) {
+            val old = Triple(
+                prefs.getString("url", "") ?: "",
+                prefs.getString("user", "") ?: "",
+                prefs.getString("pass", "") ?: "",
+            )
+            saveWebdavConfig(old.first, old.second, old.third)
+            prefs.edit().remove("url").remove("user").remove("pass").apply()
+        }
+        fun readEnc(key: String): String {
+            val v = prefs.getString(key, null) ?: return ""
+            return runCatching { KeystoreCipher.decryptFromB64(v) }.getOrDefault("")
+        }
+        return Triple(readEnc("url_v2"), readEnc("user_v2"), readEnc("pass_v2"))
+    }
 
     fun saveWebdavConfig(url: String, user: String, pass: String) {
-        prefs.edit().putString("url", url).putString("user", user).putString("pass", pass).apply()
+        prefs.edit()
+            .putString("url_v2", KeystoreCipher.encryptToB64(url))
+            .putString("user_v2", KeystoreCipher.encryptToB64(user))
+            .putString("pass_v2", KeystoreCipher.encryptToB64(pass))
+            .apply()
     }
 
     fun webdavConfigured(): Boolean = webdavConfig().first.isNotBlank()
@@ -141,14 +158,16 @@ class BackupRepository(private val context: Context) {
     /**
      * 恢复五步（协议 §6）：pre-restore 快照 → 解密校验（已由 decryptAndSelfCheck 完成）→
      * 覆盖写入 → 双校验 → 台账登记。
+     *
+     * @param snapshotPassword pre-restore 快照口令——与主备份口令一致（审查 P0：
+     *   不再硬编码，退路文件用户自己可解，反编译 APK 也拿不到口令）。
      */
-    suspend fun restore(decrypted: DecryptedFile): BackupEngine.VerifyResult =
+    suspend fun restore(decrypted: DecryptedFile, snapshotPassword: CharArray): BackupEngine.VerifyResult =
         withContext(Dispatchers.IO) {
             // 1. pre-restore 快照（退路）
             val snapshot = BackupEngine.export(supportDb(), nowIso())
             val snapBytes = VaultCipher.encrypt(
-                PRE_RESTORE_SNAPSHOT_PASSWORD.toCharArray(),
-                snapshot.payload, BackupEngine.SCHEMA_VERSION, nowIso())
+                snapshotPassword, snapshot.payload, BackupEngine.SCHEMA_VERSION, nowIso())
             val dir = File(context.filesDir, "backups").apply { mkdirs() }
             val snapFile = dir.resolve("pre-restore-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))}.ashkb")
             snapFile.writeBytes(snapBytes)
@@ -301,10 +320,5 @@ class BackupRepository(private val context: Context) {
 
     suspend fun logFailed(type: LedgerType, target: String, msg: String) {
         log(type, false, target, null, null, null, msg)
-    }
-
-    companion object {
-        /** pre-restore 快照固定口令（本机退路文件，仅恢复误操作用）。 */
-        const val PRE_RESTORE_SNAPSHOT_PASSWORD = "ashkb-pre-restore"
     }
 }

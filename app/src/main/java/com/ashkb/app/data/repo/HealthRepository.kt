@@ -1,6 +1,7 @@
 package com.ashkb.app.data.repo
 
 import android.content.Context
+import androidx.room.withTransaction
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.db.Ids
 import com.ashkb.app.data.entity.Alert
@@ -77,8 +78,8 @@ class HealthRepository(private val context: Context) {
     fun observeExerciseLogs(date: String): Flow<List<ExerciseLog>> = exerciseDao.observeByDate(date)
     fun observeUnackedAlerts(): Flow<List<Alert>> = alertDao.observeUnacked()
 
-    // ---- M5 每日症状：同日重记复用主键（upsert 幂等） ----
-    suspend fun saveSymptom(input: SymptomDaily) {
+    // ---- M5 每日症状：同日重记复用主键（upsert 幂等）----
+    suspend fun saveSymptom(input: SymptomDaily) = db.withTransaction {
         val existing = symptomDao.byDate(input.date)
         val log = if (existing != null) input.copy(id = existing.id)
         else input.copy(id = Ids.new("sym"))
@@ -118,7 +119,7 @@ class HealthRepository(private val context: Context) {
         q1: Int, q2: Int, q3: Int, q4: Int, q5: Int, q6: Int,
         notes: String?,
         backfill: Boolean = false,
-    ) {
+    ) = db.withTransaction {
         val existing = basdaiDao.byDate(date)
         val id = existing?.id ?: Ids.new("bas")
         val record = BasdaiRecord(
@@ -153,9 +154,9 @@ class HealthRepository(private val context: Context) {
         actions: List<FlareAction>,
         severityPeak: Int?,
         notes: String?,
-    ) {
+    ) = db.withTransaction {
         // 已有活跃发作则不重复开（幂等）
-        if (flareDao.activeFlare() != null) return
+        if (flareDao.activeFlare() != null) return@withTransaction
         flareDao.insert(
             FlareEvent(
                 id = Ids.new("flr"), recordedAt = nowIso(), startDate = startDate,
@@ -166,8 +167,8 @@ class HealthRepository(private val context: Context) {
         )
     }
 
-    suspend fun resolveFlare(endDate: String, notes: String?) {
-        val active = flareDao.activeFlare() ?: return
+    suspend fun resolveFlare(endDate: String, notes: String?) = db.withTransaction {
+        val active = flareDao.activeFlare() ?: return@withTransaction
         flareDao.upsert(
             active.copy(endDate = endDate, status = "resolved", notes = notes ?: active.notes)
         )
@@ -196,9 +197,9 @@ class HealthRepository(private val context: Context) {
         stiffnessChange: String?,
         isMuscleSoreness: Boolean?,
         note: String?,
-    ) {
+    ) = db.withTransaction {
         val rows = exerciseDao.byDate(LocalDate.now().minusDays(1).toString())
-        val target = rows.firstOrNull { it.id == logId } ?: return
+        val target = rows.firstOrNull { it.id == logId } ?: return@withTransaction
         exerciseDao.upsert(
             target.copy(
                 fbPainChange = painChange, fbStiffnessChange = stiffnessChange,
@@ -263,7 +264,7 @@ class HealthRepository(private val context: Context) {
 
     suspend fun archiveSupplement(id: String) = supplementDao.archive(id, nowIso())
 
-    suspend fun checkInSupplement(log: SupplementLog) {
+    suspend fun checkInSupplement(log: SupplementLog) = db.withTransaction {
         val existing = log.supId?.let { supplementLogDao.find(it, log.date, log.slotKey) }
         val toSave = if (existing != null) log.copy(id = existing.id)
         else log.copy(id = Ids.new("slog"))
@@ -274,7 +275,7 @@ class HealthRepository(private val context: Context) {
     fun observeVitals(date: String): Flow<Vitals?> = vitalsDao.observeLatestByDate(date)
     fun observeVitalsBetween(from: String, to: String): Flow<List<Vitals>> = vitalsDao.observeBetween(from, to)
 
-    suspend fun saveVitals(input: Vitals) {
+    suspend fun saveVitals(input: Vitals) = db.withTransaction {
         val existing = vitalsDao.latestByDate(input.date)
         // 同日只保留最新一条（upsert 按 id 覆盖，先查再用同一 id）
         val log = if (existing != null) input.copy(id = existing.id)
@@ -286,7 +287,7 @@ class HealthRepository(private val context: Context) {
     fun observeWeightRecent(limit: Int = 30): Flow<List<WeightLog>> = weightDao.observeRecent(limit)
     fun observeWeightToday(date: String): Flow<WeightLog?> = weightDao.observeByDate(date)
 
-    suspend fun saveWeight(date: String, weightKg: Double, notes: String?) {
+    suspend fun saveWeight(date: String, weightKg: Double, notes: String?) = db.withTransaction {
         val existing = weightDao.byDate(date)
         val log = if (existing != null) existing.copy(weightKg = weightKg, notes = notes, recordedAt = nowIso())
         else WeightLog(id = Ids.new("wgt"), date = date, recordedAt = nowIso(), weightKg = weightKg, notes = notes)
@@ -377,8 +378,8 @@ class HealthRepository(private val context: Context) {
 
     // ---- M6 AI 导入：ReportImportParser 解析结果 → 实体入库 ----
 
-    /** 化验单导入：逐行写入 lab_results（无关联复诊记录，checkupId = null；医院并入备注） */
-    suspend fun importLabReport(import: LabImport) {
+    /** 化验单导入：逐行写入 lab_results（事务内原子完成；无关联复诊记录，checkupId = null；医院并入备注） */
+    suspend fun importLabReport(import: LabImport) = db.withTransaction {
         val date = import.date ?: LocalDate.now().toString()
         val backfill = date != LocalDate.now().toString()
         val note = listOfNotNull(
@@ -420,7 +421,7 @@ class HealthRepository(private val context: Context) {
     fun observeVaccinesAll(): Flow<List<VaccineRecord>> = vaccineDao.observeAll()
     fun observeVaccinesByType(type: String): Flow<List<VaccineRecord>> = vaccineDao.observeByType(type)
 
-    suspend fun saveVaccineRecord(record: VaccineRecord) {
+    suspend fun saveVaccineRecord(record: VaccineRecord) = db.withTransaction {
         val toSave = if (record.id.isBlank()) record.copy(id = Ids.new("vac")) else record
         vaccineDao.upsert(toSave)
         // 活疫苗 + 未确认 → 疫苗安全警报（itx-010/012 联动）

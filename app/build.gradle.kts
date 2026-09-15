@@ -1,9 +1,21 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
+
+// 正式签名：凭据读自 local.properties（gitignore 排除，不入库）；
+// 未配置时回退 debug 签名，保证任意环境均可构建。
+val releaseKeystoreProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val releaseStoreFile = releaseKeystoreProps.getProperty("ashkb.store.file")
+val hasReleaseKeystore = !releaseStoreFile.isNullOrBlank() &&
+    rootProject.file(releaseStoreFile).exists()
 
 android {
     namespace = "com.ashkb.app"
@@ -13,15 +25,27 @@ android {
         applicationId = "com.ashkb.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.0.5"
+        versionCode = 11
+        versionName = "1.0.6"
+    }
+
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile!!)
+                storePassword = releaseKeystoreProps.getProperty("ashkb.store.password")
+                keyAlias = releaseKeystoreProps.getProperty("ashkb.key.alias")
+                keyPassword = releaseKeystoreProps.getProperty("ashkb.key.password")
+            }
+        }
     }
 
     buildTypes {
         release {
-            // 1.0 定版：自用场景优先稳定（暂不裁剪），debug 签名保证可直接安装
+            // v1.0.6 起：release 切换正式签名（P0 安全项）；无 keystore 环境回退 debug
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseKeystore) signingConfigs.getByName("release")
+                else signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

@@ -37,29 +37,36 @@ object BackupEngine {
     data class ExportResult(val payload: String, val rowTotal: Int, val tableCount: Int)
 
     fun export(db: SupportSQLiteDatabase, nowIso: String): ExportResult {
-        val tables = tableNames(db)
-        val tablesJson = JSONObject()
-        val manifest = JSONObject()
-        var rowTotal = 0
-        for (t in tables) {
-            val rows = readTable(db, t)
-            val arr = JSONArray()
-            for (r in rows) arr.put(r)
-            tablesJson.put(t, arr)
-            rowTotal += rows.size
-            manifest.put(t, JSONObject().apply {
-                put("rows", rows.size)
-                put("sha256", tableSha(rows))
-            })
+        // 读事务：全程读到同一快照，避免导出期间被并发写（打卡 receiver 等）污染
+        db.beginTransaction()
+        try {
+            val tables = tableNames(db)
+            val tablesJson = JSONObject()
+            val manifest = JSONObject()
+            var rowTotal = 0
+            for (t in tables) {
+                val rows = readTable(db, t)
+                val arr = JSONArray()
+                for (r in rows) arr.put(r)
+                tablesJson.put(t, arr)
+                rowTotal += rows.size
+                manifest.put(t, JSONObject().apply {
+                    put("rows", rows.size)
+                    put("sha256", tableSha(rows))
+                })
+            }
+            val payload = JSONObject().apply {
+                put("format", "ashkb-full")
+                put("schema_version", SCHEMA_VERSION)
+                put("exported_at", nowIso)
+                put("tables", tablesJson)
+                put("manifest", manifest)
+            }
+            db.setTransactionSuccessful()
+            return ExportResult(payload.toString(), rowTotal, tables.size)
+        } finally {
+            db.endTransaction()
         }
-        val payload = JSONObject().apply {
-            put("format", "ashkb-full")
-            put("schema_version", SCHEMA_VERSION)
-            put("exported_at", nowIso)
-            put("tables", tablesJson)
-            put("manifest", manifest)
-        }
-        return ExportResult(payload.toString(), rowTotal, tables.size)
     }
 
     /** 逐行 JSON：列顺序 = 建表列序（确定性）；值类型保留（INTEGER→long / REAL→double / TEXT→string / NULL→null）。 */
