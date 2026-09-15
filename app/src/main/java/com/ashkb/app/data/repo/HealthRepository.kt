@@ -108,18 +108,23 @@ class HealthRepository(private val context: Context) {
     }
 
     // ---- M5 BASDAI ----
+    /** 同日多次提交为覆盖更新（复用主键），backfill 标记补写日期 */
     suspend fun saveBasdai(
         date: String,
         q1: Int, q2: Int, q3: Int, q4: Int, q5: Int, q6: Int,
         notes: String?,
+        backfill: Boolean = false,
     ) {
+        val existing = basdaiDao.byDate(date)
+        val id = existing?.id ?: Ids.new("bas")
         val record = BasdaiRecord(
-            id = Ids.new("bas"), date = date, recordedAt = nowIso(),
+            id = id, date = date, recordedAt = nowIso(), backfill = backfill,
             q1Fatigue = q1, q2SpinePain = q2, q3PeripheralPain = q3, q4TenderPoints = q4,
             q5StiffnessDegree = q5, q6StiffnessDuration = q6,
             total = BasdaiRecord.total(q1, q2, q3, q4, q5, q6), notes = notes,
         )
-        basdaiDao.insert(record)
+        basdaiDao.upsert(record)
+        if (existing != null) basdaiDao.deleteOtherRowsForDate(date, id)
         evaluateBasdaiAlert(record)
     }
 

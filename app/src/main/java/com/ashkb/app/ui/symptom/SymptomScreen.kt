@@ -161,7 +161,25 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
-                    Button(onClick = { showBasdai = true }) { Text(if (isToday) "开始今日自评" else "补写昨日自评") }
+                    val basdaiExisting = basdaiHistory.firstOrNull { it.date == selectedDate.toString() }
+                    if (basdaiExisting != null) {
+                        Text(
+                            "$selectedDate 已记录（总分 %.1f），可修改后重新提交，覆盖原记录。".format(basdaiExisting.total),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    Button(onClick = { showBasdai = true }) {
+                        Text(
+                            when {
+                                isToday && basdaiExisting == null -> "开始今日自评"
+                                isToday -> "修改今日自评"
+                                basdaiExisting == null -> "补写昨日自评"
+                                else -> "修改昨日自评"
+                            }
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                     if (basdaiHistory.isEmpty()) {
                         Text("尚无记录", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -210,6 +228,7 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
     if (showBasdai) {
         BasdaiDialog(
             date = selectedDate,
+            existing = basdaiHistory.firstOrNull { it.date == selectedDate.toString() },
             onConfirm = { q1, q2, q3, q4, q5, q6, note ->
                 vm.saveBasdai(q1, q2, q3, q4, q5, q6, note)
                 showBasdai = false
@@ -478,7 +497,7 @@ private fun FlareHistoryRow(f: FlareEvent) {
 private fun BasdaiRow(r: BasdaiRecord) {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Column(Modifier.weight(1f)) {
-            Text(r.date, style = MaterialTheme.typography.bodySmall)
+            Text(r.date + if (r.backfill) "（补）" else "", style = MaterialTheme.typography.bodySmall)
             Text(
                 "Q1 ${r.q1Fatigue} · Q2 ${r.q2SpinePain} · Q3 ${r.q3PeripheralPain} · Q4 ${r.q4TenderPoints} · Q5 ${r.q5StiffnessDegree} · Q6 ${r.q6StiffnessDuration}",
                 style = MaterialTheme.typography.labelSmall,
@@ -570,16 +589,18 @@ private fun FlareResolveDialog(
 @Composable
 private fun BasdaiDialog(
     date: LocalDate,
+    existing: BasdaiRecord?,
     onConfirm: (Int, Int, Int, Int, Int, Int, String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var q1 by remember { mutableStateOf<Int?>(null) }
-    var q2 by remember { mutableStateOf<Int?>(null) }
-    var q3 by remember { mutableStateOf<Int?>(null) }
-    var q4 by remember { mutableStateOf<Int?>(null) }
-    var q5 by remember { mutableStateOf<Int?>(null) }
-    var q6 by remember { mutableStateOf<Int?>(null) }
-    var note by remember { mutableStateOf("") }
+    // 编辑模式：回显同日已有自评（数值不预填的原则对「编辑旧值」不适用——编辑就是要改旧值）
+    var q1 by remember(existing?.id, date) { mutableStateOf<Int?>(existing?.q1Fatigue) }
+    var q2 by remember(existing?.id, date) { mutableStateOf<Int?>(existing?.q2SpinePain) }
+    var q3 by remember(existing?.id, date) { mutableStateOf<Int?>(existing?.q3PeripheralPain) }
+    var q4 by remember(existing?.id, date) { mutableStateOf<Int?>(existing?.q4TenderPoints) }
+    var q5 by remember(existing?.id, date) { mutableStateOf<Int?>(existing?.q5StiffnessDegree) }
+    var q6 by remember(existing?.id, date) { mutableStateOf<Int?>(existing?.q6StiffnessDuration) }
+    var note by remember(existing?.id, date) { mutableStateOf(existing?.notes ?: "") }
     val complete = listOf(q1, q2, q3, q4, q5, q6).all { it != null }
     val total = if (complete) BasdaiRecord.total(q1!!, q2!!, q3!!, q4!!, q5!!, q6!!) else null
 
@@ -589,7 +610,8 @@ private fun BasdaiDialog(
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "回顾最近一周的感受作答（0=无，10=最重）。全部作答后可提交。",
+                    if (existing == null) "回顾最近一周的感受作答（0=无，10=最重）。全部作答后可提交。"
+                    else "已回显当日原值，修改后提交将覆盖更新（可多次修改）。",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -618,7 +640,7 @@ private fun BasdaiDialog(
             TextButton(
                 onClick = { onConfirm(q1!!, q2!!, q3!!, q4!!, q5!!, q6!!, note.ifBlank { null }) },
                 enabled = complete,
-            ) { Text("提交") }
+            ) { Text(if (existing == null) "提交" else "更新") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )

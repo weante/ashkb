@@ -94,8 +94,10 @@ class SymptomViewModel(private val repo: HealthRepository) : ViewModel() {
         }
     }
 
-    fun saveBasdai(q1: Int, q2: Int, q3: Int, q4: Int, q5: Int, q6: Int, notes: String?) {
-        viewModelScope.launch { repo.saveBasdai(dateStr, q1, q2, q3, q4, q5, q6, notes) }
+    fun saveBasdai(q1: Int, q2: Int, q3: Int, q4: Int, q5: Int, q6: Int, note: String?) {
+        viewModelScope.launch {
+            repo.saveBasdai(dateStr, q1, q2, q3, q4, q5, q6, note, backfill = _selectedDate.value != today)
+        }
     }
 
     fun startFlare(trigger: FlareTrigger, actions: List<FlareAction>, severityPeak: Int?, notes: String?) {

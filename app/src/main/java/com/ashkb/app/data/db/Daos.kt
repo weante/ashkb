@@ -164,8 +164,15 @@ interface BasdaiDao {
     @Query("SELECT * FROM basdai_records WHERE date BETWEEN :from AND :to ORDER BY date")
     suspend fun between(from: String, to: String): List<BasdaiRecord>
 
-    @Insert
-    suspend fun insert(record: BasdaiRecord)
+    @Query("SELECT * FROM basdai_records WHERE date = :date ORDER BY recorded_at DESC LIMIT 1")
+    suspend fun byDate(date: String): BasdaiRecord?
+
+    @Upsert
+    suspend fun upsert(record: BasdaiRecord)
+
+    /** 同日仅保留一条（覆盖语义下清理历史遗留的重复行） */
+    @Query("DELETE FROM basdai_records WHERE date = :date AND id != :keepId")
+    suspend fun deleteOtherRowsForDate(date: String, keepId: String)
 }
 
 @Dao
