@@ -3,6 +3,7 @@ package com.ashkb.app.ui.symptom
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import com.ashkb.app.domain.ClinicalThresholds
+import com.ashkb.app.ui.components.ScoreInput
+import com.ashkb.app.ui.components.SectionCard
+import com.ashkb.app.ui.theme.Spacing
+import com.ashkb.app.ui.theme.StatusTone
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,8 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 
 // ---------------------------------------------------------------------------
@@ -72,7 +77,7 @@ internal fun SymptomFormCard(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(Spacing.xs))
         }
         OutlinedTextField(
             value = stiffnessMin,
@@ -95,7 +100,7 @@ internal fun SymptomFormCard(
         SwitchRow("眼部症状", eye, "眼痛 / 发红 / 畏光 / 视物模糊——葡萄膜炎警示") { eye = it }
         SwitchRow("神经症状", neuro, "麻木 / 无力 / 大小便控制变化——需立即就医") { neuro = it }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(Spacing.xs))
         Text("以下可选（生活质量参考）", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         ScoreRow("心情", mood) { mood = it }
         ScoreRow("睡眠质量", sleepScore) { sleepScore = it }
@@ -105,8 +110,8 @@ internal fun SymptomFormCard(
             value = notes, onValueChange = { notes = it },
             label = { Text("备注（可选）") }, modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(Modifier.height(Spacing.sm))
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Button(onClick = {
                 onSave(
                     SymptomFormState(
@@ -123,41 +128,39 @@ internal fun SymptomFormCard(
     }
 }
 
-/** 0–10 选择器：不预填（null = 未记录）；点已选值再点一次可清除 */
+/**
+ * 0–10 选择器：不预填（null = 未记录，与"0 = 无"在 BASDAI 里语义不同）。
+ *
+ * 原实现是 11 个 32dp `FilterChip` 单行横滑 —— 触摸目标低于 48dp，
+ * 而这是疼痛评分与 BASDAI 六题（共 66 个 chip）的唯一入口，属临床输入硬伤。
+ * 改为 `ScoreInput`：大号等宽数字 + 48dp ± 按钮 + 滑杆。
+ */
 @Composable
 internal fun ScoreRow(label: String, value: Int?, onChange: (Int?) -> Unit) {
-    Column(Modifier.padding(vertical = 4.dp)) {
-        Row {
-            Text(label, style = MaterialTheme.typography.bodySmall)
-            Spacer(Modifier.width(6.dp))
-            Text(
-                if (value == null) "未记录" else "$value",
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Bold,
-                color = if (value == null) MaterialTheme.colorScheme.onSurfaceVariant
-                else if (value >= 7) MaterialTheme.colorScheme.error
-                else MaterialTheme.colorScheme.primary,
-            )
-        }
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            (0..10).forEach { v ->
-                FilterChip(
-                    selected = value == v,
-                    onClick = { onChange(if (value == v) null else v) },
-                    label = { Text("$v") },
-                )
-            }
-        }
+    ScoreInput(
+        value = value ?: 0,
+        onValueChange = { onChange(it) },
+        label = if (value == null) "$label（点按开始记录）" else label,
+        tone = ::painTone,
+    )
+    if (value != null) {
+        TextButton(
+            onClick = { onChange(null) },
+            contentPadding = PaddingValues(horizontal = Spacing.sm),
+        ) { Text("清除本次记录") }
     }
+}
+
+private fun painTone(v: Int): StatusTone = when {
+    v >= ClinicalThresholds.PAIN_SEVERE -> StatusTone.Danger
+    v >= ClinicalThresholds.PAIN_MODERATE -> StatusTone.Warning
+    else -> StatusTone.Success
 }
 
 @Composable
 private fun SwitchRow(label: String, checked: Boolean, hint: String, onChange: (Boolean) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        Modifier.fillMaxWidth().padding(vertical = Spacing.xxs),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -23,10 +23,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.ashkb.app.data.entity.BasdaiRecord
 import com.ashkb.app.data.entity.FlareAction
 import com.ashkb.app.data.entity.FlareTrigger
+import com.ashkb.app.ui.theme.Spacing
 import java.time.LocalDate
 
 // ---------------------------------------------------------------------------
@@ -47,9 +47,9 @@ internal fun FlareStartDialog(
         onDismissRequest = onDismiss,
         title = { Text("登记发作") },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 Text("诱因", style = MaterialTheme.typography.labelLarge)
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                     FlareTrigger.entries.forEach { t ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             RadioButton(selected = trigger == t, onClick = { trigger = t })
@@ -58,7 +58,7 @@ internal fun FlareStartDialog(
                     }
                 }
                 Text("已采取的处理（可多选）", style = MaterialTheme.typography.labelLarge)
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                     FlareAction.entries.forEach { a ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(
@@ -93,7 +93,7 @@ internal fun FlareResolveDialog(
         text = {
             Column {
                 Text("将本次发作标记为今日缓解。记录完整的发作时长有助于复诊时判断病情活动。", style = MaterialTheme.typography.bodySmall)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(Spacing.sm))
                 OutlinedTextField(
                     value = note, onValueChange = { note = it },
                     label = { Text("缓解方式 / 备注（可选）") }, modifier = Modifier.fillMaxWidth(),
@@ -134,7 +134,7 @@ internal fun BasdaiDialog(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(Spacing.sm))
                 ScoreRow("Q1 整体疲乏程度", q1) { q1 = it }
                 ScoreRow("Q2 脊柱痛程度", q2) { q2 = it }
                 ScoreRow("Q3 外周关节痛程度", q3) { q3 = it }
@@ -146,7 +146,7 @@ internal fun BasdaiDialog(
                     label = { Text("备注（可选）") }, modifier = Modifier.fillMaxWidth(),
                 )
                 if (total != null) {
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(Spacing.sm))
                     Text(
                         "总分：%.1f".format(total) + if (total >= 4.0) "（≥4.0：活动度偏高，两周内两次将提示复诊）" else "",
                         style = MaterialTheme.typography.titleMedium,

@@ -1,7 +1,6 @@
 package com.ashkb.app.ui.report
 
 import android.content.Intent
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,12 +12,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -27,6 +25,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,18 +34,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.ashkb.app.ui.GlobalMessages
+import com.ashkb.app.domain.ClinicalThresholds
+import com.ashkb.app.ui.components.LoadingBlock
+import com.ashkb.app.ui.components.SectionCard
+import com.ashkb.app.ui.components.StatusChip
+import com.ashkb.app.ui.components.TrendChart
+import com.ashkb.app.ui.components.TrendPoint
+import com.ashkb.app.ui.theme.DataLarge
+import com.ashkb.app.ui.theme.Spacing
+import com.ashkb.app.ui.theme.StatusTone
+import com.ashkb.app.ui.theme.accent
 import com.ashkb.app.data.repo.ReportRepository
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 
 /** P4 M9 报表页：概览 / 趋势 / 报告导出 三页签。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,13 +63,12 @@ fun ReportScreen(vm: ReportViewModel) {
     val pager = rememberPagerState(pageCount = { 3 })
     val tabs = listOf("概览", "趋势", "报告导出")
 
-    message?.let { msg ->
-        AlertDialog(
-            onDismissRequest = { vm.clearMessage() },
-            title = { Text("提示") },
-            text = { Text(msg) },
-            confirmButton = { TextButton(onClick = { vm.clearMessage() }) { Text("知道了") } },
-        )
+    // 提示类消息改走全局 Snackbar（非阻塞）——不再"每个操作都要点一次知道了"
+    LaunchedEffect(message) {
+        message?.let {
+            GlobalMessages.post(it)
+            vm.clearMessage()
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -76,7 +77,7 @@ fun ReportScreen(vm: ReportViewModel) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("报表与数据", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("报表与数据", style = MaterialTheme.typography.headlineSmall)
                 Text("近 30 天统计 · 趋势 · 复诊报告",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -121,28 +122,38 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
 
         item {
             SectionCard(title = "服药依从（${o.adherence.days} 天）") {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "${o.adherence.medRatePct}%",
-                        style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold,
-                        color = when {
-                            o.adherence.medRatePct >= 80 -> MaterialTheme.colorScheme.primary
-                            o.adherence.medRatePct >= 50 -> Color(0xFFB8860B)
-                            else -> MaterialTheme.colorScheme.error
-                        },
-                    )
-                    Spacer(Modifier.padding(start = 16.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("完成 ${o.adherence.medDone} · 部分 ${o.adherence.medPartial} · 跳过 ${o.adherence.medSkipped}",
-                            style = MaterialTheme.typography.bodyMedium)
-                        Text("共 ${o.adherence.medTotal} 次打卡（部分完成按 0.5 计）",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                // 阈值 90/70（原为 80/50），且数字与进度条必须同 tone（修此前的矛盾）
+                val rate = o.adherence.medRatePct
+                val tone = when {
+                    rate >= ClinicalThresholds.ADHERENCE_GOOD -> StatusTone.Success
+                    rate >= ClinicalThresholds.ADHERENCE_FAIR -> StatusTone.Warning
+                    else -> StatusTone.Danger
                 }
-                Spacer(Modifier.height(8.dp))
+                val accent = tone.accent()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("$rate%", style = DataLarge, color = accent)
+                    Spacer(Modifier.padding(start = Spacing.lg))
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                        Text(
+                            "完成 ${o.adherence.medDone} · 部分 ${o.adherence.medPartial} · 跳过 ${o.adherence.medSkipped}",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            "共 ${o.adherence.medTotal} 次打卡（部分完成按 0.5 计）",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    StatusChip(ClinicalThresholds.adherenceLabel(rate), tone)
+                }
+                Spacer(Modifier.height(Spacing.sm))
                 LinearProgressIndicator(
-                    progress = { o.adherence.medRatePct / 100f }, modifier = Modifier.fillMaxWidth())
+                    progress = { rate / 100f },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = accent,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                )
             }
         }
 
@@ -170,10 +181,12 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
                     StatCell("发热天数", "${o.symptom.feverDays}", Modifier.weight(1f))
                 }
                 if (o.symptom.eyeDays > 0) {
-                    Spacer(Modifier.height(6.dp))
-                    Text("⚠ 眼部症状天数 > 0：AS 合并葡萄膜炎需眼科评估（emr-001）",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.height(Spacing.xs))
+                    StatusChip(
+                        text = "眼部症状 ${o.symptom.eyeDays} 天：AS 合并葡萄膜炎需眼科评估（emr-001）",
+                        tone = StatusTone.Danger,
+                        icon = Icons.Rounded.WarningAmber,
+                    )
                 }
             }
         }
@@ -189,10 +202,12 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
                         StatCell("次数", "${o.basdaiCount30}", Modifier.weight(1f))
                     }
                     if (o.basdaiLatest.total >= 4.0) {
-                        Spacer(Modifier.height(6.dp))
-                        Text("⚠ BASDAI ≥ 4.0：疾病活动度高，复诊时请与医生讨论（edu-th-002）",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.height(Spacing.xs))
+                        StatusChip(
+                            text = "BASDAI ≥ 4.0：疾病活动度高，复诊时请与医生讨论（edu-th-002）",
+                            tone = StatusTone.Danger,
+                            icon = Icons.Rounded.WarningAmber,
+                        )
                     }
                 }
             }
@@ -201,7 +216,7 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
         item {
             SectionCard(title = "发作与体重") {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCell("发作次数", "${o.flareCount}" + if (o.flareActive) " ⚠活跃" else "", Modifier.weight(1f))
+                    StatCell("发作次数", "${o.flareCount}" + if (o.flareActive) "（活跃）" else "", Modifier.weight(1f))
                     StatCell("最新体重", o.weightLatest?.let { "${it.weightKg} kg" } ?: "—", Modifier.weight(1f))
                     StatCell("较上次", o.weightDelta?.let { "%+.1f kg".format(it) } ?: "—", Modifier.weight(1f))
                 }
@@ -215,7 +230,7 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
 @Composable
 private fun StatCell(label: String, value: String, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(value, style = MaterialTheme.typography.titleLarge)
         Text(label, style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -226,10 +241,7 @@ private fun StatCell(label: String, value: String, modifier: Modifier = Modifier
 @Composable
 private fun TrendsPage(t: ReportRepository.Trends?) {
     if (t == null) {
-        Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.height(48.dp))
-            Text("趋势加载中…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        LoadingBlock(minHeight = 240.dp, label = "正在统计…")
         return
     }
     LazyColumn(
@@ -238,139 +250,76 @@ private fun TrendsPage(t: ReportRepository.Trends?) {
     ) {
         item { Spacer(Modifier.height(12.dp)) }
         item {
-            SectionCard(title = "BASDAI 总分走势") {
+            SectionCard(title = "BASDAI 总分走势", subtitle = "阈值以上为高活动度") {
                 TrendChart(
-                    points = t.basdai.map { it.date to it.total.toFloat() },
-                    yMax = 10f, threshold = 4f, thresholdLabel = "活动度 4.0",
+                    points = t.basdai.map { TrendPoint(it.date, it.total.toFloat()) },
+                    unit = "",
+                    label = "BASDAI 总分",
+                    threshold = ClinicalThresholds.BASDAI_HIGH,
+                    thresholdLabel = "活动度 ${ClinicalThresholds.BASDAI_HIGH}",
                 )
             }
         }
         item {
-            SectionCard(title = "疼痛评分（0–10）") {
-                TrendChart(points = t.symptom.mapNotNull { s ->
-                    s.painScore?.let { s.date to it.toFloat() }
-                }, yMax = 10f)
+            SectionCard(title = "疼痛评分", subtitle = "0–10 分") {
+                TrendChart(
+                    points = t.symptom.mapNotNull { s ->
+                        s.painScore?.let { TrendPoint(s.date, it.toFloat()) }
+                    },
+                    unit = " 分",
+                    label = "疼痛评分",
+                )
             }
         }
         item {
-            SectionCard(title = "晨僵时长（分钟）") {
-                TrendChart(points = t.symptom.mapNotNull { s ->
-                    s.morningStiffnessMin?.let { s.date to it.toFloat() }
-                }, yMax = null)
+            SectionCard(title = "晨僵时长", subtitle = "分钟") {
+                TrendChart(
+                    points = t.symptom.mapNotNull { s ->
+                        s.morningStiffnessMin?.let { TrendPoint(s.date, it.toFloat()) }
+                    },
+                    unit = " 分钟",
+                    label = "晨僵时长",
+                )
             }
         }
         item {
-            SectionCard(title = "体重（kg）") {
-                TrendChart(points = t.weight.map { it.date to it.weightKg.toFloat() }, yMax = null)
+            SectionCard(title = "体重", subtitle = "kg") {
+                TrendChart(
+                    points = t.weight.map { TrendPoint(it.date, it.weightKg.toFloat()) },
+                    unit = " kg",
+                    label = "体重",
+                )
             }
         }
         item {
-            SectionCard(title = "收缩压 / 心率") {
-                TrendChart(points = t.vitals.mapNotNull { v ->
-                    v.bpSys?.let { v.date to it.toFloat() }
-                }, yMax = null, lineColor = Color(0xFFD32F2F))
-                Spacer(Modifier.height(8.dp))
-                TrendChart(points = t.vitals.mapNotNull { v ->
-                    v.heartRate?.let { v.date to it.toFloat() }
-                }, yMax = null, lineColor = Color(0xFF1976D2))
+            SectionCard(title = "收缩压", subtitle = "mmHg") {
+                TrendChart(
+                    points = t.vitals.mapNotNull { v ->
+                        v.bpSys?.let { TrendPoint(v.date, it.toFloat()) }
+                    },
+                    unit = " mmHg",
+                    label = "收缩压",
+                    accent = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+        item {
+            SectionCard(title = "心率", subtitle = "bpm") {
+                TrendChart(
+                    points = t.vitals.mapNotNull { v ->
+                        v.heartRate?.let { TrendPoint(v.date, it.toFloat()) }
+                    },
+                    unit = " bpm",
+                    label = "心率",
+                    accent = MaterialTheme.colorScheme.tertiary,
+                )
             }
         }
         item { Spacer(Modifier.height(20.dp)) }
     }
 }
 
-/** 极简趋势折线图：网格 + 折线 + 端点 + 首末日期标签（零依赖 Canvas 实现）。 */
-@Composable
-private fun TrendChart(
-    points: List<Pair<String, Float>>,
-    yMax: Float?,
-    threshold: Float? = null,
-    thresholdLabel: String? = null,
-    lineColor: Color = MaterialTheme.colorScheme.primary,
-) {
-    if (points.isEmpty()) {
-        Text("暂无数据", style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(vertical = 12.dp))
-        return
-    }
-    val values = points.map { it.second }
-    val vMax = (yMax ?: ((values.max() * 1.15f).coerceAtLeast(1f))).coerceAtLeast(0.001f)
-    val vMin = if (yMax != null) 0f else (values.min() * 0.85f).coerceAtMost(values.max())
-    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-
-    Column {
-        Canvas(Modifier.fillMaxWidth().height(150.dp)) {
-            val w = size.width
-            val h = size.height
-            val left = 34f
-            val bottom = h - 4f
-            val top = 10f
-            val grid = Color(0x22888888)
-            val textPx = 9f.sp.toPx()
-
-            // 网格与 y 轴刻度（4 条）
-            for (i in 0..4) {
-                val fy = bottom - (bottom - top) * i / 4f
-                drawLine(grid, Offset(left, fy), Offset(w - 4f, fy), 1f)
-                val label = vMin + (vMax - vMin) * i / 4f
-                drawContext.canvas.nativeCanvas.drawText(
-                    if (label >= 100) "%.0f".format(label) else "%.1f".format(label),
-                    2f, fy + textPx / 3, android.graphics.Paint().apply {
-                        this.color = android.graphics.Color.argb(160, 100, 100, 110)
-                        this.textSize = textPx
-                        isAntiAlias = true
-                    })
-            }
-
-            // 阈值线（如 BASDAI 4.0）
-            if (threshold != null) {
-                val fy = bottom - (bottom - top) * (threshold - vMin) / (vMax - vMin)
-                if (fy in top..bottom) {
-                    drawLine(Color(0x80CC4444), Offset(left, fy), Offset(w - 4f, fy), 1.5f)
-                    drawContext.canvas.nativeCanvas.drawText(thresholdLabel ?: "",
-                        w - 90f, fy - 4f, android.graphics.Paint().apply {
-                            color = android.graphics.Color.argb(180, 180, 50, 50)
-                            textSize = textPx; isAntiAlias = true
-                        })
-                }
-            }
-
-            fun px(i: Int): Float =
-                if (points.size == 1) (left + w) / 2 else left + (w - 4f - left) * i / (points.size - 1f)
-            fun py(v: Float): Float = bottom - (bottom - top) * (v - vMin) / (vMax - vMin)
-
-            // 折线
-            if (points.size > 1) {
-                val path = Path()
-                points.forEachIndexed { i, p ->
-                    val x = px(i); val y = py(p.second)
-                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                }
-                drawPath(path, lineColor, style = Stroke(width = 4f))
-            }
-            // 数据点
-            points.forEachIndexed { i, p ->
-                drawCircle(lineColor, 4f, Offset(px(i), py(p.second)))
-            }
-            // 末值标签
-            val last = points.last()
-            drawContext.canvas.nativeCanvas.drawText("%.1f".format(last.second),
-                (px(points.size - 1) - 30f).coerceIn(0f, w - 40f), py(last.second) - 8f,
-                android.graphics.Paint().apply {
-                    this.color = android.graphics.Color.argb(220, 30, 30, 40)
-                    this.textSize = textPx * 1.1f; isAntiAlias = true
-                    isFakeBoldText = true
-                })
-        }
-        Spacer(Modifier.height(4.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(points.first().first.takeLast(5), style = MaterialTheme.typography.labelSmall, color = labelColor)
-            Text("${points.size} 点", style = MaterialTheme.typography.labelSmall, color = labelColor)
-            Text(points.last().first.takeLast(5), style = MaterialTheme.typography.labelSmall, color = labelColor)
-        }
-    }
-}
+// 趋势图已抽到 ui/components/TrendChart.kt（坐标轴 / 整数刻度 / 拖动读数 / 无障碍摘要）
 
 // ======================= 报告导出 =======================
 
@@ -393,7 +342,10 @@ private fun ExportPage(vm: ReportViewModel, busy: Boolean, context: android.cont
                 Button(
                     onClick = {
                         vm.generateReportPdf(
-                            onReady = { intent -> runCatching { context.startActivity(Intent.createChooser(intent, "分享复诊报告")) } },
+                            onReady = { intent ->
+                                runCatching { context.startActivity(Intent.createChooser(intent, "分享复诊报告")) }
+                                    .onFailure { GlobalMessages.post("打开分享面板失败：${it.message}") }
+                            },
                             onError = { vm.reportError(it) },
                         )
                     },
@@ -413,7 +365,10 @@ private fun ExportPage(vm: ReportViewModel, busy: Boolean, context: android.cont
                 OutlinedButton(
                     onClick = {
                         vm.generateEmergencyCardPdf(
-                            onReady = { intent -> runCatching { context.startActivity(Intent.createChooser(intent, "分享紧急卡")) } },
+                            onReady = { intent ->
+                                runCatching { context.startActivity(Intent.createChooser(intent, "分享紧急卡")) }
+                                    .onFailure { GlobalMessages.post("打开分享面板失败：${it.message}") }
+                            },
                             onError = { vm.reportError(it) },
                         )
                     },
@@ -437,14 +392,4 @@ private fun ExportPage(vm: ReportViewModel, busy: Boolean, context: android.cont
 }
 
 // ======================= 公共 =======================
-
-@Composable
-private fun SectionCard(title: String, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
-        Column(Modifier.padding(14.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp))
-            content()
-        }
-    }
-}
+// SectionCard 已统一到 ui/components/Cards.kt（此前 5 份同名实现在此收口）

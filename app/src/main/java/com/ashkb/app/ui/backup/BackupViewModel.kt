@@ -30,6 +30,18 @@ class BackupViewModel(
     val ledger: StateFlow<List<BackupLedger>> = repo.observeLedger()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // ---- WebDAV 已存配置（密码不回显；sheet 预填地址与用户名） ----
+    private val _davUrl = MutableStateFlow("")
+    private val _davUser = MutableStateFlow("")
+    val davUrl: StateFlow<String> = _davUrl
+    val davUser: StateFlow<String> = _davUser
+
+    init {
+        val (u, usr) = repo.webdavConfig()
+        _davUrl.value = u
+        _davUser.value = usr
+    }
+
     // ---- 恢复流程状态（协议 §6 五步） ----
     /** 已旁路解密 + 自校验通过的备份（尚未写入主库）。 */
     val pendingRestore: StateFlow<BackupRepository.DecryptedFile?> = MutableStateFlow(null)
@@ -74,6 +86,8 @@ class BackupViewModel(
             try {
                 val msg = repo.probeWebdav(url.trim(), user.trim(), pass)
                 repo.saveWebdavConfig(url.trim(), user.trim(), pass)
+                _davUrl.value = url.trim()
+                _davUser.value = user.trim()
                 info(msg)
             } catch (e: Exception) {
                 fail("连接失败：${e.message}")

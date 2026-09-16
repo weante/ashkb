@@ -62,6 +62,11 @@ class ExerciseViewModel(private val repo: HealthRepository) : ViewModel() {
         repo.observeExerciseLogs(date.toString())
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /** 昨日症状（疼痛 / 晨僵 / 体温）——处方 hero 的判读依据 */
+    val yesterdaySymptom: StateFlow<com.ashkb.app.data.entity.SymptomDaily?> =
+        repo.observeSymptom(yesterday)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     /** R21：昨日已完成但未反馈的打卡 */
     val feedbackPending: StateFlow<List<ExerciseLog>> = pendingFeedback
 

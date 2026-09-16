@@ -4,6 +4,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
 }
 
@@ -25,8 +26,8 @@ android {
         applicationId = "com.ashkb.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 11
-        versionName = "1.0.6"
+        versionCode = 12
+        versionName = "1.0.7"
     }
 
     signingConfigs {
@@ -82,6 +83,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
     implementation("androidx.core:core-ktx:1.13.1")
+
+    // 导航（UI 改版唯一新增依赖，见方案 §8.6）：规范化返回栈 / 状态保存 / 深链接
+    implementation("androidx.navigation:navigation-compose:2.8.4")
 
     // JSON（种子 payload 解析，org.json 亦可用，此处统一 kotlinx）
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

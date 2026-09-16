@@ -1,32 +1,51 @@
 package com.ashkb.app.ui.emergency
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.PictureAsPdf
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.WarningAmber
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,16 +54,37 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.ashkb.app.data.entity.EmergencyContact
 import com.ashkb.app.data.entity.EmergencyEvent
 import com.ashkb.app.data.entity.EmergencyScene
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.Labels
+import com.ashkb.app.ui.GlobalMessages
+import com.ashkb.app.ui.components.AlertBanner
+import com.ashkb.app.ui.components.DividerList
+import com.ashkb.app.ui.components.EmptyState
+import com.ashkb.app.ui.components.KeyValueRow
+import com.ashkb.app.ui.components.ScreenTopBar
+import com.ashkb.app.ui.components.SectionCard
+import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.knowledge.KbDetailDialog
+import com.ashkb.app.ui.theme.Size
+import com.ashkb.app.ui.theme.Spacing
+import com.ashkb.app.ui.theme.StatusTone
 import java.time.LocalDate
 
+private fun Context.dial(phone: String) {
+    runCatching { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))) }
+        .onFailure { GlobalMessages.post("无法打开拨号面板：${it.message}") }
+}
+
+/**
+ * 紧急卡（方案 §10.8 反向设计）：疼痛中、慌乱中、单手操作——
+ * 字要大、按钮要大、信息要少。120 快拨固定在底部，不随内容滚动。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
@@ -57,189 +97,204 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
     var selectedCard by remember { mutableStateOf<KbEntry?>(null) }
     var showContactForm by remember { mutableStateOf(false) }
     var showEventForm by remember { mutableStateOf(false) }
+    var showAllEvents by remember { mutableStateOf(false) }
+    var exporting by remember { mutableStateOf(false) }
 
-    // 加载应急卡种子
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        cards = vm.emergencyCards()
-    }
+    LaunchedEffect(Unit) { cards = vm.emergencyCards() }
 
-    Column(Modifier.fillMaxSize()) {
-        TopAppBar(title = { Text("紧急卡") })
-
-        LazyColumn(
-            Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            // ---- 快速拨号 ----
-            item {
-                Card(
-                    Modifier.fillMaxWidth(),
-                    colors = androidx.compose.material3.CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.08f)
-                    ),
-                ) {
-                    Column(Modifier.padding(14.dp)) {
-                        Text("紧急呼叫", style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = {
-                                    context.startActivity(
-                                        Intent(Intent.ACTION_DIAL, Uri.parse("tel:120"))
-                                    )
-                                },
-                                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.error
-                                ),
-                            ) { Text("120 急救") }
-                            if (contacts.isNotEmpty()) {
-                                OutlinedButton(onClick = {
-                                    val first = contacts.first()
-                                    context.startActivity(
-                                        Intent(Intent.ACTION_DIAL, Uri.parse("tel:${first.phone}"))
-                                    )
-                                }) { Text("联系 ${contacts.first().name}") }
-                            }
-                        }
-                    }
-                }
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
+        // 外层 AppShell 的 Scaffold 已吃掉系统栏内边距，这里置 0 防止双倍空白
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        bottomBar = {
+            Button(
+                onClick = { context.dial("120") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+                    .height(Size.emergencyCallHeight),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+                shape = MaterialTheme.shapes.large,
+            ) {
+                Icon(
+                    Icons.Rounded.Call,
+                    contentDescription = null,   // 文字已承载语义
+                    modifier = Modifier.size(Size.iconLg),
+                )
+                Spacer(Modifier.width(Spacing.sm))
+                Text("120 急救", style = MaterialTheme.typography.headlineSmall)
             }
+        },
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            ScreenTopBar(title = "紧急卡", onBack = onBack)
 
-            // ---- 五应急场景卡 ----
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("应急处理卡", style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 4.dp))
-                    Text("出现以下情况时快速查阅，严重情况请立即就医",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = Spacing.lg, end = Spacing.lg,
+                    top = Spacing.md, bottom = Spacing.md,
+                ),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                // ---- 五应急场景卡（不可折叠，最先看到）----
+                items(cards, key = { it.id }) { card ->
+                    AlertBanner(
+                        tone = StatusTone.Danger,
+                        icon = Icons.Rounded.WarningAmber,
+                        title = card.title,
+                        body = card.summary,
+                        actionLabel = "查看详情",
+                        onAction = { selectedCard = card },
+                        titleStyle = MaterialTheme.typography.titleLarge,
+                    )
                 }
-            }
 
-            items(cards) { card ->
-                Card(
-                    onClick = { selectedCard = card },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = androidx.compose.material3.CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    ),
-                ) {
-                    Row(
-                        Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("⚠", style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.error)
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(card.title, fontWeight = FontWeight.Medium)
-                            Text(card.summary, maxLines = 2,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Text("查看 →", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
-
-            // ---- 紧急联系人 ----
-            item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("紧急联系人", style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.weight(1f))
+                // ---- 紧急联系人 ----
+                item {
+                    SectionCard(
+                        title = "紧急联系人",
+                        subtitle = "一键拨号，按钮比普通按钮大",
+                        action = {
                             TextButton(onClick = { showContactForm = true }) { Text("添加") }
-                        }
+                        },
+                    ) {
                         if (contacts.isEmpty()) {
-                            Text("尚未添加紧急联系人",
+                            Text(
+                                "尚未添加紧急联系人",
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodySmall)
+                            )
                         } else {
-                            contacts.forEach { c ->
-                                Row(
-                                    Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
+                            DividerList(contacts, key = { it.id }) { c ->
+                                Column(
+                                    Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
                                 ) {
-                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        Text(c.name, fontWeight = FontWeight.Medium)
-                                        c.relation?.let {
-                                            Text(it, style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                    }
-                                    TextButton(onClick = {
-                                        context.startActivity(
-                                            Intent(Intent.ACTION_DIAL, Uri.parse("tel:${c.phone}"))
+                                    Text(c.name, style = MaterialTheme.typography.titleMedium)
+                                    c.relation?.let {
+                                        Text(
+                                            it,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
-                                    }) { Text(c.phone) }
+                                    }
                                 }
-                                HorizontalDivider()
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ---- 个人信息卡 ----
-            item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("我的信息（供急救人员参考）",
-                            style = MaterialTheme.typography.titleMedium)
-                        profile?.let { p ->
-                            Text("姓名：${p.displayName}")
-                            Text("诊断：${p.diagnosis}")
-                            Text("HLA-B27：${hlaLabel(p.hlaB27)}")
-                            p.allergies?.let { Text("过敏史：$it") }
-                            p.emergencyBloodType?.let { Text("血型：$it") }
-                        } ?: Text("未建档", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-
-            // ---- 紧急事件历史 ----
-            item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("紧急事件记录", style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.weight(1f))
-                            TextButton(onClick = { showEventForm = true }) { Text("记录") }
-                        }
-                        if (events.isEmpty()) {
-                            Text("暂无记录",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodySmall)
-                        } else {
-                            events.take(3).forEach { e ->
-                                Row(
-                                    Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
+                                FilledTonalButton(
+                                    onClick = { context.dial(c.phone) },
+                                    modifier = Modifier.heightIn(min = Size.touchComfort),
                                 ) {
-                                    Text(e.date, fontWeight = FontWeight.Medium)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(EmergencyScene.fromKey(e.scene).label,
-                                        Modifier.weight(1f),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(if (e.resolvedDate != null) "已转归" else "进行中",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (e.resolvedDate != null)
-                                            MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.error)
+                                    Icon(
+                                        Icons.Rounded.Call,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(Size.iconSm),
+                                    )
+                                    Spacer(Modifier.width(Spacing.xs))
+                                    Text(c.phone)
                                 }
-                                HorizontalDivider()
+                            }
+                        }
+                    }
+                }
+
+                // ---- 个人信息（供急救人员参考）----
+                item {
+                    SectionCard(
+                        title = "我的信息",
+                        subtitle = "供急救人员参考",
+                        action = {
+                            TextButton(
+                                onClick = {
+                                    if (!exporting) {
+                                        exporting = true
+                                        vm.exportCardPdf(
+                                            onReady = { intent ->
+                                                runCatching {
+                                                    context.startActivity(
+                                                        Intent.createChooser(intent, "分享紧急卡")
+                                                    )
+                                                }
+                                                exporting = false
+                                            },
+                                            onError = {
+                                                GlobalMessages.post(it)
+                                                exporting = false
+                                            },
+                                        )
+                                    }
+                                },
+                                enabled = !exporting,
+                            ) {
+                                Icon(
+                                    Icons.Rounded.PictureAsPdf,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(Size.iconSm),
+                                )
+                                Spacer(Modifier.width(Spacing.xs))
+                                Text(if (exporting) "生成中" else "导出打印版")
+                            }
+                        },
+                    ) {
+                        profile?.let { p ->
+                            KeyValueRow("姓名", p.displayName)
+                            KeyValueRow("诊断", p.diagnosis)
+                            KeyValueRow("HLA-B27", Labels.hlaB27(p.hlaB27))
+                            p.allergies?.let {
+                                KeyValueRow("过敏史", it, valueTone = StatusTone.Danger)
+                            }
+                            p.emergencyBloodType?.let { KeyValueRow("血型", it) }
+                        } ?: Text(
+                            "未建档",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                // ---- 紧急事件记录 ----
+                item {
+                    SectionCard(
+                        title = "紧急事件记录",
+                        action = {
+                            TextButton(onClick = { showEventForm = true }) { Text("记录") }
+                        },
+                    ) {
+                        if (events.isEmpty()) {
+                            EmptyState(
+                                icon = Icons.Rounded.Schedule,
+                                title = "暂无紧急事件记录",
+                                body = "发热、感染、发作等事件会记录在这里",
+                            )
+                        } else {
+                            val shown = if (showAllEvents) events else events.take(3)
+                            DividerList(shown) { e ->
+                                Column(Modifier.weight(1f)) {
+                                    Text(e.date, style = MaterialTheme.typography.titleSmall)
+                                    Text(
+                                        EmergencyScene.fromKey(e.scene).label,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                if (e.resolvedDate != null) {
+                                    StatusChip("已转归", StatusTone.Success, Icons.Rounded.CheckCircle)
+                                } else {
+                                    StatusChip("进行中", StatusTone.Danger, Icons.Rounded.Schedule)
+                                }
+                            }
+                            if (events.size > 3 && !showAllEvents) {
+                                TextButton(
+                                    onClick = { showAllEvents = true },
+                                    modifier = Modifier.padding(top = Spacing.xs),
+                                ) { Text("查看全部 ${events.size} 条") }
                             }
                         }
                     }
                 }
             }
-
-            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 
@@ -250,18 +305,13 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
         onDismiss = { showContactForm = false },
     )
 
-    if (showEventForm) EmergencyEventFormDialog(
+    if (showEventForm) EmergencyEventSheet(
         onSave = { vm.saveEmergencyEvent(it); showEventForm = false },
         onDismiss = { showEventForm = false },
     )
 }
 
-private fun hlaLabel(k: String) = when (k) {
-    "positive" -> "阳性"; "negative" -> "阴性"; else -> "未知"
-}
-
-// ===== 联系人表单 =====
-@OptIn(ExperimentalMaterial3Api::class)
+// ===== 联系人表单（字段少，保留 AlertDialog；校验错误可见 + 可读） =====
 @Composable
 private fun ContactFormDialog(onSave: (EmergencyContact) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
@@ -270,27 +320,45 @@ private fun ContactFormDialog(onSave: (EmergencyContact) -> Unit, onDismiss: () 
     var isEmergency by remember { mutableStateOf(true) }
     var isDoctor by remember { mutableStateOf(false) }
     var hospital by remember { mutableStateOf("") }
+    var attempted by remember { mutableStateOf(false) }
 
-    androidx.compose.material3.AlertDialog(
+    AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("添加联系人") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("姓名") }, singleLine = true)
-                OutlinedTextField(relation, { relation = it },
-                    label = { Text("关系") }, singleLine = true)
-                OutlinedTextField(phone, { phone = it },
-                    label = { Text("电话") }, singleLine = true)
-                OutlinedTextField(hospital, { hospital = it },
-                    label = { Text("医院（医生填写）") }, singleLine = true)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.Checkbox(
-                        checked = isEmergency, onCheckedChange = { isEmergency = it })
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                OutlinedTextField(
+                    name, { name = it }, label = { Text("姓名") }, singleLine = true,
+                    isError = attempted && name.isBlank(),
+                    supportingText = { if (attempted && name.isBlank()) Text("必填") },
+                )
+                OutlinedTextField(relation, { relation = it }, label = { Text("关系") }, singleLine = true)
+                OutlinedTextField(
+                    phone, { phone = it }, label = { Text("电话") }, singleLine = true,
+                    isError = attempted && phone.isBlank(),
+                    supportingText = { if (attempted && phone.isBlank()) Text("必填") },
+                )
+                OutlinedTextField(hospital, { hospital = it }, label = { Text("医院（医生填写）") }, singleLine = true)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = Size.touchMin)
+                        .toggleable(value = isEmergency, role = Role.Checkbox, onValueChange = { isEmergency = it }),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = isEmergency, onCheckedChange = null)
+                    Spacer(Modifier.width(Spacing.xs))
                     Text("紧急联系人", style = MaterialTheme.typography.bodyMedium)
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.Checkbox(
-                        checked = isDoctor, onCheckedChange = { isDoctor = it })
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = Size.touchMin)
+                        .toggleable(value = isDoctor, role = Role.Checkbox, onValueChange = { isDoctor = it }),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = isDoctor, onCheckedChange = null)
+                    Spacer(Modifier.width(Spacing.xs))
                     Text("主治医生", style = MaterialTheme.typography.bodyMedium)
                 }
             }
@@ -298,6 +366,7 @@ private fun ContactFormDialog(onSave: (EmergencyContact) -> Unit, onDismiss: () 
         confirmButton = {
             TextButton(
                 onClick = {
+                    attempted = true
                     if (name.isNotBlank() && phone.isNotBlank()) {
                         onSave(
                             EmergencyContact(
@@ -318,10 +387,10 @@ private fun ContactFormDialog(onSave: (EmergencyContact) -> Unit, onDismiss: () 
     )
 }
 
-// ===== 紧急事件表单 =====
+// ===== 紧急事件表单（9 字段 + 单选 + 条件项，迁 ModalBottomSheet） =====
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EmergencyEventFormDialog(
+private fun EmergencyEventSheet(
     onSave: (EmergencyEvent) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -334,68 +403,100 @@ private fun EmergencyEventFormDialog(
     var outcome by remember { mutableStateOf("") }
     var resolved by remember { mutableStateOf(false) }
     var notes by remember { mutableStateOf("") }
+    var attempted by remember { mutableStateOf(false) }
+    val dateOk = runCatching { LocalDate.parse(date.trim()) }.getOrNull() != null
 
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("记录紧急事件") },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.fillMaxWidth()
-                    .verticalScroll(androidx.compose.foundation.rememberScrollState()),
-            ) {
-                Text("场景", style = MaterialTheme.typography.bodySmall)
-                EmergencyScene.entries.forEach { s ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        androidx.compose.material3.RadioButton(
-                            selected = scene == s, onClick = { scene = s })
-                        Text(s.label, style = MaterialTheme.typography.bodyMedium)
-                    }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.xl)
+                .imePadding(),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text("记录紧急事件", style = MaterialTheme.typography.titleLarge)
+
+            Text("场景", style = MaterialTheme.typography.labelLarge)
+            EmergencyScene.entries.forEach { s ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = Size.touchMin)
+                        .selectable(selected = scene == s, role = Role.RadioButton, onClick = { scene = s }),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(selected = scene == s, onClick = null)
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text(s.label, style = MaterialTheme.typography.bodyLarge)
                 }
-                OutlinedTextField(date, { date = it },
-                    label = { Text("日期") }, singleLine = true)
-                OutlinedTextField(symptoms, { symptoms = it },
-                    label = { Text("症状描述") })
-                OutlinedTextField(actions, { actions = it },
-                    label = { Text("已采取措施") })
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.Checkbox(
-                        checked = hospitalVisit, onCheckedChange = { hospitalVisit = it })
-                    Text("是否就医", style = MaterialTheme.typography.bodyMedium)
-                }
-                if (hospitalVisit) {
-                    OutlinedTextField(hospitalName, { hospitalName = it },
-                        label = { Text("医院名称") }, singleLine = true)
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.Checkbox(
-                        checked = resolved, onCheckedChange = { resolved = it })
-                    Text("已转归/恢复", style = MaterialTheme.typography.bodyMedium)
-                }
-                if (resolved) {
-                    OutlinedTextField(outcome, { outcome = it },
-                        label = { Text("转归结果") }, singleLine = true)
-                }
-                OutlinedTextField(notes, { notes = it }, label = { Text("备注") })
             }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                onSave(
-                    EmergencyEvent(
-                        id = "", date = date, recordedAt = nowIso(),
-                        scene = scene.name, severity = "high",
-                        symptoms = symptoms.ifBlank { null },
-                        actionsTaken = actions.ifBlank { null },
-                        hospitalVisit = hospitalVisit,
-                        hospitalName = hospitalName.ifBlank { null },
-                        outcome = outcome.ifBlank { null },
-                        resolvedDate = if (resolved) LocalDate.now().toString() else null,
-                        notes = notes.ifBlank { null },
-                    )
-                )
-            }) { Text("保存") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-    )
+
+            OutlinedTextField(
+                date, { date = it }, label = { Text("日期") }, singleLine = true,
+                isError = attempted && !dateOk,
+                supportingText = { if (attempted && !dateOk) Text("日期格式 yyyy-MM-dd") },
+            )
+            OutlinedTextField(symptoms, { symptoms = it }, label = { Text("症状描述") })
+            OutlinedTextField(actions, { actions = it }, label = { Text("已采取措施") })
+
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = Size.touchMin)
+                    .toggleable(value = hospitalVisit, role = Role.Checkbox, onValueChange = { hospitalVisit = it }),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = hospitalVisit, onCheckedChange = null)
+                Spacer(Modifier.width(Spacing.xs))
+                Text("是否就医", style = MaterialTheme.typography.bodyLarge)
+            }
+            if (hospitalVisit) {
+                OutlinedTextField(hospitalName, { hospitalName = it }, label = { Text("医院名称") }, singleLine = true)
+            }
+
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = Size.touchMin)
+                    .toggleable(value = resolved, role = Role.Checkbox, onValueChange = { resolved = it }),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = resolved, onCheckedChange = null)
+                Spacer(Modifier.width(Spacing.xs))
+                Text("已转归 / 恢复", style = MaterialTheme.typography.bodyLarge)
+            }
+            if (resolved) {
+                OutlinedTextField(outcome, { outcome = it }, label = { Text("转归结果") }, singleLine = true)
+            }
+
+            OutlinedTextField(notes, { notes = it }, label = { Text("备注") })
+
+            Button(
+                onClick = {
+                    attempted = true
+                    if (dateOk) {
+                        onSave(
+                            EmergencyEvent(
+                                id = "", date = date.trim(), recordedAt = nowIso(),
+                                scene = scene.name, severity = "high",
+                                symptoms = symptoms.ifBlank { null },
+                                actionsTaken = actions.ifBlank { null },
+                                hospitalVisit = hospitalVisit,
+                                hospitalName = hospitalName.ifBlank { null },
+                                outcome = outcome.ifBlank { null },
+                                resolvedDate = if (resolved) LocalDate.now().toString() else null,
+                                notes = notes.ifBlank { null },
+                            )
+                        )
+                    }
+                },
+                enabled = dateOk,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = Size.touchMin),
+            ) { Text("保存") }
+        }
+    }
 }

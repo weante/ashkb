@@ -1,44 +1,50 @@
 package com.ashkb.app.ui
 
-import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.QueryStats
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.rounded.Emergency
+import androidx.compose.material.icons.rounded.MedicalInformation
+import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.ashkb.app.ui.backup.BackupScreen
 import com.ashkb.app.ui.backup.BackupViewModel
 import com.ashkb.app.ui.checkup.CheckupScreen
 import com.ashkb.app.ui.checkup.CheckupViewModel
+import com.ashkb.app.ui.components.NavRow
 import com.ashkb.app.ui.emergency.EmergencyScreen
 import com.ashkb.app.ui.emergency.EmergencyViewModel
 import com.ashkb.app.ui.exercise.ExerciseScreen
@@ -47,34 +53,62 @@ import com.ashkb.app.ui.knowledge.KnowledgeScreen
 import com.ashkb.app.ui.knowledge.KnowledgeViewModel
 import com.ashkb.app.ui.me.MeScreen
 import com.ashkb.app.ui.me.MeViewModel
+import com.ashkb.app.ui.me.MedEditScreen
+import com.ashkb.app.ui.me.MedsScreen
+import com.ashkb.app.ui.me.ProfileEditScreen
+import com.ashkb.app.ui.navigation.Backup
+import com.ashkb.app.ui.navigation.Checkup
+import com.ashkb.app.ui.navigation.Emergency
+import com.ashkb.app.ui.navigation.Exercise
+import com.ashkb.app.ui.navigation.Health
+import com.ashkb.app.ui.navigation.Knowledge
+import com.ashkb.app.ui.navigation.Me
+import com.ashkb.app.ui.navigation.MedEdit
+import com.ashkb.app.ui.navigation.Meds
+import com.ashkb.app.ui.navigation.ProfileEdit
+import com.ashkb.app.ui.navigation.Report
+import com.ashkb.app.ui.navigation.Symptom
+import com.ashkb.app.ui.navigation.TABS
+import com.ashkb.app.ui.navigation.Today
+import com.ashkb.app.ui.navigation.Wellness
 import com.ashkb.app.ui.report.ReportScreen
 import com.ashkb.app.ui.report.ReportViewModel
 import com.ashkb.app.ui.symptom.SymptomScreen
 import com.ashkb.app.ui.symptom.SymptomViewModel
+import com.ashkb.app.ui.theme.Motion
+import com.ashkb.app.ui.theme.Size
+import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.today.TodayScreen
 import com.ashkb.app.ui.today.TodayViewModel
 import com.ashkb.app.ui.wellness.WellnessScreen
 import com.ashkb.app.ui.wellness.WellnessViewModel
 
-private enum class Tab(val label: String) {
-    TODAY("今日"), HEALTH("健康"), REPORT("报表"), KNOWLEDGE("知识"), ME("我的")
-}
-
-/** 今日 Tab 子页 */
-private enum class TodaySub { SYMPTOM, EXERCISE }
-
-/** 健康 Tab 子页 */
-private enum class HealthSub { WELLNESS, CHECKUP, EMERGENCY }
-
-/** 我的 Tab 子页（P4：备份与数据） */
-private enum class MeSub { BACKUP }
-
+/**
+ * 应用骨架。
+ *
+ * 修掉此前的三个结构性 bug：
+ * 1. 子页靠 early `return` 渲染，`Scaffold` / `NavigationBar` 根本没被 compose（底栏消失）；
+ * 2. `WellnessScreen` 无顶栏且 `onBack` 从不调用，其余 L2 页顶栏无返回箭头（进得去出不来）；
+ * 3. 无 `rememberSaveable` / 无 Navigation-Compose，转屏回到初始 tab（状态全丢）。
+ *
+ * 现在：`Scaffold` 常驻，底栏可见性由当前路由层级决定（L1 显示、L2/L3 隐藏）。
+ */
 @Composable
 fun AppShell() {
-    var tab by remember { mutableStateOf(Tab.TODAY) }
-    var todaySub by remember { mutableStateOf<TodaySub?>(null) }
-    var healthSub by remember { mutableStateOf<HealthSub?>(null) }
-    var meSub by remember { mutableStateOf<MeSub?>(null) }
+    val nav = rememberNavController()
+    val snackbar = remember { SnackbarHostState() }
+
+    val backStackEntry by nav.currentBackStackEntryAsState()
+    val destination = backStackEntry?.destination
+    val topTab = TABS.firstOrNull { t ->
+        destination?.hierarchy?.any { it.hasRoute(t.route::class) } == true
+    }
+    val showBottomBar = topTab != null
+
+    // ViewModel 一次性消息 → Snackbar（替代"每个操作都要点一次知道了"的阻塞弹窗）
+    LaunchedEffect(Unit) {
+        GlobalMessages.events.collect { snackbar.showSnackbar(it) }
+    }
 
     val todayVm: TodayViewModel = viewModel(factory = TodayViewModel.Factory)
     val meVm: MeViewModel = viewModel(factory = MeViewModel.Factory)
@@ -87,166 +121,191 @@ fun AppShell() {
     val reportVm: ReportViewModel = viewModel(factory = ReportViewModel.Factory)
     val backupVm: BackupViewModel = viewModel(factory = BackupViewModel.Factory)
 
-    // 返回键处理
-    BackHandler(enabled = todaySub != null || healthSub != null || meSub != null) {
-        when {
-            todaySub != null -> todaySub = null
-            healthSub != null -> healthSub = null
-            meSub != null -> meSub = null
-        }
-    }
-
-    // 今日子页
-    todaySub?.let { s ->
-        when (s) {
-            TodaySub.SYMPTOM -> SymptomScreen(vm = symptomVm, onBack = { todaySub = null })
-            TodaySub.EXERCISE -> ExerciseScreen(vm = exerciseVm, onBack = { todaySub = null })
-        }
-        return
-    }
-
-    // 健康子页
-    healthSub?.let { s ->
-        when (s) {
-            HealthSub.WELLNESS -> WellnessScreen(vm = wellnessVm, onBack = { healthSub = null })
-            HealthSub.CHECKUP -> CheckupScreen(vm = checkupVm, onBack = { healthSub = null })
-            HealthSub.EMERGENCY -> EmergencyScreen(vm = emergencyVm, onBack = { healthSub = null })
-        }
-        return
-    }
-
-    // 我的子页
-    meSub?.let { s ->
-        when (s) {
-            MeSub.BACKUP -> BackupScreen(vm = backupVm, onBack = { meSub = null })
-        }
-        return
-    }
-
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
-            NavigationBar {
-                Tab.entries.forEach { t ->
-                    NavigationBarItem(
-                        selected = tab == t,
-                        onClick = { tab = t },
-                        icon = {
-                            Icon(
-                                when (t) {
-                                    Tab.TODAY -> Icons.Filled.Home
-                                    Tab.HEALTH -> Icons.Filled.Favorite
-                                    Tab.REPORT -> Icons.Filled.QueryStats
-                                    Tab.KNOWLEDGE -> Icons.Filled.MenuBook
-                                    Tab.ME -> Icons.Filled.Person
-                                }, contentDescription = t.label
-                            )
-                        },
-                        label = { Text(t.label) },
-                    )
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = slideInVertically { it },
+                exit = slideOutVertically { it },
+            ) {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+                    TABS.forEach { t ->
+                        val selected = topTab == t
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = {
+                                if (!selected) {
+                                    nav.navigate(t.route) {
+                                        popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = if (selected) t.selectedIcon else t.icon,
+                                    contentDescription = null,   // 装饰性：label 已承载语义
+                                    modifier = Modifier.size(Size.iconMd),
+                                )
+                            },
+                            label = { Text(t.label) },
+                        )
+                    }
                 }
             }
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            when (tab) {
-                Tab.TODAY -> TodayScreen(
+        NavHost(
+            navController = nav,
+            startDestination = Today,
+            modifier = Modifier.padding(padding),
+            enterTransition = { fadeIn(tween(Motion.NormalMs)) },
+            exitTransition = { fadeOut(tween(Motion.NormalMs)) },
+        ) {
+            // ---- L1 ----
+            composable<Today> {
+                TodayScreen(
                     vm = todayVm,
-                    onMedListNeeded = { tab = Tab.ME },
-                    onOpenSymptom = { todaySub = TodaySub.SYMPTOM },
-                    onOpenExercise = { todaySub = TodaySub.EXERCISE },
+                    onMedListNeeded = { nav.navigate(MedEdit()) },   // 修：直达表单，不再只切 tab
+                    onOpenSymptom = { nav.navigate(Symptom) },
+                    onOpenExercise = { nav.navigate(Exercise) },
                 )
-                Tab.HEALTH -> HealthHub(
-                    onOpenWellness = { healthSub = HealthSub.WELLNESS },
-                    onOpenCheckup = { healthSub = HealthSub.CHECKUP },
-                    onOpenEmergency = { healthSub = HealthSub.EMERGENCY },
+            }
+            composable<Health> {
+                HealthHub(
+                    wellnessVm = wellnessVm,
+                    checkupVm = checkupVm,
+                    emergencyVm = emergencyVm,
+                    onOpenWellness = { nav.navigate(Wellness) },
+                    onOpenCheckup = { nav.navigate(Checkup) },
+                    onOpenEmergency = { nav.navigate(Emergency) },
                 )
-                Tab.REPORT -> ReportScreen(vm = reportVm)
-                Tab.KNOWLEDGE -> KnowledgeScreen(vm = knowledgeVm)
-                Tab.ME -> MeScreen(meVm, onOpenBackup = { meSub = MeSub.BACKUP })
+            }
+            composable<Report> { ReportScreen(vm = reportVm) }
+            composable<Knowledge> { KnowledgeScreen(vm = knowledgeVm) }
+            composable<Me> {
+                MeScreen(
+                    vm = meVm,
+                    onOpenMeds = { nav.navigate(Meds) },
+                    onOpenBackup = { nav.navigate(Backup) },
+                    onEditProfile = { nav.navigate(ProfileEdit) },
+                )
+            }
+
+            // ---- L2 ----
+            composable<Symptom> { SymptomScreen(vm = symptomVm, onBack = { nav.popBackStack() }) }
+            composable<Exercise> { ExerciseScreen(vm = exerciseVm, onBack = { nav.popBackStack() }) }
+            composable<Wellness> { WellnessScreen(vm = wellnessVm, onBack = { nav.popBackStack() }) }
+            composable<Checkup> { CheckupScreen(vm = checkupVm, onBack = { nav.popBackStack() }) }
+            composable<Emergency> { EmergencyScreen(vm = emergencyVm, onBack = { nav.popBackStack() }) }
+            composable<Backup> { BackupScreen(vm = backupVm, onBack = { nav.popBackStack() }) }
+            composable<Meds> {
+                MedsScreen(
+                    vm = meVm,
+                    onAdd = { nav.navigate(MedEdit()) },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+
+            // ---- L3 ----
+            composable<MedEdit> {
+                MedEditScreen(
+                    vm = meVm,
+                    onSaved = { nav.popBackStack() },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable<ProfileEdit> {
+                val profile by meVm.profile.collectAsState()
+                ProfileEditScreen(
+                    initial = profile,
+                    onSave = {
+                        meVm.saveProfile(it)
+                        nav.popBackStack()
+                    },
+                    onBack = { nav.popBackStack() },
+                )
             }
         }
     }
 }
 
+/** 健康 hub：三张入口卡改为 NavRow，副标题放实时摘要（不点进去也知道状态）。 */
 @Composable
 private fun HealthHub(
+    wellnessVm: WellnessViewModel,
+    checkupVm: CheckupViewModel,
+    emergencyVm: EmergencyViewModel,
     onOpenWellness: () -> Unit,
     onOpenCheckup: () -> Unit,
     onOpenEmergency: () -> Unit,
 ) {
+    val vitals by wellnessVm.vitalsToday.collectAsState()
+    val weight by wellnessVm.weightToday.collectAsState()
+    val checkupItems by checkupVm.checkupItems.collectAsState()
+    val labRecent by checkupVm.labRecent.collectAsState()
+    val contacts by emergencyVm.contacts.collectAsState()
+
+    val wellnessSub = buildList {
+        add(if (vitals != null) "今日体征已记" else "今日体征未记")
+        add(if (weight != null) "体重已记" else "体重未记")
+    }.joinToString(" · ")
+
+    val checkupSub = "复诊项目 ${checkupItems.size} 项 · 化验 ${labRecent.size} 条"
+
+    val emergencySub = if (contacts.isEmpty()) {
+        "尚未添加紧急联系人"
+    } else {
+        "紧急联系人 ${contacts.size} 位 · 已就绪"
+    }
+
     LazyColumn(
-        Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         item {
-            Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("健康管理", style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold)
-                Text("骨健康、营养、复诊与应急——全方位守护你的健康",
+            Column(Modifier.padding(top = Spacing.xxl), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Text("健康管理", style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    "骨健康、营养、复诊与应急——全方位守护你的健康",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
 
         // M2/M3 营养与骨健康
         item {
-            HealthEntryCard(
+            NavRow(
+                icon = Icons.Rounded.Restaurant,
                 title = "营养与骨健康",
-                subtitle = "体征记录 · 体重追踪 · 补剂档案 · 饮食画像 · 忌口清单",
-                icon = "🥗",
+                subtitle = wellnessSub,
                 onClick = onOpenWellness,
             )
         }
 
         // M6 复诊管理
         item {
-            HealthEntryCard(
+            NavRow(
+                icon = Icons.Rounded.MedicalInformation,
                 title = "复诊管理",
-                subtitle = "复诊项目配置 · 复诊记录 · 化验结果 · 疫苗记录",
-                icon = "📋",
+                subtitle = checkupSub,
                 onClick = onOpenCheckup,
             )
         }
 
         // M7 紧急卡
         item {
-            HealthEntryCard(
+            NavRow(
+                icon = Icons.Rounded.Emergency,
                 title = "紧急卡",
-                subtitle = "五应急场景 · 紧急联系人 · 个人急救信息 · 事件记录",
-                icon = "🚨",
+                subtitle = emergencySub,
                 onClick = onOpenEmergency,
             )
         }
 
-        item { Spacer(Modifier.height(24.dp)) }
-    }
-}
-
-@Composable
-private fun HealthEntryCard(
-    title: String,
-    subtitle: String,
-    icon: String,
-    onClick: () -> Unit,
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(icon, style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Text("→", style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary)
-        }
+        item { Spacer(Modifier.height(Spacing.xxl)) }
     }
 }

@@ -28,9 +28,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.ashkb.app.data.entity.KbEntry
+import com.ashkb.app.ui.components.ScreenTopBar
+import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.knowledge.KbDetailDialog
+import com.ashkb.app.ui.theme.Spacing
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -53,24 +55,17 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     Column(Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text("症状与自评") },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
-        )
+        ScreenTopBar(title = "症状与自评", onBack = onBack)
         LazyColumn(
-            Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            item { Spacer(Modifier.height(4.dp)) }
+            item { Spacer(Modifier.height(Spacing.xs)) }
 
             // ---- 系统警报区 ----
             if (alerts.isNotEmpty()) {
                 item {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                         alerts.take(3).forEach { alert ->
                             AlertCard(
                                 alert = alert,
@@ -100,7 +95,7 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
             item {
                 Row(
                     Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text("记录日期", style = MaterialTheme.typography.bodySmall)
@@ -142,7 +137,7 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(Spacing.sm))
                     val basdaiExisting = basdaiHistory.firstOrNull { it.date == selectedDate.toString() }
                     if (basdaiExisting != null) {
                         Text(
@@ -150,7 +145,7 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(Spacing.sm))
                     }
                     Button(onClick = { showBasdai = true }) {
                         Text(
@@ -162,14 +157,11 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
                             }
                         )
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(Spacing.sm))
                     if (basdaiHistory.isEmpty()) {
                         Text("尚无记录", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
-                        basdaiHistory.take(8).forEach { r ->
-                            BasdaiRow(r)
-                            androidx.compose.material3.HorizontalDivider()
-                        }
+                        BasdaiList(basdaiHistory.take(8))
                     }
                 }
             }
@@ -178,14 +170,11 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
             if (flareHistory.isNotEmpty()) {
                 item {
                     SectionCard(title = "发作历史") {
-                        flareHistory.take(10).forEach { f ->
-                            FlareHistoryRow(f)
-                            androidx.compose.material3.HorizontalDivider()
-                        }
+                        FlareHistoryList(flareHistory.take(10))
                     }
                 }
             }
-            item { Spacer(Modifier.height(24.dp)) }
+            item { Spacer(Modifier.height(Spacing.xxl)) }
         }
     }
 

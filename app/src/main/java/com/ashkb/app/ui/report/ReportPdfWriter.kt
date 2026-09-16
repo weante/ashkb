@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import com.ashkb.app.data.repo.ReportRepository
+import com.ashkb.app.domain.Labels
 import java.io.File
 import java.time.LocalDate
 
@@ -148,7 +149,7 @@ object ReportPdfWriter {
             d.kv("姓名", p.displayName)
             d.kv("诊断", p.diagnosis)
             d.kv("确诊年份", p.diagnoseYear?.toString() ?: "未填")
-            d.kv("HLA-B27", hla(p.hlaB27))
+            d.kv("HLA-B27", Labels.hlaB27(p.hlaB27))
             d.kv("病情分期", stage(p.diseaseStage))
             p.allergies?.let { d.kv("过敏史", it) }
             p.emergencyBloodType?.let { d.kv("血型", it) }
@@ -244,7 +245,7 @@ object ReportPdfWriter {
         if (p == null) d.line("（未建档）")
         else {
             d.bigLine("${p.displayName} · ${p.diagnosis}")
-            d.kv("HLA-B27", hla(p.hlaB27))
+            d.kv("HLA-B27", Labels.hlaB27(p.hlaB27))
             d.kv("病情分期", stage(p.diseaseStage))
             p.allergies?.let { d.kv("过敏史", it) }
             p.emergencyBloodType?.let { d.kv("血型", it) }
@@ -272,7 +273,6 @@ object ReportPdfWriter {
         return f
     }
 
-    private fun hla(k: String) = when (k) { "positive" -> "阳性"; "negative" -> "阴性"; else -> "未知" }
     private fun stage(k: String) = when (k) { "active" -> "活动期"; "stable" -> "缓解期"; else -> "未评估" }
     private fun freq(k: String) = when (k) {
         "DAILY" -> "每日"; "BID" -> "每日两次"; "Q8H" -> "每8小时"; "WEEKLY" -> "每周一次";

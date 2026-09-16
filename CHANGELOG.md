@@ -4,6 +4,51 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.7] — 2026-09-16
+
+按《ASHKB UI 改版方案》落地设计系统与主要页面重构；修复注射部位无法选上臂的问题。v1.0.6（正式签名）可直接覆盖安装。
+
+### 修复 · 注射部位选择
+
+- 生物制剂（依那西普等）注射部位新增「左上臂 / 右上臂」（原仅大腿 / 腹部共 4 个部位）
+- 部位选项改自动换行布局（FlowRow），窄屏下不再截断
+
+### 修复 · WebDAV 连接测试失败（HTTPS 下 MKCOL 实际未发出）
+
+- **根因**：Android 的 `HttpsURLConnectionImpl` 把真实实现藏在 `delegate` 字段指向的 `HttpURLConnectionImpl` 里，原反射覆写直接在包装类上找 `method` 字段，找的是无效影子字段且失败被静默吞掉——MKCOL 请求实际按 **GET** 发出，服务器自然返回 404「资源不存在」。地址与密码都对也照样报「MKCOL 失败：HTTP 404」
+- 修复反射逻辑：先解引用 `delegate` 再沿类层级找 `method` 字段覆写，失败时明确报错而非静默降级
+- 测试连接改为先 PROPFIND 检查服务器地址，按状态码区分原因：404 = 地址在服务器上不存在（附坚果云正确地址示例）、401 = 账号或应用密码错误、403 = 无权限、3xx = 需改用跳转后的最终地址
+
+### 新增 · 设计系统与导航架构
+
+- **设计 token 主题**（`ui/theme`）：间距 / 圆角 / 字阶 / 色调 / 触控尺寸统一收口，新增深色模式（`values-night`）
+- **统一组件库**（`ui/components`）：SectionCard、StatusChip / AlertBanner（状态三重编码：文字 + 图标 + 颜色）、TrendChart（坐标轴 / 整数刻度 / 阈值线 / 拖动读数）、DividerList、表单与导航组件等
+- **Navigation-Compose 路由**：二级页真正独立成页，页面切换不再丢失底栏导航状态
+- **全局消息总线**（GlobalMessages → Snackbar）：操作提示不再逐条弹窗打断
+- **领域收口**：临床阈值集中 `ClinicalThresholds`（依从 90/70、BASDAI ≥ 4 等）；枚举标签统一 `Labels`，界面不再出现英文枚举 key
+
+### 页面重构
+
+- **紧急卡**：反向设计——「120 急救」大按钮固定底部常驻；黑名单场景置顶横幅；事件记录迁 ModalBottomSheet；页面内可直接导出紧急卡 PDF
+- **运动**：处方 hero 区（结合昨日疼痛 / 晨僵 / 体温展示判读依据）；黑榜拦截项置顶横幅；次日反馈表单迁 ModalBottomSheet
+- **营养与骨健康**：体征 hero 区；体征 / 身体成分 / 饮食三组吸顶分组头；体重趋势图（TrendChart）
+- **知识库**：搜索框与分类筛选吸顶；条目卡改为可点击 Surface；分类标签 StatusChip 化；详情「查看原文」改为按钮
+- **症状与自评**：警报卡 StatusChip 三重编码；发作 / BASDAI 历史列表改 DividerList
+- **复诊管理**：化验 / 影像 AI 导入迁 ModalBottomSheet；异常值区分偏高 / 偏低并三重编码
+- **我的**：药单独立成页，药品与健康档案编辑从弹窗改为整页编辑
+- **备份**：WebDAV 配置迁 ModalBottomSheet；恢复台账「查看全部」；校验结果 ✓ / ✗ 图标化
+- **报表**：操作提示改全局 Snackbar；警告条 StatusChip 化
+
+### 可及性
+
+- 可点击元素最小 48×48dp；全部图标显式 contentDescription（装饰性图标由相邻文字承载语义）
+- 状态展示三重编码（文字 + 图标 + 颜色），不单靠颜色区分
+- Compose 层不再覆盖 FontWeight、不再使用魔法 dp，统一走主题排版与 Spacing token
+
+### 验证
+
+- 全量 86 条单元测试通过；release（正式签名）与 debug 包均构建成功
+
 ## [v1.0.6] — 2026-09-15
 
 安全加固与健壮性（依据 v1.0.5 代码审查报告 P0/P1 项）。
