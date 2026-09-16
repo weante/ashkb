@@ -183,7 +183,12 @@ fun AppShell() {
                     onOpenEmergency = { nav.navigate(Emergency) },
                 )
             }
-            composable<Report> { ReportScreen(vm = reportVm) }
+            composable<Report> {
+                ReportScreen(
+                    vm = reportVm,
+                    onOpenBackup = { nav.navigate(Backup) },
+                )
+            }
             composable<Knowledge> { KnowledgeScreen(vm = knowledgeVm) }
             composable<Me> {
                 MeScreen(

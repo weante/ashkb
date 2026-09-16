@@ -49,6 +49,7 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
     val records by vm.checkupRecords.collectAsState()
     val vaccines by vm.vaccineRecords.collectAsState()
     val labRecent by vm.labRecent.collectAsState()
+    val labLimit by vm.labLimit.collectAsState()
     val imagingRecords by vm.imagingRecords.collectAsState()
 
     var showItemForm by remember { mutableStateOf(false) }
@@ -93,6 +94,8 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
                 )
                 CheckupTab.LABS -> LabsList(
                     labs = labRecent,
+                    canLoadMore = labRecent.size >= labLimit,
+                    onLoadMore = { vm.loadMoreLabs() },
                     onImport = { showLabImport = true },
                 )
                 CheckupTab.IMAGING -> ImagingList(

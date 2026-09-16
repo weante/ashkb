@@ -3,6 +3,7 @@ package com.ashkb.app.ui.checkup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -73,6 +75,41 @@ private fun LabValue(valueText: String, unit: String?, abnormal: String?) {
 private fun labValueText(lab: LabResult): String =
     lab.value?.let { "%.2f".format(it).trimEnd('0').trimEnd('.') } ?: lab.valueText ?: "-"
 
+private fun LabResult.isAbnormal() = abnormal == "high" || abnormal == "low"
+
+@Composable
+private fun RowScope.LabRow(lab: LabResult) {
+    Text(lab.testName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+    LabValue(labValueText(lab), lab.unit, lab.abnormal)
+}
+
+/** 化验分组：异常项置顶，正常项默认折叠——复诊沟通先看要紧的。 */
+@Composable
+private fun LabGroup(rows: List<LabResult>) {
+    val (abnormal, normal) = rows.partition { it.isAbnormal() }
+    var showNormal by remember { mutableStateOf(false) }
+    if (abnormal.isNotEmpty()) {
+        DividerList(items = abnormal, key = { it.id }) { lab -> LabRow(lab) }
+    }
+    if (normal.isNotEmpty()) {
+        if (abnormal.isNotEmpty()) {
+            HorizontalDivider(
+                Modifier.padding(vertical = Spacing.xs),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+        }
+        if (showNormal) {
+            DividerList(items = normal, key = { it.id }) { lab -> LabRow(lab) }
+        }
+        TextButton(
+            onClick = { showNormal = !showNormal },
+            modifier = Modifier.heightIn(min = Size.touchMin),
+        ) {
+            Text(if (showNormal) "收起正常项" else "展开正常项（${normal.size}）")
+        }
+    }
+}
+
 // ===== 化验详情弹窗 =====
 @Composable
 internal fun LabDetailDialog(record: CheckupRecord, vm: CheckupViewModel, onDismiss: () -> Unit) {
@@ -87,10 +124,7 @@ internal fun LabDetailDialog(record: CheckupRecord, vm: CheckupViewModel, onDism
                 if (labs.isEmpty()) {
                     Text("暂无化验指标", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    DividerList(items = labs) { lab ->
-                        Text(lab.testName, Modifier.weight(1f))
-                        LabValue(labValueText(lab), lab.unit, lab.abnormal)
-                    }
+                    LabGroup(labs)
                 }
                 Spacer(Modifier.height(Spacing.sm))
                 OutlinedButton(onClick = { showAdd = true }) { Text("添加指标") }
@@ -104,9 +138,14 @@ internal fun LabDetailDialog(record: CheckupRecord, vm: CheckupViewModel, onDism
     }
 }
 
-// ===== 化验结果列表（按日期分组，支持 AI 导入） =====
+// ===== 化验结果列表（按日期分组，支持 AI 导入；底部翻页加载更早记录） =====
 @Composable
-internal fun LabsList(labs: List<LabResult>, onImport: () -> Unit) {
+internal fun LabsList(
+    labs: List<LabResult>,
+    canLoadMore: Boolean,
+    onLoadMore: () -> Unit,
+    onImport: () -> Unit,
+) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -135,16 +174,21 @@ internal fun LabsList(labs: List<LabResult>, onImport: () -> Unit) {
             }
             labs.groupBy { it.date }.forEach { (date, rows) ->
                 item(key = "lab-$date") {
-                    val abnormalCount = rows.count { it.abnormal == "high" || it.abnormal == "low" }
+                    val abnormalCount = rows.count { it.isAbnormal() }
                     SectionCard(
                         title = date,
                         subtitle = if (abnormalCount > 0) "${rows.size} 项 · $abnormalCount 项异常" else "${rows.size} 项",
                     ) {
-                        DividerList(items = rows) { lab ->
-                            Text(lab.testName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                            LabValue(labValueText(lab), lab.unit, lab.abnormal)
-                        }
+                        LabGroup(rows)
                     }
+                }
+            }
+            if (canLoadMore) {
+                item(key = "lab-load-more") {
+                    OutlinedButton(
+                        onClick = onLoadMore,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
+                    ) { Text("加载更早的化验记录") }
                 }
             }
             item { Spacer(Modifier.height(Spacing.xxl)) }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.ui.components.LoadingBlock
+import com.ashkb.app.ui.components.NavRow
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.components.TrendChart
@@ -53,7 +55,7 @@ import kotlinx.coroutines.launch
 /** P4 M9 报表页：概览 / 趋势 / 报告导出 三页签。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReportScreen(vm: ReportViewModel) {
+fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
     val overview by vm.overview.collectAsState()
     val trends by vm.trends.collectAsState()
     val busy by vm.busy.collectAsState()
@@ -97,7 +99,7 @@ fun ReportScreen(vm: ReportViewModel) {
             when (page) {
                 0 -> OverviewPage(overview)
                 1 -> TrendsPage(trends)
-                else -> ExportPage(vm, busy, context)
+                else -> ExportPage(vm, busy, context, onOpenBackup)
             }
         }
     }
@@ -324,7 +326,7 @@ private fun TrendsPage(t: ReportRepository.Trends?) {
 // ======================= 报告导出 =======================
 
 @Composable
-private fun ExportPage(vm: ReportViewModel, busy: Boolean, context: android.content.Context) {
+private fun ExportPage(vm: ReportViewModel, busy: Boolean, context: android.content.Context, onOpenBackup: () -> Unit) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -378,13 +380,12 @@ private fun ExportPage(vm: ReportViewModel, busy: Boolean, context: android.cont
         }
 
         item {
-            SectionCard(title = "数据备份（R20）") {
-                Text(
-                    "全量加密备份 / 恢复 / WebDAV 远程备份在「我的 → 备份与数据」中进行。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            NavRow(
+                icon = Icons.Rounded.Backup,
+                title = "数据备份（R20）",
+                subtitle = "全量加密备份 · 恢复自证 · WebDAV 远程备份 · 档案 JSON 导出导入",
+                onClick = onOpenBackup,
+            )
         }
 
         item { Spacer(Modifier.height(20.dp)) }

@@ -14,8 +14,12 @@ import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.LabImport
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -32,7 +36,12 @@ class CheckupViewModel(private val repo: HealthRepository) : ViewModel() {
     val vaccineRecords: StateFlow<List<VaccineRecord>> = repo.observeVaccinesAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val labRecent: StateFlow<List<LabResult>> = repo.observeLabRecent()
+    private val _labLimit = MutableStateFlow(100)
+    val labLimit: StateFlow<Int> = _labLimit.asStateFlow()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val labRecent: StateFlow<List<LabResult>> = _labLimit
+        .flatMapLatest { repo.observeLabRecent(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val imagingRecords: StateFlow<List<ImagingRecord>> = repo.observeImagingRecords()
@@ -57,6 +66,10 @@ class CheckupViewModel(private val repo: HealthRepository) : ViewModel() {
 
     fun saveLabResult(result: LabResult) {
         viewModelScope.launch { repo.saveLabResult(result) }
+    }
+
+    fun loadMoreLabs() {
+        _labLimit.value += 100
     }
 
     fun importLabReport(import: LabImport) {
