@@ -44,7 +44,10 @@ class BackupRepository(private val context: Context) {
                 prefs.getString("user", "") ?: "",
                 prefs.getString("pass", "") ?: "",
             )
-            saveWebdavConfig(old.first, old.second, old.third)
+            // R3：旧明文配置若为 http:// 则不再迁移——强制 HTTPS 后无法使用，删除即失效
+            if (!old.first.trim().startsWith("http://", ignoreCase = true)) {
+                saveWebdavConfig(old.first, old.second, old.third)
+            }
             prefs.edit().remove("url").remove("user").remove("pass").apply()
         }
         fun readEnc(key: String): String {
@@ -54,7 +57,14 @@ class BackupRepository(private val context: Context) {
         return Triple(readEnc("url_v2"), readEnc("user_v2"), readEnc("pass_v2"))
     }
 
+    /** R3：强制 HTTPS——明文 http 会把账号密码暴露给链路上任何人，入口直接拒绝。 */
+    private fun requireHttps(url: String) {
+        if (url.trim().startsWith("http://", ignoreCase = true))
+            throw WebDavClient.DavException("仅支持 https:// 地址——明文 http 会把账号密码暴露给链路上任何人")
+    }
+
     fun saveWebdavConfig(url: String, user: String, pass: String) {
+        requireHttps(url) // R3：http:// 配置不入库
         prefs.edit()
             .putString("url_v2", KeystoreCipher.encryptToB64(url))
             .putString("user_v2", KeystoreCipher.encryptToB64(user))
@@ -106,6 +116,7 @@ class BackupRepository(private val context: Context) {
     suspend fun backupWebdav(password: CharArray): String = withContext(Dispatchers.IO) {
         val (url, user, pass) = webdavConfig()
         if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
+        requireHttps(url) // R3：旧版本存的 http:// 配置给出明确报错，而非网络层异常
         val client = WebDavClient(url, user, pass)
         val exported = BackupEngine.export(supportDb(), nowIso())
         val bytes = VaultCipher.encrypt(password, exported.payload, BackupEngine.schemaVersion(supportDb()), nowIso())
@@ -124,7 +135,10 @@ class BackupRepository(private val context: Context) {
     }
 
     suspend fun probeWebdav(url: String, user: String, pass: String): String =
-        withContext(Dispatchers.IO) { WebDavClient(url, user, pass).probe() }
+        withContext(Dispatchers.IO) {
+            requireHttps(url) // R3：先于任何网络请求拦截明文 http
+            WebDavClient(url, user, pass).probe()
+        }
 
     // ======================= 恢复 =======================
 
@@ -162,7 +176,10 @@ class BackupRepository(private val context: Context) {
      * @param snapshotPassword pre-restore 快照口令——与主备份口令一致（审查 P0：
      *   不再硬编码，退路文件用户自己可解，反编译 APK 也拿不到口令）。
      */
-    suspend fun restore(decrypted: DecryptedFile, snapshotPassword: CharArray): BackupEngine.VerifyResult =
+    suspend fun restore(
+        decrypted: DecryptedFile, snapshotPassword: CharArray,
+        mode: BackupEngine.RestoreMode = BackupEngine.RestoreMode.FULL_ROLLBACK,
+    ): BackupEngine.VerifyResult =
         withContext(Dispatchers.IO) {
             // 1. pre-restore 快照（退路）
             val snapshot = BackupEngine.export(supportDb(), nowIso())
@@ -171,11 +188,12 @@ class BackupRepository(private val context: Context) {
             val dir = File(context.filesDir, "backups").apply { mkdirs() }
             val snapFile = dir.resolve("pre-restore-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))}.ashkb")
             snapFile.writeBytes(snapBytes)
+            val modeNote = if (mode == BackupEngine.RestoreMode.FULL_ROLLBACK) "完整回滚" else "按表合并"
             try {
                 // 2. 覆盖写入 + 3. 双校验
-                val verify = BackupEngine.restore(supportDb(), decrypted.payload)
+                val verify = BackupEngine.restore(supportDb(), decrypted.payload, mode)
                 log(LedgerType.RESTORE, true, "restore", snapFile.name, verify.totalRows,
-                    verify.rowsOk, "pre-restore 快照已留存；行数+SHA 双校验${if (verify.rowsOk) "通过" else "失败"}")
+                    verify.rowsOk, "pre-restore 快照已留存；$modeNote；行数+SHA 双校验${if (verify.rowsOk) "通过" else "失败"}")
                 verify
             } catch (e: Exception) {
                 log(LedgerType.RESTORE, false, "restore", snapFile.name, null, false, e.message)

@@ -95,6 +95,50 @@ class ReportImportParserTest {
         assertNull(ReportImportParser.parseLab("随手打的文字没有逗号"))
     }
 
+    // ---- R4：未识别行不再静默丢弃 ----
+
+    @Test
+    fun parseLab_skippedLines() {
+        // 标题行 / 表头复读 / 格式漂移 / 空结果行都应进 skippedLines（原文保留，供确认页展示）
+        val text = """
+            【化验单整理】
+            日期: 2026-08-02
+            项目, 结果, 单位, 参考范围, 标记
+            血沉(ESR), 15, mm/h, 0-20, 正常
+            血沉结果为 15
+            某项目
+            白细胞, , 10^9/L
+        """.trimIndent()
+        val result = ReportImportParser.parseLab(text)!!
+        assertEquals(1, result.rows.size)
+        assertEquals(
+            listOf(
+                "【化验单整理】",
+                "项目, 结果, 单位, 参考范围, 标记",
+                "血沉结果为 15",
+                "某项目",
+                "白细胞, , 10^9/L",
+            ),
+            result.skippedLines,
+        )
+    }
+
+    @Test
+    fun parseImaging_skippedLines() {
+        // 首个键值行之前的噪声行进 skippedLines；键行之后视为多行字段值，不计入
+        val text = """
+            【影像报告整理】
+            报告编号 20260731001
+            类型: MRI
+            日期: 2026-07-31
+            部位: 骶髂关节
+            结论: 双侧骶髂关节炎性改变。
+        """.trimIndent()
+        val imp = ReportImportParser.parseImaging(text)!!
+        assertEquals(listOf("【影像报告整理】", "报告编号 20260731001"), imp.skippedLines)
+        assertEquals("骶髂关节", imp.bodyPart)
+    }
+
     // ---- 参考范围 ----
 
     @Test

@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -46,6 +47,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 
 import com.ashkb.app.R
+import com.ashkb.app.data.backup.BackupEngine
 import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.entity.LedgerStatus
 import com.ashkb.app.data.entity.LedgerType
@@ -66,6 +68,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
     val pending by vm.pendingRestore.collectAsState()
     val pendingName by vm.pendingFileName.collectAsState()
     val restoreResult by vm.restoreResult.collectAsState()
+    val restoreMode by vm.restoreMode.collectAsState()
     val ledger by vm.ledger.collectAsState()
     val davUrl by vm.davUrl.collectAsState()
     val davUser by vm.davUser.collectAsState()
@@ -230,6 +233,32 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                                 stringResource(R.string.backup_prerestore_note) +
                                     stringResource(R.string.backup_restore_overwrite_note),
                                 style = MaterialTheme.typography.bodySmall,
+                            )
+                            Spacer(Modifier.height(Spacing.sm))
+                            // R2：恢复语义二选一（默认完整回滚，用户拍板）——文案把后果写清楚
+                            Text(
+                                stringResource(R.string.backup_restore_mode_title),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                            Spacer(Modifier.height(Spacing.xs))
+                            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                                FilterChip(
+                                    selected = restoreMode == BackupEngine.RestoreMode.FULL_ROLLBACK,
+                                    onClick = { vm.setRestoreMode(BackupEngine.RestoreMode.FULL_ROLLBACK) },
+                                    label = { Text(stringResource(R.string.backup_restore_mode_full)) },
+                                )
+                                FilterChip(
+                                    selected = restoreMode == BackupEngine.RestoreMode.MERGE_TABLES,
+                                    onClick = { vm.setRestoreMode(BackupEngine.RestoreMode.MERGE_TABLES) },
+                                    label = { Text(stringResource(R.string.backup_restore_mode_merge)) },
+                                )
+                            }
+                            Text(
+                                if (restoreMode == BackupEngine.RestoreMode.FULL_ROLLBACK)
+                                    stringResource(R.string.backup_restore_mode_full_desc)
+                                else stringResource(R.string.backup_restore_mode_merge_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Spacer(Modifier.height(Spacing.sm))
                             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {

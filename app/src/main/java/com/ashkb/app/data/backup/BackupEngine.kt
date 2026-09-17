@@ -15,6 +15,14 @@ import java.security.MessageDigest
  */
 object BackupEngine {
 
+    /** R2：恢复语义二选一——完整回滚 / 按表合并。 */
+    enum class RestoreMode {
+        /** 完整回滚：先清空全部用户表（含备份里没有的表），再按备份重建——真正回到备份时点。 */
+        FULL_ROLLBACK,
+        /** 按表合并：只覆盖备份里包含的表，其余表保持现状（旧行为）。 */
+        MERGE_TABLES,
+    }
+
     class BackupException(msg: String, cause: Throwable? = null) : Exception(msg, cause)
 
     /**
@@ -112,8 +120,13 @@ object BackupEngine {
     /**
      * 恢复：事务内逐表 DELETE + INSERT（按 PRAGMA 列类型绑定），随后双校验。
      * 调用方必须在调用前完成 pre-restore 快照（协议 §6 退路）。
+     * R2：mode=FULL_ROLLBACK 时先清空全部用户表（含备份里没有的表）再重建，
+     * 真正回到备份时点；MERGE_TABLES 保持旧行为（备份里没有的表保留现状）。
      */
-    fun restore(db: SupportSQLiteDatabase, payload: String): VerifyResult {
+    fun restore(
+        db: SupportSQLiteDatabase, payload: String,
+        mode: RestoreMode = RestoreMode.MERGE_TABLES,
+    ): VerifyResult {
         val root = JSONObject(payload)
         val schema = root.optInt("schema_version", 0)
         if (schema <= 0) throw BackupException("备份缺少 schema_version")
@@ -126,6 +139,9 @@ object BackupEngine {
         val tables = root.getJSONObject("tables")
         db.beginTransaction()
         try {
+            if (mode == RestoreMode.FULL_ROLLBACK) {
+                for (t in tableNames(db)) db.execSQL("DELETE FROM `$t`")
+            }
             val names = tables.keys().asSequence().toList()
             for (t in names) {
                 insertTable(db, t, tables.getJSONArray(t))

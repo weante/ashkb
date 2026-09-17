@@ -48,6 +48,11 @@ class BackupViewModel(
     val pendingFileName: StateFlow<String?> = MutableStateFlow(null)
     val restoreResult: StateFlow<BackupEngine.VerifyResult?> = MutableStateFlow(null)
 
+    /** R2：恢复语义二选一，默认完整回滚（用户拍板）。 */
+    private val _restoreMode = MutableStateFlow(BackupEngine.RestoreMode.FULL_ROLLBACK)
+    val restoreMode: StateFlow<BackupEngine.RestoreMode> = _restoreMode
+    fun setRestoreMode(mode: BackupEngine.RestoreMode) { _restoreMode.value = mode }
+
     /** 恢复口令（内存暂存，用毕清零；pre-restore 快照复用同一口令）。 */
     private var restorePassword: CharArray? = null
 
@@ -141,12 +146,14 @@ class BackupViewModel(
         viewModelScope.launch {
             (busy as MutableStateFlow).value = true
             try {
-                val v = repo.restore(d, pass)
+                val mode = _restoreMode.value
+                val modeNote = if (mode == BackupEngine.RestoreMode.FULL_ROLLBACK) "完整回滚（回到备份时点）" else "按表合并"
+                val v = repo.restore(d, pass, mode)
                 wipeRestorePassword()
                 (restoreResult as MutableStateFlow).value = v
-                if (v.rowsOk) info("恢复完成：双校验（行数 + SHA-256）全部通过，共 ${v.totalRows} 行。" +
+                if (v.rowsOk) info("恢复完成（$modeNote）：双校验（行数 + SHA-256）全部通过，共 ${v.totalRows} 行。" +
                     "误恢复退路快照已留存（口令与本次备份口令相同）。请重启应用以刷新界面数据。")
-                else info("恢复已写入，但双校验未全部通过：${v.rowDetails.take(5).joinToString("；")}")
+                else info("恢复已写入（$modeNote），但双校验未全部通过：${v.rowDetails.take(5).joinToString("；")}")
             } catch (e: Exception) {
                 fail("恢复失败：${e.message}")
             } finally { (busy as MutableStateFlow).value = false }
@@ -158,6 +165,7 @@ class BackupViewModel(
         (pendingRestore as MutableStateFlow).value = null
         (pendingFileName as MutableStateFlow).value = null
         (restoreResult as MutableStateFlow).value = null
+        _restoreMode.value = BackupEngine.RestoreMode.FULL_ROLLBACK
     }
 
     /** 一键恢复演练（协议 §7 首次恢复演练）。 */

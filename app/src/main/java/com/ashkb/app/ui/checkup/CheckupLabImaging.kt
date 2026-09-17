@@ -325,6 +325,42 @@ internal fun ImportKind.title(): String = when (this) {
     ImportKind.IMAGING -> stringResource(R.string.imaging_ai_import_title)
 }
 
+/** R4：解析未识别的行不再静默丢弃——「已导入 N 项 · M 行未识别」，可展开查看原文手补。 */
+@Composable
+private fun SkippedLinesHint(importedCount: Int, lines: List<String>) {
+    var expanded by remember(lines) { mutableStateOf(false) }
+    TextButton(
+        onClick = { expanded = !expanded },
+        modifier = Modifier.heightIn(min = Size.touchMin),
+    ) {
+        Text(stringResource(R.string.ai_import_skipped_summary, importedCount, lines.size))
+    }
+    if (expanded) {
+        Surface(
+            Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceContainer,
+        ) {
+            Column(
+                Modifier
+                    .heightIn(max = 120.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                Text(stringResource(R.string.ai_import_skipped_title), style = MaterialTheme.typography.labelLarge)
+                lines.forEach {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: () -> Unit) {
@@ -448,6 +484,7 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
                         }
                     }
                 }
+                if (imp.skippedLines.isNotEmpty()) SkippedLinesHint(imp.rows.size, imp.skippedLines)
             }
             imagingImport?.let { imp ->
                 Text(stringResource(R.string.ai_import_parse_result), style = MaterialTheme.typography.titleSmall)
@@ -458,6 +495,7 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
                 imp.hospital?.let {
                     Text(stringResource(R.string.checkup_hospital_line, it), style = MaterialTheme.typography.bodySmall)
                 }
+                if (imp.skippedLines.isNotEmpty()) SkippedLinesHint(1, imp.skippedLines)
             }
 
             SheetSaveButton(

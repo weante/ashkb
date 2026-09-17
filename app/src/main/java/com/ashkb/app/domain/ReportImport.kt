@@ -23,6 +23,8 @@ data class LabImport(
     val hospital: String?,
     val note: String?,
     val rows: List<LabImportRow>,
+    /** R4：未能解析成数据行的原文（模板复读 / 表头 / 格式漂移 / 空结果行），供确认页提示手补 */
+    val skippedLines: List<String> = emptyList(),
 )
 
 data class ImagingImport(
@@ -33,6 +35,8 @@ data class ImagingImport(
     val findings: String? = null,
     val conclusion: String? = null,
     val compare: String? = null, // 对比前片的变化描述
+    /** R4：首个键值行之前、无法归入任何字段的原文行（键行之后视为多行字段值，不计入） */
+    val skippedLines: List<String> = emptyList(),
 )
 
 object ReportImportParser {
@@ -42,6 +46,7 @@ object ReportImportParser {
 
     private val FIELD_SPLIT = Regex("[,，;；\\t]")
 
+    /** R4：解析失败的行不再静默丢弃——原文进 [LabImport.skippedLines]，确认页提示「M 行未识别」。 */
     fun parseLab(text: String): LabImport? {
         val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
         if (lines.isEmpty()) return null
@@ -49,17 +54,21 @@ object ReportImportParser {
         var hospital: String? = null
         var note: String? = null
         val rows = mutableListOf<LabImportRow>()
+        val skipped = mutableListOf<String>()
         for (line in lines) {
             val l = norm(line)
             when {
                 l.startsWith("日期") -> date = afterColon(l)
                 l.startsWith("医院") -> hospital = afterColon(l)
                 l.startsWith("备注") -> note = afterColon(l)
-                else -> parseLabRow(l)?.let { rows.add(it) }
+                else -> {
+                    val row = parseLabRow(l)
+                    if (row != null) rows.add(row) else skipped.add(line)
+                }
             }
         }
         if (date == null && rows.isEmpty()) return null
-        return LabImport(normalizeDate(date), hospital?.takeIf { it.isNotBlank() }, note?.takeIf { it.isNotBlank() }, rows)
+        return LabImport(normalizeDate(date), hospital?.takeIf { it.isNotBlank() }, note?.takeIf { it.isNotBlank() }, rows, skipped)
     }
 
     private fun parseLabRow(line: String): LabImportRow? {
@@ -122,10 +131,12 @@ object ReportImportParser {
 
     private val IMAGING_KEYS = listOf("类型", "日期", "医院", "部位", "所见", "结论", "对比", "备注")
 
+    /** R4：首个键值行之前无法归入任何字段的行不再静默丢弃——原文进 [ImagingImport.skippedLines]。 */
     fun parseImaging(text: String): ImagingImport? {
         val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
         if (lines.isEmpty()) return null
         val fields = linkedMapOf<String, MutableList<String>>()
+        val skipped = mutableListOf<String>()
         var current: String? = null
         for (line in lines) {
             val l = norm(line)
@@ -136,6 +147,8 @@ object ReportImportParser {
                 if (v.isNotBlank()) fields.getOrPut(key) { mutableListOf() }.add(v)
             } else if (current != null) {
                 fields.getOrPut(current) { mutableListOf() }.add(l)
+            } else {
+                skipped.add(line)
             }
         }
         val modality = modalityOf(fields["类型"]?.joinToString(" ") ?: "") ?: return null
@@ -150,6 +163,7 @@ object ReportImportParser {
             findings = fields["所见"]?.joinToString("\n")?.takeIf { it.isNotBlank() },
             conclusion = fields["结论"]?.joinToString("\n")?.takeIf { it.isNotBlank() },
             compare = fields["对比"]?.joinToString("\n")?.takeIf { it.isNotBlank() },
+            skippedLines = skipped,
         )
     }
 

@@ -4,6 +4,8 @@
     <string name="ai_import_copy_template">复制模板</string>
     <string name="ai_import_parse_action">解析</string>
     <string name="ai_import_parse_result">解析结果</string>
+    <string name="ai_import_skipped_summary">已导入 %1$d 项 · %2$d 行未识别</string>
+    <string name="ai_import_skipped_title">未识别的行（可手动补录）</string>
     <string name="ai_import_step1">第一步：复制模板，连同报告照片一起发给任意 AI 助手</string>
     <string name="ai_import_step2">第二步：把 AI 的回复原文粘贴到下面</string>
     <string name="backup_bypass_decrypt">旁路解密与校验</string>
@@ -41,6 +43,11 @@
     <string name="backup_profile_json_title">健康档案 JSON（换机建档）</string>
     <string name="backup_profile_save_share">保存 / 分享档案</string>
     <string name="backup_restore_execute">执行恢复（覆盖当前数据）</string>
+    <string name="backup_restore_mode_full">完整回滚</string>
+    <string name="backup_restore_mode_full_desc">先清空全部数据，再按备份重建——真正回到备份时点。备份时点之后新增的数据将全部丢失（误恢复可用 pre-restore 快照兜底找回）。</string>
+    <string name="backup_restore_mode_merge">按表合并</string>
+    <string name="backup_restore_mode_merge_desc">只覆盖备份里包含的表，其余数据保持现状。适合想把旧备份的部分数据合回来的场景。</string>
+    <string name="backup_restore_mode_title">恢复方式（二选一）</string>
     <string name="backup_restore_overwrite_note">然后覆盖写入主库并做行数 + SHA-256 双校验。</string>
     <string name="backup_restore_title">恢复（五步含退路）</string>
     <string name="backup_return_modify">返回修改</string>
