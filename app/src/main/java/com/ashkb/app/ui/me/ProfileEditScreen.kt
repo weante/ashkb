@@ -135,9 +135,11 @@ fun ProfileEditScreen(
             }
             Text(stringResource(R.string.profile_stage_field_note), style = MaterialTheme.typography.labelMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                // R1 三态：缓解期 / 控制中 / 发作期（不确定由引擎按发作期保守处理）
                 listOf(
-                    "active" to stringResource(R.string.stage_active_with_note),
                     "stable" to stringResource(R.string.stage_stable),
+                    "controlled" to stringResource(R.string.stage_controlled),
+                    "flare" to stringResource(R.string.stage_flare),
                     "unknown" to stringResource(R.string.common_uncertain),
                 ).forEach { (k, l) ->
                     FilterChip(selected = stage == k, onClick = { stage = k }, label = { Text(l) })

@@ -211,7 +211,8 @@ fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
 private fun PrescriptionHero(ui: com.ashkb.app.ui.exercise.ExerciseUiState, yesterday: com.ashkb.app.data.entity.SymptomDaily?) {
     val tone = when (ui.stage) {
         "stable" -> StatusTone.Success
-        "active" -> StatusTone.Warning
+        "controlled" -> StatusTone.Info
+        "flare" -> StatusTone.Warning
         else -> StatusTone.Neutral
     }
     val (bg, fg) = tone.colors()
@@ -231,7 +232,8 @@ private fun PrescriptionHero(ui: com.ashkb.app.ui.exercise.ExerciseUiState, yest
                 Text(
                     when (ui.stage) {
                         "stable" -> stringResource(R.string.exercise_stable_prescription)
-                        "active" -> stringResource(R.string.exercise_active_prescription)
+                        "controlled" -> stringResource(R.string.exercise_controlled_prescription)
+                        "flare" -> stringResource(R.string.exercise_flare_prescription)
                         else -> stringResource(R.string.stage_not_set_filtered)
                     },
                     style = MaterialTheme.typography.labelLarge,
@@ -247,7 +249,14 @@ private fun PrescriptionHero(ui: com.ashkb.app.ui.exercise.ExerciseUiState, yest
                 )
                 Text(
                     buildString {
-                        append(if (ui.stage == "stable") stringResource(R.string.exercise_stable_rule_note) else stringResource(R.string.exercise_active_rule_note))
+                        append(
+                            when (ui.stage) {
+                                "stable" -> stringResource(R.string.exercise_stable_rule_note)
+                                "controlled" -> stringResource(R.string.exercise_controlled_rule_note)
+                                // 未设置分期按发作期保守过滤（R1：unknown → flare）
+                                else -> stringResource(R.string.exercise_flare_rule_note)
+                            }
+                        )
                         if (ui.cervicalInvolved) append(stringResource(R.string.exercise_cervical_marked))
                     },
                     style = MaterialTheme.typography.bodySmall,

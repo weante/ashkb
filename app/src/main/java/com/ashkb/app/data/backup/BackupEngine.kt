@@ -42,6 +42,13 @@ object BackupEngine {
             }
         }
 
+    /**
+     * R8：恢复表名白名单校验（纯函数）——返回备份 tables 里不在当前库表清单中的表名。
+     * 调用方据此整体拒绝恢复：构造恶意备份携带任意表名（含反引号逃逸）写入的攻击面就此封死。
+     */
+    fun unknownTables(tablesJson: JSONObject, knownTables: Set<String>): List<String> =
+        tablesJson.keys().asSequence().filter { it !in knownTables }.sorted().toList()
+
     fun sha256Hex(data: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(data).joinToString("") { "%02x".format(it) }
 
@@ -137,6 +144,11 @@ object BackupEngine {
         if (expectedFormat != "ashkb-full") throw BackupException("备份格式不正确：$expectedFormat")
 
         val tables = root.getJSONObject("tables")
+        // R8：表名白名单——备份里的每个表必须存在于当前库（sqlite_master 动态发现），
+        // 任一未知表名即整体拒绝（事务开始前校验，保证拒绝时零写入）
+        val unknown = unknownTables(tables, tableNames(db).toHashSet())
+        if (unknown.isNotEmpty()) throw BackupException(
+            "备份包含当前数据库不存在的表，已整体拒绝：${unknown.joinToString("、")}")
         db.beginTransaction()
         try {
             if (mode == RestoreMode.FULL_ROLLBACK) {
@@ -145,6 +157,10 @@ object BackupEngine {
             val names = tables.keys().asSequence().toList()
             for (t in names) {
                 insertTable(db, t, tables.getJSONArray(t))
+            }
+            // R1：旧备份归一化——v8 前导出的 disease_stage='active' 落库时并入 controlled（与迁移 v7→v8 同义）
+            if (tables.has("profile")) {
+                db.execSQL("UPDATE `profile` SET `disease_stage` = 'controlled' WHERE `disease_stage` = 'active'")
             }
             db.setTransactionSuccessful()
         } catch (e: Exception) {

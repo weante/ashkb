@@ -57,8 +57,8 @@ data class Profile(
     @ColumnInfo(name = "diagnosis") val diagnosis: String,
     @ColumnInfo(name = "diagnose_year") val diagnoseYear: Int? = null,
     @ColumnInfo(name = "hla_b27") val hlaB27: String = "unknown", // positive / negative / unknown
-    /** R27 矩阵分期维：active（炎症活动期）/ stable（缓解期）——驱动 M4 运动过滤与 M5 预警灵敏度 */
-    @ColumnInfo(name = "disease_stage") val diseaseStage: String = "unknown", // active / stable / unknown
+    /** R1 三态：stable（缓解期）/ controlled（控制中）/ flare（发作期）——驱动 M4 运动过滤与 M5 预警灵敏度；unknown 由引擎按 flare 保守处理 */
+    @ColumnInfo(name = "disease_stage") val diseaseStage: String = "unknown", // stable / controlled / flare / unknown
     @ColumnInfo(name = "spine_mobility") val spineMobility: String? = null, // none / mild / moderate / severe（颈椎受累=moderate+）
     @ColumnInfo(name = "comorbidities") val comorbidities: String? = null, // JSON 数组
     @ColumnInfo(name = "allergies") val allergies: String? = null, // JSON 数组

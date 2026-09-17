@@ -273,7 +273,9 @@ object ReportPdfWriter {
         return f
     }
 
-    private fun stage(k: String) = when (k) { "active" -> "活动期"; "stable" -> "缓解期"; else -> "未评估" }
+    private fun stage(k: String) = when (k) {
+        "stable" -> "缓解期"; "controlled" -> "控制中"; "flare" -> "发作期"; else -> "未评估（按发作期保守）"
+    }
     private fun freq(k: String) = when (k) {
         "DAILY" -> "每日"; "BID" -> "每日两次"; "Q8H" -> "每8小时"; "WEEKLY" -> "每周一次";
         "BIW" -> "每周两次"; "Q2W" -> "每两周一次"; "PRN" -> "按需"; else -> k

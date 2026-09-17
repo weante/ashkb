@@ -131,8 +131,9 @@ fun MeScreen(
 
 @Composable
 private fun stageLabel(k: String?) = when (k) {
-    "active" -> stringResource(R.string.stage_active_filtered)
     "stable" -> stringResource(R.string.stage_stable)
+    "controlled" -> stringResource(R.string.stage_controlled)
+    "flare" -> stringResource(R.string.stage_flare_filtered)
     else -> stringResource(R.string.stage_not_set_conservative)
 }
 

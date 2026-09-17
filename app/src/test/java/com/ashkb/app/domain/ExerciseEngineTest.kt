@@ -8,9 +8,10 @@ import org.junit.Test
 
 /**
  * P5 运动分级矩阵单测（R27 安全核心）：
- * 红榜 grade_matrix 按分期判定、黑榜 stage 条件拦截、颈椎受累全期拦截、
+ * 红榜 grade_matrix 按分期判定（R1 三态：stable/controlled/flare，unknown→flare 保守）、
+ * 发作期红榜只出 L1、黑榜 stage 条件拦截、颈椎受累全期拦截、
  * 停用项不进当日处方、反馈判读（exc-010）。
- * 矩阵判定错误会直接把高危动作放给活动期患者——任何一条失败都不应定版。
+ * 矩阵判定错误会直接把高危动作放给发作期患者——任何一条失败都不应定版。
  */
 class ExerciseEngineTest {
 
@@ -33,28 +34,58 @@ class ExerciseEngineTest {
     }
 
     @Test
-    fun `红榜 L2 活动期降级`() {
+    fun `红榜 L2 控制中降级`() {
         val e = entry("""{"list_type":"red","grade":"L2","dose":"每周 3 次",
-            "grade_matrix":{"stable":"recommend","active":"downgrade"}}""")
-        val c = ExerciseEngine.evaluate(e, diseaseStage = "active", spineMobility = null)
+            "grade_matrix":{"stable":"recommend","controlled":"downgrade"}}""")
+        val c = ExerciseEngine.evaluate(e, diseaseStage = "controlled", spineMobility = null)
         assertEquals("downgrade", c.verdict)
         assertTrue(c.hint.contains("减量"))
     }
 
     @Test
-    fun `红榜 L3 活动期暂停`() {
+    fun `红榜 L3 控制中暂停`() {
         val e = entry("""{"list_type":"red","grade":"L3",
-            "grade_matrix":{"stable":"allow","active":"pause"}}""")
-        val c = ExerciseEngine.evaluate(e, diseaseStage = "active", spineMobility = null)
+            "grade_matrix":{"stable":"allow","controlled":"pause"}}""")
+        val c = ExerciseEngine.evaluate(e, diseaseStage = "controlled", spineMobility = null)
         assertEquals("pause", c.verdict)
     }
 
     @Test
-    fun `未建档 unknown 分期按活动期保守处理`() {
+    fun `未建档 unknown 分期按发作期保守处理`() {
         val e = entry("""{"list_type":"red","grade":"L2",
-            "grade_matrix":{"stable":"recommend","active":"pause"}}""")
+            "grade_matrix":{"stable":"recommend","flare":"pause"}}""")
         assertEquals("pause", ExerciseEngine.evaluate(e, null, null).verdict)
         assertEquals("pause", ExerciseEngine.evaluate(e, "unknown", null).verdict)
+    }
+
+    @Test
+    fun `旧种子矩阵只有 stable-active 两键时 controlled 回退 active 行为`() {
+        // v8 前安装的 kb_entries 只有旧两键矩阵，种子不重导——引擎按 active 键回退
+        val e = entry("""{"list_type":"red","grade":"L2",
+            "grade_matrix":{"stable":"recommend","active":"downgrade"}}""")
+        assertEquals("downgrade", ExerciseEngine.evaluate(e, "controlled", null).verdict)
+    }
+
+    @Test
+    fun `旧种子矩阵 flare 回退 active 行为（L1 不受强制暂停影响）`() {
+        val e = entry("""{"list_type":"red","grade":"L1",
+            "grade_matrix":{"stable":"recommend","active":"recommend"}}""")
+        assertEquals("recommend", ExerciseEngine.evaluate(e, "flare", null).verdict)
+    }
+
+    @Test
+    fun `发作期红榜 L2 即使矩阵放行也强制暂停`() {
+        val e = entry("""{"list_type":"red","grade":"L2",
+            "grade_matrix":{"controlled":"downgrade","flare":"allow"}}""")
+        assertEquals("pause", ExerciseEngine.evaluate(e, "flare", null).verdict)
+    }
+
+    @Test
+    fun `发作期红榜 L1 按矩阵 flare 键判定`() {
+        val e = entry("""{"list_type":"red","grade":"L1",
+            "grade_matrix":{"controlled":"recommend","flare":"downgrade"}}""")
+        val c = ExerciseEngine.evaluate(e, "flare", null)
+        assertEquals("downgrade", c.verdict)
     }
 
     @Test
@@ -66,20 +97,22 @@ class ExerciseEngineTest {
     // ======================= 黑榜拦截 =======================
 
     @Test
-    fun `黑榜 活动期命中 stage 拦截`() {
+    fun `黑榜 控制中与发作期命中 stage 拦截`() {
         val e = entry("""{"list_type":"black","grade":"L3","risk":"高冲击",
-            "block_rule":{"stage":["active","stable"]}}""")
-        assertEquals("block", ExerciseEngine.evaluate(e, "active", null).verdict)
+            "block_rule":{"stage":["controlled","flare","stable"]}}""")
+        assertEquals("block", ExerciseEngine.evaluate(e, "controlled", null).verdict)
+        assertEquals("block", ExerciseEngine.evaluate(e, "flare", null).verdict)
     }
 
     @Test
-    fun `黑榜 仅活动期条目在缓解期不拦截`() {
+    fun `黑榜 仅控制中发作期条目在缓解期不拦截`() {
         // 种子真实结构：黑榜条目带 grade_matrix（stable 期显示「不建议」而非硬拦截）
         val e = entry("""{"list_type":"black","grade":"L3","risk":"高冲击",
-            "grade_matrix":{"stable":"advise_against","active":"block"},
-            "block_rule":{"stage":["active"]}}""")
+            "grade_matrix":{"stable":"advise_against","controlled":"block","flare":"block"},
+            "block_rule":{"stage":["controlled","flare"]}}""")
         assertEquals("advise_against", ExerciseEngine.evaluate(e, "stable", null).verdict)
-        assertEquals("block", ExerciseEngine.evaluate(e, "active", null).verdict)
+        assertEquals("block", ExerciseEngine.evaluate(e, "controlled", null).verdict)
+        assertEquals("block", ExerciseEngine.evaluate(e, "flare", null).verdict)
     }
 
     @Test
@@ -96,18 +129,18 @@ class ExerciseEngineTest {
     @Test
     fun `颈椎受累加 cervical_gated 条件仍拦截`() {
         val e = entry("""{"list_type":"black","risk":"深度后仰",
-            "block_rule":{"stage":["active"],"cervical":true}}""")
-        assertEquals("block", ExerciseEngine.evaluate(e, "active", "severe").verdict)
+            "block_rule":{"stage":["flare"],"cervical":true}}""")
+        assertEquals("block", ExerciseEngine.evaluate(e, "flare", "severe").verdict)
     }
 
     @Test
     fun `cervical_gated 但颈椎未受累不拦截`() {
-        // 条件化拦截（exb-004/005 语义）：仅「活动期 且 颈椎受累」才硬拦
+        // 条件化拦截（exb-004/005 语义）：仅「发作期 且 颈椎受累」才硬拦
         val e = entry("""{"list_type":"black","risk":"深度后仰",
-            "grade_matrix":{"stable":"advise_against","active":"advise_against"},
-            "block_rule":{"stage":["active"],"cervical":true}}""")
-        assertEquals("advise_against", ExerciseEngine.evaluate(e, "active", "mild").verdict)
-        assertEquals("block", ExerciseEngine.evaluate(e, "active", "severe").verdict)
+            "grade_matrix":{"stable":"advise_against","controlled":"advise_against"},
+            "block_rule":{"stage":["controlled"],"cervical":true}}""")
+        assertEquals("advise_against", ExerciseEngine.evaluate(e, "controlled", "mild").verdict)
+        assertEquals("block", ExerciseEngine.evaluate(e, "controlled", "severe").verdict)
     }
 
     @Test
@@ -115,13 +148,13 @@ class ExerciseEngineTest {
         val e = entry("""{"list_type":"black","risk":"蛙泳换气",
             "cervical_condition":"cervical_only"}""")
         assertEquals("block", ExerciseEngine.evaluate(e, "stable", "moderate").verdict)
-        assertEquals("block", ExerciseEngine.evaluate(e, "active", "severe").verdict)
+        assertEquals("block", ExerciseEngine.evaluate(e, "flare", "severe").verdict)
     }
 
     @Test
     fun `cervical_only 但颈椎未受累不因颈椎拦截`() {
         val e = entry("""{"list_type":"black","risk":"蛙泳换气",
-            "grade_matrix":{"stable":"advise_against","active":"block"},
+            "grade_matrix":{"stable":"advise_against","controlled":"block"},
             "cervical_condition":"cervical_only"}""")
         assertEquals("advise_against", ExerciseEngine.evaluate(e, "stable", null).verdict)
     }
@@ -145,8 +178,8 @@ class ExerciseEngineTest {
     @Test
     fun `拦截条目带替代方案提示`() {
         val e = entry("""{"list_type":"black","risk":"仰卧起坐",
-            "block_rule":{"stage":["active","stable"]},"alternative_hint":"改为平板支撑 30 秒"}""")
-        val c = ExerciseEngine.evaluate(e, "active", null)
+            "block_rule":{"stage":["controlled","flare","stable"]},"alternative_hint":"改为平板支撑 30 秒"}""")
+        val c = ExerciseEngine.evaluate(e, "flare", null)
         assertTrue(c.hint.contains("替代方案"))
         assertTrue(c.hint.contains("平板支撑"))
     }
@@ -163,6 +196,16 @@ class ExerciseEngineTest {
         assertEquals(redOk.id, plan[0].entry.id)
         assertEquals(1, blocked.size)
         assertEquals(black.id, blocked[0].entry.id)
+    }
+
+    @Test
+    fun `发作期当日处方只出 L1`() {
+        // R1 发作期：L2/L3 一律 pause（今日只出 L1 轻柔项），矩阵放行也强制暂停
+        val l1 = entry("""{"list_type":"red","grade":"L1","grade_matrix":{"flare":"recommend"}}""")
+        val l2 = entry("""{"list_type":"red","grade":"L2","grade_matrix":{"flare":"allow"}}""")
+        val l3 = entry("""{"list_type":"red","grade":"L3","grade_matrix":{"flare":"allow"}}""")
+        val (plan, _) = ExerciseEngine.todayPlan(listOf(l1, l2, l3), "flare", null)
+        assertEquals(listOf("L1"), plan.map { it.grade })
     }
 
     @Test

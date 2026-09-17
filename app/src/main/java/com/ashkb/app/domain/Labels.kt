@@ -11,7 +11,7 @@ object Labels {
     }
 
     fun diseaseStage(key: String?): String = when (key) {
-        "active" -> "活动期"; "stable" -> "缓解期"; else -> "未评估"
+        "stable" -> "缓解期"; "controlled" -> "控制中"; "flare" -> "发作期"; else -> "未评估"
     }
 
     fun dietPattern(key: String?): String = when (key) {

@@ -1,12 +1,15 @@
 package com.ashkb.app.data.backup
 
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * P5 备份引擎纯逻辑单测：SHA-256 摘要的确定性与已知向量。
- * （全库导出/恢复依赖 SupportSQLiteDatabase，属设备实测项——见 dogfooding 手册 DR 演练）
+ * P5 备份引擎纯逻辑单测：SHA-256 摘要确定性与已知向量 + R8 恢复表名白名单校验。
+ * （全库导出/恢复依赖 SupportSQLiteDatabase，属设备实测项——见 dogfooding 手册 DR 演练；
+ *  restore 的白名单守卫在事务开始前抛 BackupException，拒绝时零写入。）
  */
 class BackupEngineTest {
 
@@ -56,5 +59,37 @@ class BackupEngineTest {
             BackupEngine.sha256Hex(rowsSorted.toByteArray()),
             BackupEngine.sha256Hex(rowsDifferent.toByteArray()),
         )
+    }
+
+    // ======================= R8 恢复表名白名单 =======================
+
+    private val knownTables = setOf("medications", "medication_logs", "profile", "alerts")
+
+    @Test
+    fun `全部表名在白名单内返回空（合法备份放行）`() {
+        val tables = JSONObject("""{"medications":[],"profile":[],"alerts":[]}""")
+        assertTrue(BackupEngine.unknownTables(tables, knownTables).isEmpty())
+    }
+
+    @Test
+    fun `恶意备份携带未知表名被识别（整体拒绝依据）`() {
+        val tables = JSONObject("""{"medications":[],"evil_table":[],"profile":[]}""")
+        assertEquals(listOf("evil_table"), BackupEngine.unknownTables(tables, knownTables))
+    }
+
+    @Test
+    fun `反引号逃逸表名被识别（不因拼接转义漏网）`() {
+        // insertTable 用 `表名` 包裹标识符——构造含反引号的表名验证白名单能拦下
+        val tables = JSONObject("""{"medications":[],"alerts` FROM secrets--":[]}""")
+        assertEquals(
+            listOf("alerts` FROM secrets--"),
+            BackupEngine.unknownTables(tables, knownTables),
+        )
+    }
+
+    @Test
+    fun `多个未知表名按字典序稳定返回`() {
+        val tables = JSONObject("""{"zeta":[],"alpha":[],"profile":[]}""")
+        assertEquals(listOf("alpha", "zeta"), BackupEngine.unknownTables(tables, knownTables))
     }
 }

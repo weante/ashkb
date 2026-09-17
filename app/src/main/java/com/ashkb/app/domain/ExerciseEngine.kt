@@ -37,8 +37,8 @@ object ExerciseEngine {
     fun parse(entry: KbEntry): JSONObject = runCatching { JSONObject(entry.payload) }.getOrDefault(JSONObject())
 
     /**
-     * 矩阵判定核心。stage 取 profile.disease_stage（active/stable/unknown；
-     * unknown 按 active 处理——保守侧，矩阵 §4「用户标记 + 症状趋势提示复核」）。
+     * 矩阵判定核心。stage 取 profile.disease_stage（R1 三态：stable / controlled / flare；
+     * unknown 及一切未识别值按 flare 处理——保守侧，矩阵 §4「用户标记 + 症状趋势提示复核」）。
      */
     fun evaluate(
         entry: KbEntry,
@@ -49,11 +49,17 @@ object ExerciseEngine {
         val listType = p.optStr("list_type") ?: "red"
         val grade = p.optStr("grade") ?: "L2"
         val matrix = p.optJSONObject("grade_matrix")
-        val stage = if (diseaseStage == "stable") "stable" else "active"
-        val raw = matrix?.optStr(stage) ?: when (listType) {
-            "black" -> "block"
-            else -> "allow"
+        val stage = when (diseaseStage) {
+            "stable", "controlled" -> diseaseStage
+            else -> "flare" // flare / unknown / null / 残留旧值 → 发作期保守
         }
+        // R1 兼容：v8 之前的种子矩阵只有 stable/active 两键——controlled/flare 回退到旧 active 行为
+        val raw = matrix?.optStr(stage)
+            ?: matrix?.optStr("active")
+            ?: when (listType) {
+                "black" -> "block"
+                else -> "allow"
+            }
         val cervical = cervicalInvolved(spineMobility)
         val cervicalCondition = p.optStr("cervical_condition") ?: "none"
         val dose = p.optStr("dose")
@@ -72,6 +78,8 @@ object ExerciseEngine {
 
         val verdict = when {
             blackIntercepted || cervicalBlock -> "block"
+            // R1 发作期：红榜 L2/L3 一律 pause（当日只出 L1 轻柔项）——矩阵之外的引擎级兜底
+            stage == "flare" && listType == "red" && grade != "L1" -> "pause"
             else -> raw
         }
 
@@ -81,7 +89,7 @@ object ExerciseEngine {
                 "allow" -> append("可以做。${dose ?: ""}")
                 "downgrade" -> append("今日减量执行（幅度减半 / 时长缩短）。${dose ?: ""}")
                 "conditional" -> append("条件允许时做：仅轻柔体式，幅度以不痛为界。${dose ?: ""}")
-                "pause" -> append("活动期暂停（降级为 L1 轻柔项替代）。")
+                "pause" -> append("当前分期暂停（降级为 L1 轻柔项替代）。")
                 "advise_against" -> append("不建议：骨折与应力风险随强度上升。")
                 else -> append("已拦截：${p.optStr("risk") ?: "高强度高风险动作"}")
             }

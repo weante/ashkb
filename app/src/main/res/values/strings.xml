@@ -180,8 +180,8 @@
     <string name="emergency_seek_care">是否就医</string>
     <string name="emergency_share_card">分享紧急卡</string>
     <string name="emergency_tab">应急</string>
-    <string name="exercise_active_prescription">活动期处方（保守过滤已生效）</string>
-    <string name="exercise_active_rule_note">活动期：L1 轻柔项为主，L2 多数暂停或减量，L3 拦截。</string>
+    <string name="exercise_controlled_prescription">控制中处方（减量保守执行）</string>
+    <string name="exercise_controlled_rule_note">控制中：L1 照常，L2 减量或暂停，L3 拦截。</string>
     <string name="exercise_by_stage">按分期推荐</string>
     <string name="exercise_cervical_marked">颈椎受累已标记：泳姿与颈部动作条目自动收紧。</string>
     <string name="exercise_checkin_done">完成打卡</string>
@@ -193,7 +193,9 @@
     <string name="exercise_feedback_done_suffix">" · 已反馈"</string>
     <string name="exercise_feedback_pending">昨日运动反馈待填</string>
     <string name="exercise_fill_feedback">填反馈</string>
-    <string name="exercise_filter_rule_note">按 R27 矩阵（L1/L2/L3 × 活动期/缓解期）过滤生成</string>
+    <string name="exercise_filter_rule_note">按 R27 矩阵（L1/L2/L3 × 缓解期/控制中/发作期）过滤生成</string>
+    <string name="exercise_flare_prescription">发作期处方（仅 L1 轻柔项）</string>
+    <string name="exercise_flare_rule_note">发作期：仅保留 L1 轻柔项，L2/L3 暂停，黑榜拦截。</string>
     <string name="exercise_intensity_self_test">强度自测（说话试验：能自如说话=中等，有点费力=高）</string>
     <string name="exercise_minute_space_suffix">" 分钟"</string>
     <string name="exercise_minute_suffix">" 分"</string>
@@ -458,11 +460,12 @@
     <string name="severity_mild">轻度</string>
     <string name="severity_moderate">中</string>
     <string name="severity_severe">重度</string>
-    <string name="stage_active_filtered">活动期（运动处方已保守过滤）</string>
     <string name="stage_active_paren">（活跃）</string>
-    <string name="stage_active_with_note">活动期（疼痛晨僵加重）</string>
-    <string name="stage_not_set_conservative">未设置（按活动期保守处理）</string>
-    <string name="stage_not_set_filtered">分期未设置（按活动期保守过滤）</string>
+    <string name="stage_controlled">控制中</string>
+    <string name="stage_flare">发作期</string>
+    <string name="stage_flare_filtered">发作期（运动处方已保守过滤）</string>
+    <string name="stage_not_set_conservative">未设置（按发作期保守处理）</string>
+    <string name="stage_not_set_filtered">分期未设置（按发作期保守过滤）</string>
     <string name="stage_stable">缓解期</string>
     <string name="stage_update_note">分期可随病情变化随时更新——运动处方即时重算。</string>
     <string name="symptom_alert_section">症状警报</string>

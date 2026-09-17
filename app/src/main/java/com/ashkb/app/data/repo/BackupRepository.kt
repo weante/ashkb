@@ -312,7 +312,9 @@ class BackupRepository(private val context: Context) {
             diagnosis = po.getString("diagnosis"),
             diagnoseYear = if (po.has("diagnose_year")) po.getInt("diagnose_year") else existing?.diagnoseYear,
             hlaB27 = po.optString("hla_b27", existing?.hlaB27 ?: "unknown"),
-            diseaseStage = po.optString("disease_stage", existing?.diseaseStage ?: "unknown"),
+            // R1：旧档案 JSON 的 active 归一化为 controlled（与迁移 v7→v8 同义；其余未识别值原样透传，引擎按 flare 保守处理）
+            diseaseStage = po.optString("disease_stage", existing?.diseaseStage ?: "unknown")
+                .let { if (it == "active") "controlled" else it },
             allergies = po.optString("allergies").ifBlank { existing?.allergies },
             emergencyBloodType = po.optString("emergency_blood_type").ifBlank { existing?.emergencyBloodType },
         )
