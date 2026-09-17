@@ -144,6 +144,7 @@ internal fun ScoreRow(label: String, value: Int?, onChange: (Int?) -> Unit) {
         value = value ?: 0,
         onValueChange = { onChange(it) },
         label = if (value == null) stringResource(R.string.symptom_record_hint, label) else label,
+        unrecorded = value == null,
         tone = ::painTone,
     )
     if (value != null) {

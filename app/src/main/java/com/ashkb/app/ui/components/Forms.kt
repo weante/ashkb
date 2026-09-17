@@ -18,7 +18,9 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,6 +43,9 @@ import kotlin.math.roundToInt
  *
  * 取代此前 66 个 32dp `FilterChip` 横滑条 —— 临床输入优先于视觉密度：
  * 大号数字 + 48dp 触摸目标 + 滑杆步进 + 语义描述。
+ *
+ * 未作答态（unrecorded=true）数字位显示「—」：null = 未记录 与 0 = 无 在
+ * BASDAI 语义上严格不同，不能让未作答看起来像已选 0。
  */
 @Composable
 fun ScoreInput(
@@ -48,12 +53,18 @@ fun ScoreInput(
     onValueChange: (Int) -> Unit,
     range: IntRange = 0..10,
     label: String,
+    unrecorded: Boolean = false,
     lowLabel: String = stringResource(R.string.common_none),
     highLabel: String = stringResource(R.string.symptom_scale_worst),
     tone: (Int) -> StatusTone,
 ) {
     val cs = MaterialTheme.colorScheme
-    val accent = tone(value).accent()
+    val accent = if (unrecorded) cs.onSurfaceVariant else tone(value).accent()
+    // M3 Slider 对落在当前值上的点按不回调 onValueChange（dispatchRawDelta 值相等即丢弃），
+    // 未作答态显示 0 时「答 0」的点按会被静默吞掉、该题永远提交不了。
+    // 记录手势期最近原始值，onValueChangeFinished（任何点按/拖动收尾必回调）按它兜底提交。
+    var gestureValue by remember { mutableFloatStateOf(value.toFloat()) }
+    LaunchedEffect(value) { gestureValue = value.toFloat() }
     val sliderDesc = stringResource(R.string.forms_slider_a11y, label, value, range.last)
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -65,7 +76,11 @@ fun ScoreInput(
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Text("$value", style = DataLarge, color = accent)
+            if (unrecorded) {
+                Text("—", style = DataLarge, color = accent)
+            } else {
+                Text("$value", style = DataLarge, color = accent)
+            }
             Text(
                 "/ ${range.last}",
                 style = MaterialTheme.typography.labelMedium,
@@ -85,7 +100,13 @@ fun ScoreInput(
             }
             Slider(
                 value = value.toFloat(),
-                onValueChange = { onValueChange(it.roundToInt().coerceIn(range.first, range.last)) },
+                onValueChange = {
+                    gestureValue = it
+                    onValueChange(it.roundToInt().coerceIn(range.first, range.last))
+                },
+                onValueChangeFinished = {
+                    onValueChange(gestureValue.roundToInt().coerceIn(range.first, range.last))
+                },
                 valueRange = range.first.toFloat()..range.last.toFloat(),
                 steps = (range.last - range.first - 1).coerceAtLeast(0),
                 modifier = Modifier
