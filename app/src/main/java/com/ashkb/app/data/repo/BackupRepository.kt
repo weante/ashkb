@@ -190,10 +190,11 @@ class BackupRepository(private val context: Context) {
             snapFile.writeBytes(snapBytes)
             val modeNote = if (mode == BackupEngine.RestoreMode.FULL_ROLLBACK) "完整回滚" else "按表合并"
             try {
-                // 2. 覆盖写入 + 3. 双校验
+                // 2. 覆盖写入 + 3. 双校验（事务内：失败即整体回滚，库保持恢复前状态）
                 val verify = BackupEngine.restore(supportDb(), decrypted.payload, mode)
-                log(LedgerType.RESTORE, true, "restore", snapFile.name, verify.totalRows,
-                    verify.rowsOk, "pre-restore 快照已留存；$modeNote；行数+SHA 双校验${if (verify.rowsOk) "通过" else "失败"}")
+                log(LedgerType.RESTORE, verify.rowsOk, "restore", snapFile.name, verify.totalRows,
+                    verify.rowsOk, "pre-restore 快照已留存；$modeNote；行数+SHA 双校验" +
+                        if (verify.rowsOk) "通过" else "失败——已整体回滚，库保持恢复前状态")
                 verify
             } catch (e: Exception) {
                 log(LedgerType.RESTORE, false, "restore", snapFile.name, null, false, e.message)

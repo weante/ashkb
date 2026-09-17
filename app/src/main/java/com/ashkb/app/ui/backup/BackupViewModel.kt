@@ -153,7 +153,7 @@ class BackupViewModel(
                 (restoreResult as MutableStateFlow).value = v
                 if (v.rowsOk) info("恢复完成（$modeNote）：双校验（行数 + SHA-256）全部通过，共 ${v.totalRows} 行。" +
                     "误恢复退路快照已留存（口令与本次备份口令相同）。请重启应用以刷新界面数据。")
-                else info("恢复已写入（$modeNote），但双校验未全部通过：${v.rowDetails.take(5).joinToString("；")}")
+                else info("恢复未完成：双校验未通过，已整体回滚——库保持恢复前状态（${v.rowDetails.take(5).joinToString("；")}）。")
             } catch (e: Exception) {
                 fail("恢复失败：${e.message}")
             } finally { (busy as MutableStateFlow).value = false }

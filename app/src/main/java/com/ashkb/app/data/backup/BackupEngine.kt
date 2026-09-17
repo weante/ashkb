@@ -129,6 +129,10 @@ object BackupEngine {
      * 调用方必须在调用前完成 pre-restore 快照（协议 §6 退路）。
      * R2：mode=FULL_ROLLBACK 时先清空全部用户表（含备份里没有的表）再重建，
      * 真正回到备份时点；MERGE_TABLES 保持旧行为（备份里没有的表保留现状）。
+     * 双校验在事务内进行（审查 P2「事务后无回滚」）：任一表行数或 SHA-256 不匹配
+     * 即不 setTransactionSuccessful——endTransaction 整体回滚，库保持恢复前状态。
+     * 校验针对备份原文；R1 归一化（active→controlled，与迁移 v7→v8 同义）在
+     * 校验通过后、提交前执行（否则归一化改值必致 profile 表 SHA 误报不匹配）。
      */
     fun restore(
         db: SupportSQLiteDatabase, payload: String,
@@ -158,17 +162,22 @@ object BackupEngine {
             for (t in names) {
                 insertTable(db, t, tables.getJSONArray(t))
             }
-            // R1：旧备份归一化——v8 前导出的 disease_stage='active' 落库时并入 controlled（与迁移 v7→v8 同义）
-            if (tables.has("profile")) {
-                db.execSQL("UPDATE `profile` SET `disease_stage` = 'controlled' WHERE `disease_stage` = 'active'")
+            // 双校验（事务内，针对备份原文——归一化在其后）：失败则不提交，整体回滚
+            val result = verifyAgainst(db, root.getJSONObject("manifest"), tables)
+            if (result.rowsOk) {
+                // R1：旧备份归一化——v8 前导出的 disease_stage='active' 落库时并入 controlled；
+                // 校验已按备份原文通过，此处等价于恢复旧备份后补跑 v7→v8 的数据迁移
+                if (tables.has("profile")) {
+                    db.execSQL("UPDATE `profile` SET `disease_stage` = 'controlled' WHERE `disease_stage` = 'active'")
+                }
+                db.setTransactionSuccessful()
             }
-            db.setTransactionSuccessful()
+            return result
         } catch (e: Exception) {
             throw BackupException("恢复写入失败：${e.message}", e)
         } finally {
             db.endTransaction()
         }
-        return verifyAgainst(db, root.getJSONObject("manifest"), root.optJSONObject("tables"))
     }
 
     /**

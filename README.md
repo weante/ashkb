@@ -27,8 +27,8 @@ Ankylosing Spondylitis Health Knowledge Base —— 一款面向强直性脊柱�
 - 复诊报告 PDF 导出（档案 + 用药 + 依从症状 + 化验复诊 + 下次复诊），系统分享面板分发
 
 ### 🏃 运动（R27 分级矩阵）
-- 按疾病状态（稳定 / 控制中 / 发作期）与疼痛、晨僵、发热实时判读，输出当日运动处方
-- 黑榜动作拦截（如颈椎高风险动作全期拦截），运动后反馈记录
+- 按疾病分期（缓解期 / 控制中 / 发作期；未评估按发作期保守处理）与脊柱活动度判读，输出当日运动处方；发作期红榜 L2/L3 一律暂停，当日只出 L1 轻柔项
+- 黑榜动作拦截（如颈椎高风险动作全期拦截），运动后反馈记录；昨日疼痛 / 晨僵 / 体温作为处方参考展示
 
 ### 📚 知识库
 - 内置种子医学知识（指南共识摘要、相互作用、忌口、疫苗、应急场景），本地检索，无需联网
@@ -43,7 +43,7 @@ Ankylosing Spondylitis Health Knowledge Base —— 一款面向强直性脊柱�
 | 项 | 说明 |
 |---|---|
 | 语言 / UI | Kotlin · Jetpack Compose（Material 3） |
-| 存储 | Room（v6，含 1→6 链式迁移，30+ 实体表） |
+| 存储 | Room（v8，含 1→8 链式迁移，25 实体表） |
 | 依赖 | **仅 AndroidX / Kotlin 官方库**，零第三方 UI / 网络 / 图表库 |
 | 图表 | Canvas 自绘折线图 |
 | PDF | `android.graphics.pdf` 原生导出 |
@@ -58,7 +58,7 @@ git clone https://github.com/weante/ashkb.git
 cd ashkb
 ./gradlew assembleDebug        # Debug APK
 ./gradlew assembleRelease      # Release APK（注意：签名配置请自行修改）
-./gradlew testDebugUnitTest    # 75 条单元测试
+./gradlew testDebugUnitTest    # 97 条单元测试
 ```
 
 要求：JDK 17+，Android SDK 34。或直接用 Android Studio 打开。
@@ -72,11 +72,11 @@ cd ashkb
 
 ## 测试
 
-86 条 JVM 单元测试覆盖核心 domain 逻辑：排程计算（含 BIW 每周两针边界）、运动分级矩阵 R27、检查报告 AI 导入解析（化验 / 影像 / 参考范围）、备份加密与 SHA、通用名键目录。
+97 条 JVM 单元测试覆盖核心 domain 逻辑：排程计算（含 BIW 每周两针边界）、运动分级矩阵 R27（三态分期 + 发作期 L1 兜底）、检查报告 AI 导入解析（化验 / 影像 / 参考范围 / 未识别行提示）、备份加密 / 恢复表名白名单与 SHA、通用名键目录。
 
 ## 版本
 
-当前 `v1.0.4`（versionCode 9）。P0~P5 阶段开发完成，处于自用验证（dogfooding）阶段。
+当前 `v1.0.15`（versionCode 20）。P0~P5 阶段开发完成，处于自用验证（dogfooding）阶段。
 
 ## License
 

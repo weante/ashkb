@@ -10,6 +10,7 @@ import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
+import java.io.File
 import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,12 @@ class AshkbApplication : Application() {
         super.onCreate()
         NotificationHelper.ensureChannels(this)
         appScope.launch {
+            // A3：分享产物清理——files/exports 下的明文导出物（档案 JSON / 报告 PDF / 紧急卡 PDF）
+            // 启动即清空，防止敏感内容在设备上无限期残留（分享动作本身不受影响）
+            runCatching {
+                val exports = File(filesDir, "exports")
+                if (exports.isDirectory) exports.listFiles()?.forEach { it.delete() }
+            }
             importKbSeedIfNeeded(this@AshkbApplication)
             // 启动即重排未来 7 天闹钟（覆盖跨日 / 杀后台遗漏）
             val meds = AppDatabase.get(this@AshkbApplication).medicationDao().observeActive().first()

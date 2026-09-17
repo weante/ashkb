@@ -26,7 +26,7 @@
     <string name="backup_encryption_note">WebDAV 服务商或任何拿到文件者都无法读取明文。口令遗忘 = 备份不可恢复，请务必牢记。</string>
     <string name="backup_encryption_title">备份加密（AES-256-GCM）</string>
     <string name="backup_export_profile">导出档案</string>
-    <string name="backup_file_note">备份文件 = 全库 27 表快照 + 逐表 SHA-256 清单，经口令派生密钥加密。</string>
+    <string name="backup_file_note">备份文件 = 全库 25 表快照 + 逐表 SHA-256 清单，经口令派生密钥加密。</string>
     <string name="backup_file_password">该备份的口令</string>
     <string name="backup_generating">生成中</string>
     <string name="backup_generating_dots">生成中…</string>

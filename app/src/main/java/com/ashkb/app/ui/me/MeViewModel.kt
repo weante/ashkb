@@ -27,7 +27,6 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
 
     fun saveMedication(context: android.content.Context, med: Medication) = viewModelScope.launch {
         repo.saveMedication(med)
-        val actives = repo.observeMedications()
         val list = com.ashkb.app.data.db.AppDatabase.get(context).medicationDao().listActive()
         ReminderScheduler.rescheduleAll(context, list)
     }

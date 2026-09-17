@@ -1,6 +1,7 @@
 package com.ashkb.app
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -18,8 +19,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (Build.VERSION.SDK_INT >= 33) {
-            notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        // A4：通知权限只请求一次——被拒后不再每次冷启动反复触发系统弹窗（可去系统设置自行开启）
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+            if (!prefs.getBoolean("notif_permission_asked", false)) {
+                prefs.edit().putBoolean("notif_permission_asked", true).apply()
+                notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
         }
         setContent {
             AshkbTheme {
