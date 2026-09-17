@@ -16,6 +16,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.CheckupItem
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.data.entity.CheckupType
@@ -38,19 +41,19 @@ internal fun CheckupItemFormSheet(onSave: (CheckupItem) -> Unit, onDismiss: () -
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
-            Text("添加复诊项目", style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(name, { name = it }, label = { Text("项目名称") }, singleLine = true)
-            ChipGroupLabel("类型")
+            Text(stringResource(R.string.checkup_add_item_button), style = MaterialTheme.typography.titleLarge)
+            OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.checkup_item_name)) }, singleLine = true)
+            ChipGroupLabel(stringResource(R.string.common_type))
             ChipGroup(
                 options = CheckupType.entries.map { it.name to it.label },
                 selected = type.name,
                 onSelect = { type = CheckupType.valueOf(it) },
             )
             OutlinedTextField(cycleDays, { cycleDays = it },
-                label = { Text("周期（天，留空=按需）") }, singleLine = true)
-            OutlinedTextField(notes, { notes = it }, label = { Text("备注") })
+                label = { Text(stringResource(R.string.med_cycle_days_field)) }, singleLine = true)
+            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes)) })
             SheetSaveButton(
-                text = "保存",
+                text = stringResource(R.string.common_save),
                 enabled = name.isNotBlank(),
                 onClick = {
                     if (name.isNotBlank()) {
@@ -88,27 +91,27 @@ internal fun CheckupRecordFormSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
-            Text("记录复诊", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.checkup_record_visit), style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(itemName, { itemName = it },
-                label = { Text("项目名称") }, singleLine = true)
-            ChipGroupLabel("类型")
+                label = { Text(stringResource(R.string.checkup_item_name)) }, singleLine = true)
+            ChipGroupLabel(stringResource(R.string.common_type))
             ChipGroup(
                 options = CheckupType.entries.map { it.name to it.label },
                 selected = checkType.name,
                 onSelect = { checkType = CheckupType.valueOf(it) },
             )
-            OutlinedTextField(date, { date = it }, label = { Text("日期") }, singleLine = true)
+            OutlinedTextField(date, { date = it }, label = { Text(stringResource(R.string.common_date)) }, singleLine = true)
             OutlinedTextField(hospital, { hospital = it },
-                label = { Text("医院") }, singleLine = true)
+                label = { Text(stringResource(R.string.common_hospital)) }, singleLine = true)
             OutlinedTextField(doctor, { doctor = it },
-                label = { Text("医生") }, singleLine = true)
+                label = { Text(stringResource(R.string.checkup_doctor_short)) }, singleLine = true)
             OutlinedTextField(nextDate, { nextDate = it },
-                label = { Text("下次复诊日期（可选）") }, singleLine = true)
+                label = { Text(stringResource(R.string.checkup_next_date_field)) }, singleLine = true)
             OutlinedTextField(conclusion, { conclusion = it },
-                label = { Text("诊断结论 / 医生意见") })
-            OutlinedTextField(notes, { notes = it }, label = { Text("备注") })
+                label = { Text(stringResource(R.string.imaging_conclusion)) })
+            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes)) })
             SheetSaveButton(
-                text = "保存",
+                text = stringResource(R.string.common_save),
                 enabled = itemName.isNotBlank(),
                 onClick = {
                     if (itemName.isNotBlank()) {
@@ -145,31 +148,31 @@ internal fun VaccineFormSheet(onSave: (VaccineRecord) -> Unit, onDismiss: () -> 
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
-            Text("记录疫苗接种", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.vaccine_record_action), style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(name, { name = it },
-                label = { Text("疫苗名称") }, singleLine = true)
-            ChipGroupLabel("类型")
+                label = { Text(stringResource(R.string.vaccine_name_field)) }, singleLine = true)
+            ChipGroupLabel(stringResource(R.string.common_type))
             ChipGroup(
                 options = VaccineType.entries.map { it.name to it.label },
                 selected = type.name,
                 onSelect = { type = VaccineType.valueOf(it) },
             )
-            OutlinedTextField(date, { date = it }, label = { Text("接种日期") }, singleLine = true)
+            OutlinedTextField(date, { date = it }, label = { Text(stringResource(R.string.vaccine_date)) }, singleLine = true)
             OutlinedTextField(dose, { dose = it },
-                label = { Text("剂次（可选）") }, singleLine = true)
+                label = { Text(stringResource(R.string.vaccine_dose_field)) }, singleLine = true)
             OutlinedTextField(hospital, { hospital = it },
-                label = { Text("接种医院") }, singleLine = true)
-            ChipGroupLabel("医生确认")
+                label = { Text(stringResource(R.string.vaccine_hospital)) }, singleLine = true)
+            ChipGroupLabel(stringResource(R.string.vaccine_doctor_confirm))
             ChipGroup(
                 options = DoctorConfirm.entries.map { it.name to it.label },
                 selected = confirm.name,
                 onSelect = { confirm = DoctorConfirm.valueOf(it) },
             )
             OutlinedTextField(nextDue, { nextDue = it },
-                label = { Text("下次加强日期（可选）") }, singleLine = true)
-            OutlinedTextField(notes, { notes = it }, label = { Text("备注 / 反应") })
+                label = { Text(stringResource(R.string.vaccine_booster_date)) }, singleLine = true)
+            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.exercise_notes_reaction)) })
             SheetSaveButton(
-                text = "保存",
+                text = stringResource(R.string.common_save),
                 enabled = name.isNotBlank(),
                 onClick = {
                     if (name.isNotBlank()) {

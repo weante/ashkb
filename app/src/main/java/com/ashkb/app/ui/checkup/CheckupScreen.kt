@@ -27,14 +27,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.data.entity.ImagingRecord
 import com.ashkb.app.ui.components.ScreenTopBar
 
-enum class CheckupTab(val label: String) {
-    ITEMS("项目"), RECORDS("记录"), LABS("化验"), IMAGING("影像"), VACCINES("疫苗")
+enum class CheckupTab { ITEMS, RECORDS, LABS, IMAGING, VACCINES }
+
+@Composable
+private fun CheckupTab.label(): String = when (this) {
+    CheckupTab.ITEMS -> stringResource(R.string.common_item)
+    CheckupTab.RECORDS -> stringResource(R.string.common_record)
+    CheckupTab.LABS -> stringResource(R.string.checkup_lab_tab)
+    CheckupTab.IMAGING -> stringResource(R.string.checkup_imaging_tab)
+    CheckupTab.VACCINES -> stringResource(R.string.checkup_vaccine_tab)
 }
 
 /** M6 复诊管理页（协议 §M6）：项目 / 记录 / 化验 / 影像 / 疫苗五个 Tab。 */
@@ -61,7 +71,7 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
     var imagingDetail by remember { mutableStateOf<ImagingRecord?>(null) }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenTopBar(title = "复诊管理", onBack = onBack)
+        ScreenTopBar(title = stringResource(R.string.checkup_manage_title), onBack = onBack)
 
         ScrollableTabRow(
             selectedTabIndex = pager.currentPage,
@@ -72,7 +82,7 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
                 Tab(
                     selected = pager.currentPage == index,
                     onClick = { scope.launch { pager.animateScrollToPage(index) } },
-                    text = { Text(t.label) },
+                    text = { Text(t.label()) },
                 )
             }
         }

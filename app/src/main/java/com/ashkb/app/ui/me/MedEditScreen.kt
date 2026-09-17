@@ -33,6 +33,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+
+import com.ashkb.app.R
 import com.ashkb.app.data.db.Ids
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.entity.MedClass
@@ -88,6 +91,8 @@ fun MedEditScreen(
     var doctorTold by remember { mutableStateOf(false) }
     var leafletRead by remember { mutableStateOf(false) }
 
+    val prnFallback = stringResource(R.string.med_reason_backup)
+
     fun buildMed(): Medication = Medication(
         id = Ids.new("med"),
         name = name.trim(),
@@ -97,7 +102,7 @@ fun MedEditScreen(
         route = route,
         dose = dose.trim(),
         frequency = frequency.name,
-        prnReason = if (frequency == MedFrequency.PRN) prnReason.trim().ifBlank { "备用" } else null,
+        prnReason = if (frequency == MedFrequency.PRN) prnReason.trim().ifBlank { prnFallback } else null,
         takeTimes = if (frequency == MedFrequency.PRN || route == "injection") {
             times.take(1).let { if (it.isEmpty()) null else JSONArray(it).toString() }
         } else {
@@ -124,7 +129,7 @@ fun MedEditScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             ScreenTopBar(
-                title = if (step == 1) "添加药品" else "用药核对清单",
+                title = if (step == 1) stringResource(R.string.med_add_medication) else stringResource(R.string.med_verify_checklist),
                 onBack = ::goBackStep,
             )
         },
@@ -139,7 +144,7 @@ fun MedEditScreen(
                     OutlinedButton(
                         onClick = ::goBackStep,
                         modifier = Modifier.weight(1f).heightIn(min = Size.touchMin),
-                    ) { Text(if (step == 1) "取消" else "返回修改") }
+                    ) { Text(if (step == 1) stringResource(R.string.common_cancel) else stringResource(R.string.backup_return_modify)) }
 
                     Button(
                         onClick = {
@@ -160,7 +165,7 @@ fun MedEditScreen(
                             }
                         },
                         modifier = Modifier.weight(1f).heightIn(min = Size.touchMin),
-                    ) { Text(if (step == 1) "下一步 · 核对" else "保存入库") }
+                    ) { Text(if (step == 1) stringResource(R.string.med_next_verify) else stringResource(R.string.checkup_save_record)) }
                 }
             }
         },
@@ -176,19 +181,19 @@ fun MedEditScreen(
             if (step == 1) {
                 OutlinedTextField(
                     name, { name = it },
-                    label = { Text("药品名（必填，如：阿达木单抗）") },
+                    label = { Text(stringResource(R.string.med_name_field)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     brand, { brand = it },
-                    label = { Text("商品名（选填，如：修美乐）") },
+                    label = { Text(stringResource(R.string.med_brand_field)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     nameKey, { nameKey = it },
-                    label = { Text("通用名键（必填，小写英文，如 adalimumab）") },
+                    label = { Text(stringResource(R.string.med_generic_key_field)) },
                     modifier = Modifier.fillMaxWidth(),
-                    supportingText = { Text("用于知识库相互作用检索；输入中英文自动匹配") },
+                    supportingText = { Text(stringResource(R.string.med_generic_key_note)) },
                 )
                 // P5 R8：自动匹配——键为空时按药品名检索建议
                 val keySuggestions = DrugKeyCatalog.suggest(if (nameKey.isBlank()) name else nameKey)
@@ -214,23 +219,23 @@ fun MedEditScreen(
                         }
                     }
                 }
-                Text("药物类别", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.med_category), style = MaterialTheme.typography.labelMedium)
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
                     MedClass.entries.forEach { c ->
                         FilterChip(selected = medClass == c, onClick = { medClass = c }, label = { Text(c.label) })
                     }
                 }
-                Text("给药途径", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.med_route), style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    FilterChip(selected = route == "oral", onClick = { route = "oral" }, label = { Text("口服") })
-                    FilterChip(selected = route == "injection", onClick = { route = "injection" }, label = { Text("注射") })
+                    FilterChip(selected = route == "oral", onClick = { route = "oral" }, label = { Text(stringResource(R.string.med_route_oral)) })
+                    FilterChip(selected = route == "injection", onClick = { route = "injection" }, label = { Text(stringResource(R.string.med_route_injection)) })
                 }
                 OutlinedTextField(
                     dose, { dose = it },
-                    label = { Text("剂量（必填，含单位，如 40 mg）") },
+                    label = { Text(stringResource(R.string.med_dose_field)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text("频次", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.med_frequency), style = MaterialTheme.typography.labelMedium)
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                     MedFrequency.entries.forEach { f ->
                         FilterChip(selected = frequency == f, onClick = { frequency = f }, label = { Text(f.label) })
@@ -238,7 +243,7 @@ fun MedEditScreen(
                 }
                 if (frequency != MedFrequency.PRN) {
                     if (route == "oral") {
-                        Text("服药时刻（本地提醒时刻）", style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.med_dose_time_field), style = MaterialTheme.typography.labelMedium)
                         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
                             listOf("06:30", "08:00", "12:00", "18:00", "21:00").forEach { t ->
                                 FilterChip(
@@ -251,7 +256,7 @@ fun MedEditScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                             OutlinedTextField(
                                 customTime, { customTime = it },
-                                label = { Text("自定义 HH:mm") },
+                                label = { Text(stringResource(R.string.med_custom_time)) },
                                 modifier = Modifier.weight(1f),
                             )
                             TextButton(onClick = {
@@ -259,7 +264,7 @@ fun MedEditScreen(
                                     times = times + customTime
                                     customTime = ""
                                 }
-                            }) { Text("添加") }
+                            }) { Text(stringResource(R.string.common_add)) }
                         }
                         if (times.isNotEmpty()) {
                             Text(
@@ -271,17 +276,17 @@ fun MedEditScreen(
                     } else if (frequency == MedFrequency.Q2W || frequency == MedFrequency.CUSTOM) {
                         OutlinedTextField(
                             cycleDays, { cycleDays = it.filter { c -> c.isDigit() }.take(3) },
-                            label = { Text("注射周期（天，如 14 = 每两周）") },
+                            label = { Text(stringResource(R.string.med_inj_cycle_field)) },
                             modifier = Modifier.fillMaxWidth(),
                         )
                         OutlinedTextField(
                             startDate, { startDate = it },
-                            label = { Text("周期锚点日期（YYYY-MM-DD，本期注射日）") },
+                            label = { Text(stringResource(R.string.med_cycle_anchor_date)) },
                             modifier = Modifier.fillMaxWidth(),
                         )
                     } else {
                         Text(
-                            "注射日按下方选择的固定星期自动出卡（默认 09:00 提醒）。",
+                            stringResource(R.string.med_inj_schedule_note),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -289,18 +294,18 @@ fun MedEditScreen(
                 } else {
                     OutlinedTextField(
                         prnReason, { prnReason = it },
-                        label = { Text("按需原因（如：备用镇痛）") },
+                        label = { Text(stringResource(R.string.med_prn_reason_field)) },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 if (frequency == MedFrequency.WEEKLY || frequency == MedFrequency.BIW) {
                     Text(
-                        if (frequency == MedFrequency.BIW) "每周两针——两个注射星期"
-                        else "每周固定星期（如甲氨蝶呤）",
+                        if (frequency == MedFrequency.BIW) stringResource(R.string.med_biweekly_note)
+                        else stringResource(R.string.med_freq_fixed_weekday),
                         style = MaterialTheme.typography.labelMedium,
                     )
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                        listOf(1 to "一", 2 to "二", 3 to "三", 4 to "四", 5 to "五", 6 to "六", 7 to "日").forEach { (d, l) ->
+                        listOf(1 to stringResource(R.string.weekday_one), 2 to stringResource(R.string.weekday_two), 3 to stringResource(R.string.weekday_three), 4 to stringResource(R.string.weekday_four), 5 to stringResource(R.string.weekday_five), 6 to stringResource(R.string.weekday_six), 7 to stringResource(R.string.weekday_sunday)).forEach { (d, l) ->
                             FilterChip(
                                 selected = weekday == d,
                                 onClick = { weekday = d; biwError = false },
@@ -310,7 +315,7 @@ fun MedEditScreen(
                     }
                     if (frequency == MedFrequency.BIW) {
                         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                            listOf(1 to "一", 2 to "二", 3 to "三", 4 to "四", 5 to "五", 6 to "六", 7 to "日").forEach { (d, l) ->
+                            listOf(1 to stringResource(R.string.weekday_one), 2 to stringResource(R.string.weekday_two), 3 to stringResource(R.string.weekday_three), 4 to stringResource(R.string.weekday_four), 5 to stringResource(R.string.weekday_five), 6 to stringResource(R.string.weekday_six), 7 to stringResource(R.string.weekday_sunday)).forEach { (d, l) ->
                                 FilterChip(
                                     selected = weekday2 == d,
                                     onClick = { weekday2 = d; biwError = false },
@@ -320,7 +325,7 @@ fun MedEditScreen(
                         }
                         if (biwError && weekday == weekday2) {
                             Text(
-                                "两针星期需不同（如周一 / 周四），请调整",
+                                stringResource(R.string.med_inj_two_days_error),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -328,34 +333,34 @@ fun MedEditScreen(
                     }
                 }
                 if (route == "oral") {
-                    Text("餐食关系", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.nutrition_meal_relation), style = MaterialTheme.typography.labelMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        listOf("with_food" to "随餐", "empty_stomach" to "空腹", "any" to "均可").forEach { (k, l) ->
+                        listOf("with_food" to stringResource(R.string.med_with_meal), "empty_stomach" to stringResource(R.string.med_fasting), "any" to stringResource(R.string.common_any)).forEach { (k, l) ->
                             FilterChip(selected = food == k, onClick = { food = k }, label = { Text(l) })
                         }
                     }
                 }
                 OutlinedTextField(
                     storage, { storage = it },
-                    label = { Text("储存提示（如：2–8℃ 冷藏）") },
+                    label = { Text(stringResource(R.string.med_storage_hint)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             } else {
                 // ---- 第二步：R03 核对清单 ----
                 val h = hits
                 if (h == null) {
-                    Text("正在检索知识库…")
+                    Text(stringResource(R.string.knowledge_searching))
                 } else if (h.isEmpty()) {
                     Text(
-                        "本系统知识库无此药相关数据，无法判断相互作用。请咨询医生 / 药师后使用。",
+                        stringResource(R.string.knowledge_no_interaction_data),
                         color = MaterialTheme.colorScheme.error,
                     )
                 } else {
-                    Text("知识库命中 ${h.size} 条相关提示：", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.med_kb_hits_prefix, h.size), style = MaterialTheme.typography.titleSmall)
                     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                         h.take(5).forEach { e ->
                             Text(
-                                "· ${if (e.severityLevel == "high") "【高危】" else "【提示】"}${e.title}",
+                                "· ${if (e.severityLevel == "high") stringResource(R.string.knowledge_high_risk_prefix) else stringResource(R.string.common_notice_prefix)}${e.title}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (e.severityLevel == "high") MaterialTheme.colorScheme.error
                                 else MaterialTheme.colorScheme.onSurface,
@@ -369,14 +374,14 @@ fun MedEditScreen(
                 HorizontalDivider(Modifier.padding(vertical = Spacing.xs))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = doctorTold, onCheckedChange = { doctorTold = it })
-                    Text("已告知风湿科医生我在使用此药")
+                    Text(stringResource(R.string.med_told_doctor))
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = leafletRead, onCheckedChange = { leafletRead = it })
-                    Text("已核对药品说明书用法用量")
+                    Text(stringResource(R.string.med_verified_manual))
                 }
                 Text(
-                    "两项均为待办——未勾选也可保存，药单将显示「核对待办」标记提醒您补办。",
+                    stringResource(R.string.med_verify_optional_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

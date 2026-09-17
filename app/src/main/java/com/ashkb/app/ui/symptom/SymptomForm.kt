@@ -18,6 +18,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+
+import com.ashkb.app.R
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.ui.components.ScoreInput
 import com.ashkb.app.ui.components.SectionCard
@@ -30,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import java.time.LocalDate
 
 // ---------------------------------------------------------------------------
@@ -70,7 +73,7 @@ internal fun SymptomFormCard(
     var fatigue by remember(existing?.id, dateKey) { mutableStateOf(existing?.fatigue) }
     var notes by remember(existing?.id, dateKey) { mutableStateOf(existing?.notes ?: "") }
 
-    SectionCard(title = if (existing == null) "$dateLabel 症状（未记录）" else "$dateLabel 症状") {
+    SectionCard(title = if (existing == null) stringResource(R.string.symptom_form_title_unrecorded, dateLabel) else stringResource(R.string.symptom_form_title, dateLabel)) {
         if (existing != null) {
             Text(
                 "已记录于 ${existing.recordedAt.take(16).replace("T", " ")}，再次保存将覆盖",
@@ -82,33 +85,33 @@ internal fun SymptomFormCard(
         OutlinedTextField(
             value = stiffnessMin,
             onValueChange = { stiffnessMin = it.filter { c -> c.isDigit() }.take(4) },
-            label = { Text("晨僵时长（分钟，醒后至僵硬感消退）") },
+            label = { Text(stringResource(R.string.symptom_stiffness_field)) },
             modifier = Modifier.fillMaxWidth(),
         )
-        ScoreRow("夜间痛（是否夜间痛醒，0=无）", nightPain) { nightPain = it }
-        ScoreRow("整体疼痛（0=无，10=最重）", painScore) { painScore = it }
+        ScoreRow(stringResource(R.string.symptom_night_pain_label), nightPain) { nightPain = it }
+        ScoreRow(stringResource(R.string.symptom_pain_overall_label), painScore) { painScore = it }
 
-        SwitchRow("发热", feverish, "体温 ≥ 38.5℃ 将触发应急警报") { feverish = it }
+        SwitchRow(stringResource(R.string.symptom_fever), feverish, stringResource(R.string.emergency_fever_threshold_note)) { feverish = it }
         if (feverish) {
             OutlinedTextField(
                 value = feverTemp,
                 onValueChange = { feverTemp = it.filter { c -> c.isDigit() || c == '.' }.take(5) },
-                label = { Text("最高体温（℃，如 38.6）") },
+                label = { Text(stringResource(R.string.symptom_max_fever_field)) },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        SwitchRow("眼部症状", eye, "眼痛 / 发红 / 畏光 / 视物模糊——葡萄膜炎警示") { eye = it }
-        SwitchRow("神经症状", neuro, "麻木 / 无力 / 大小便控制变化——需立即就医") { neuro = it }
+        SwitchRow(stringResource(R.string.symptom_eye_symptoms), eye, stringResource(R.string.symptom_uveitis_warning)) { eye = it }
+        SwitchRow(stringResource(R.string.symptom_neuro), neuro, stringResource(R.string.emergency_neuro_redflag)) { neuro = it }
 
         Spacer(Modifier.height(Spacing.xs))
-        Text("以下可选（生活质量参考）", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        ScoreRow("心情", mood) { mood = it }
-        ScoreRow("睡眠质量", sleepScore) { sleepScore = it }
-        ScoreRow("疲乏程度", fatigue) { fatigue = it }
+        Text(stringResource(R.string.symptom_optional_qol), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ScoreRow(stringResource(R.string.wellness_mood), mood) { mood = it }
+        ScoreRow(stringResource(R.string.wellness_sleep_quality), sleepScore) { sleepScore = it }
+        ScoreRow(stringResource(R.string.symptom_fatigue), fatigue) { fatigue = it }
 
         OutlinedTextField(
             value = notes, onValueChange = { notes = it },
-            label = { Text("备注（可选）") }, modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.common_notes_optional)) }, modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(Spacing.sm))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -123,7 +126,7 @@ internal fun SymptomFormCard(
                         notes = notes.ifBlank { null },
                     )
                 )
-            }) { Text(if (existing == null) "保存$dateLabel 症状" else "更新$dateLabel 症状") }
+            }) { Text(if (existing == null) stringResource(R.string.symptom_form_save, dateLabel) else stringResource(R.string.symptom_form_update, dateLabel)) }
         }
     }
 }
@@ -140,14 +143,14 @@ internal fun ScoreRow(label: String, value: Int?, onChange: (Int?) -> Unit) {
     ScoreInput(
         value = value ?: 0,
         onValueChange = { onChange(it) },
-        label = if (value == null) "$label（点按开始记录）" else label,
+        label = if (value == null) stringResource(R.string.symptom_record_hint, label) else label,
         tone = ::painTone,
     )
     if (value != null) {
         TextButton(
             onClick = { onChange(null) },
             contentPadding = PaddingValues(horizontal = Spacing.sm),
-        ) { Text("清除本次记录") }
+        ) { Text(stringResource(R.string.symptom_clear_record)) }
     }
 }
 

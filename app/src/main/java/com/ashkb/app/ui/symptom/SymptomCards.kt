@@ -22,6 +22,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.Alert
 import com.ashkb.app.data.entity.BasdaiRecord
 import com.ashkb.app.data.entity.FlareAction
@@ -38,13 +41,14 @@ import com.ashkb.app.ui.theme.colors
 // 警报 / 发作 / BASDAI 卡
 // ---------------------------------------------------------------------------
 
+@Composable
 private fun alertLabel(alertType: String): String = when (alertType) {
-    "symptom_abnormal" -> "症状警报"
-    "basdai_high" -> "自评偏高"
-    "flare_day7" -> "发作追踪"
-    "review_due" -> "内容复核"
-    "neuro_red_flag" -> "神经红旗"
-    else -> "提醒"
+    "symptom_abnormal" -> stringResource(R.string.symptom_alert_section)
+    "basdai_high" -> stringResource(R.string.basdai_self_high)
+    "flare_day7" -> stringResource(R.string.report_flare_tracking)
+    "review_due" -> stringResource(R.string.backup_content_review)
+    "neuro_red_flag" -> stringResource(R.string.emergency_neuro_flag)
+    else -> stringResource(R.string.reminder_nav)
 }
 
 private fun alertIcon(alertType: String) = when (alertType) {
@@ -80,9 +84,9 @@ internal fun AlertCard(alert: Alert, onView: () -> Unit, onAck: () -> Unit) {
                 modifier = Modifier.padding(top = Spacing.xs),
             ) {
                 if (alert.kbRef != null) {
-                    TextButton(onClick = onView) { Text("查看依据") }
+                    TextButton(onClick = onView) { Text(stringResource(R.string.knowledge_view_evidence)) }
                 }
-                TextButton(onClick = onAck) { Text("知道了") }
+                TextButton(onClick = onAck) { Text(stringResource(R.string.common_got_it)) }
             }
         }
     }
@@ -90,25 +94,25 @@ internal fun AlertCard(alert: Alert, onView: () -> Unit, onAck: () -> Unit) {
 
 @Composable
 internal fun FlareStatusCard(flare: FlareEvent?, days: Long?, onResolve: () -> Unit, onStart: () -> Unit) {
-    SectionCard(title = "发作登记") {
+    SectionCard(title = stringResource(R.string.symptom_flare_register)) {
         if (flare == null) {
             Text(
-                "当前无活跃发作。症状明显加重（疼痛 / 晨僵突然变重）时在此登记，系统将追踪天数并在第 7 天提醒就医指征。",
+                stringResource(R.string.symptom_no_flare_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(Spacing.sm))
-            OutlinedButton(onClick = onStart) { Text("登记发作") }
+            OutlinedButton(onClick = onStart) { Text(stringResource(R.string.symptom_log_flare)) }
         } else {
             StatusChip(
-                text = if (days != null) "发作进行中 · 第 $days 天" else "发作进行中",
+                text = if (days != null) stringResource(R.string.symptom_flare_day_n, days) else stringResource(R.string.symptom_flare_active),
                 tone = StatusTone.Danger,
                 icon = Icons.Rounded.WarningAmber,
             )
             Spacer(Modifier.height(Spacing.sm))
             Text(
                 "开始：${flare.startDate} · 诱因：${FlareTrigger.fromKey(flare.trigger).label}" +
-                    (flare.severityPeak?.let { " · 峰值疼痛 $it/10" } ?: ""),
+                    (flare.severityPeak?.let { stringResource(R.string.symptom_peak_pain_suffix, it) } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -126,9 +130,9 @@ internal fun FlareStatusCard(flare: FlareEvent?, days: Long?, onResolve: () -> U
                 }
             }
             Spacer(Modifier.height(Spacing.sm))
-            Button(onClick = onResolve) { Text("标记缓解") }
+            Button(onClick = onResolve) { Text(stringResource(R.string.symptom_mark_remission)) }
             Text(
-                "自我处理（休息 / 温和活动 / 热敷）7–10 天无改善应联系风湿科",
+                stringResource(R.string.symptom_self_care_note),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = Spacing.xs),
@@ -142,7 +146,7 @@ internal fun FlareHistoryList(events: List<FlareEvent>) {
     DividerList(items = events, key = { it.id }) { f ->
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
             Text(
-                "${f.startDate} 至 ${f.endDate ?: "至今"}",
+                "${f.startDate} 至 ${f.endDate ?: stringResource(R.string.symptom_until_now)}",
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(
@@ -152,7 +156,7 @@ internal fun FlareHistoryList(events: List<FlareEvent>) {
             )
         }
         StatusChip(
-            text = if (f.status == "active") "进行中" else "已缓解",
+            text = if (f.status == "active") stringResource(R.string.symptom_flare_ongoing) else stringResource(R.string.symptom_status_remitted),
             tone = if (f.status == "active") StatusTone.Danger else StatusTone.Neutral,
         )
     }
@@ -162,7 +166,7 @@ internal fun FlareHistoryList(events: List<FlareEvent>) {
 internal fun BasdaiList(records: List<BasdaiRecord>) {
     DividerList(items = records, key = { it.id }) { r ->
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-            Text(r.date + if (r.backfill) "（补）" else "", style = MaterialTheme.typography.bodySmall)
+            Text(r.date + if (r.backfill) stringResource(R.string.report_supplement_tag) else "", style = MaterialTheme.typography.bodySmall)
             Text(
                 "Q1 ${r.q1Fatigue} · Q2 ${r.q2SpinePain} · Q3 ${r.q3PeripheralPain} · Q4 ${r.q4TenderPoints} · Q5 ${r.q5StiffnessDegree} · Q6 ${r.q6StiffnessDuration}",
                 style = MaterialTheme.typography.labelSmall,

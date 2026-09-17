@@ -44,6 +44,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.DietProfile
 import com.ashkb.app.data.entity.FoodAvoidItem
 import com.ashkb.app.data.entity.Supplement
@@ -86,7 +89,7 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
     var showAvoidManage by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenTopBar(title = "营养与骨健康", onBack = onBack)
+        ScreenTopBar(title = stringResource(R.string.nutrition_bone_health_title), onBack = onBack)
 
         LazyColumn(
             Modifier.fillMaxSize(),
@@ -97,74 +100,74 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             // ---- 分组一：体征 ----
-            stickyHeader { GroupHeader("体征") }
+            stickyHeader { GroupHeader(stringResource(R.string.vitals_short)) }
             item { VitalsHero(vitals = vitals, onEdit = { showVitals = true }) }
 
             // ---- 分组二：身体成分 ----
-            stickyHeader { GroupHeader("身体成分") }
+            stickyHeader { GroupHeader(stringResource(R.string.vitals_body_composition)) }
             item {
                 SectionCard(
-                    title = "体重追踪",
-                    subtitle = if (weightList.isEmpty()) null else "近 30 天 ${weightList.size} 条记录",
+                    title = stringResource(R.string.wellness_weight_tracking),
+                    subtitle = if (weightList.isEmpty()) null else stringResource(R.string.wellness_weight_records, weightList.size),
                     action = {
                         OutlinedButton(onClick = { showWeight = true }) {
-                            Text(if (weight != null) "编辑" else "记录")
+                            Text(if (weight != null) stringResource(R.string.common_edit) else stringResource(R.string.common_record))
                         }
                     },
                 ) {
                     // DAO 按日期倒序返回，趋势图需要从旧到新
                     val points = weightList.asReversed().map { TrendPoint(it.date, it.weightKg.toFloat()) }
                     if (points.isNotEmpty()) {
-                        TrendChart(points = points, unit = "kg", label = "体重")
+                        TrendChart(points = points, unit = "kg", label = stringResource(R.string.vitals_weight))
                         Spacer(Modifier.height(Spacing.md))
                     }
                     StatTile(
-                        label = "今日体重",
-                        value = weight?.weightKg?.let { "%.1f".format(it) } ?: "未记录",
+                        label = stringResource(R.string.vitals_today_weight),
+                        value = weight?.weightKg?.let { "%.1f".format(it) } ?: stringResource(R.string.common_not_recorded),
                         unit = weight?.let { "kg" },
                     )
                 }
             }
             item {
                 SectionCard(
-                    title = "身体指标",
+                    title = stringResource(R.string.vitals_body_measures),
                     action = {
                         OutlinedButton(onClick = { showBodyMeasure = true }) {
-                            Text(if (bm != null) "更新" else "录入")
+                            Text(if (bm != null) stringResource(R.string.common_update) else stringResource(R.string.common_input_action))
                         }
                     },
                 ) {
                     if (bm != null) {
-                        KeyValueRow("身高", bm!!.heightCm?.let { "%.0f cm".format(it) } ?: "未填")
-                        KeyValueRow("腰围", bm!!.waistCm?.let { "%.0f cm".format(it) } ?: "未填")
-                        KeyValueRow("臀围", bm!!.hipCm?.let { "%.0f cm".format(it) } ?: "未填")
-                        KeyValueRow("BMI", bm!!.bmi?.let { "%.1f".format(it) } ?: "未填")
+                        KeyValueRow(stringResource(R.string.vitals_height_short), bm!!.heightCm?.let { "%.0f cm".format(it) } ?: stringResource(R.string.common_unfilled))
+                        KeyValueRow(stringResource(R.string.vitals_waist), bm!!.waistCm?.let { "%.0f cm".format(it) } ?: stringResource(R.string.common_unfilled))
+                        KeyValueRow(stringResource(R.string.vitals_hip), bm!!.hipCm?.let { "%.0f cm".format(it) } ?: stringResource(R.string.common_unfilled))
+                        KeyValueRow("BMI", bm!!.bmi?.let { "%.1f".format(it) } ?: stringResource(R.string.common_unfilled))
                     } else {
                         EmptyState(
                             icon = Icons.Rounded.Straighten,
-                            title = "还没有基线数据",
-                            body = "录入身高与腰围，可长期跟踪 BMI 变化",
+                            title = stringResource(R.string.report_no_baseline),
+                            body = stringResource(R.string.vitals_bmi_hint),
                         )
                     }
                 }
             }
 
             // ---- 分组三：营养与饮食 ----
-            stickyHeader { GroupHeader("营养与饮食") }
+            stickyHeader { GroupHeader(stringResource(R.string.wellness_nutrition_section)) }
             item {
                 SectionCard(
-                    title = "补剂档案",
-                    subtitle = "${supplements.size} 种",
+                    title = stringResource(R.string.nutrition_supplement_archive),
+                    subtitle = stringResource(R.string.wellness_supplements_count, supplements.size),
                     action = {
-                        OutlinedButton(onClick = { showSupplementForm = true }) { Text("添加") }
+                        OutlinedButton(onClick = { showSupplementForm = true }) { Text(stringResource(R.string.common_add)) }
                     },
                 ) {
                     if (supplements.isEmpty()) {
                         EmptyState(
                             icon = Icons.Rounded.Medication,
-                            title = "还没有添加补剂",
-                            body = "钙 / 维 D / Omega-3 等可在此记录",
-                            actionLabel = "添加补剂",
+                            title = stringResource(R.string.nutrition_no_supplements),
+                            body = stringResource(R.string.nutrition_supplement_hint),
+                            actionLabel = stringResource(R.string.nutrition_add_supplement),
                             onAction = { showSupplementForm = true },
                         )
                     } else {
@@ -182,11 +185,11 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
                                 )
                             }
                             if (supLogs.any { it.supId == sup.id && it.status == "done" }) {
-                                StatusChip(text = "已服", tone = StatusTone.Success, icon = Icons.Rounded.CheckCircle)
+                                StatusChip(text = stringResource(R.string.med_status_taken_short), tone = StatusTone.Success, icon = Icons.Rounded.CheckCircle)
                             } else {
                                 TextButton(onClick = {
                                     vm.checkInSupplement(sup, "done", null, null)
-                                }) { Text("打卡") }
+                                }) { Text(stringResource(R.string.exercise_checkin_short)) }
                             }
                         }
                     }
@@ -194,24 +197,24 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
             }
             item {
                 SectionCard(
-                    title = "饮食画像",
+                    title = stringResource(R.string.nutrition_diet_profile),
                     action = {
                         if (diet != null) {
-                            OutlinedButton(onClick = { showDietForm = true }) { Text("编辑") }
+                            OutlinedButton(onClick = { showDietForm = true }) { Text(stringResource(R.string.common_edit)) }
                         }
                     },
                 ) {
                     if (diet != null) {
                         val d = diet!!
-                        KeyValueRow("饮食模式", Labels.dietPattern(d.dietPattern))
-                        KeyValueRow("海鱼摄入", Labels.seafoodFreq(d.seafoodFreq))
-                        KeyValueRow("乳制品", Labels.dairyTolerance(d.dairyTolerant))
+                        KeyValueRow(stringResource(R.string.nutrition_diet_pattern), Labels.dietPattern(d.dietPattern))
+                        KeyValueRow(stringResource(R.string.nutrition_fish_intake), Labels.seafoodFreq(d.seafoodFreq))
+                        KeyValueRow(stringResource(R.string.nutrition_dairy), Labels.dairyTolerance(d.dairyTolerant))
                     } else {
                         EmptyState(
                             icon = Icons.Rounded.Restaurant,
-                            title = "还没有设置饮食画像",
-                            body = "设置后可获得更精准的抗炎饮食建议",
-                            actionLabel = "设置画像",
+                            title = stringResource(R.string.nutrition_profile_empty),
+                            body = stringResource(R.string.nutrition_profile_benefit),
+                            actionLabel = stringResource(R.string.nutrition_set_profile),
                             onAction = { showDietForm = true },
                         )
                     }
@@ -219,18 +222,18 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
             }
             item {
                 SectionCard(
-                    title = "忌口清单",
-                    subtitle = "${avoids.size} 项",
+                    title = stringResource(R.string.nutrition_avoid_list),
+                    subtitle = stringResource(R.string.wellness_avoid_count, avoids.size),
                     action = {
-                        OutlinedButton(onClick = { showAvoidManage = true }) { Text("管理") }
+                        OutlinedButton(onClick = { showAvoidManage = true }) { Text(stringResource(R.string.common_manage)) }
                     },
                 ) {
                     if (avoids.isEmpty()) {
                         EmptyState(
                             icon = Icons.Rounded.NoMeals,
-                            title = "暂无忌口项",
-                            body = "可添加过敏 / 不耐受 / 医生建议忌口项",
-                            actionLabel = "添加忌口项",
+                            title = stringResource(R.string.nutrition_no_avoid_items),
+                            body = stringResource(R.string.nutrition_avoid_hint),
+                            actionLabel = stringResource(R.string.nutrition_add_avoid_item),
                             onAction = { showAvoidManage = true },
                         )
                     } else {
@@ -248,7 +251,7 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
                         }
                         if (avoids.size > 5) {
                             TextButton(onClick = { showAvoidManage = true }) {
-                                Text("查看全部 ${avoids.size} 项")
+                                Text(stringResource(R.string.wellness_view_all_avoids, avoids.size))
                             }
                         }
                     }
@@ -324,36 +327,36 @@ private fun VitalsHero(vitals: Vitals?, onEdit: () -> Unit) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "今日体征",
+                    stringResource(R.string.vitals_today_title),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
                 FilledTonalButton(onClick = onEdit) {
-                    Text(if (vitals != null) "编辑" else "记录")
+                    Text(if (vitals != null) stringResource(R.string.common_edit) else stringResource(R.string.common_record))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 Box(Modifier.weight(1f)) {
                     StatTile(
-                        label = "体温",
-                        value = temp?.let { "%.1f".format(it) } ?: "未记录",
+                        label = stringResource(R.string.vitals_temperature_short),
+                        value = temp?.let { "%.1f".format(it) } ?: stringResource(R.string.common_not_recorded),
                         unit = temp?.let { "℃" },
                         tone = tempTone,
                     )
                 }
                 Box(Modifier.weight(1f)) {
                     StatTile(
-                        label = "血压",
-                        value = if (sys != null && dia != null) "$sys/$dia" else "未记录",
+                        label = stringResource(R.string.vitals_bp),
+                        value = if (sys != null && dia != null) "$sys/$dia" else stringResource(R.string.common_not_recorded),
                         tone = bpTone,
                     )
                 }
                 Box(Modifier.weight(1f)) {
                     StatTile(
-                        label = "心率",
-                        value = hr?.toString() ?: "未记录",
-                        unit = hr?.let { "次/分" },
+                        label = stringResource(R.string.vitals_heart_rate),
+                        value = hr?.toString() ?: stringResource(R.string.common_not_recorded),
+                        unit = hr?.let { stringResource(R.string.vitals_bpm_unit) },
                         tone = hrTone,
                     )
                 }
@@ -381,18 +384,18 @@ private fun VitalsSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
-            Text("记录体征", style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(temp, { temp = it }, label = { Text("体温 (℃)") }, singleLine = true)
+            Text(stringResource(R.string.vitals_record_action), style = MaterialTheme.typography.titleLarge)
+            OutlinedTextField(temp, { temp = it }, label = { Text(stringResource(R.string.vitals_temperature_field)) }, singleLine = true)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OutlinedTextField(sys, { sys = it }, label = { Text("收缩压") },
+                OutlinedTextField(sys, { sys = it }, label = { Text(stringResource(R.string.vitals_bp_systolic)) },
                     singleLine = true, modifier = Modifier.weight(1f))
-                OutlinedTextField(dia, { dia = it }, label = { Text("舒张压") },
+                OutlinedTextField(dia, { dia = it }, label = { Text(stringResource(R.string.vitals_bp_diastolic)) },
                     singleLine = true, modifier = Modifier.weight(1f))
             }
-            OutlinedTextField(hr, { hr = it }, label = { Text("心率 (次/分)") }, singleLine = true)
-            OutlinedTextField(notes, { notes = it }, label = { Text("备注（可选）") })
+            OutlinedTextField(hr, { hr = it }, label = { Text(stringResource(R.string.vitals_heart_rate_field)) }, singleLine = true)
+            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
             SheetSaveButton(
-                text = "保存",
+                text = stringResource(R.string.common_save),
                 onClick = {
                     vm.saveVitals(
                         temperature = temp.toDoubleOrNull(),
@@ -417,11 +420,11 @@ private fun WeightSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
-            Text("记录体重", style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(weight, { weight = it }, label = { Text("体重 (kg)") }, singleLine = true)
-            OutlinedTextField(notes, { notes = it }, label = { Text("备注（可选）") })
+            Text(stringResource(R.string.vitals_record_weight), style = MaterialTheme.typography.titleLarge)
+            OutlinedTextField(weight, { weight = it }, label = { Text(stringResource(R.string.vitals_weight_field)) }, singleLine = true)
+            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
             SheetSaveButton(
-                text = "保存",
+                text = stringResource(R.string.common_save),
                 enabled = weight.toDoubleOrNull() != null,
                 onClick = {
                     weight.toDoubleOrNull()?.let { w ->
@@ -446,14 +449,14 @@ private fun BodyMeasureSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
-            Text("身体指标", style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(height, { height = it }, label = { Text("身高 (cm)") }, singleLine = true)
-            OutlinedTextField(waist, { waist = it }, label = { Text("腰围 (cm)") }, singleLine = true)
-            OutlinedTextField(hip, { hip = it }, label = { Text("臀围 (cm)") }, singleLine = true)
-            OutlinedTextField(bmi, { bmi = it }, label = { Text("BMI（可自动）") }, singleLine = true)
-            OutlinedTextField(notes, { notes = it }, label = { Text("备注（可选）") })
+            Text(stringResource(R.string.vitals_body_measures), style = MaterialTheme.typography.titleLarge)
+            OutlinedTextField(height, { height = it }, label = { Text(stringResource(R.string.vitals_height_cm)) }, singleLine = true)
+            OutlinedTextField(waist, { waist = it }, label = { Text(stringResource(R.string.vitals_waist_cm)) }, singleLine = true)
+            OutlinedTextField(hip, { hip = it }, label = { Text(stringResource(R.string.vitals_hip_cm)) }, singleLine = true)
+            OutlinedTextField(bmi, { bmi = it }, label = { Text(stringResource(R.string.profile_bmi_auto)) }, singleLine = true)
+            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
             SheetSaveButton(
-                text = "保存",
+                text = stringResource(R.string.common_save),
                 onClick = {
                     vm.saveBodyMeasure(
                         heightCm = height.toDoubleOrNull(),
@@ -480,19 +483,19 @@ private fun SupplementSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
-            Text("添加补剂", style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(name, { name = it }, label = { Text("名称") }, singleLine = true)
-            OutlinedTextField(brand, { brand = it }, label = { Text("品牌（可选）") }, singleLine = true)
-            OutlinedTextField(dose, { dose = it }, label = { Text("剂量（如 1000IU）") }, singleLine = true)
-            Text("类别", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.nutrition_add_supplement), style = MaterialTheme.typography.titleLarge)
+            OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.common_name)) }, singleLine = true)
+            OutlinedTextField(brand, { brand = it }, label = { Text(stringResource(R.string.nutrition_brand_field)) }, singleLine = true)
+            OutlinedTextField(dose, { dose = it }, label = { Text(stringResource(R.string.nutrition_dose_field)) }, singleLine = true)
+            Text(stringResource(R.string.common_category), style = MaterialTheme.typography.labelMedium)
             ChipGroup(
                 options = SupplementCategory.entries.map { it.name to it.label },
                 selected = category.name,
                 onSelect = { key -> category = SupplementCategory.fromKey(key) },
             )
-            OutlinedTextField(notes, { notes = it }, label = { Text("备注（可选）") })
+            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
             SheetSaveButton(
-                text = "保存",
+                text = stringResource(R.string.common_save),
                 enabled = name.isNotBlank() && dose.isNotBlank(),
                 onClick = {
                     if (name.isNotBlank() && dose.isNotBlank()) {
@@ -522,35 +525,35 @@ private fun DietSheet(vm: WellnessViewModel, current: DietProfile?, onDismiss: (
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
-            Text("饮食画像", style = MaterialTheme.typography.titleLarge)
-            Text("饮食模式", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.nutrition_diet_profile), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.nutrition_diet_pattern), style = MaterialTheme.typography.labelMedium)
             ChipGroup(
                 options = listOf(
-                    "mixed" to "杂食", "mediterranean" to "地中海式", "vegetarian" to "素食",
-                    "vegan" to "纯素", "low_starch" to "低淀粉", "paleo" to "旧石器式",
+                    "mixed" to stringResource(R.string.nutrition_diet_omnivore), "mediterranean" to stringResource(R.string.nutrition_diet_med), "vegetarian" to stringResource(R.string.nutrition_diet_vegetarian),
+                    "vegan" to stringResource(R.string.nutrition_diet_vegan), "low_starch" to stringResource(R.string.nutrition_diet_low_starch), "paleo" to stringResource(R.string.nutrition_diet_paleo),
                 ),
                 selected = pattern,
                 onSelect = { pattern = it },
             )
-            Text("海鱼 / 海鲜频率", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.nutrition_fish_frequency), style = MaterialTheme.typography.labelMedium)
             ChipGroup(
                 options = listOf(
-                    "never" to "不吃", "rare" to "偶尔", "weekly" to "每周", "frequent" to "经常",
+                    "never" to stringResource(R.string.nutrition_fish_never), "rare" to stringResource(R.string.nutrition_fish_occasionally), "weekly" to stringResource(R.string.med_freq_weekly), "frequent" to stringResource(R.string.nutrition_fish_often),
                 ),
                 selected = seafood,
                 onSelect = { seafood = it },
             )
-            Text("乳制品耐受", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.nutrition_dairy_tolerance), style = MaterialTheme.typography.labelMedium)
             ChipGroup(
                 options = listOf(
-                    "yes" to "耐受", "no" to "不耐受", "lactose_free_only" to "仅无乳糖",
+                    "yes" to stringResource(R.string.nutrition_tolerance_tag), "no" to stringResource(R.string.nutrition_intolerance), "lactose_free_only" to stringResource(R.string.nutrition_diet_lactose_free),
                 ),
                 selected = dairy,
                 onSelect = { dairy = it },
             )
-            OutlinedTextField(notes, { notes = it }, label = { Text("备注（可选）") })
+            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
             SheetSaveButton(
-                text = "保存",
+                text = stringResource(R.string.common_save),
                 onClick = {
                     vm.saveDietProfile(
                         DietProfile(
@@ -588,15 +591,15 @@ private fun AvoidManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
             )
         } else {
             SheetColumn {
-                Text("忌口清单", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.nutrition_avoid_list), style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "${items.size} 项 · 过敏 / 不耐受 / 医嘱 / 药效冲突",
+                    stringResource(R.string.wellness_avoid_section_count, items.size),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (items.isEmpty()) {
                     Text(
-                        "暂无忌口项，点下方按钮添加",
+                        stringResource(R.string.nutrition_avoid_empty),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -614,9 +617,9 @@ private fun AvoidManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
                             )
                         }
                         DestructiveAction(
-                            label = "删除",
-                            confirmTitle = "删除「${item.name}」？",
-                            confirmBody = "删除后该忌口项不再出现在清单与知识库提示中，可在备份中恢复。",
+                            label = stringResource(R.string.common_delete),
+                            confirmTitle = stringResource(R.string.wellness_delete_confirm, item.name),
+                            confirmBody = stringResource(R.string.nutrition_avoid_delete_note),
                             onConfirm = { vm.deleteFoodAvoid(item.id) },
                         )
                     }
@@ -624,7 +627,7 @@ private fun AvoidManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
                 Button(
                     onClick = { adding = true },
                     modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                ) { Text("添加忌口项") }
+                ) { Text(stringResource(R.string.nutrition_add_avoid_item)) }
             }
         }
     }
@@ -637,25 +640,25 @@ private fun AvoidAddStep(onSave: (FoodAvoidItem) -> Unit, onBack: () -> Unit) {
     var severity by remember { mutableStateOf("medium") }
 
     SheetColumn {
-        Text("添加忌口项", style = MaterialTheme.typography.titleLarge)
-        OutlinedTextField(name, { name = it }, label = { Text("食物名称") }, singleLine = true)
-        Text("类别", style = MaterialTheme.typography.labelMedium)
+        Text(stringResource(R.string.nutrition_add_avoid_item), style = MaterialTheme.typography.titleLarge)
+        OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.nutrition_food_name)) }, singleLine = true)
+        Text(stringResource(R.string.common_category), style = MaterialTheme.typography.labelMedium)
         ChipGroup(
             options = listOf(
-                "allergy" to "过敏", "intolerance" to "不耐受", "doctor_advice" to "医嘱",
-                "personal_experience" to "个人体验", "drug_interaction" to "药效冲突",
+                "allergy" to stringResource(R.string.profile_allergy_short), "intolerance" to stringResource(R.string.nutrition_intolerance), "doctor_advice" to stringResource(R.string.checkup_doctor_advice),
+                "personal_experience" to stringResource(R.string.knowledge_personal_experience_tag), "drug_interaction" to stringResource(R.string.knowledge_drug_conflict),
             ),
             selected = category,
             onSelect = { category = it },
         )
-        Text("严重程度", style = MaterialTheme.typography.labelMedium)
+        Text(stringResource(R.string.symptom_severity), style = MaterialTheme.typography.labelMedium)
         ChipGroup(
-            options = listOf("high" to "高", "medium" to "中", "low" to "低"),
+            options = listOf("high" to stringResource(R.string.severity_high), "medium" to stringResource(R.string.severity_moderate), "low" to stringResource(R.string.severity_low)),
             selected = severity,
             onSelect = { severity = it },
         )
         SheetSaveButton(
-            text = "添加",
+            text = stringResource(R.string.common_add),
             enabled = name.isNotBlank(),
             onClick = {
                 if (name.isNotBlank()) {
@@ -669,7 +672,7 @@ private fun AvoidAddStep(onSave: (FoodAvoidItem) -> Unit, onBack: () -> Unit) {
                 }
             },
         )
-        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("返回清单") }
+        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.knowledge_back_to_list)) }
     }
 }
 

@@ -25,7 +25,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+
+import com.ashkb.app.R
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 
@@ -120,7 +123,7 @@ fun ScreenTopBar(
                 IconButton(onClick = onBack, modifier = Modifier.size(Size.touchMin)) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = "返回",
+                        contentDescription = stringResource(R.string.common_back),
                         modifier = Modifier.size(Size.iconMd),
                     )
                 }

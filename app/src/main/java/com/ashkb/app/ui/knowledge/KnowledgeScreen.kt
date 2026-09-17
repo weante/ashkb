@@ -32,7 +32,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.EmptyState
@@ -54,14 +57,14 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
     LaunchedEffect(Unit) { vm.refreshReviewCheck() }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenTopBar(title = "AS 知识库（${ui.entries.size} 条）")
+        ScreenTopBar(title = stringResource(R.string.knowledge_title_count, ui.entries.size))
 
         // 搜索 + 分类筛选固定吸顶，滚动不消失
         Column(Modifier.padding(horizontal = Spacing.lg)) {
             OutlinedTextField(
                 value = ui.query,
                 onValueChange = { vm.setQuery(it) },
-                label = { Text("搜索标题 / 摘要 / 内容") },
+                label = { Text(stringResource(R.string.knowledge_search_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
@@ -84,8 +87,8 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
                 AlertBanner(
                     tone = StatusTone.Warning,
                     icon = Icons.Rounded.Schedule,
-                    title = "${ui.overdueCount} 条内容已过复核日",
-                    body = "就医核对时以医生意见为准",
+                    title = stringResource(R.string.knowledge_overdue_count, ui.overdueCount),
+                    body = stringResource(R.string.common_doctor_final_note),
                 )
             }
             Spacer(Modifier.height(Spacing.xs))
@@ -100,8 +103,8 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
                 item {
                     EmptyState(
                         icon = Icons.Rounded.SearchOff,
-                        title = "没有匹配的条目",
-                        body = "换个关键词试试（如药名、运动名、症状）",
+                        title = stringResource(R.string.knowledge_no_match),
+                        body = stringResource(R.string.knowledge_search_empty),
                     )
                 }
             }
@@ -116,9 +119,10 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
     detail?.let { KbDetailDialog(entry = it, onDismiss = { detail = null }) }
 }
 
+@Composable
 private fun categoryLabel(category: String): String = when (category) {
-    "interaction" -> "相互作用"; "food_drug" -> "食物药物"; "exercise" -> "运动"
-    "emergency" -> "应急"; "edu" -> "教育"; else -> category
+    "interaction" -> stringResource(R.string.knowledge_interaction_title); "food_drug" -> stringResource(R.string.knowledge_food_drug_section); "exercise" -> stringResource(R.string.exercise_tab)
+    "emergency" -> stringResource(R.string.emergency_tab); "edu" -> stringResource(R.string.knowledge_education_tag); else -> category
 }
 
 /** 类别固定映射（方案 §10.9）：药物 Info、食物 Brand、指南 Neutral、相互作用 Warning。 */
@@ -153,10 +157,10 @@ private fun KbListCard(entry: KbEntry, overdue: Boolean, onClick: () -> Unit) {
                 )
                 Spacer(Modifier.weight(1f))
                 if (entry.severityLevel == "high") {
-                    StatusChip(text = "高风险", tone = StatusTone.Danger, icon = Icons.Rounded.WarningAmber)
+                    StatusChip(text = stringResource(R.string.knowledge_high_risk), tone = StatusTone.Danger, icon = Icons.Rounded.WarningAmber)
                 }
                 if (overdue) {
-                    StatusChip(text = "已过复核日", tone = StatusTone.Warning, icon = Icons.Rounded.Schedule)
+                    StatusChip(text = stringResource(R.string.checkup_overdue_short), tone = StatusTone.Warning, icon = Icons.Rounded.Schedule)
                 }
             }
             Text(

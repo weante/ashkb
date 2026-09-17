@@ -42,8 +42,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.data.entity.ImagingRecord
 import com.ashkb.app.data.entity.LabResult
@@ -66,8 +69,8 @@ import com.ashkb.app.ui.theme.StatusTone
 private fun LabValue(valueText: String, unit: String?, abnormal: String?) {
     val text = listOfNotNull(valueText, unit).joinToString(" ")
     when (abnormal) {
-        "high" -> StatusChip(text = "$text 偏高", tone = StatusTone.Danger, icon = Icons.Rounded.TrendingUp)
-        "low" -> StatusChip(text = "$text 偏低", tone = StatusTone.Warning, icon = Icons.Rounded.TrendingDown)
+        "high" -> StatusChip(text = stringResource(R.string.lab_value_high, text), tone = StatusTone.Danger, icon = Icons.Rounded.TrendingUp)
+        "low" -> StatusChip(text = stringResource(R.string.lab_value_low, text), tone = StatusTone.Warning, icon = Icons.Rounded.TrendingDown)
         else -> Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
@@ -105,7 +108,7 @@ private fun LabGroup(rows: List<LabResult>) {
             onClick = { showNormal = !showNormal },
             modifier = Modifier.heightIn(min = Size.touchMin),
         ) {
-            Text(if (showNormal) "收起正常项" else "展开正常项（${normal.size}）")
+            Text(if (showNormal) stringResource(R.string.lab_collapse_normal) else stringResource(R.string.lab_expand_normal, normal.size))
         }
     }
 }
@@ -118,19 +121,19 @@ internal fun LabDetailDialog(record: CheckupRecord, vm: CheckupViewModel, onDism
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("${record.itemName} 化验结果") },
+        title = { Text(stringResource(R.string.lab_dialog_title, record.itemName)) },
         text = {
             Column {
                 if (labs.isEmpty()) {
-                    Text("暂无化验指标", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.lab_indicators_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     LabGroup(labs)
                 }
                 Spacer(Modifier.height(Spacing.sm))
-                OutlinedButton(onClick = { showAdd = true }) { Text("添加指标") }
+                OutlinedButton(onClick = { showAdd = true }) { Text(stringResource(R.string.lab_add_indicator)) }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) } },
     )
 
     if (showAdd) {
@@ -152,9 +155,9 @@ internal fun LabsList(
     ) {
         if (labs.isEmpty()) {
             item {
-                SectionCard(title = "暂无化验数据") {
+                SectionCard(title = stringResource(R.string.report_no_lab_data)) {
                     Text(
-                        "把「AI 导入模板」连同检验报告照片发给任意 AI 助手，AI 按格式整理后粘贴回来即可批量入库",
+                        stringResource(R.string.lab_ai_import_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -162,7 +165,7 @@ internal fun LabsList(
                     Button(
                         onClick = onImport,
                         modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                    ) { Text("AI 导入化验单") }
+                    ) { Text(stringResource(R.string.lab_ai_import_title)) }
                 }
             }
         } else {
@@ -170,14 +173,14 @@ internal fun LabsList(
                 Button(
                     onClick = onImport,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                ) { Text("AI 导入化验单") }
+                ) { Text(stringResource(R.string.lab_ai_import_title)) }
             }
             labs.groupBy { it.date }.forEach { (date, rows) ->
                 item(key = "lab-$date") {
                     val abnormalCount = rows.count { it.isAbnormal() }
                     SectionCard(
                         title = date,
-                        subtitle = if (abnormalCount > 0) "${rows.size} 项 · $abnormalCount 项异常" else "${rows.size} 项",
+                        subtitle = if (abnormalCount > 0) stringResource(R.string.lab_count_abnormal, rows.size, abnormalCount) else stringResource(R.string.lab_count_plain, rows.size),
                     ) {
                         LabGroup(rows)
                     }
@@ -188,7 +191,7 @@ internal fun LabsList(
                     OutlinedButton(
                         onClick = onLoadMore,
                         modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                    ) { Text("加载更早的化验记录") }
+                    ) { Text(stringResource(R.string.lab_load_older)) }
                 }
             }
             item { Spacer(Modifier.height(Spacing.xxl)) }
@@ -209,9 +212,9 @@ internal fun ImagingList(
     ) {
         if (records.isEmpty()) {
             item {
-                SectionCard(title = "暂无影像记录") {
+                SectionCard(title = stringResource(R.string.imaging_empty)) {
                     Text(
-                        "把「AI 导入模板」连同 MRI/CT/X线报告照片发给任意 AI 助手，粘贴回复即可入库",
+                        stringResource(R.string.imaging_ai_import_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -219,7 +222,7 @@ internal fun ImagingList(
                     Button(
                         onClick = onImport,
                         modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                    ) { Text("AI 导入影像报告") }
+                    ) { Text(stringResource(R.string.imaging_ai_import_title)) }
                 }
             }
         } else {
@@ -227,7 +230,7 @@ internal fun ImagingList(
                 Button(
                     onClick = onImport,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                ) { Text("AI 导入影像报告") }
+                ) { Text(stringResource(R.string.imaging_ai_import_title)) }
             }
             items(records, key = { it.id }) { rec ->
                 Surface(
@@ -252,13 +255,13 @@ internal fun ImagingList(
                             )
                             Spacer(Modifier.weight(1f))
                             if (rec.backfill) {
-                                StatusChip(text = "补记", tone = StatusTone.Warning)
+                                StatusChip(text = stringResource(R.string.today_supplement_log), tone = StatusTone.Warning)
                             }
                         }
                         Text(rec.bodyPart, style = MaterialTheme.typography.bodyMedium)
                         rec.hospital?.let {
                             Text(
-                                "医院：$it",
+                                stringResource(R.string.checkup_hospital_line, it),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -293,17 +296,17 @@ internal fun ImagingDetailDialog(record: ImagingRecord, onDismiss: () -> Unit) {
             ) {
                 record.hospital?.let {
                     Text(
-                        "医院：$it",
+                        stringResource(R.string.checkup_hospital_line, it),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                record.findings?.let { f -> LabeledBlock("检查所见", f) }
-                record.conclusion?.let { c -> LabeledBlock("结论 / 印象", c) }
-                record.notes?.let { n -> LabeledBlock("备注", n) }
+                record.findings?.let { f -> LabeledBlock(stringResource(R.string.imaging_findings), f) }
+                record.conclusion?.let { c -> LabeledBlock(stringResource(R.string.imaging_impression), c) }
+                record.notes?.let { n -> LabeledBlock(stringResource(R.string.common_notes), n) }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) } },
     )
 }
 
@@ -314,8 +317,12 @@ private fun LabeledBlock(label: String, content: String) {
 }
 
 // ===== AI 导入（复制模板 → 粘贴 AI 回复 → 解析保存；流程长，迁 ModalBottomSheet） =====
-internal enum class ImportKind(val title: String) {
-    LAB("AI 导入化验单"), IMAGING("AI 导入影像报告")
+internal enum class ImportKind { LAB, IMAGING }
+
+@Composable
+internal fun ImportKind.title(): String = when (this) {
+    ImportKind.LAB -> stringResource(R.string.lab_ai_import_title)
+    ImportKind.IMAGING -> stringResource(R.string.imaging_ai_import_title)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -328,6 +335,8 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
     var labImport by remember { mutableStateOf<LabImport?>(null) }
     var imagingImport by remember { mutableStateOf<ImagingImport?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    val labParseEmpty = stringResource(R.string.lab_parse_empty)
+    val imagingParseEmpty = stringResource(R.string.imaging_parse_empty)
 
     fun tryParse() {
         error = null
@@ -336,14 +345,14 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
         if (kind == ImportKind.LAB) {
             val parsed = ReportImportParser.parseLab(pasted)
             if (parsed == null || parsed.rows.isEmpty()) {
-                error = "未解析出化验数据——请粘贴 AI 按模板输出的完整文本（含「日期」「医院」和各行数据）"
+                error = labParseEmpty
             } else {
                 labImport = parsed
             }
         } else {
             val parsed = ReportImportParser.parseImaging(pasted)
             if (parsed == null) {
-                error = "未解析出影像数据——请粘贴 AI 按模板输出的完整文本（需含「类型」行）"
+                error = imagingParseEmpty
             } else {
                 imagingImport = parsed
             }
@@ -352,9 +361,9 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
-            Text(kind.title, style = MaterialTheme.typography.titleLarge)
+            Text(kind.title(), style = MaterialTheme.typography.titleLarge)
 
-            Text("第一步：复制模板，连同报告照片一起发给任意 AI 助手", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.ai_import_step1), style = MaterialTheme.typography.bodyMedium)
             Surface(
                 Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.medium,
@@ -383,15 +392,15 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
                         )
                         Spacer(Modifier.size(Spacing.xs))
                     }
-                    Text(if (copied) "已复制" else "复制模板")
+                    Text(if (copied) stringResource(R.string.common_copied) else stringResource(R.string.ai_import_copy_template))
                 }
             }
 
-            Text("第二步：把 AI 的回复原文粘贴到下面", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.ai_import_step2), style = MaterialTheme.typography.bodyMedium)
             OutlinedTextField(
                 value = pasted,
                 onValueChange = { pasted = it },
-                label = { Text("粘贴 AI 回复") },
+                label = { Text(stringResource(R.string.common_paste_ai_reply)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 4,
             )
@@ -406,18 +415,19 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
                 onClick = { tryParse() },
                 enabled = pasted.isNotBlank(),
                 modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-            ) { Text("解析") }
+            ) { Text(stringResource(R.string.ai_import_parse_action)) }
 
             labImport?.let { imp ->
                 val abnormalCount = imp.rows.count { it.abnormal == "high" || it.abnormal == "low" }
                 Text(
-                    "解析结果：${imp.rows.size} 项" + if (abnormalCount > 0) " · $abnormalCount 项异常" else "",
+                    if (abnormalCount > 0) stringResource(R.string.lab_parse_result_abnormal, imp.rows.size, abnormalCount)
+                    else stringResource(R.string.lab_parse_result, imp.rows.size),
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Text(
                     buildString {
-                        append("日期：${imp.date ?: "未识别（将记为今天）"}")
-                        imp.hospital?.let { append(" · 医院：$it") }
+                        append("日期：${imp.date ?: stringResource(R.string.symptom_unrecognized_today)}")
+                        imp.hospital?.let { append(stringResource(R.string.lab_hospital_suffix, it)) }
                     },
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -440,18 +450,18 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
                 }
             }
             imagingImport?.let { imp ->
-                Text("解析结果", style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.ai_import_parse_result), style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "${ImagingRecord.modalityLabel(imp.modality)} · ${imp.bodyPart} · ${imp.date ?: "未识别（将记为今天）"}",
+                    "${ImagingRecord.modalityLabel(imp.modality)} · ${imp.bodyPart} · ${imp.date ?: stringResource(R.string.symptom_unrecognized_today)}",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 imp.hospital?.let {
-                    Text("医院：$it", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.checkup_hospital_line, it), style = MaterialTheme.typography.bodySmall)
                 }
             }
 
             SheetSaveButton(
-                text = "保存",
+                text = stringResource(R.string.common_save),
                 enabled = labImport != null || imagingImport != null,
                 onClick = {
                     labImport?.let { vm.importLabReport(it) }
@@ -475,20 +485,20 @@ private fun AddLabSheet(record: CheckupRecord, vm: CheckupViewModel, onDismiss: 
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
-            Text("添加化验指标", style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(testName, { testName = it }, label = { Text("指标名称") }, singleLine = true)
-            OutlinedTextField(value, { value = it }, label = { Text("数值") }, singleLine = true)
-            OutlinedTextField(unit, { unit = it }, label = { Text("单位") }, singleLine = true)
+            Text(stringResource(R.string.lab_add_indicator_action), style = MaterialTheme.typography.titleLarge)
+            OutlinedTextField(testName, { testName = it }, label = { Text(stringResource(R.string.lab_indicator_name)) }, singleLine = true)
+            OutlinedTextField(value, { value = it }, label = { Text(stringResource(R.string.lab_value)) }, singleLine = true)
+            OutlinedTextField(unit, { unit = it }, label = { Text(stringResource(R.string.common_unit)) }, singleLine = true)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 OutlinedTextField(refLow, { refLow = it },
-                    label = { Text("参考下限") }, singleLine = true,
+                    label = { Text(stringResource(R.string.lab_ref_lower)) }, singleLine = true,
                     modifier = Modifier.weight(1f))
                 OutlinedTextField(refHigh, { refHigh = it },
-                    label = { Text("参考上限") }, singleLine = true,
+                    label = { Text(stringResource(R.string.lab_ref_upper)) }, singleLine = true,
                     modifier = Modifier.weight(1f))
             }
             SheetSaveButton(
-                text = "添加",
+                text = stringResource(R.string.common_add),
                 enabled = testName.isNotBlank(),
                 onClick = {
                     if (testName.isNotBlank()) {

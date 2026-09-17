@@ -36,7 +36,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+
+import com.ashkb.app.R
 import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.ui.components.LoadingBlock
@@ -63,7 +66,7 @@ fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val pager = rememberPagerState(pageCount = { 3 })
-    val tabs = listOf("概览", "趋势", "报告导出")
+    val tabs = listOf(stringResource(R.string.report_overview_tab), stringResource(R.string.report_trends_tab), stringResource(R.string.report_export_section))
 
     // 提示类消息改走全局 Snackbar（非阻塞）——不再"每个操作都要点一次知道了"
     LaunchedEffect(message) {
@@ -79,12 +82,12 @@ fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("报表与数据", style = MaterialTheme.typography.headlineSmall)
-                Text("近 30 天统计 · 趋势 · 复诊报告",
+                Text(stringResource(R.string.me_report_nav), style = MaterialTheme.typography.headlineSmall)
+                Text(stringResource(R.string.report_subtitle),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            OutlinedButton(onClick = { vm.refresh() }, enabled = !busy) { Text("刷新") }
+            OutlinedButton(onClick = { vm.refresh() }, enabled = !busy) { Text(stringResource(R.string.common_refresh)) }
         }
 
         ScrollableTabRow(selectedTabIndex = pager.currentPage, edgePadding = 8.dp) {
@@ -112,7 +115,7 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
     if (o == null) {
         Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(Modifier.height(48.dp))
-            Text("统计加载中…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.report_stats_loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
@@ -123,7 +126,7 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
         item { Spacer(Modifier.height(12.dp)) }
 
         item {
-            SectionCard(title = "服药依从（${o.adherence.days} 天）") {
+            SectionCard(title = stringResource(R.string.report_adherence_days, o.adherence.days)) {
                 // 阈值 90/70（原为 80/50），且数字与进度条必须同 tone（修此前的矛盾）
                 val rate = o.adherence.medRatePct
                 val tone = when {
@@ -137,11 +140,11 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
                     Spacer(Modifier.padding(start = Spacing.lg))
                     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                         Text(
-                            "完成 ${o.adherence.medDone} · 部分 ${o.adherence.medPartial} · 跳过 ${o.adherence.medSkipped}",
+                            stringResource(R.string.report_adherence_breakdown, o.adherence.medDone, o.adherence.medPartial, o.adherence.medSkipped),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            "共 ${o.adherence.medTotal} 次打卡（部分完成按 0.5 计）",
+                            stringResource(R.string.report_adherence_total, o.adherence.medTotal),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -160,32 +163,32 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
         }
 
         item {
-            SectionCard(title = "运动执行") {
+            SectionCard(title = stringResource(R.string.report_exercise_section)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCell("完成次数", "${o.exercise.doneCount}", Modifier.weight(1f))
-                    StatCell("累计时长", "${o.exercise.totalMinutes} 分", Modifier.weight(1f))
-                    StatCell("跳过", "${o.exercise.skippedCount}", Modifier.weight(1f))
+                    StatCell(stringResource(R.string.report_completed_count), "${o.exercise.doneCount}", Modifier.weight(1f))
+                    StatCell(stringResource(R.string.report_total_duration), stringResource(R.string.report_exercise_minutes, o.exercise.totalMinutes), Modifier.weight(1f))
+                    StatCell(stringResource(R.string.med_skip), "${o.exercise.skippedCount}", Modifier.weight(1f))
                 }
             }
         }
 
         item {
-            SectionCard(title = "症状概览") {
+            SectionCard(title = stringResource(R.string.symptom_overview_title)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCell("记录天数", "${o.symptom.daysRecorded}/30", Modifier.weight(1f))
-                    StatCell("平均疼痛", o.symptom.avgPain?.let { "%.1f/10".format(it) } ?: "—", Modifier.weight(1f))
-                    StatCell("平均晨僵", o.symptom.avgStiffnessMin?.let { "%.0f 分".format(it) } ?: "—", Modifier.weight(1f))
+                    StatCell(stringResource(R.string.report_record_days), "${o.symptom.daysRecorded}/30", Modifier.weight(1f))
+                    StatCell(stringResource(R.string.report_avg_pain), o.symptom.avgPain?.let { "%.1f/10".format(it) } ?: "—", Modifier.weight(1f))
+                    StatCell(stringResource(R.string.report_avg_stiffness), o.symptom.avgStiffnessMin?.let { "%.0f 分".format(it) } ?: "—", Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCell("夜间痛天数", "${o.symptom.nightPainDays}", Modifier.weight(1f))
-                    StatCell("眼部症状", "${o.symptom.eyeDays} 天", Modifier.weight(1f))
-                    StatCell("发热天数", "${o.symptom.feverDays}", Modifier.weight(1f))
+                    StatCell(stringResource(R.string.symptom_night_pain_days), "${o.symptom.nightPainDays}", Modifier.weight(1f))
+                    StatCell(stringResource(R.string.symptom_eye_symptoms), stringResource(R.string.report_eye_days, o.symptom.eyeDays), Modifier.weight(1f))
+                    StatCell(stringResource(R.string.report_fever_days), "${o.symptom.feverDays}", Modifier.weight(1f))
                 }
                 if (o.symptom.eyeDays > 0) {
                     Spacer(Modifier.height(Spacing.xs))
                     StatusChip(
-                        text = "眼部症状 ${o.symptom.eyeDays} 天：AS 合并葡萄膜炎需眼科评估（emr-001）",
+                        text = stringResource(R.string.report_eye_days_warning, o.symptom.eyeDays),
                         tone = StatusTone.Danger,
                         icon = Icons.Rounded.WarningAmber,
                     )
@@ -194,19 +197,19 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
         }
 
         item {
-            SectionCard(title = "疾病活动度（BASDAI）") {
+            SectionCard(title = stringResource(R.string.report_basdai_section)) {
                 if (o.basdaiLatest == null) {
-                    Text("近 30 天无 BASDAI 自评", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.report_no_basdai), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        StatCell("最新", "%.1f/10".format(o.basdaiLatest.total), Modifier.weight(1f))
-                        StatCell("环比", o.basdaiDelta?.let { "%+.1f".format(it) } ?: "—", Modifier.weight(1f))
-                        StatCell("次数", "${o.basdaiCount30}", Modifier.weight(1f))
+                        StatCell(stringResource(R.string.report_latest), "%.1f/10".format(o.basdaiLatest.total), Modifier.weight(1f))
+                        StatCell(stringResource(R.string.report_mom), o.basdaiDelta?.let { "%+.1f".format(it) } ?: "—", Modifier.weight(1f))
+                        StatCell(stringResource(R.string.exercise_count), "${o.basdaiCount30}", Modifier.weight(1f))
                     }
                     if (o.basdaiLatest.total >= 4.0) {
                         Spacer(Modifier.height(Spacing.xs))
                         StatusChip(
-                            text = "BASDAI ≥ 4.0：疾病活动度高，复诊时请与医生讨论（edu-th-002）",
+                            text = stringResource(R.string.basdai_high_alert_note),
                             tone = StatusTone.Danger,
                             icon = Icons.Rounded.WarningAmber,
                         )
@@ -216,11 +219,11 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
         }
 
         item {
-            SectionCard(title = "发作与体重") {
+            SectionCard(title = stringResource(R.string.report_flare_weight_section)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCell("发作次数", "${o.flareCount}" + if (o.flareActive) "（活跃）" else "", Modifier.weight(1f))
-                    StatCell("最新体重", o.weightLatest?.let { "${it.weightKg} kg" } ?: "—", Modifier.weight(1f))
-                    StatCell("较上次", o.weightDelta?.let { "%+.1f kg".format(it) } ?: "—", Modifier.weight(1f))
+                    StatCell(stringResource(R.string.report_flare_count), "${o.flareCount}" + if (o.flareActive) stringResource(R.string.stage_active_paren) else "", Modifier.weight(1f))
+                    StatCell(stringResource(R.string.wellness_latest_weight), o.weightLatest?.let { "${it.weightKg} kg" } ?: "—", Modifier.weight(1f))
+                    StatCell(stringResource(R.string.trend_vs_last), o.weightDelta?.let { "%+.1f kg".format(it) } ?: "—", Modifier.weight(1f))
                 }
             }
         }
@@ -243,7 +246,7 @@ private fun StatCell(label: String, value: String, modifier: Modifier = Modifier
 @Composable
 private fun TrendsPage(t: ReportRepository.Trends?) {
     if (t == null) {
-        LoadingBlock(minHeight = 240.dp, label = "正在统计…")
+        LoadingBlock(minHeight = 240.dp, label = stringResource(R.string.report_stats_loading_dots))
         return
     }
     LazyColumn(
@@ -252,67 +255,67 @@ private fun TrendsPage(t: ReportRepository.Trends?) {
     ) {
         item { Spacer(Modifier.height(12.dp)) }
         item {
-            SectionCard(title = "BASDAI 总分走势", subtitle = "阈值以上为高活动度") {
+            SectionCard(title = stringResource(R.string.report_basdai_trend), subtitle = stringResource(R.string.report_threshold_note2)) {
                 TrendChart(
                     points = t.basdai.map { TrendPoint(it.date, it.total.toFloat()) },
                     unit = "",
-                    label = "BASDAI 总分",
+                    label = stringResource(R.string.basdai_total_score),
                     threshold = ClinicalThresholds.BASDAI_HIGH,
-                    thresholdLabel = "活动度 ${ClinicalThresholds.BASDAI_HIGH}",
+                    thresholdLabel = stringResource(R.string.report_activity_level, ClinicalThresholds.BASDAI_HIGH),
                 )
             }
         }
         item {
-            SectionCard(title = "疼痛评分", subtitle = "0–10 分") {
+            SectionCard(title = stringResource(R.string.symptom_pain_score), subtitle = stringResource(R.string.common_score_range)) {
                 TrendChart(
                     points = t.symptom.mapNotNull { s ->
                         s.painScore?.let { TrendPoint(s.date, it.toFloat()) }
                     },
-                    unit = " 分",
-                    label = "疼痛评分",
+                    unit = stringResource(R.string.exercise_minute_suffix),
+                    label = stringResource(R.string.symptom_pain_score),
                 )
             }
         }
         item {
-            SectionCard(title = "晨僵时长", subtitle = "分钟") {
+            SectionCard(title = stringResource(R.string.symptom_morning_stiffness), subtitle = stringResource(R.string.exercise_minutes)) {
                 TrendChart(
                     points = t.symptom.mapNotNull { s ->
                         s.morningStiffnessMin?.let { TrendPoint(s.date, it.toFloat()) }
                     },
-                    unit = " 分钟",
-                    label = "晨僵时长",
+                    unit = stringResource(R.string.exercise_minute_space_suffix),
+                    label = stringResource(R.string.symptom_morning_stiffness),
                 )
             }
         }
         item {
-            SectionCard(title = "体重", subtitle = "kg") {
+            SectionCard(title = stringResource(R.string.vitals_weight), subtitle = "kg") {
                 TrendChart(
                     points = t.weight.map { TrendPoint(it.date, it.weightKg.toFloat()) },
                     unit = " kg",
-                    label = "体重",
+                    label = stringResource(R.string.vitals_weight),
                 )
             }
         }
         item {
-            SectionCard(title = "收缩压", subtitle = "mmHg") {
+            SectionCard(title = stringResource(R.string.vitals_bp_systolic), subtitle = "mmHg") {
                 TrendChart(
                     points = t.vitals.mapNotNull { v ->
                         v.bpSys?.let { TrendPoint(v.date, it.toFloat()) }
                     },
                     unit = " mmHg",
-                    label = "收缩压",
+                    label = stringResource(R.string.vitals_bp_systolic),
                     accent = MaterialTheme.colorScheme.error,
                 )
             }
         }
         item {
-            SectionCard(title = "心率", subtitle = "bpm") {
+            SectionCard(title = stringResource(R.string.vitals_heart_rate), subtitle = "bpm") {
                 TrendChart(
                     points = t.vitals.mapNotNull { v ->
                         v.heartRate?.let { TrendPoint(v.date, it.toFloat()) }
                     },
                     unit = " bpm",
-                    label = "心率",
+                    label = stringResource(R.string.vitals_heart_rate),
                     accent = MaterialTheme.colorScheme.tertiary,
                 )
             }
@@ -334,56 +337,58 @@ private fun ExportPage(vm: ReportViewModel, busy: Boolean, context: android.cont
         item { Spacer(Modifier.height(12.dp)) }
 
         item {
-            SectionCard(title = "复诊报告（PDF）") {
+            SectionCard(title = stringResource(R.string.report_pdf_title)) {
                 Text(
-                    "汇总健康档案、当前用药、30 天依从与症状、BASDAI 走势、近 180 天化验与复诊记录、下次复诊安排，生成 PDF 供复诊时出示。",
+                    stringResource(R.string.report_pdf_note),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(10.dp))
+                val shareTitle = stringResource(R.string.report_share_action)
                 Button(
                     onClick = {
                         vm.generateReportPdf(
                             onReady = { intent ->
-                                runCatching { context.startActivity(Intent.createChooser(intent, "分享复诊报告")) }
-                                    .onFailure { GlobalMessages.post("打开分享面板失败：${it.message}") }
+                                runCatching { context.startActivity(Intent.createChooser(intent, shareTitle)) }
+                                    .onFailure { context.getString(R.string.report_share_fail, it.message) }
                             },
                             onError = { vm.reportError(it) },
                         )
                     },
                     enabled = !busy,
-                ) { Text(if (busy) "生成中…" else "生成复诊报告 PDF") }
+                ) { Text(if (busy) stringResource(R.string.backup_generating_dots) else stringResource(R.string.report_generate_pdf)) }
             }
         }
 
         item {
-            SectionCard(title = "紧急卡打印版（PDF）") {
+            SectionCard(title = stringResource(R.string.emergency_card_pdf_title)) {
                 Text(
-                    "M7 紧急卡纸质版：患者信息、紧急联系人、五应急场景处理卡，打印后随身携带。",
+                    stringResource(R.string.emergency_pdf_note),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(10.dp))
+                val shareTitle = stringResource(R.string.emergency_share_card)
                 OutlinedButton(
                     onClick = {
                         vm.generateEmergencyCardPdf(
                             onReady = { intent ->
-                                runCatching { context.startActivity(Intent.createChooser(intent, "分享紧急卡")) }
-                                    .onFailure { GlobalMessages.post("打开分享面板失败：${it.message}") }
+                                runCatching { context.startActivity(Intent.createChooser(intent, shareTitle)) }
+                                    .onFailure { context.getString(R.string.report_share_fail, it.message) }
                             },
                             onError = { vm.reportError(it) },
                         )
                     },
                     enabled = !busy,
-                ) { Text("生成紧急卡 PDF") }
+                ) { Text(stringResource(R.string.emergency_generate_pdf)) }
             }
         }
 
         item {
             NavRow(
                 icon = Icons.Rounded.Backup,
-                title = "数据备份（R20）",
-                subtitle = "全量加密备份 · 恢复自证 · WebDAV 远程备份 · 档案 JSON 导出导入",
+                title = stringResource(R.string.backup_section_title),
+                subtitle = stringResource(R.string.backup_section_subtitle),
                 onClick = onOpenBackup,
             )
         }

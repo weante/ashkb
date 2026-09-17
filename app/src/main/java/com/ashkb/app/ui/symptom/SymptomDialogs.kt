@@ -23,6 +23,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.BasdaiRecord
 import com.ashkb.app.data.entity.FlareAction
 import com.ashkb.app.data.entity.FlareTrigger
@@ -45,10 +48,10 @@ internal fun FlareStartDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("登记发作") },
+        title = { Text(stringResource(R.string.symptom_log_flare)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Text("诱因", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.symptom_trigger), style = MaterialTheme.typography.labelLarge)
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                     FlareTrigger.entries.forEach { t ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -57,7 +60,7 @@ internal fun FlareStartDialog(
                         }
                     }
                 }
-                Text("已采取的处理（可多选）", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.emergency_actions_multi), style = MaterialTheme.typography.labelLarge)
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                     FlareAction.entries.forEach { a ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -69,15 +72,15 @@ internal fun FlareStartDialog(
                         }
                     }
                 }
-                ScoreRow("本次峰值疼痛", peak) { peak = it }
+                ScoreRow(stringResource(R.string.symptom_peak_pain), peak) { peak = it }
                 OutlinedTextField(
                     value = note, onValueChange = { note = it },
-                    label = { Text("备注（可选）") }, modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.common_notes_optional)) }, modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(trigger, actions.toList(), peak, note.ifBlank { null }) }) { Text("登记") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = { TextButton(onClick = { onConfirm(trigger, actions.toList(), peak, note.ifBlank { null }) }) { Text(stringResource(R.string.emergency_record_action)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
     )
 }
 
@@ -89,19 +92,19 @@ internal fun FlareResolveDialog(
     var note by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("标记缓解") },
+        title = { Text(stringResource(R.string.symptom_mark_remission)) },
         text = {
             Column {
-                Text("将本次发作标记为今日缓解。记录完整的发作时长有助于复诊时判断病情活动。", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.symptom_remission_confirm_note), style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(Spacing.sm))
                 OutlinedTextField(
                     value = note, onValueChange = { note = it },
-                    label = { Text("缓解方式 / 备注（可选）") }, modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.symptom_relieve_notes_field)) }, modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(note.ifBlank { null }) }) { Text("确认缓解") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = { TextButton(onClick = { onConfirm(note.ifBlank { null }) }) { Text(stringResource(R.string.symptom_confirm_remission)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
     )
 }
 
@@ -125,30 +128,30 @@ internal fun BasdaiDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("BASDAI 自评（$date）") },
+        title = { Text(stringResource(R.string.basdai_dialog_title, date)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    if (existing == null) "回顾最近一周的感受作答（0=无，10=最重）。全部作答后可提交。"
-                    else "已回显当日原值，修改后提交将覆盖更新（可多次修改）。",
+                    if (existing == null) stringResource(R.string.basdai_weekly_note)
+                    else stringResource(R.string.vitals_editable_note),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(Spacing.sm))
-                ScoreRow("Q1 整体疲乏程度", q1) { q1 = it }
-                ScoreRow("Q2 脊柱痛程度", q2) { q2 = it }
-                ScoreRow("Q3 外周关节痛程度", q3) { q3 = it }
-                ScoreRow("Q4 触痛部位程度（按压痛）", q4) { q4 = it }
-                ScoreRow("Q5 晨僵程度", q5) { q5 = it }
-                ScoreRow("Q6 晨僵时长（0=无，10=全天）", q6) { q6 = it }
+                ScoreRow(stringResource(R.string.basdai_q1_fatigue), q1) { q1 = it }
+                ScoreRow(stringResource(R.string.basdai_q2_spinal_pain), q2) { q2 = it }
+                ScoreRow(stringResource(R.string.basdai_q3_peripheral), q3) { q3 = it }
+                ScoreRow(stringResource(R.string.basdai_q4_tenderness), q4) { q4 = it }
+                ScoreRow(stringResource(R.string.basdai_q5_stiffness), q5) { q5 = it }
+                ScoreRow(stringResource(R.string.basdai_q6_stiffness), q6) { q6 = it }
                 OutlinedTextField(
                     value = note, onValueChange = { note = it },
-                    label = { Text("备注（可选）") }, modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.common_notes_optional)) }, modifier = Modifier.fillMaxWidth(),
                 )
                 if (total != null) {
                     Spacer(Modifier.height(Spacing.sm))
                     Text(
-                        "总分：%.1f".format(total) + if (total >= 4.0) "（≥4.0：活动度偏高，两周内两次将提示复诊）" else "",
+                        "总分：%.1f".format(total) + if (total >= 4.0) stringResource(R.string.basdai_high_note_paren) else "",
                         style = MaterialTheme.typography.titleMedium,
                         color = if (total >= 4.0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     )
@@ -159,8 +162,8 @@ internal fun BasdaiDialog(
             TextButton(
                 onClick = { onConfirm(q1!!, q2!!, q3!!, q4!!, q5!!, q6!!, note.ifBlank { null }) },
                 enabled = complete,
-            ) { Text(if (existing == null) "提交" else "更新") }
+            ) { Text(if (existing == null) stringResource(R.string.common_submit) else stringResource(R.string.common_update)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
     )
 }

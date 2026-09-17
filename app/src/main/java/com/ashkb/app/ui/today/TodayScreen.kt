@@ -50,9 +50,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.SkipReason
 import com.ashkb.app.data.repo.TodayItem
@@ -101,8 +104,8 @@ fun TodayScreen(
         // ---- Hero：一屏一主角（今天是"下一次该做什么"）----
         item {
             HeroHeader(
-                dateText = todayDate.format(DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHINESE)),
-                who = profile?.let { "${it.displayName} · ${it.diagnosis}" } ?: "先完成健康档案建档",
+                dateText = todayDate.format(DateTimeFormatter.ofPattern(stringResource(R.string.date_pattern_month_day_week), Locale.CHINESE)),
+                who = profile?.let { "${it.displayName} · ${it.diagnosis}" } ?: stringResource(R.string.today_profile_not_built),
                 pendingCount = pending,
                 scheduledCount = scheduled,
             )
@@ -114,9 +117,9 @@ fun TodayScreen(
                 AlertBanner(
                     tone = StatusTone.Danger,
                     icon = Icons.Rounded.WarningAmber,
-                    title = "${alerts.size} 条未读健康警报",
+                    title = stringResource(R.string.today_alerts_count, alerts.size),
                     body = alerts.first().message,
-                    actionLabel = "查看",
+                    actionLabel = stringResource(R.string.common_view),
                     onAction = onOpenSymptom,
                 )
             }
@@ -127,16 +130,16 @@ fun TodayScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 QuickEntryButton(
                     icon = Icons.Rounded.MonitorHeart,
-                    title = "记症状",
-                    status = if (symptomRecorded) "今日已记录" else "今日未记录",
+                    title = stringResource(R.string.today_log_symptom),
+                    status = if (symptomRecorded) stringResource(R.string.today_recorded) else stringResource(R.string.today_not_recorded),
                     done = symptomRecorded,
                     modifier = Modifier.weight(1f),
                     onClick = onOpenSymptom,
                 )
                 QuickEntryButton(
                     icon = Icons.Rounded.FitnessCenter,
-                    title = "今日运动",
-                    status = if (exerciseDone > 0) "已打卡 $exerciseDone 项" else "按分期推荐",
+                    title = stringResource(R.string.exercise_today_title),
+                    status = if (exerciseDone > 0) stringResource(R.string.today_exercise_done, exerciseDone) else stringResource(R.string.exercise_by_stage),
                     done = exerciseDone > 0,
                     modifier = Modifier.weight(1f),
                     onClick = onOpenExercise,
@@ -146,16 +149,16 @@ fun TodayScreen(
 
         if (items.isEmpty()) {
             item {
-                SectionCard(title = "今日用药") {
+                SectionCard(title = stringResource(R.string.today_meds_section)) {
                     EmptyState(
                         icon = Icons.Rounded.Medication,
-                        title = "还没有添加药品",
+                        title = stringResource(R.string.med_empty_hint),
                         body = if (profile == null) {
-                            "建档后添加药品，这里会显示今天该服用的药与打卡入口"
+                            stringResource(R.string.today_build_then_add_note)
                         } else {
-                            "添加后，这里会显示今天该服用的药"
+                            stringResource(R.string.med_add_hint_today)
                         },
-                        actionLabel = "添加药品",
+                        actionLabel = stringResource(R.string.med_add_medication),
                         onAction = onMedListNeeded,
                     )
                 }
@@ -250,9 +253,9 @@ private fun HeroHeader(
                 )
                 Text(
                     when {
-                        scheduledCount == 0 -> "今天没有用药计划"
-                        pendingCount == 0 -> "今天的用药都记完了"
-                        else -> "今天还有 $pendingCount 次用药待记录"
+                        scheduledCount == 0 -> stringResource(R.string.today_no_med_plan)
+                        pendingCount == 0 -> stringResource(R.string.today_all_done)
+                        else -> stringResource(R.string.today_pending_meds, pendingCount)
                     },
                     style = MaterialTheme.typography.headlineSmall,
                 )
@@ -279,7 +282,7 @@ private fun HeroHeader(
                         },
                     )
                     Text(
-                        "待记录",
+                        stringResource(R.string.common_pending_record),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -333,37 +336,38 @@ private data class MedStatus(
     val actionable: Boolean,
 )
 
+@Composable
 private fun medStatusOf(item: TodayItem, missed: Boolean): MedStatus = when {
     item.done -> MedStatus(
-        chip = "已服",
+        chip = stringResource(R.string.med_status_taken_short),
         tone = StatusTone.Success,
         icon = Icons.Rounded.CheckCircle,
-        detail = "已服 " + (item.log?.takenAt?.takeLast(5) ?: "") +
-            if (item.isLate) "（晚于计划 30 分钟以上）" else "",
+        detail = stringResource(R.string.med_taken_prefix) + (item.log?.takenAt?.takeLast(5) ?: "") +
+            if (item.isLate) stringResource(R.string.med_late_note) else "",
         actionable = false,
     )
     item.skipped -> MedStatus(
-        chip = "已跳过",
+        chip = stringResource(R.string.med_status_skipped),
         tone = StatusTone.Neutral,
         icon = Icons.Rounded.RemoveCircleOutline,
-        detail = "已跳过：" + (
+        detail = stringResource(R.string.backup_skipped_prefix) + (
             SkipReason.entries.firstOrNull { it.name.equals(item.log?.reason, true) }?.label
                 ?: item.log?.reason ?: ""
             ),
         actionable = false,
     )
     missed -> MedStatus(
-        chip = "漏服",
+        chip = stringResource(R.string.med_status_missed),
         tone = StatusTone.Danger,
         icon = Icons.Rounded.ErrorOutline,
-        detail = "计划 ${item.slotTime} · 尚未记录",
+        detail = stringResource(R.string.today_plan_no_log, item.slotTime ?: ""),
         actionable = true,
     )
     else -> MedStatus(
-        chip = "待服",
+        chip = stringResource(R.string.med_status_pending),
         tone = StatusTone.Info,
         icon = Icons.Rounded.Schedule,
-        detail = "计划 ${item.slotTime ?: "按需"}",
+        detail = "计划 ${item.slotTime ?: stringResource(R.string.med_prn_short)}",
         actionable = true,
     )
 }
@@ -432,13 +436,13 @@ private fun MedCheckCard(
                         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                     ) {
                         StatusChip(item.slotLabel, st.tone, st.icon)
-                        if (med.route == "injection") StatusChip("注射", StatusTone.Info)
+                        if (med.route == "injection") StatusChip(stringResource(R.string.med_route_injection), StatusTone.Info)
                         if (med.route == "oral") {
                             StatusChip(
                                 when (med.takeWithFood) {
-                                    "empty_stomach" -> "空腹"
-                                    "with_food" -> "随餐"
-                                    else -> "均可"
+                                    "empty_stomach" -> stringResource(R.string.med_fasting)
+                                    "with_food" -> stringResource(R.string.med_with_meal)
+                                    else -> stringResource(R.string.common_any)
                                 },
                                 StatusTone.Neutral,
                             )
@@ -454,14 +458,14 @@ private fun MedCheckCard(
             if (st.actionable && !item.isPrn) {
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Button(onClick = onCheckIn, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                        Text("服用")
+                        Text(stringResource(R.string.med_take_action))
                     }
                     OutlinedButton(onClick = onSkip, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                        Text("跳过")
+                        Text(stringResource(R.string.med_skip))
                     }
                     if (med.route == "injection") {
                         OutlinedButton(onClick = onPostpone, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                            Text("顺延")
+                            Text(stringResource(R.string.med_postpone))
                         }
                     }
                 }
@@ -469,13 +473,13 @@ private fun MedCheckCard(
 
             if (item.isPrn) {
                 Text(
-                    "按需药不设提醒，记录实际使用即可",
+                    stringResource(R.string.med_prn_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (!item.done) {
                     Button(onClick = onPrnTaken, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                        Text("记录使用")
+                        Text(stringResource(R.string.med_record_prn_use))
                     }
                 }
             }
@@ -493,10 +497,10 @@ private fun SkipDialog(
     var note by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("跳过 $medName") },
+        title = { Text(stringResource(R.string.med_skip_title, medName)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("请选择原因（跳过会如实记录，不计入漏服）", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.med_skip_reason_note), style = MaterialTheme.typography.bodySmall)
                 SkipReason.entries.forEach { r ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = reason == r, onClick = { reason = r })
@@ -506,21 +510,22 @@ private fun SkipDialog(
                 if (reason == SkipReason.OTHER) {
                     androidx.compose.material3.OutlinedTextField(
                         value = note, onValueChange = { note = it },
-                        label = { Text("补充说明") }, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.common_extra_notes)) }, modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(reason.name, note.ifBlank { null }) }) { Text("记录跳过") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = { TextButton(onClick = { onConfirm(reason.name, note.ifBlank { null }) }) { Text(stringResource(R.string.med_record_skip)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
     )
 }
 
 /** 依那西普等皮下注射可选部位（大腿前外侧 / 腹部 / 上臂外侧，左右各一）。 */
-private val INJ_SITES = listOf(
-    "thigh_l" to "左大腿", "thigh_r" to "右大腿",
-    "abdomen_l" to "左腹部", "abdomen_r" to "右腹部",
-    "arm_l" to "左上臂", "arm_r" to "右上臂",
+@Composable
+private fun injSites(): List<Pair<String, String>> = listOf(
+    "thigh_l" to stringResource(R.string.med_site_left_thigh), "thigh_r" to stringResource(R.string.med_site_right_thigh),
+    "abdomen_l" to stringResource(R.string.med_site_left_abdomen), "abdomen_r" to stringResource(R.string.med_site_right_abdomen),
+    "arm_l" to stringResource(R.string.med_site_left_arm), "arm_r" to stringResource(R.string.med_site_right_arm),
 )
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -531,23 +536,24 @@ private fun InjSiteDialog(
     onConfirm: (site: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var site by remember { mutableStateOf(INJ_SITES.firstOrNull { it.first != lastSite }?.first ?: "thigh_l") }
+    val sites = injSites()
+    var site by remember { mutableStateOf(sites.firstOrNull { it.first != lastSite }?.first ?: "thigh_l") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("注射 $medName") },
+        title = { Text(stringResource(R.string.med_injection_title, medName)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 if (lastSite != null) {
-                    val lastLabel = INJ_SITES.firstOrNull { it.first == lastSite }?.second ?: lastSite
-                    Text("上次部位：$lastLabel——建议轮换", style = MaterialTheme.typography.bodySmall)
+                    val lastLabel = sites.firstOrNull { it.first == lastSite }?.second ?: lastSite
+                    Text(stringResource(R.string.med_last_site_note, lastLabel), style = MaterialTheme.typography.bodySmall)
                 }
-                Text("请选择本次注射部位：", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.med_inj_site_prompt), style = MaterialTheme.typography.bodyMedium)
                 // FlowRow：6 个 chip 一行放不下会自动换行（旧 Row 会把后面的选项截在屏幕外）
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
-                    INJ_SITES.forEach { (key, label) ->
+                    sites.forEach { (key, label) ->
                         FilterChip(
                             selected = site == key,
                             onClick = { site = key },
@@ -557,8 +563,8 @@ private fun InjSiteDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(site) }) { Text("完成注射") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = { TextButton(onClick = { onConfirm(site) }) { Text(stringResource(R.string.med_complete_injection)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
     )
 }
 
@@ -575,18 +581,18 @@ private fun PostponeDialog(
     var custom by remember { mutableStateOf("") }
     val customDate = runCatching { LocalDate.parse(custom.trim()) }.getOrNull()
     val target = customDate ?: today.plusDays(offset.toLong())
-    val fmt = DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHINESE)
+    val fmt = DateTimeFormatter.ofPattern(stringResource(R.string.date_pattern_month_day_week), Locale.CHINESE)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("顺延 $medName 注射") },
+        title = { Text(stringResource(R.string.med_postpone_title, medName)) },
         text = {
             Column {
                 Text(
                     buildString {
-                        append("顺延后以新日期为周期锚点")
-                        if (cycleDays != null) append("（每 $cycleDays 天起算）")
-                        append("，后续注射与提醒自动重排。今日卡将移至新日期。")
+                        append(stringResource(R.string.med_postpone_anchor_note))
+                        if (cycleDays != null) append(stringResource(R.string.med_cycle_note, cycleDays))
+                        append(stringResource(R.string.med_postpone_reschedule_note))
                     },
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -596,18 +602,18 @@ private fun PostponeDialog(
                         FilterChip(
                             selected = custom.isBlank() && offset == d,
                             onClick = { offset = d; custom = "" },
-                            label = { Text("+$d 天") },
+                            label = { Text(stringResource(R.string.med_plus_days, d)) },
                         )
                     }
                 }
                 androidx.compose.material3.OutlinedTextField(
                     value = custom,
                     onValueChange = { custom = it },
-                    label = { Text("或输入日期 YYYY-MM-DD") },
+                    label = { Text(stringResource(R.string.med_postpone_manual_date)) },
                     modifier = Modifier.fillMaxWidth(),
                     isError = custom.isNotBlank() && customDate == null,
                     supportingText = if (custom.isNotBlank() && customDate == null) {
-                        { Text("格式：2026-09-01") }
+                        { Text(stringResource(R.string.common_date_format_hint)) }
                     } else null,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -618,7 +624,7 @@ private fun PostponeDialog(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "如因发热 / 感染延迟注射，请先联系医生再顺延——生物制剂治疗期间感染需医生评估。",
+                    stringResource(R.string.med_postpone_infection_warning),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -628,8 +634,8 @@ private fun PostponeDialog(
             TextButton(
                 onClick = { onConfirm(target) },
                 enabled = custom.isBlank() || customDate != null,
-            ) { Text("顺延至此日") }
+            ) { Text(stringResource(R.string.med_postpone_to_date)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
     )
 }

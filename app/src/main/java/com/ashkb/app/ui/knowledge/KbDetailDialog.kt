@@ -18,6 +18,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.theme.Spacing
@@ -39,22 +42,22 @@ fun KbDetailDialog(entry: KbEntry, onDismiss: () -> Unit) {
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 if (overdue) {
-                    StatusChip(text = "已过复核日，以医嘱为准", tone = StatusTone.Warning, icon = Icons.Rounded.Schedule)
+                    StatusChip(text = stringResource(R.string.checkup_overdue_note), tone = StatusTone.Warning, icon = Icons.Rounded.Schedule)
                     Spacer(Modifier.height(Spacing.sm))
                 }
                 Text(entry.summary, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(Spacing.md))
-                PayloadSection("处置与建议", payload.optArr("action"))
-                PayloadSection("证据原文", payload.optArr("evidence"))
-                LabeledText("要点", payload.optStr("content"))
-                LabeledText("剂量锚点", payload.optStr("dose"))
-                LabeledText("获益", payload.optStr("benefit"))
-                LabeledText("风险", payload.optStr("risk"))
-                LabeledText("替代方案", payload.optStr("alternative_hint"))
-                LabeledText("阈值说明", payload.optStr("note"))
-                LabeledText("触发条件", payload.optStr("condition"))
+                PayloadSection(stringResource(R.string.checkup_disposition), payload.optArr("action"))
+                PayloadSection(stringResource(R.string.knowledge_evidence_source), payload.optArr("evidence"))
+                LabeledText(stringResource(R.string.knowledge_key_points), payload.optStr("content"))
+                LabeledText(stringResource(R.string.med_dose_anchor), payload.optStr("dose"))
+                LabeledText(stringResource(R.string.knowledge_benefit), payload.optStr("benefit"))
+                LabeledText(stringResource(R.string.knowledge_risk), payload.optStr("risk"))
+                LabeledText(stringResource(R.string.knowledge_alternative), payload.optStr("alternative_hint"))
+                LabeledText(stringResource(R.string.report_threshold_note), payload.optStr("note"))
+                LabeledText(stringResource(R.string.knowledge_trigger_condition), payload.optStr("condition"))
                 payload.optStr("value")?.let {
-                    LabeledText("阈值", "$it ${payload.optStr("unit") ?: ""}")
+                    LabeledText(stringResource(R.string.report_threshold), "$it ${payload.optStr("unit") ?: ""}")
                 }
                 Spacer(Modifier.height(Spacing.md))
                 Surface(
@@ -64,12 +67,12 @@ fun KbDetailDialog(entry: KbEntry, onDismiss: () -> Unit) {
                 ) {
                     Column(Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                         Text(
-                            "来源：${entry.sourceName}",
+                            stringResource(R.string.knowledge_source_line, entry.sourceName),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            "证据层级 ${entry.sourceTier} · 适配 ${entry.adaptedAt} · 复核 ${entry.reviewDue} · v${entry.version}",
+                            stringResource(R.string.knowledge_evidence_meta, entry.sourceTier, entry.adaptedAt, entry.reviewDue, entry.version),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -79,19 +82,19 @@ fun KbDetailDialog(entry: KbEntry, onDismiss: () -> Unit) {
                                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
                                     start = Spacing.xxs, end = Spacing.xxs, top = Spacing.xxs, bottom = Spacing.xxs,
                                 ),
-                            ) { Text("查看原文") }
+                            ) { Text(stringResource(R.string.knowledge_view_source)) }
                         }
                     }
                 }
                 Text(
-                    "本条目为患者教育参考，不替代医嘱。内容如与医生意见冲突，以医嘱为准。",
+                    stringResource(R.string.knowledge_disclaimer),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = Spacing.sm),
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) } },
     )
 }
 

@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -35,6 +36,8 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.Size as GeometrySize
+
+import com.ashkb.app.R
 import com.ashkb.app.ui.theme.Clinical
 import com.ashkb.app.ui.theme.Motion
 import com.ashkb.app.ui.theme.Size
@@ -69,8 +72,8 @@ fun TrendChart(
     if (points.isEmpty()) {
         EmptyState(
             icon = Icons.Outlined.ShowChart,
-            title = "还没有数据",
-            body = "记录满 2 天后这里会出现趋势",
+            title = stringResource(R.string.common_no_data),
+            body = stringResource(R.string.report_trend_wait_note),
         )
         return
     }
@@ -117,7 +120,10 @@ fun TrendChart(
         progress.animateTo(1f, tween(Motion.SlowMs, easing = EaseOut))
     }
 
-    val a11y = remember(points, threshold) { summarize(label, points, unit, threshold) }
+    val dirRise = stringResource(R.string.trend_up_to)
+    val dirFall = stringResource(R.string.trend_down_to)
+    val dirFlat = stringResource(R.string.trend_flat)
+    val a11y = remember(points, threshold) { summarize(label, points, unit, threshold, dirRise, dirFall, dirFlat) }
 
     Canvas(
         modifier = modifier
@@ -319,14 +325,22 @@ private fun nearestIndex(x: Float, count: Int, left: Float, width: Float): Int {
     return (ratio * (count - 1)).roundToInt().coerceIn(0, count - 1)
 }
 
-private fun summarize(label: String, points: List<TrendPoint>, unit: String, threshold: Float?): String {
+private fun summarize(
+    label: String,
+    points: List<TrendPoint>,
+    unit: String,
+    threshold: Float?,
+    dirRise: String,
+    dirFall: String,
+    dirFlat: String,
+): String {
     val first = points.first().value
     val last = points.last().value
     val avg = points.map { it.value.toDouble() }.average()
     val dir = when {
-        last > first + 0.05f -> "升至"
-        last < first - 0.05f -> "降至"
-        else -> "持平于"
+        last > first + 0.05f -> dirRise
+        last < first - 0.05f -> dirFall
+        else -> dirFlat
     }
     return buildString {
         append("$label 趋势，共 ${points.size} 个数据点")

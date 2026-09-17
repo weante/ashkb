@@ -32,6 +32,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -40,6 +41,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+
+import com.ashkb.app.R
 import com.ashkb.app.ui.backup.BackupScreen
 import com.ashkb.app.ui.backup.BackupViewModel
 import com.ashkb.app.ui.checkup.CheckupScreen
@@ -100,7 +103,8 @@ fun AppShell() {
 
     val backStackEntry by nav.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
-    val topTab = TABS.firstOrNull { t ->
+    val tabs = TABS()
+    val topTab = tabs.firstOrNull { t ->
         destination?.hierarchy?.any { it.hasRoute(t.route::class) } == true
     }
     val showBottomBar = topTab != null
@@ -130,7 +134,7 @@ fun AppShell() {
                 exit = slideOutVertically { it },
             ) {
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
-                    TABS.forEach { t ->
+                    tabs.forEach { t ->
                         val selected = topTab == t
                         NavigationBarItem(
                             selected = selected,
@@ -254,16 +258,16 @@ private fun HealthHub(
     val contacts by emergencyVm.contacts.collectAsState()
 
     val wellnessSub = buildList {
-        add(if (vitals != null) "今日体征已记" else "今日体征未记")
-        add(if (weight != null) "体重已记" else "体重未记")
+        add(if (vitals != null) stringResource(R.string.vitals_today_recorded) else stringResource(R.string.vitals_today_not_recorded))
+        add(if (weight != null) stringResource(R.string.vitals_weight_recorded) else stringResource(R.string.vitals_weight_not_recorded))
     }.joinToString(" · ")
 
-    val checkupSub = "复诊项目 ${checkupItems.size} 项 · 化验 ${labRecent.size} 条"
+    val checkupSub = stringResource(R.string.health_badge_checkup_lab, checkupItems.size, labRecent.size)
 
     val emergencySub = if (contacts.isEmpty()) {
-        "尚未添加紧急联系人"
+        stringResource(R.string.emergency_no_contacts)
     } else {
-        "紧急联系人 ${contacts.size} 位 · 已就绪"
+        stringResource(R.string.health_badge_contacts_ready, contacts.size)
     }
 
     LazyColumn(
@@ -272,9 +276,9 @@ private fun HealthHub(
     ) {
         item {
             Column(Modifier.padding(top = Spacing.xxl), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Text("健康管理", style = MaterialTheme.typography.headlineSmall)
+                Text(stringResource(R.string.me_health_manage), style = MaterialTheme.typography.headlineSmall)
                 Text(
-                    "骨健康、营养、复诊与应急——全方位守护你的健康",
+                    stringResource(R.string.me_health_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -285,7 +289,7 @@ private fun HealthHub(
         item {
             NavRow(
                 icon = Icons.Rounded.Restaurant,
-                title = "营养与骨健康",
+                title = stringResource(R.string.nutrition_bone_health_title),
                 subtitle = wellnessSub,
                 onClick = onOpenWellness,
             )
@@ -295,7 +299,7 @@ private fun HealthHub(
         item {
             NavRow(
                 icon = Icons.Rounded.MedicalInformation,
-                title = "复诊管理",
+                title = stringResource(R.string.checkup_manage_title),
                 subtitle = checkupSub,
                 onClick = onOpenCheckup,
             )
@@ -305,7 +309,7 @@ private fun HealthHub(
         item {
             NavRow(
                 icon = Icons.Rounded.Emergency,
-                title = "紧急卡",
+                title = stringResource(R.string.emergency_card_title),
                 subtitle = emergencySub,
                 onClick = onOpenEmergency,
             )

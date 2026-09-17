@@ -42,7 +42,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.entity.LedgerStatus
 import com.ashkb.app.data.entity.LedgerType
@@ -107,7 +110,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenTopBar(title = "备份与数据", onBack = onBack)
+        ScreenTopBar(title = stringResource(R.string.me_backup_section), onBack = onBack)
 
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.lg),
@@ -116,44 +119,45 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
             Spacer(Modifier.height(Spacing.xs))
 
             // ---- 加密说明 ----
-            SectionCard(title = "备份加密（AES-256-GCM）") {
+            SectionCard(title = stringResource(R.string.backup_encryption_title)) {
                 Text(
-                    "备份文件 = 全库 27 表快照 + 逐表 SHA-256 清单，经口令派生密钥加密。" +
-                        "WebDAV 服务商或任何拿到文件者都无法读取明文。口令遗忘 = 备份不可恢复，请务必牢记。",
+                    stringResource(R.string.backup_file_note) +
+                        stringResource(R.string.backup_encryption_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
             // ---- 本机全量备份 ----
-            SectionCard(title = "全量备份到本机") {
+            SectionCard(title = stringResource(R.string.backup_local_full)) {
                 OutlinedTextField(
                     value = backupPass, onValueChange = { backupPass = it },
-                    label = { Text("备份口令（≥6 位）") },
+                    label = { Text(stringResource(R.string.backup_password_field)) },
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(Spacing.sm))
+                val shareTitle = stringResource(R.string.backup_save_share)
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Button(
                         onClick = {
                             vm.backupLocal(backupPass) { intent ->
                                 runCatching {
-                                    context.startActivity(Intent.createChooser(intent, "保存 / 分享备份"))
+                                    context.startActivity(Intent.createChooser(intent, shareTitle))
                                 }
                             }
                         },
                         enabled = !busy && backupPass.length >= 6,
                         modifier = Modifier.heightIn(min = Size.touchMin),
-                    ) { Text("生成本机备份") }
+                    ) { Text(stringResource(R.string.backup_local_generate)) }
                     OutlinedButton(
                         onClick = { vm.backupWebdav(backupPass) },
                         enabled = !busy && backupPass.length >= 6,
                         modifier = Modifier.heightIn(min = Size.touchMin),
-                    ) { Text("备份到 WebDAV") }
+                    ) { Text(stringResource(R.string.backup_to_dav)) }
                 }
                 Text(
-                    "本机文件存于 app 私有目录（files/backups），可通过分享另存到下载 / 云盘 / 电脑。",
+                    stringResource(R.string.backup_local_storage_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -161,25 +165,25 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
 
             // ---- WebDAV 配置（表单收进 sheet，页面只留状态与入口） ----
             SectionCard(
-                title = "WebDAV 远程备份（可选）",
-                subtitle = if (davUrl.isNotBlank()) "已配置：$davUrl · $davUser" else null,
+                title = stringResource(R.string.backup_dav_section_title),
+                subtitle = if (davUrl.isNotBlank()) stringResource(R.string.backup_dav_configured, davUrl, davUser) else null,
             ) {
                 OutlinedButton(
                     onClick = { showDavSheet = true },
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                ) { Text(if (davUrl.isNotBlank()) "修改 WebDAV 配置" else "配置 WebDAV") }
+                ) { Text(if (davUrl.isNotBlank()) stringResource(R.string.backup_modify_dav) else stringResource(R.string.backup_configure_dav)) }
             }
 
             // ---- 恢复（协议 §6 五步） ----
-            SectionCard(title = "恢复（五步含退路）") {
+            SectionCard(title = stringResource(R.string.backup_restore_title)) {
                 Row(
                     Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Text(
-                        pickedName ?: "未选择备份文件",
+                        pickedName ?: stringResource(R.string.backup_no_file_selected),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f),
                         color = if (pickedName == null) MaterialTheme.colorScheme.onSurfaceVariant
@@ -188,12 +192,12 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                     OutlinedButton(
                         onClick = { pickRestoreFile.launch(arrayOf("*/*")) },
                         enabled = !busy,
-                    ) { Text("选择 .ashkb") }
+                    ) { Text(stringResource(R.string.backup_select_file)) }
                 }
                 Spacer(Modifier.height(Spacing.xs))
                 OutlinedTextField(
                     value = restorePass, onValueChange = { restorePass = it },
-                    label = { Text("该备份的口令") },
+                    label = { Text(stringResource(R.string.backup_file_password)) },
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -203,7 +207,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                         pickedBytes?.let { vm.verifyBackup(pickedName ?: "backup", it, restorePass) }
                     },
                     enabled = !busy && pickedBytes != null && restorePass.isNotBlank(),
-                ) { Text("旁路解密与校验") }
+                ) { Text(stringResource(R.string.backup_bypass_decrypt)) }
 
                 if (pending != null) {
                     Spacer(Modifier.height(Spacing.sm))
@@ -223,16 +227,16 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                             )
                             Spacer(Modifier.height(Spacing.sm))
                             Text(
-                                "「执行恢复」将先对当前数据做 pre-restore 快照（可撤销退路），" +
-                                    "然后覆盖写入主库并做行数 + SHA-256 双校验。",
+                                stringResource(R.string.backup_prerestore_note) +
+                                    stringResource(R.string.backup_restore_overwrite_note),
                                 style = MaterialTheme.typography.bodySmall,
                             )
                             Spacer(Modifier.height(Spacing.sm))
                             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                                 Button(onClick = { vm.doRestore() }, enabled = !busy) {
-                                    Text("执行恢复（覆盖当前数据）")
+                                    Text(stringResource(R.string.backup_restore_execute))
                                 }
-                                OutlinedButton(onClick = { vm.cancelRestore() }) { Text("取消") }
+                                OutlinedButton(onClick = { vm.cancelRestore() }) { Text(stringResource(R.string.common_cancel)) }
                             }
                         }
                     }
@@ -251,7 +255,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                             modifier = Modifier.size(Size.iconSm),
                         )
                         Text(
-                            if (r.rowsOk) "双校验通过：${r.totalRows} 行与备份逐表一致"
+                            if (r.rowsOk) stringResource(R.string.backup_verify_pass, r.totalRows)
                             else "校验未全部通过：${r.rowDetails.take(5).joinToString("；")}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = if (r.rowsOk) MaterialTheme.colorScheme.primary
@@ -262,47 +266,48 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
             }
 
             // ---- 恢复演练 ----
-            SectionCard(title = "恢复演练（一键自证）") {
+            SectionCard(title = stringResource(R.string.backup_drill_title)) {
                 Text(
-                    "备份 → 加密 → 解密 → 覆盖恢复 → 行数+SHA 双校验 → 复核一致，全链路自动跑一遍。" +
-                        "写入的正是刚导出的当前数据（可逆无损），无需口令、不落盘，结果记入台账（DRILL）。",
+                    stringResource(R.string.backup_drill_flow_note) +
+                        stringResource(R.string.backup_drill_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(Spacing.sm))
-                Button(onClick = { vm.drill() }, enabled = !busy) { Text("执行恢复演练") }
+                Button(onClick = { vm.drill() }, enabled = !busy) { Text(stringResource(R.string.backup_run_drill)) }
             }
 
             // ---- 档案 JSON ----
-            SectionCard(title = "健康档案 JSON（换机建档）") {
+            SectionCard(title = stringResource(R.string.backup_profile_json_title)) {
                 Text(
-                    "明文 JSON：档案 + 在用药清单（不含打卡日志）。新设备导入后可快速建档。",
+                    stringResource(R.string.backup_profile_json_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(Spacing.sm))
+                val shareTitle = stringResource(R.string.backup_profile_save_share)
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     OutlinedButton(
                         onClick = {
                             vm.exportProfileJson { intent ->
                                 runCatching {
-                                    context.startActivity(Intent.createChooser(intent, "保存 / 分享档案"))
+                                    context.startActivity(Intent.createChooser(intent, shareTitle))
                                 }
                             }
                         },
                         enabled = !busy,
-                    ) { Text("导出档案") }
+                    ) { Text(stringResource(R.string.backup_export_profile)) }
                     OutlinedButton(
                         onClick = { pickImportJson.launch(arrayOf("*/*")) },
                         enabled = !busy,
-                    ) { Text("导入档案") }
+                    ) { Text(stringResource(R.string.backup_import_profile)) }
                 }
             }
 
             // ---- 台账（默认折叠前 5 条，可展开全部） ----
-            SectionCard(title = "备份台账（${ledger.size}）") {
+            SectionCard(title = stringResource(R.string.backup_ledger_count, ledger.size)) {
                 if (ledger.isEmpty()) {
-                    Text("暂无记录", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.common_no_records), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     val shown = if (showAllLedger) ledger else ledger.take(5)
                     DividerList(items = shown, key = { it.id }) { l ->
@@ -310,14 +315,14 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                     }
                     if (ledger.size > 5) {
                         TextButton(onClick = { showAllLedger = !showAllLedger }) {
-                            Text(if (showAllLedger) "收起" else "查看全部 ${ledger.size} 条")
+                            Text(if (showAllLedger) stringResource(R.string.common_collapse) else stringResource(R.string.backup_view_all_count, ledger.size))
                         }
                     }
                 }
             }
 
             if (busy) {
-                LoadingBlock(label = "处理中…（加密 / 网络操作可能需要数十秒）")
+                LoadingBlock(label = stringResource(R.string.backup_processing))
             }
             Spacer(Modifier.height(Spacing.xxl))
         }
@@ -354,7 +359,7 @@ private fun LedgerRow(l: BackupLedger) {
                     tint = if (ok) Clinical.colors.success else Clinical.colors.danger,
                 )
                 Text(
-                    if (ok) "成功" else "失败",
+                    if (ok) stringResource(R.string.common_success) else stringResource(R.string.common_failed),
                     style = MaterialTheme.typography.labelMedium,
                     color = if (ok) Clinical.colors.success else Clinical.colors.danger,
                 )
@@ -364,8 +369,8 @@ private fun LedgerRow(l: BackupLedger) {
             buildString {
                 append(l.createdAt.take(19).replace("T", " "))
                 l.fileName?.let { append("　$it") }
-                l.rowTotal?.let { append("　${it} 行") }
-                l.verifyOk?.let { if (it) append("　双校验通过") }
+                l.rowTotal?.let { append(stringResource(R.string.backup_row_count, it)) }
+                l.verifyOk?.let { if (it) append(stringResource(R.string.backup_dual_verify_passed)) }
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -391,21 +396,21 @@ private fun WebDavSheet(vm: BackupViewModel, initialUrl: String, initialUser: St
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            Text("WebDAV 远程备份配置", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.backup_dav_config_title), style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(
                 value = davUrl, onValueChange = { davUrl = it },
-                label = { Text("服务器地址（https://…/dav）") },
+                label = { Text(stringResource(R.string.backup_dav_url_field)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
             OutlinedTextField(
                 value = davUser, onValueChange = { davUser = it },
-                label = { Text("用户名") }, modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.backup_dav_username_field)) }, modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
             OutlinedTextField(
                 value = davPass, onValueChange = { davPass = it },
-                label = { Text("密码 / 应用密码（保存后加密存储，不回显）") },
+                label = { Text(stringResource(R.string.backup_dav_password_field)) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -416,10 +421,10 @@ private fun WebDavSheet(vm: BackupViewModel, initialUrl: String, initialUser: St
                 },
                 enabled = davUrl.isNotBlank() && davUser.isNotBlank() && davPass.isNotBlank(),
                 modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-            ) { Text("测试连接并保存") }
+            ) { Text(stringResource(R.string.backup_dav_test_save)) }
             Text(
-                "三步探针：目录可写 → 写入探针回读一致 → 清理。上传后自动回读比对 SHA-256，" +
-                    "保留日 7 / 周 4 / 月 6 份，路径 /ashkb/backup/。",
+                stringResource(R.string.backup_dav_probe_note) +
+                    stringResource(R.string.backup_dav_retention_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

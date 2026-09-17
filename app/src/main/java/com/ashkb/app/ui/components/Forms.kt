@@ -24,8 +24,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+
+import com.ashkb.app.R
 import com.ashkb.app.ui.theme.DataLarge
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
@@ -45,12 +48,13 @@ fun ScoreInput(
     onValueChange: (Int) -> Unit,
     range: IntRange = 0..10,
     label: String,
-    lowLabel: String = "无",
-    highLabel: String = "最严重",
+    lowLabel: String = stringResource(R.string.common_none),
+    highLabel: String = stringResource(R.string.symptom_scale_worst),
     tone: (Int) -> StatusTone,
 ) {
     val cs = MaterialTheme.colorScheme
     val accent = tone(value).accent()
+    val sliderDesc = stringResource(R.string.forms_slider_a11y, label, value, range.last)
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -77,7 +81,7 @@ fun ScoreInput(
                 onClick = { onValueChange((value - 1).coerceAtLeast(range.first)) },
                 modifier = Modifier.size(Size.touchMin),
             ) {
-                Icon(Icons.Rounded.Remove, contentDescription = "减少一分")
+                Icon(Icons.Rounded.Remove, contentDescription = stringResource(R.string.symptom_decrease_one))
             }
             Slider(
                 value = value.toFloat(),
@@ -87,13 +91,13 @@ fun ScoreInput(
                 modifier = Modifier
                     .weight(1f)
                     .height(Size.touchMin)
-                    .semantics { contentDescription = "$label 当前 $value 分，满分 ${range.last}" },
+                    .semantics { contentDescription = sliderDesc },
             )
             FilledTonalIconButton(
                 onClick = { onValueChange((value + 1).coerceAtMost(range.last)) },
                 modifier = Modifier.size(Size.touchMin),
             ) {
-                Icon(Icons.Rounded.Add, contentDescription = "增加一分")
+                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.symptom_increase_one))
             }
         }
         Row(
@@ -134,11 +138,11 @@ fun DestructiveAction(
                         onConfirm()
                     },
                 ) {
-                    Text("删除", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirming = false }) { Text("取消") }
+                TextButton(onClick = { confirming = false }) { Text(stringResource(R.string.common_cancel)) }
             },
         )
     }

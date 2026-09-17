@@ -42,7 +42,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.ExerciseLog
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.ExerciseEngine
@@ -74,7 +77,7 @@ fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
     var kbDetail by remember { mutableStateOf<com.ashkb.app.data.entity.KbEntry?>(null) }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenTopBar(title = "今日运动", onBack = onBack)
+        ScreenTopBar(title = stringResource(R.string.exercise_today_title), onBack = onBack)
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -90,7 +93,7 @@ fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
                     icon = Icons.Rounded.Block,
                     title = card.entry.title,
                     body = "L3 · ${card.movements.joinToString("、")}｜${card.hint}",
-                    actionLabel = "查看条目",
+                    actionLabel = stringResource(R.string.knowledge_view_entry),
                     onAction = { kbDetail = card.entry },
                 )
             }
@@ -104,8 +107,8 @@ fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
             if (pending.isNotEmpty()) {
                 item {
                     SectionCard(
-                        title = "昨日运动反馈待填",
-                        subtitle = "填写后系统按「运动后 2 小时疼痛规则」（exc-010）判读是否需要减量",
+                        title = stringResource(R.string.exercise_feedback_pending),
+                        subtitle = stringResource(R.string.exercise_pain_rule_note),
                         container = StatusTone.Warning.container(),
                     ) {
                         DividerList(pending, key = { it.id }) { log ->
@@ -114,7 +117,7 @@ fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(1f),
                             )
-                            OutlinedButton(onClick = { feedbackTarget = log }) { Text("填反馈") }
+                            OutlinedButton(onClick = { feedbackTarget = log }) { Text(stringResource(R.string.exercise_fill_feedback)) }
                         }
                     }
                 }
@@ -123,13 +126,13 @@ fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
             // ---- 今日已打卡 ----
             if (todayLogs.isNotEmpty()) {
                 item {
-                    SectionCard(title = "今日已打卡 ${todayLogs.size} 项") {
+                    SectionCard(title = stringResource(R.string.exercise_today_done, todayLogs.size)) {
                         DividerList(todayLogs, key = { it.id }) { log ->
                             Text(
                                 buildString {
                                     append(log.excName)
-                                    log.durationMin?.let { append(" · $it 分钟") }
-                                    if (log.fbPainChange != null) append(" · 已反馈")
+                                    log.durationMin?.let { append(stringResource(R.string.exercise_minutes_suffix, it)) }
+                                    if (log.fbPainChange != null) append(stringResource(R.string.exercise_feedback_done_suffix))
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -137,7 +140,7 @@ fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
                             )
                             Icon(
                                 imageVector = Icons.Rounded.CheckCircle,
-                                contentDescription = "已完成",
+                                contentDescription = stringResource(R.string.common_completed),
                                 modifier = Modifier.size(Size.iconSm),
                                 tint = StatusTone.Success.accent(),
                             )
@@ -151,15 +154,15 @@ fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
                 item {
                     EmptyState(
                         icon = Icons.Rounded.Schedule,
-                        title = "今日没有推荐运动",
-                        body = "完善健康档案中的病情分期后，会按 R27 矩阵生成当日处方",
+                        title = stringResource(R.string.exercise_none_today),
+                        body = stringResource(R.string.exercise_no_stage_hint),
                     )
                 }
             } else {
                 item {
-                    Text("今日处方", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.exercise_today_prescription), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "按 R27 矩阵（L1/L2/L3 × 活动期/缓解期）过滤生成",
+                        stringResource(R.string.exercise_filter_rule_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -227,15 +230,15 @@ private fun PrescriptionHero(ui: com.ashkb.app.ui.exercise.ExerciseUiState, yest
             ) {
                 Text(
                     when (ui.stage) {
-                        "stable" -> "缓解期处方"
-                        "active" -> "活动期处方（保守过滤已生效）"
-                        else -> "分期未设置（按活动期保守过滤）"
+                        "stable" -> stringResource(R.string.exercise_stable_prescription)
+                        "active" -> stringResource(R.string.exercise_active_prescription)
+                        else -> stringResource(R.string.stage_not_set_filtered)
                     },
                     style = MaterialTheme.typography.labelLarge,
                     color = fg,
                 )
                 Text(
-                    if (ui.plan.isEmpty()) "今日暂无推荐运动"
+                    if (ui.plan.isEmpty()) stringResource(R.string.exercise_no_recommendation)
                     else "今日适合：${ui.plan.take(2).joinToString("、") { it.entry.title }}",
                     style = MaterialTheme.typography.headlineMedium,
                     color = fg,
@@ -244,8 +247,8 @@ private fun PrescriptionHero(ui: com.ashkb.app.ui.exercise.ExerciseUiState, yest
                 )
                 Text(
                     buildString {
-                        append(if (ui.stage == "stable") "缓解期：L1/L2 按指南剂量渐进；L3 黑榜仍拦截。" else "活动期：L1 轻柔项为主，L2 多数暂停或减量，L3 拦截。")
-                        if (ui.cervicalInvolved) append("颈椎受累已标记：泳姿与颈部动作条目自动收紧。")
+                        append(if (ui.stage == "stable") stringResource(R.string.exercise_stable_rule_note) else stringResource(R.string.exercise_active_rule_note))
+                        if (ui.cervicalInvolved) append(stringResource(R.string.exercise_cervical_marked))
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = fg,
@@ -258,8 +261,8 @@ private fun PrescriptionHero(ui: com.ashkb.app.ui.exercise.ExerciseUiState, yest
             Box(Modifier.weight(1f)) {
                 val pain = yesterday?.painScore
                 StatTile(
-                    label = "昨日疼痛",
-                    value = pain?.toString() ?: "未记录",
+                    label = stringResource(R.string.symptom_yesterday_pain),
+                    value = pain?.toString() ?: stringResource(R.string.common_not_recorded),
                     unit = pain?.let { "/ 10" },
                     tone = when {
                         pain == null -> StatusTone.Neutral
@@ -271,19 +274,19 @@ private fun PrescriptionHero(ui: com.ashkb.app.ui.exercise.ExerciseUiState, yest
             }
             Box(Modifier.weight(1f)) {
                 StatTile(
-                    label = "昨日晨僵",
-                    value = yesterday?.morningStiffnessMin?.toString() ?: "未记录",
-                    unit = yesterday?.morningStiffnessMin?.let { "分" },
+                    label = stringResource(R.string.symptom_yesterday_stiffness),
+                    value = yesterday?.morningStiffnessMin?.toString() ?: stringResource(R.string.common_not_recorded),
+                    unit = yesterday?.morningStiffnessMin?.let { stringResource(R.string.common_minute_unit) },
                 )
             }
             Box(Modifier.weight(1f)) {
                 val feverish = yesterday?.feverish == true
                 StatTile(
-                    label = "昨日体温",
+                    label = stringResource(R.string.symptom_yesterday_fever),
                     value = when {
                         yesterday?.feverTemp != null -> "%.1f".format(yesterday.feverTemp)
-                        feverish -> "自觉发热"
-                        else -> "无热"
+                        feverish -> stringResource(R.string.symptom_fever_self)
+                        else -> stringResource(R.string.symptom_no_fever)
                     },
                     unit = yesterday?.feverTemp?.let { "℃" },
                     tone = if (feverish) StatusTone.Danger else StatusTone.Neutral,
@@ -293,8 +296,9 @@ private fun PrescriptionHero(ui: com.ashkb.app.ui.exercise.ExerciseUiState, yest
     }
 }
 
+@Composable
 private fun verdictLabel(v: String) = when (v) {
-    "recommend" -> "推荐"; "allow" -> "允许"; "downgrade" -> "减量执行"; "conditional" -> "条件允许"; else -> v
+    "recommend" -> stringResource(R.string.common_recommended); "allow" -> stringResource(R.string.permission_allowed); "downgrade" -> stringResource(R.string.exercise_reduce_action); "conditional" -> stringResource(R.string.knowledge_condition_allowed); else -> v
 }
 
 private fun verdictTone(v: String) = when (v) {
@@ -310,16 +314,17 @@ private fun PlanCard(
     onCheckIn: () -> Unit,
     onDetail: () -> Unit,
 ) {
+    val verdict = verdictLabel(card.verdict)
     SectionCard(
         title = card.entry.title,
         subtitle = buildString {
-            append("${card.grade} · ${verdictLabel(card.verdict)}")
+            append("${card.grade} · $verdict")
             if (card.movements.isNotEmpty()) append(" · ${card.movements.joinToString("、")}")
         },
         action = {
             StatusChip(
                 text = when (card.verdict) {
-                    "recommend" -> "推荐"; "downgrade" -> "减量"; "conditional" -> "条件"; else -> "允许"
+                    "recommend" -> stringResource(R.string.common_recommended); "downgrade" -> stringResource(R.string.exercise_reduce_amount); "conditional" -> stringResource(R.string.common_condition); else -> stringResource(R.string.permission_allowed)
                 },
                 tone = verdictTone(card.verdict),
             )
@@ -328,8 +333,8 @@ private fun PlanCard(
         Text(card.hint, style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(Spacing.sm))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Button(onClick = onCheckIn) { Text("打卡") }
-            OutlinedButton(onClick = onDetail) { Text("详情") }
+            Button(onClick = onCheckIn) { Text(stringResource(R.string.exercise_checkin_short)) }
+            OutlinedButton(onClick = onDetail) { Text(stringResource(R.string.common_details)) }
         }
     }
 }
@@ -351,36 +356,36 @@ private fun CheckInDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("打卡：$excName") },
+        title = { Text(stringResource(R.string.exercise_checkin_title, excName)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 OutlinedTextField(
                     value = duration,
                     onValueChange = { duration = it.filter { c -> c.isDigit() }.take(3) },
-                    label = { Text("时长（分钟）") },
+                    label = { Text(stringResource(R.string.exercise_duration_field)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
                 Text(
-                    "强度自测（说话试验：能自如说话=中等，有点费力=高）",
+                    stringResource(R.string.exercise_intensity_self_test),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    listOf("low" to "低", "moderate" to "中", "high" to "高").forEach { (k, l) ->
+                    listOf("low" to stringResource(R.string.severity_low), "moderate" to stringResource(R.string.severity_moderate), "high" to stringResource(R.string.severity_high)).forEach { (k, l) ->
                         FilterChip(selected = intensity == k, onClick = { intensity = k }, label = { Text(l) })
                     }
                 }
                 OutlinedTextField(
                     value = note, onValueChange = { note = it },
-                    label = { Text("备注（可选）") }, modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.common_notes_optional)) }, modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(duration.toIntOrNull(), intensity, note.ifBlank { null }) }) { Text("完成打卡") }
+            TextButton(onClick = { onConfirm(duration.toIntOrNull(), intensity, note.ifBlank { null }) }) { Text(stringResource(R.string.exercise_checkin_done)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
     )
 }
 
@@ -407,17 +412,17 @@ private fun FeedbackSheet(
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            Text("昨日运动后感受：$excName", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.exercise_feedback_title, excName), style = MaterialTheme.typography.titleLarge)
             Text(
-                "与不运动的平常日相比",
+                stringResource(R.string.exercise_compare_baseline),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            FeedbackRadio("运动后疼痛", pain) { pain = it }
-            FeedbackRadio("次日晨僵", stiffness) { stiffness = it }
+            FeedbackRadio(stringResource(R.string.exercise_post_pain), pain) { pain = it }
+            FeedbackRadio(stringResource(R.string.exercise_next_day_stiffness), stiffness) { stiffness = it }
 
             Text(
-                "加重时：更像哪种？",
+                stringResource(R.string.symptom_worse_pattern_label),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -427,16 +432,16 @@ private fun FeedbackSheet(
             ) {
                 FilterChip(
                     selected = soreness == true, onClick = { soreness = true },
-                    label = { Text("肌肉酸痛（延迟性）") },
+                    label = { Text(stringResource(R.string.exercise_dom)) },
                 )
                 FilterChip(
                     selected = soreness == false, onClick = { soreness = false },
-                    label = { Text("关节 / 脊柱炎症感") },
+                    label = { Text(stringResource(R.string.symptom_inflammation)) },
                 )
             }
             OutlinedTextField(
                 value = note, onValueChange = { note = it },
-                label = { Text("备注（可选）") }, modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.common_notes_optional)) }, modifier = Modifier.fillMaxWidth(),
             )
             if (pain != null && stiffness != null) {
                 Text(
@@ -451,7 +456,7 @@ private fun FeedbackSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = Size.touchMin),
-            ) { Text("保存反馈") }
+            ) { Text(stringResource(R.string.exercise_save_feedback)) }
         }
     }
 }
@@ -465,7 +470,7 @@ private fun FeedbackRadio(label: String, value: String?, onChange: (String) -> U
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
-            listOf("better" to "好转", "same" to "不变", "worse" to "加重").forEach { (k, l) ->
+            listOf("better" to stringResource(R.string.symptom_outcome_improved), "same" to stringResource(R.string.trend_flat_short), "worse" to stringResource(R.string.symptom_worse)).forEach { (k, l) ->
                 FilterChip(selected = value == k, onClick = { onChange(k) }, label = { Text(l) })
             }
         }

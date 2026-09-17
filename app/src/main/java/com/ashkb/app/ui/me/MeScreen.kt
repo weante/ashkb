@@ -31,6 +31,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+
+import com.ashkb.app.R
 import com.ashkb.app.domain.Labels
 import com.ashkb.app.ui.components.KeyValueRow
 import com.ashkb.app.ui.components.NavRow
@@ -60,32 +63,32 @@ fun MeScreen(
         // ---- 档案卡 ----
         item {
             SectionCard(
-                title = "健康档案",
-                subtitle = if (profile == null) "尚未建档" else null,
+                title = stringResource(R.string.profile_health_record),
+                subtitle = if (profile == null) stringResource(R.string.profile_not_built_short) else null,
                 action = {
                     if (profile != null) {
-                        TextButton(onClick = onEditProfile) { Text("编辑") }
+                        TextButton(onClick = onEditProfile) { Text(stringResource(R.string.common_edit)) }
                     }
                 },
             ) {
                 val p = profile
                 if (p == null) {
                     Text(
-                        "过敏史、血型与用药史是禁忌检查与紧急卡的数据基础",
+                        stringResource(R.string.profile_data_note),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(Spacing.md))
-                    Button(onClick = onEditProfile) { Text("开始建档") }
+                    Button(onClick = onEditProfile) { Text(stringResource(R.string.profile_start_building)) }
                 } else {
-                    KeyValueRow("称呼", p.displayName)
-                    KeyValueRow("诊断", p.diagnosis)
-                    KeyValueRow("确诊年份", p.diagnoseYear?.toString() ?: "未填")
+                    KeyValueRow(stringResource(R.string.profile_display_name), p.displayName)
+                    KeyValueRow(stringResource(R.string.profile_diagnosis), p.diagnosis)
+                    KeyValueRow(stringResource(R.string.profile_diagnosis_year), p.diagnoseYear?.toString() ?: stringResource(R.string.common_unfilled))
                     KeyValueRow("HLA-B27", Labels.hlaB27(p.hlaB27))
-                    KeyValueRow("病情分期", stageLabel(p.diseaseStage))
-                    KeyValueRow("脊柱活动度", spineLabel(p.spineMobility))
-                    KeyValueRow("过敏史", p.allergies ?: "未填")
-                    KeyValueRow("血型", p.emergencyBloodType ?: "未填")
+                    KeyValueRow(stringResource(R.string.profile_disease_stage), stageLabel(p.diseaseStage))
+                    KeyValueRow(stringResource(R.string.profile_spine_mobility), spineLabel(p.spineMobility))
+                    KeyValueRow(stringResource(R.string.profile_allergy_history), p.allergies ?: stringResource(R.string.common_unfilled))
+                    KeyValueRow(stringResource(R.string.profile_blood_type), p.emergencyBloodType ?: stringResource(R.string.common_unfilled))
                 }
             }
         }
@@ -94,11 +97,11 @@ fun MeScreen(
         item {
             NavRow(
                 icon = Icons.Rounded.Medication,
-                title = "药单管理",
+                title = stringResource(R.string.med_manage_title),
                 subtitle = if (meds.isEmpty()) {
-                    "尚未添加药品"
+                    stringResource(R.string.med_not_added)
                 } else {
-                    "在用 ${meds.size} 种 · " + meds.joinToString("、") { it.name }
+                    stringResource(R.string.me_in_use_prefix, meds.size) + meds.joinToString("、") { it.name }
                 },
                 badge = {
                     if (meds.isNotEmpty()) {
@@ -116,8 +119,8 @@ fun MeScreen(
         item {
             NavRow(
                 icon = Icons.Rounded.Backup,
-                title = "备份与数据",
-                subtitle = "全量加密备份 · 恢复自证 · WebDAV 远程备份 · 档案 JSON 导出导入",
+                title = stringResource(R.string.me_backup_section),
+                subtitle = stringResource(R.string.backup_section_subtitle),
                 onClick = onOpenBackup,
             )
         }
@@ -126,16 +129,18 @@ fun MeScreen(
     }
 }
 
+@Composable
 private fun stageLabel(k: String?) = when (k) {
-    "active" -> "活动期（运动处方已保守过滤）"
-    "stable" -> "缓解期"
-    else -> "未设置（按活动期保守处理）"
+    "active" -> stringResource(R.string.stage_active_filtered)
+    "stable" -> stringResource(R.string.stage_stable)
+    else -> stringResource(R.string.stage_not_set_conservative)
 }
 
+@Composable
 private fun spineLabel(k: String?) = when (k) {
-    "none" -> "无受限"; "mild" -> "轻度"
-    "moderate" -> "中度（颈椎受累）"; "severe" -> "重度（颈椎受累）"
-    else -> "未填"
+    "none" -> stringResource(R.string.profile_mobility_none); "mild" -> stringResource(R.string.severity_mild)
+    "moderate" -> stringResource(R.string.profile_mobility_moderate_cervical); "severe" -> stringResource(R.string.profile_mobility_severe_cervical)
+    else -> stringResource(R.string.common_unfilled)
 }
 
 @Composable
@@ -147,24 +152,24 @@ private fun ReminderSelfCheckCard() {
     val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     val exactOk = if (Build.VERSION.SDK_INT >= 31) am.canScheduleExactAlarms() else true
 
-    SectionCard(title = "提醒可靠性自检") {
-        CheckRow("通知权限", if (notifOk) "已授权" else "未授权——提醒将无法显示", notifOk)
-        CheckRow("精确闹钟", if (exactOk) "已允许——按分钟准时提醒" else "未允许——提醒可能有 15 分钟内偏差", exactOk)
+    SectionCard(title = stringResource(R.string.reminder_selfcheck_title)) {
+        CheckRow(stringResource(R.string.reminder_notification_permission), if (notifOk) stringResource(R.string.permission_granted) else stringResource(R.string.reminder_no_permission), notifOk)
+        CheckRow(stringResource(R.string.reminder_exact_alarm), if (exactOk) stringResource(R.string.reminder_exact_ok) else stringResource(R.string.reminder_no_exact), exactOk)
         Spacer(Modifier.height(Spacing.md))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             if (!exactOk && Build.VERSION.SDK_INT >= 31) {
                 OutlinedButton(onClick = {
                     context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-                }) { Text("申请精确闹钟") }
+                }) { Text(stringResource(R.string.reminder_request_exact_alarm)) }
             }
             OutlinedButton(onClick = {
                 context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
                     putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
                 })
-            }) { Text("通知设置") }
+            }) { Text(stringResource(R.string.reminder_notification_settings)) }
         }
         Text(
-            "提醒为本机系统通知，不依赖任何服务器。部分厂商系统可能限制后台——若提醒未响，请将本应用加入电池白名单。",
+            stringResource(R.string.reminder_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = Spacing.sm),
@@ -190,7 +195,7 @@ private fun CheckRow(label: String, desc: String, ok: Boolean) {
         }
         Icon(
             imageVector = if (ok) Icons.Rounded.CheckCircle else Icons.Rounded.ErrorOutline,
-            contentDescription = if (ok) "已通过" else "未通过",
+            contentDescription = if (ok) stringResource(R.string.common_passed) else stringResource(R.string.common_not_passed),
             modifier = Modifier.size(Size.iconMd),
             tint = if (ok) {
                 MaterialTheme.colorScheme.primary

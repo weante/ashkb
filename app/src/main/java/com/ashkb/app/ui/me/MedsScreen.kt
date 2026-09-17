@@ -34,6 +34,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.MedFrequency
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.StopReason
@@ -60,11 +63,11 @@ fun MedsScreen(
     Scaffold(
         topBar = {
             ScreenTopBar(
-                title = "药单管理",
+                title = stringResource(R.string.med_manage_title),
                 onBack = onBack,
                 actions = {
                     IconButton(onClick = onAdd, modifier = Modifier.size(Size.touchMin)) {
-                        Icon(Icons.Rounded.Add, contentDescription = "新增药品")
+                        Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.med_add_new))
                     }
                 },
             )
@@ -79,17 +82,17 @@ fun MedsScreen(
         ) {
             Spacer(Modifier.height(Spacing.md))
             if (meds.isEmpty()) {
-                SectionCard(title = "药单") {
+                SectionCard(title = stringResource(R.string.nav_meds)) {
                     EmptyState(
                         icon = Icons.Rounded.Medication,
-                        title = "还没有添加药品",
-                        body = "添加后，这里会生成每日打卡计划与用药提醒",
-                        actionLabel = "添加药品",
+                        title = stringResource(R.string.med_empty_hint),
+                        body = stringResource(R.string.med_add_plan_note),
+                        actionLabel = stringResource(R.string.med_add_medication),
                         onAction = onAdd,
                     )
                 }
             } else {
-                SectionCard(title = "在用药品（${meds.size}）") {
+                SectionCard(title = stringResource(R.string.me_meds_count, meds.size)) {
                     meds.forEachIndexed { index, med ->
                         MedRow(
                             med = med,
@@ -109,7 +112,7 @@ fun MedsScreen(
                 ) {
                     Icon(Icons.Rounded.Add, contentDescription = null)
                     Spacer(Modifier.width(Spacing.sm))
-                    Text("添加药品")
+                    Text(stringResource(R.string.med_add_medication))
                 }
             }
             Spacer(Modifier.height(Spacing.xxl))
@@ -146,17 +149,17 @@ private fun MedRow(med: Medication, onStop: () -> Unit) {
                 Text(
                     buildString {
                         append(MedFrequency.fromKey(med.frequency).label)
-                        if (med.route == "injection") append(" · 注射")
+                        if (med.route == "injection") append(stringResource(R.string.med_injection_suffix))
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (needsCheck) {
-                    StatusChip("核对待办", StatusTone.Warning, Icons.Rounded.WarningAmber)
+                    StatusChip(stringResource(R.string.med_verify_todo_tag), StatusTone.Warning, Icons.Rounded.WarningAmber)
                 }
             }
         }
-        TextButton(onClick = onStop) { Text("停用") }
+        TextButton(onClick = onStop) { Text(stringResource(R.string.med_deactivate)) }
     }
 }
 
@@ -173,10 +176,10 @@ private fun StopMedDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("停用 $medName") },
+        title = { Text(stringResource(R.string.me_med_disable, medName)) },
         text = {
             Column {
-                Text("请选择停用原因（将写入药单变更记录）", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.med_deactivate_reason_note), style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(Spacing.xs))
                 StopReason.entries.forEach { r ->
                     Row(
@@ -190,7 +193,7 @@ private fun StopMedDialog(
                 if (reason == StopReason.OTHER) {
                     OutlinedTextField(
                         value = note, onValueChange = { note = it },
-                        label = { Text("停用原因说明（必填）") },
+                        label = { Text(stringResource(R.string.med_deactivate_reason_field)) },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -205,7 +208,7 @@ private fun StopMedDialog(
                 if (isBiologic && reason == StopReason.SELF_STOPPED) {
                     Spacer(Modifier.height(Spacing.xs))
                     Text(
-                        "生物制剂自行停药可能导致病情反弹，请务必先咨询风湿科医生。",
+                        stringResource(R.string.med_bio_stop_warning),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -216,8 +219,8 @@ private fun StopMedDialog(
             TextButton(
                 onClick = { onConfirm(reason.name.lowercase(), note.ifBlank { null }) },
                 enabled = reason != StopReason.OTHER || note.isNotBlank(),
-            ) { Text("停用并记录") }
+            ) { Text(stringResource(R.string.med_deactivate_and_record)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
     )
 }

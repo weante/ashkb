@@ -73,13 +73,22 @@ object VaultCipher {
         if (headerLen <= 0 || 12 + headerLen >= file.size) throw VaultException("文件头长度非法")
         val headerBytes = file.copyOfRange(12, 12 + headerLen)
         val ct = file.copyOfRange(12 + headerLen, file.size)
-        val header = JSONObject(String(headerBytes, Charsets.UTF_8))
+        val header = try {
+            JSONObject(String(headerBytes, Charsets.UTF_8))
+        } catch (e: Exception) {
+            throw VaultException("文件头损坏", e)
+        }
         if (header.optString("cipher") != "aes-256-gcm") throw VaultException("不支持的加密算法 ${header.optString("cipher")}")
         val kdf = header.optString("kdf")
         if (kdf != KDF) throw VaultException("不支持的 KDF：$kdf")
-        val salt = Base64.getDecoder().decode(header.getString("salt"))
-        val iv = Base64.getDecoder().decode(header.getString("iv"))
-        val iter = header.getInt("iter")
+        val salt: ByteArray; val iv: ByteArray; val iter: Int
+        try {
+            salt = Base64.getDecoder().decode(header.getString("salt"))
+            iv = Base64.getDecoder().decode(header.getString("iv"))
+            iter = header.getInt("iter")
+        } catch (e: Exception) {
+            throw VaultException("文件头损坏", e)
+        }
         val key = deriveKey(password, salt, iter)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv))

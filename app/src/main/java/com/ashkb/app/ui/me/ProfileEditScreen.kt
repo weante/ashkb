@@ -25,6 +25,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.ui.components.ScreenTopBar
@@ -42,8 +45,9 @@ fun ProfileEditScreen(
     onSave: (Profile) -> Unit,
     onBack: () -> Unit,
 ) {
+    val defaultDiagnosis = stringResource(R.string.profile_diag_axial_spa)
     var name by remember { mutableStateOf(initial?.displayName ?: "") }
-    var diagnosis by remember { mutableStateOf(initial?.diagnosis ?: "中轴型脊柱关节炎") }
+    var diagnosis by remember { mutableStateOf(initial?.diagnosis ?: defaultDiagnosis) }
     var year by remember { mutableStateOf(initial?.diagnoseYear?.toString() ?: "") }
     var hla by remember { mutableStateOf(initial?.hlaB27 ?: "unknown") }
     var allergies by remember {
@@ -61,7 +65,7 @@ fun ProfileEditScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             ScreenTopBar(
-                title = if (initial == null) "健康档案建档" else "编辑健康档案",
+                title = if (initial == null) stringResource(R.string.profile_build_title) else stringResource(R.string.profile_edit_action),
                 onBack = onBack,
             )
         },
@@ -74,7 +78,7 @@ fun ProfileEditScreen(
                     OutlinedButton(
                         onClick = onBack,
                         modifier = Modifier.weight(1f).heightIn(min = Size.touchMin),
-                    ) { Text("取消") }
+                    ) { Text(stringResource(R.string.common_cancel)) }
                     Button(
                         onClick = {
                             if (name.isBlank()) return@Button
@@ -96,7 +100,7 @@ fun ProfileEditScreen(
                             )
                         },
                         modifier = Modifier.weight(1f).heightIn(min = Size.touchMin),
-                    ) { Text("保存") }
+                    ) { Text(stringResource(R.string.common_save)) }
                 }
             }
         },
@@ -111,66 +115,66 @@ fun ProfileEditScreen(
         ) {
             OutlinedTextField(
                 name, { name = it },
-                label = { Text("称呼（必填）") },
+                label = { Text(stringResource(R.string.profile_display_name_required)) },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 diagnosis, { diagnosis = it },
-                label = { Text("诊断（必填）") },
+                label = { Text(stringResource(R.string.profile_diag_required)) },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 year, { year = it.filter { c -> c.isDigit() }.take(4) },
-                label = { Text("确诊年份") },
+                label = { Text(stringResource(R.string.profile_diagnosis_year)) },
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                listOf("positive" to "阳性", "negative" to "阴性", "unknown" to "未知").forEach { (k, l) ->
+                listOf("positive" to stringResource(R.string.checkup_positive), "negative" to stringResource(R.string.checkup_negative), "unknown" to stringResource(R.string.common_unknown)).forEach { (k, l) ->
                     FilterChip(selected = hla == k, onClick = { hla = k }, label = { Text("B27 $l") })
                 }
             }
-            Text("病情分期（运动处方与预警灵敏度依据）", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.profile_stage_field_note), style = MaterialTheme.typography.labelMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 listOf(
-                    "active" to "活动期（疼痛晨僵加重）",
-                    "stable" to "缓解期",
-                    "unknown" to "不确定",
+                    "active" to stringResource(R.string.stage_active_with_note),
+                    "stable" to stringResource(R.string.stage_stable),
+                    "unknown" to stringResource(R.string.common_uncertain),
                 ).forEach { (k, l) ->
                     FilterChip(selected = stage == k, onClick = { stage = k }, label = { Text(l) })
                 }
             }
-            Text("脊柱活动度受限程度", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.profile_mobility_degree), style = MaterialTheme.typography.labelMedium)
             Text(
-                "颈椎受累（中度以上）将自动收紧泳姿与颈部动作条目",
+                stringResource(R.string.profile_cervical_note),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 listOf(
-                    "none" to "无受限", "mild" to "轻度",
-                    "moderate" to "中度", "severe" to "重度",
+                    "none" to stringResource(R.string.profile_mobility_none), "mild" to stringResource(R.string.severity_mild),
+                    "moderate" to stringResource(R.string.profile_mobility_moderate), "severe" to stringResource(R.string.severity_severe),
                 ).forEach { (k, l) ->
                     FilterChip(selected = spine == k, onClick = { spine = k }, label = { Text(l) })
                 }
             }
             OutlinedTextField(
                 allergies, { allergies = it },
-                label = { Text("过敏史（逗号分隔，如：青霉素,磺胺）") },
+                label = { Text(stringResource(R.string.profile_allergy_field)) },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 bloodType, { bloodType = it },
-                label = { Text("血型（紧急卡用，如 A+）") },
+                label = { Text(stringResource(R.string.profile_blood_field)) },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 comorbid, { comorbid = it },
-                label = { Text("合并症（逗号分隔，如：葡萄膜炎史,骨质疏松）") },
+                label = { Text(stringResource(R.string.profile_comorbidity_field)) },
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                "档案数据仅存本机；血型与过敏史将用于紧急信息卡。" +
-                    "分期可随病情变化随时更新——运动处方即时重算。",
+                stringResource(R.string.profile_local_data_note) +
+                    stringResource(R.string.stage_update_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

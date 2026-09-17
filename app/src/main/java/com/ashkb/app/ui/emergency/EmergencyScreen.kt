@@ -54,8 +54,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.EmergencyContact
 import com.ashkb.app.data.entity.EmergencyEvent
 import com.ashkb.app.data.entity.EmergencyScene
@@ -78,7 +81,7 @@ import java.time.LocalDate
 
 private fun Context.dial(phone: String) {
     runCatching { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))) }
-        .onFailure { GlobalMessages.post("无法打开拨号面板：${it.message}") }
+        .onFailure { GlobalMessages.post(getString(R.string.emergency_dial_fail, it.message)) }
 }
 
 /**
@@ -125,12 +128,12 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                     modifier = Modifier.size(Size.iconLg),
                 )
                 Spacer(Modifier.width(Spacing.sm))
-                Text("120 急救", style = MaterialTheme.typography.headlineSmall)
+                Text(stringResource(R.string.emergency_call_120), style = MaterialTheme.typography.headlineSmall)
             }
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            ScreenTopBar(title = "紧急卡", onBack = onBack)
+            ScreenTopBar(title = stringResource(R.string.emergency_card_title), onBack = onBack)
 
             LazyColumn(
                 Modifier.fillMaxSize(),
@@ -147,7 +150,7 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                         icon = Icons.Rounded.WarningAmber,
                         title = card.title,
                         body = card.summary,
-                        actionLabel = "查看详情",
+                        actionLabel = stringResource(R.string.common_view_details),
                         onAction = { selectedCard = card },
                         titleStyle = MaterialTheme.typography.titleLarge,
                     )
@@ -156,15 +159,15 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                 // ---- 紧急联系人 ----
                 item {
                     SectionCard(
-                        title = "紧急联系人",
-                        subtitle = "一键拨号，按钮比普通按钮大",
+                        title = stringResource(R.string.emergency_contact_title),
+                        subtitle = stringResource(R.string.emergency_call_a11y),
                         action = {
-                            TextButton(onClick = { showContactForm = true }) { Text("添加") }
+                            TextButton(onClick = { showContactForm = true }) { Text(stringResource(R.string.common_add)) }
                         },
                     ) {
                         if (contacts.isEmpty()) {
                             Text(
-                                "尚未添加紧急联系人",
+                                stringResource(R.string.emergency_no_contacts),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -203,9 +206,10 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                 // ---- 个人信息（供急救人员参考）----
                 item {
                     SectionCard(
-                        title = "我的信息",
-                        subtitle = "供急救人员参考",
+                        title = stringResource(R.string.me_my_info),
+                        subtitle = stringResource(R.string.emergency_for_paramedics),
                         action = {
+                            val shareTitle = stringResource(R.string.emergency_share_card)
                             TextButton(
                                 onClick = {
                                     if (!exporting) {
@@ -214,7 +218,7 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                                             onReady = { intent ->
                                                 runCatching {
                                                     context.startActivity(
-                                                        Intent.createChooser(intent, "分享紧急卡")
+                                                        Intent.createChooser(intent, shareTitle)
                                                     )
                                                 }
                                                 exporting = false
@@ -234,20 +238,20 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                                     modifier = Modifier.size(Size.iconSm),
                                 )
                                 Spacer(Modifier.width(Spacing.xs))
-                                Text(if (exporting) "生成中" else "导出打印版")
+                                Text(if (exporting) stringResource(R.string.backup_generating) else stringResource(R.string.emergency_export_print))
                             }
                         },
                     ) {
                         profile?.let { p ->
-                            KeyValueRow("姓名", p.displayName)
-                            KeyValueRow("诊断", p.diagnosis)
+                            KeyValueRow(stringResource(R.string.profile_name), p.displayName)
+                            KeyValueRow(stringResource(R.string.profile_diagnosis), p.diagnosis)
                             KeyValueRow("HLA-B27", Labels.hlaB27(p.hlaB27))
                             p.allergies?.let {
-                                KeyValueRow("过敏史", it, valueTone = StatusTone.Danger)
+                                KeyValueRow(stringResource(R.string.profile_allergy_history), it, valueTone = StatusTone.Danger)
                             }
-                            p.emergencyBloodType?.let { KeyValueRow("血型", it) }
+                            p.emergencyBloodType?.let { KeyValueRow(stringResource(R.string.profile_blood_type), it) }
                         } ?: Text(
-                            "未建档",
+                            stringResource(R.string.profile_not_built),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -257,16 +261,16 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                 // ---- 紧急事件记录 ----
                 item {
                     SectionCard(
-                        title = "紧急事件记录",
+                        title = stringResource(R.string.emergency_events_title),
                         action = {
-                            TextButton(onClick = { showEventForm = true }) { Text("记录") }
+                            TextButton(onClick = { showEventForm = true }) { Text(stringResource(R.string.common_record)) }
                         },
                     ) {
                         if (events.isEmpty()) {
                             EmptyState(
                                 icon = Icons.Rounded.Schedule,
-                                title = "暂无紧急事件记录",
-                                body = "发热、感染、发作等事件会记录在这里",
+                                title = stringResource(R.string.emergency_events_empty),
+                                body = stringResource(R.string.symptom_events_empty_hint),
                             )
                         } else {
                             val shown = if (showAllEvents) events else events.take(3)
@@ -280,9 +284,9 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                                     )
                                 }
                                 if (e.resolvedDate != null) {
-                                    StatusChip("已转归", StatusTone.Success, Icons.Rounded.CheckCircle)
+                                    StatusChip(stringResource(R.string.symptom_outcome_done), StatusTone.Success, Icons.Rounded.CheckCircle)
                                 } else {
-                                    StatusChip("进行中", StatusTone.Danger, Icons.Rounded.Schedule)
+                                    StatusChip(stringResource(R.string.symptom_flare_ongoing), StatusTone.Danger, Icons.Rounded.Schedule)
                                 }
                             }
                             if (events.size > 3 && !showAllEvents) {
@@ -324,21 +328,21 @@ private fun ContactFormDialog(onSave: (EmergencyContact) -> Unit, onDismiss: () 
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("添加联系人") },
+        title = { Text(stringResource(R.string.emergency_add_contact)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 OutlinedTextField(
-                    name, { name = it }, label = { Text("姓名") }, singleLine = true,
+                    name, { name = it }, label = { Text(stringResource(R.string.profile_name)) }, singleLine = true,
                     isError = attempted && name.isBlank(),
-                    supportingText = { if (attempted && name.isBlank()) Text("必填") },
+                    supportingText = { if (attempted && name.isBlank()) Text(stringResource(R.string.common_required)) },
                 )
-                OutlinedTextField(relation, { relation = it }, label = { Text("关系") }, singleLine = true)
+                OutlinedTextField(relation, { relation = it }, label = { Text(stringResource(R.string.emergency_relation)) }, singleLine = true)
                 OutlinedTextField(
-                    phone, { phone = it }, label = { Text("电话") }, singleLine = true,
+                    phone, { phone = it }, label = { Text(stringResource(R.string.emergency_phone)) }, singleLine = true,
                     isError = attempted && phone.isBlank(),
-                    supportingText = { if (attempted && phone.isBlank()) Text("必填") },
+                    supportingText = { if (attempted && phone.isBlank()) Text(stringResource(R.string.common_required)) },
                 )
-                OutlinedTextField(hospital, { hospital = it }, label = { Text("医院（医生填写）") }, singleLine = true)
+                OutlinedTextField(hospital, { hospital = it }, label = { Text(stringResource(R.string.imaging_hospital_label)) }, singleLine = true)
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -348,7 +352,7 @@ private fun ContactFormDialog(onSave: (EmergencyContact) -> Unit, onDismiss: () 
                 ) {
                     Checkbox(checked = isEmergency, onCheckedChange = null)
                     Spacer(Modifier.width(Spacing.xs))
-                    Text("紧急联系人", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.emergency_contact_title), style = MaterialTheme.typography.bodyMedium)
                 }
                 Row(
                     Modifier
@@ -359,7 +363,7 @@ private fun ContactFormDialog(onSave: (EmergencyContact) -> Unit, onDismiss: () 
                 ) {
                     Checkbox(checked = isDoctor, onCheckedChange = null)
                     Spacer(Modifier.width(Spacing.xs))
-                    Text("主治医生", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.profile_primary_doctor), style = MaterialTheme.typography.bodyMedium)
                 }
             }
         },
@@ -381,9 +385,9 @@ private fun ContactFormDialog(onSave: (EmergencyContact) -> Unit, onDismiss: () 
                     }
                 },
                 enabled = name.isNotBlank() && phone.isNotBlank(),
-            ) { Text("保存") }
+            ) { Text(stringResource(R.string.common_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
     )
 }
 
@@ -416,9 +420,9 @@ private fun EmergencyEventSheet(
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            Text("记录紧急事件", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.emergency_record_event), style = MaterialTheme.typography.titleLarge)
 
-            Text("场景", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.emergency_scenario), style = MaterialTheme.typography.labelLarge)
             EmergencyScene.entries.forEach { s ->
                 Row(
                     Modifier
@@ -434,12 +438,12 @@ private fun EmergencyEventSheet(
             }
 
             OutlinedTextField(
-                date, { date = it }, label = { Text("日期") }, singleLine = true,
+                date, { date = it }, label = { Text(stringResource(R.string.common_date)) }, singleLine = true,
                 isError = attempted && !dateOk,
-                supportingText = { if (attempted && !dateOk) Text("日期格式 yyyy-MM-dd") },
+                supportingText = { if (attempted && !dateOk) Text(stringResource(R.string.common_date_format_hint2)) },
             )
-            OutlinedTextField(symptoms, { symptoms = it }, label = { Text("症状描述") })
-            OutlinedTextField(actions, { actions = it }, label = { Text("已采取措施") })
+            OutlinedTextField(symptoms, { symptoms = it }, label = { Text(stringResource(R.string.symptom_description)) })
+            OutlinedTextField(actions, { actions = it }, label = { Text(stringResource(R.string.emergency_actions_taken)) })
 
             Row(
                 Modifier
@@ -450,10 +454,10 @@ private fun EmergencyEventSheet(
             ) {
                 Checkbox(checked = hospitalVisit, onCheckedChange = null)
                 Spacer(Modifier.width(Spacing.xs))
-                Text("是否就医", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.emergency_seek_care), style = MaterialTheme.typography.bodyLarge)
             }
             if (hospitalVisit) {
-                OutlinedTextField(hospitalName, { hospitalName = it }, label = { Text("医院名称") }, singleLine = true)
+                OutlinedTextField(hospitalName, { hospitalName = it }, label = { Text(stringResource(R.string.checkup_hospital_field)) }, singleLine = true)
             }
 
             Row(
@@ -465,13 +469,13 @@ private fun EmergencyEventSheet(
             ) {
                 Checkbox(checked = resolved, onCheckedChange = null)
                 Spacer(Modifier.width(Spacing.xs))
-                Text("已转归 / 恢复", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.symptom_outcome_recovered), style = MaterialTheme.typography.bodyLarge)
             }
             if (resolved) {
-                OutlinedTextField(outcome, { outcome = it }, label = { Text("转归结果") }, singleLine = true)
+                OutlinedTextField(outcome, { outcome = it }, label = { Text(stringResource(R.string.symptom_outcome_label)) }, singleLine = true)
             }
 
-            OutlinedTextField(notes, { notes = it }, label = { Text("备注") })
+            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes)) })
 
             Button(
                 onClick = {
@@ -496,7 +500,7 @@ private fun EmergencyEventSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = Size.touchMin),
-            ) { Text("保存") }
+            ) { Text(stringResource(R.string.common_save)) }
         }
     }
 }

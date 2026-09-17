@@ -28,6 +28,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.components.SectionCard
@@ -55,7 +58,7 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     Column(Modifier.fillMaxSize()) {
-        ScreenTopBar(title = "症状与自评", onBack = onBack)
+        ScreenTopBar(title = stringResource(R.string.symptom_self_eval_section), onBack = onBack)
         LazyColumn(
             Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -98,20 +101,20 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("记录日期", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.common_record_date), style = MaterialTheme.typography.bodySmall)
                     FilterChip(
                         selected = isToday,
                         onClick = { vm.selectDate(vm.today) },
-                        label = { Text("今天") },
+                        label = { Text(stringResource(R.string.common_today)) },
                     )
                     FilterChip(
                         selected = !isToday,
                         onClick = { vm.selectDate(vm.today.minusDays(1)) },
-                        label = { Text("昨天（补写）") },
+                        label = { Text(stringResource(R.string.symptom_yesterday_fill)) },
                     )
                     if (!isToday) {
                         Text(
-                            "漏记可补写，已记可修改",
+                            stringResource(R.string.symptom_editable_hint),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -123,7 +126,7 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
             item {
                 SymptomFormCard(
                     existing = symptom,
-                    dateLabel = if (isToday) "今日" else "昨日",
+                    dateLabel = if (isToday) stringResource(R.string.today_tab) else stringResource(R.string.common_yesterday),
                     dateKey = selectedDate,
                     onSave = { f -> vm.saveSymptom(f.morningStiffnessMin, f.nightPain, f.painScore, f.feverish, f.feverTemp, f.eyeSymptom, f.neuroRedFlag, f.mood, f.sleep, f.fatigue, f.notes) },
                 )
@@ -131,9 +134,9 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
 
             // ---- BASDAI ----
             item {
-                SectionCard(title = "BASDAI 疾病活动度自评") {
+                SectionCard(title = stringResource(R.string.basdai_title)) {
                     Text(
-                        "6 题自评（0–10），总分 (Q1+Q2+Q3+Q4+(Q5+Q6)/2)/5。建议每周固定同日自评一次，就诊时给医生看趋势。",
+                        stringResource(R.string.basdai_intro_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -150,16 +153,16 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
                     Button(onClick = { showBasdai = true }) {
                         Text(
                             when {
-                                isToday && basdaiExisting == null -> "开始今日自评"
-                                isToday -> "修改今日自评"
-                                basdaiExisting == null -> "补写昨日自评"
-                                else -> "修改昨日自评"
+                                isToday && basdaiExisting == null -> stringResource(R.string.symptom_start_today_eval)
+                                isToday -> stringResource(R.string.symptom_edit_today_self)
+                                basdaiExisting == null -> stringResource(R.string.symptom_fill_yesterday_eval)
+                                else -> stringResource(R.string.symptom_edit_yesterday_eval)
                             }
                         )
                     }
                     Spacer(Modifier.height(Spacing.sm))
                     if (basdaiHistory.isEmpty()) {
-                        Text("尚无记录", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.common_no_records_yet), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         BasdaiList(basdaiHistory.take(8))
                     }
@@ -169,7 +172,7 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
             // ---- 发作历史 ----
             if (flareHistory.isNotEmpty()) {
                 item {
-                    SectionCard(title = "发作历史") {
+                    SectionCard(title = stringResource(R.string.symptom_flare_history)) {
                         FlareHistoryList(flareHistory.take(10))
                     }
                 }

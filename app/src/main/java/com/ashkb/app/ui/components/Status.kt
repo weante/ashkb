@@ -32,7 +32,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+
+import com.ashkb.app.R
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
@@ -143,7 +146,7 @@ fun AlertBanner(
                         IconButton(onClick = onDismiss, modifier = Modifier.size(Size.touchMin)) {
                             Icon(
                                 Icons.Rounded.Close,
-                                contentDescription = "关闭提示",
+                                contentDescription = stringResource(R.string.common_close_hint),
                                 modifier = Modifier.size(Size.iconSm),
                                 tint = fg,
                             )

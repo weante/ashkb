@@ -11,8 +11,12 @@ import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import kotlinx.serialization.Serializable
+
+import com.ashkb.app.R
 
 // ---- L1（底栏可见，无返回箭头）----
 @Serializable data object Today
@@ -42,10 +46,11 @@ class TopTab(
     val selectedIcon: ImageVector,
 )
 
-val TABS: List<TopTab> = listOf(
-    TopTab(Today, "今日", Icons.Outlined.CheckCircle, Icons.Rounded.CheckCircle),
-    TopTab(Health, "健康", Icons.Outlined.MonitorHeart, Icons.Rounded.MonitorHeart),
-    TopTab(Report, "报表", Icons.Outlined.Insights, Icons.Rounded.Insights),
-    TopTab(Knowledge, "知识", Icons.Outlined.MenuBook, Icons.Rounded.MenuBook),
-    TopTab(Me, "我的", Icons.Outlined.Person, Icons.Rounded.Person),
+@Composable
+fun TABS(): List<TopTab> = listOf(
+    TopTab(Today, stringResource(R.string.today_tab), Icons.Outlined.CheckCircle, Icons.Rounded.CheckCircle),
+    TopTab(Health, stringResource(R.string.me_health_section), Icons.Outlined.MonitorHeart, Icons.Rounded.MonitorHeart),
+    TopTab(Report, stringResource(R.string.report_tab), Icons.Outlined.Insights, Icons.Rounded.Insights),
+    TopTab(Knowledge, stringResource(R.string.knowledge_tab), Icons.Outlined.MenuBook, Icons.Rounded.MenuBook),
+    TopTab(Me, stringResource(R.string.nav_me), Icons.Outlined.Person, Icons.Rounded.Person),
 )

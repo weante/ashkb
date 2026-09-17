@@ -18,6 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.CheckupItem
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.data.entity.CheckupType
@@ -40,9 +43,9 @@ internal fun CheckupItemsList(items: List<CheckupItem>, onAdd: () -> Unit, onDea
     ) {
         if (items.isEmpty()) {
             item {
-                SectionCard(title = "暂无复诊项目") {
+                SectionCard(title = stringResource(R.string.checkup_items_empty)) {
                     Text(
-                        "添加周期性检查项目（如血常规、眼科年检），系统将自动追踪",
+                        stringResource(R.string.checkup_add_item_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -50,7 +53,7 @@ internal fun CheckupItemsList(items: List<CheckupItem>, onAdd: () -> Unit, onDea
                     Button(
                         onClick = onAdd,
                         modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                    ) { Text("添加项目") }
+                    ) { Text(stringResource(R.string.checkup_add_item)) }
                 }
             }
         } else {
@@ -59,14 +62,14 @@ internal fun CheckupItemsList(items: List<CheckupItem>, onAdd: () -> Unit, onDea
                     title = item.name,
                     subtitle = buildString {
                         append(CheckupType.fromKey(item.checkType).label)
-                        if (item.cycleDays != null) append(" · 每 ${item.cycleDays} 天")
-                        else append(" · 按需")
+                        if (item.cycleDays != null) append(stringResource(R.string.checkup_cycle_days_suffix, item.cycleDays))
+                        else append(stringResource(R.string.med_prn_suffix))
                     },
                     action = {
                         DestructiveAction(
-                            label = "停用",
-                            confirmTitle = "停用该项目？",
-                            confirmBody = "停用后不再追踪「${item.name}」，历史记录保留。",
+                            label = stringResource(R.string.med_deactivate),
+                            confirmTitle = stringResource(R.string.checkup_deactivate_title),
+                            confirmBody = stringResource(R.string.checkup_disable_confirm, item.name),
                             onConfirm = { onDeactivate(item.id) },
                         )
                     },
@@ -76,7 +79,7 @@ internal fun CheckupItemsList(items: List<CheckupItem>, onAdd: () -> Unit, onDea
                 OutlinedButton(
                     onClick = onAdd,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                ) { Text("添加项目") }
+                ) { Text(stringResource(R.string.checkup_add_item)) }
                 Spacer(Modifier.height(Spacing.xxl))
             }
         }
@@ -96,9 +99,9 @@ internal fun CheckupRecordsList(
     ) {
         if (records.isEmpty()) {
             item {
-                SectionCard(title = "暂无复诊记录") {
+                SectionCard(title = stringResource(R.string.checkup_records_empty)) {
                     Text(
-                        "记录复诊结果、化验指标，便于趋势追踪与就医回顾",
+                        stringResource(R.string.checkup_section_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -106,7 +109,7 @@ internal fun CheckupRecordsList(
                     Button(
                         onClick = onAdd,
                         modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                    ) { Text("记录复诊") }
+                    ) { Text(stringResource(R.string.checkup_record_visit)) }
                 }
             }
         } else {
@@ -116,7 +119,7 @@ internal fun CheckupRecordsList(
                     subtitle = CheckupType.fromKey(rec.checkType).label,
                     action = if (rec.checkType == "LAB") {
                         {
-                            TextButton(onClick = { onViewLab(rec) }) { Text("化验详情") }
+                            TextButton(onClick = { onViewLab(rec) }) { Text(stringResource(R.string.lab_detail_title)) }
                         }
                     } else {
                         null
@@ -125,17 +128,17 @@ internal fun CheckupRecordsList(
                     Text(rec.itemName, style = MaterialTheme.typography.bodyMedium)
                     rec.hospital?.let {
                         Text(
-                            "医院：$it",
+                            stringResource(R.string.checkup_hospital_line, it),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     rec.conclusion?.let {
-                        Text("结论：$it", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.checkup_conclusion_line, it), style = MaterialTheme.typography.bodySmall)
                     }
                     rec.nextDate?.let {
                         Text(
-                            "下次复诊：$it",
+                            stringResource(R.string.checkup_next_visit_line, it),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -146,7 +149,7 @@ internal fun CheckupRecordsList(
                 OutlinedButton(
                     onClick = onAdd,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                ) { Text("添加记录") }
+                ) { Text(stringResource(R.string.common_add_record)) }
                 Spacer(Modifier.height(Spacing.xxl))
             }
         }
@@ -162,9 +165,9 @@ internal fun VaccineList(vaccines: List<VaccineRecord>, onAdd: () -> Unit) {
     ) {
         if (vaccines.isEmpty()) {
             item {
-                SectionCard(title = "暂无疫苗记录") {
+                SectionCard(title = stringResource(R.string.vaccine_empty)) {
                     Text(
-                        "AS 患者使用生物制剂期间接种疫苗需谨慎——活疫苗务必先与医生确认",
+                        stringResource(R.string.vaccine_bio_warning),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -172,7 +175,7 @@ internal fun VaccineList(vaccines: List<VaccineRecord>, onAdd: () -> Unit) {
                     Button(
                         onClick = onAdd,
                         modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                    ) { Text("记录疫苗") }
+                    ) { Text(stringResource(R.string.vaccine_record_short)) }
                 }
             }
         } else {
@@ -181,7 +184,7 @@ internal fun VaccineList(vaccines: List<VaccineRecord>, onAdd: () -> Unit) {
                     title = vac.date,
                     subtitle = vac.vaccineName,
                     action = if (vac.vaccineType == "LIVE") {
-                        { StatusChip(text = "活疫苗", tone = StatusTone.Danger, icon = Icons.Rounded.WarningAmber) }
+                        { StatusChip(text = stringResource(R.string.vaccine_live), tone = StatusTone.Danger, icon = Icons.Rounded.WarningAmber) }
                     } else {
                         null
                     },
@@ -197,7 +200,7 @@ internal fun VaccineList(vaccines: List<VaccineRecord>, onAdd: () -> Unit) {
                     )
                     vac.nextDueDate?.let {
                         Text(
-                            "下次：$it",
+                            stringResource(R.string.checkup_next_short, it),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -208,7 +211,7 @@ internal fun VaccineList(vaccines: List<VaccineRecord>, onAdd: () -> Unit) {
                 OutlinedButton(
                     onClick = onAdd,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                ) { Text("添加记录") }
+                ) { Text(stringResource(R.string.common_add_record)) }
                 Spacer(Modifier.height(Spacing.xxl))
             }
         }
