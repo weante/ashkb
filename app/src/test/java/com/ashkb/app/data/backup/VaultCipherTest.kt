@@ -15,16 +15,18 @@ class VaultCipherTest {
 
     private val payload = """{"format":"ashkb-full","schema_version":5,"tables":{},"manifest":{}}"""
     private val pass = "correct-horse-battery".toCharArray()
+    // R7 后 schemaVersion 从 DB 派生（SupportSQLiteDatabase，纯 JVM 不可构造），此处为任意往返值
+    private val schema = 7
 
     private fun enc(pw: CharArray = pass): ByteArray =
-        VaultCipher.encrypt(pw, payload, BackupEngine.SCHEMA_VERSION, "2026-08-31T10:00:00")
+        VaultCipher.encrypt(pw, payload, schema, "2026-08-31T10:00:00")
 
     @Test
     fun `加解密往返一致`() {
         val file = enc()
         val d = VaultCipher.decrypt(pass, file)
         assertEquals(payload, d.payload)
-        assertEquals(BackupEngine.SCHEMA_VERSION, d.schemaVersion)
+        assertEquals(schema, d.schemaVersion)
         assertEquals("2026-08-31T10:00:00", d.createdAt)
     }
 

@@ -35,6 +35,9 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
     fun stopMedication(context: android.content.Context, med: Medication, reason: String, note: String?) =
         viewModelScope.launch {
             repo.stopMedication(med, reason, note)
+            // R6 治本：归档≠删除，rescheduleAll 只遍历活跃药、取消不到被停药的未来闹钟——
+            // 先单独取消该药全部闹钟（slotsFor 不查归档标志，request code 仍可算对），再重排活跃药
+            ReminderScheduler.cancelAllFuture(context, listOf(med))
             val list = com.ashkb.app.data.db.AppDatabase.get(context).medicationDao().listActive()
             ReminderScheduler.rescheduleAll(context, list)
         }

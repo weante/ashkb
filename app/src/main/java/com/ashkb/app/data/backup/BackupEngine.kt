@@ -17,7 +17,12 @@ object BackupEngine {
 
     class BackupException(msg: String, cause: Throwable? = null) : Exception(msg, cause)
 
-    const val SCHEMA_VERSION = 6
+    /**
+     * R7：备份 schema 标签直接取 Room DB 版本（PRAGMA user_version），随迁移自动演进——
+     * 此前是独立常量（停在 6），Room 升到 7 后未同步，标签失真。
+     */
+    fun schemaVersion(db: SupportSQLiteDatabase): Int =
+        db.query("PRAGMA user_version").use { c -> c.moveToFirst(); c.getInt(0) }
 
     /** 表清单：用户表（排除 Room 元数据 / 系统表），固定字典序保证备份文件确定性。 */
     fun tableNames(db: SupportSQLiteDatabase): List<String> =
@@ -57,7 +62,7 @@ object BackupEngine {
             }
             val payload = JSONObject().apply {
                 put("format", "ashkb-full")
-                put("schema_version", SCHEMA_VERSION)
+                put("schema_version", schemaVersion(db))
                 put("exported_at", nowIso)
                 put("tables", tablesJson)
                 put("manifest", manifest)
@@ -112,8 +117,9 @@ object BackupEngine {
         val root = JSONObject(payload)
         val schema = root.optInt("schema_version", 0)
         if (schema <= 0) throw BackupException("备份缺少 schema_version")
-        if (schema > SCHEMA_VERSION) throw BackupException(
-            "备份来自更高版本（schema $schema > 当前 $SCHEMA_VERSION），请先升级 APP")
+        val current = schemaVersion(db)
+        if (schema > current) throw BackupException(
+            "备份来自更高版本（schema $schema > 当前 $current），请先升级 APP")
         val expectedFormat = root.optString("format")
         if (expectedFormat != "ashkb-full") throw BackupException("备份格式不正确：$expectedFormat")
 

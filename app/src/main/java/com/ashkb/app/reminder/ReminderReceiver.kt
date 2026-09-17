@@ -37,6 +37,11 @@ class ReminderReceiver : BroadcastReceiver() {
             try {
                 val repo = app.medicationRepository
                 val med = repo.medicationById(medId) ?: return@launch
+                // R6 兜底：停药（归档）后不得再提醒——防停药路径之外任何来源残留的孤儿闹钟
+                if (med.isArchived) {
+                    NotificationHelper.cancel(context, medId, slotKey)
+                    return@launch
+                }
                 // 计划仍在今日复查：顺延 / 停用 / 改时刻后残留的旧闹钟静默取消
                 if (slotKey != null && com.ashkb.app.domain.ScheduleCalc
                         .slotsFor(med, java.time.LocalDate.now()).none { it.key == slotKey }

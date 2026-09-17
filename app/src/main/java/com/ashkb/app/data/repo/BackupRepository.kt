@@ -87,7 +87,7 @@ class BackupRepository(private val context: Context) {
     /** 全量加密备份到本机（协议 §3 全量导出：ashkb-YYYYMMDD.ashkb）。 */
     suspend fun backupLocal(password: CharArray): BackupOutcome = withContext(Dispatchers.IO) {
         val exported = BackupEngine.export(supportDb(), nowIso())
-        val bytes = VaultCipher.encrypt(password, exported.payload, BackupEngine.SCHEMA_VERSION, nowIso())
+        val bytes = VaultCipher.encrypt(password, exported.payload, BackupEngine.schemaVersion(supportDb()), nowIso())
         val dir = File(context.filesDir, "backups").apply { mkdirs() }
         // 同日多次备份保留时分秒后缀
         val name = "ashkb-${LocalDate.now()}" +
@@ -108,7 +108,7 @@ class BackupRepository(private val context: Context) {
         if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
         val client = WebDavClient(url, user, pass)
         val exported = BackupEngine.export(supportDb(), nowIso())
-        val bytes = VaultCipher.encrypt(password, exported.payload, BackupEngine.SCHEMA_VERSION, nowIso())
+        val bytes = VaultCipher.encrypt(password, exported.payload, BackupEngine.schemaVersion(supportDb()), nowIso())
         val name = "ashkb-backup-${LocalDate.now()}.ashkb"
         try {
             val upMsg = client.upload(name, bytes)
@@ -136,7 +136,7 @@ class BackupRepository(private val context: Context) {
             val d = VaultCipher.decrypt(password, bytes)
             val root = JSONObject(d.payload)
             if (root.optString("format") != "ashkb-full") throw BackupEngine.BackupException("备份格式不正确")
-            if (root.optInt("schema_version", 0) > BackupEngine.SCHEMA_VERSION)
+            if (root.optInt("schema_version", 0) > BackupEngine.schemaVersion(supportDb()))
                 throw BackupEngine.BackupException("备份 schema 高于当前 APP 版本，请先升级")
             // 文件内自校验：payload 行重新序列化后与 manifest 比对
             val manifest = root.getJSONObject("manifest")
@@ -167,7 +167,7 @@ class BackupRepository(private val context: Context) {
             // 1. pre-restore 快照（退路）
             val snapshot = BackupEngine.export(supportDb(), nowIso())
             val snapBytes = VaultCipher.encrypt(
-                snapshotPassword, snapshot.payload, BackupEngine.SCHEMA_VERSION, nowIso())
+                snapshotPassword, snapshot.payload, BackupEngine.schemaVersion(supportDb()), nowIso())
             val dir = File(context.filesDir, "backups").apply { mkdirs() }
             val snapFile = dir.resolve("pre-restore-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))}.ashkb")
             snapFile.writeBytes(snapBytes)
@@ -187,39 +187,55 @@ class BackupRepository(private val context: Context) {
 
     data class DrillReport(
         val rowTotal: Int, val tableCount: Int,
-        val roundtripOk: Boolean,   // 演练后库与演练前逐字节一致
+        val roundtripOk: Boolean,   // 副本演练前后逐字节一致（生产库全程零写入）
         val detail: String,
     )
 
     /**
-     * 一键恢复演练：导出 → 加密 → 解密 → 覆盖恢复 → 双校验 → 复核导出一致。
-     * 全程内存态、可逆（恢复写入的正是刚导出的当前数据）；
-     * 演练口令随机即弃，不落盘——证明的是加密链路 + 恢复链路本身可用。
-     * 台账登记为 DRILL 类型。
+     * 一键恢复演练（R5 方案A，协议 §6 旁路模式）：生产库先 WAL checkpoint 再整库复制副本，
+     * 导出 → 加密 → 解密 → 恢复 → 双校验 → 复核导出一致，全程在副本上跑，生产库零写入。
+     * 旧实现对生产库真实 DELETE+重插——导出→写回窗口内通知栏打卡 / 闹钟 / BootReceiver
+     * 的任何写入都会被抹掉，且双快照都不含该行（丢数据、演练还报成功）。
+     * 演练口令随机即弃，不落盘；副本用后即删；台账照旧登记 DRILL。
      */
     suspend fun drill(): DrillReport = withContext(Dispatchers.IO) {
         val now = nowIso()
-        // 1. 导出当前全库
-        val before = BackupEngine.export(supportDb(), now)
-        // 2. 加密 → 解密（证明加密链路）
-        val drillPass = "drill-${java.util.UUID.randomUUID()}"
-        val bytes = VaultCipher.encrypt(drillPass.toCharArray(), before.payload, BackupEngine.SCHEMA_VERSION, now)
-        val decrypted = VaultCipher.decrypt(drillPass.toCharArray(), bytes)
-        // 3. 恢复写入（写入的即刚导出的当前数据——可逆）+ 双校验
-        val verify = BackupEngine.restore(supportDb(), decrypted.payload)
-        // 4. 复核：重新导出与演练前逐字节比对（此时尚未写台账行，故应严格一致）
-        val after = BackupEngine.export(supportDb(), now)
-        val roundtripOk = before.payload == after.payload
-        val detail = buildString {
-            append("加密链路✓ 解密✓ 恢复双校验${if (verify.rowsOk) "✓" else "✗"}" +
-                " 复核一致${if (roundtripOk) "✓" else "✗"}；" +
-                "${before.tableCount} 表 ${before.rowTotal} 行")
-            if (!verify.rowsOk) append("；异常：${verify.rowDetails.take(3).joinToString("；")}")
+        // WAL checkpoint 让主库文件自包含（-wal 日志并回主文件），副本才是完整快照；
+        // checkpoint 属 SQLite 例行整理，不改库的逻辑内容
+        runCatching { supportDb().query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() } }
+        val src = context.getDatabasePath("ashkb.db")
+        val name = "ashkb-drill-${java.util.UUID.randomUUID()}"
+        val drillDb = androidx.room.Room.databaseBuilder(context, AppDatabase::class.java, name).build()
+        try {
+            src.copyTo(context.getDatabasePath(name), overwrite = true)
+            val copy = drillDb.openHelper.writableDatabase
+            // 1. 副本导出
+            val before = BackupEngine.export(copy, now)
+            // 2. 加密 → 解密（证明加密链路）
+            val drillPass = "drill-${java.util.UUID.randomUUID()}"
+            val bytes = VaultCipher.encrypt(drillPass.toCharArray(), before.payload, BackupEngine.schemaVersion(copy), now)
+            val decrypted = VaultCipher.decrypt(drillPass.toCharArray(), bytes)
+            // 3. 副本上恢复写入 + 双校验
+            val verify = BackupEngine.restore(copy, decrypted.payload)
+            // 4. 复核：副本重新导出与首次导出逐字节比对
+            val after = BackupEngine.export(copy, now)
+            val roundtripOk = before.payload == after.payload
+            val detail = buildString {
+                append("加密链路✓ 解密✓ 恢复双校验${if (verify.rowsOk) "✓" else "✗"}" +
+                    " 复核一致${if (roundtripOk) "✓" else "✗"}；" +
+                    "${before.tableCount} 表 ${before.rowTotal} 行（旁路副本，生产库零写入）")
+                if (!verify.rowsOk) append("；异常：${verify.rowDetails.take(3).joinToString("；")}")
+            }
+            // 5. 台账照旧登记 DRILL（生产库唯一写入，放在比对之后）
+            log(LedgerType.DRILL, verify.rowsOk && roundtripOk, "drill", null,
+                before.rowTotal, verify.rowsOk, detail)
+            DrillReport(before.rowTotal, before.tableCount, roundtripOk, detail)
+        } finally {
+            runCatching { drillDb.close() }
+            listOf(name, "$name-wal", "$name-shm").forEach {
+                runCatching { context.getDatabasePath(it).delete() }
+            }
         }
-        // 5. 台账登记（放在比对之后——台账行本身会改变库内容）
-        log(LedgerType.DRILL, verify.rowsOk && roundtripOk, "drill", null,
-            before.rowTotal, verify.rowsOk, detail)
-        DrillReport(before.rowTotal, before.tableCount, roundtripOk, detail)
     }
 
     // ======================= 档案 JSON（模块导出） =======================
