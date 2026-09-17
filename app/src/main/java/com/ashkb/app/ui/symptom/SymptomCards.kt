@@ -142,7 +142,7 @@ internal fun FlareHistoryList(events: List<FlareEvent>) {
     DividerList(items = events, key = { it.id }) { f ->
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
             Text(
-                "${f.startDate} → ${f.endDate ?: "进行中"}",
+                "${f.startDate} 至 ${f.endDate ?: "至今"}",
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(
