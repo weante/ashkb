@@ -26,8 +26,8 @@ android {
         applicationId = "com.ashkb.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 20
-        versionName = "1.0.15"
+        versionCode = 21
+        versionName = "1.0.16"
     }
 
     signingConfigs {
@@ -44,7 +44,11 @@ android {
     buildTypes {
         release {
             // v1.0.6 起：release 切换正式签名（P0 安全项）；无 keystore 环境回退 debug
-            isMinifyEnabled = false
+            // v1.0.16（C1）：开 R8 混淆 + 资源压缩——医疗类 App 上架前必做；
+            // keep 规则见 proguard-rules.pro（实体 / kotlinx-serialization 导航路由），
+            // Room / Compose / Navigation 由各自 consumer rules 自带覆盖
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = if (hasReleaseKeystore) signingConfigs.getByName("release")
                 else signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

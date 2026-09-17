@@ -76,7 +76,7 @@ cd ashkb
 
 ## 版本
 
-当前 `v1.0.15`（versionCode 20）。P0~P5 阶段开发完成，处于自用验证（dogfooding）阶段。
+当前 `v1.0.16`（versionCode 21）。P0~P5 阶段开发完成，处于自用验证（dogfooding）阶段。
 
 ## License
 

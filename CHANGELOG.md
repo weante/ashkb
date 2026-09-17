@@ -4,6 +4,20 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.16] — 2026-09-18
+
+待办池清理第二批（C 组）：release 开启 R8 混淆与资源压缩。v1.0.15 可直接覆盖安装（无数据库与功能变更）。
+
+### 构建 · release 开启 R8 混淆 + 资源压缩（C1 · 上架前必做）
+
+- release 构建 `isMinifyEnabled` + `isShrinkResources` 双开：代码混淆（类 / 方法重命名）+ 死代码裁剪 + 资源压缩——逆向分析门槛显著提高，医疗数据类 App 上架前标配
+- keep 规则（proguard-rules.pro）三层覆盖：
+  - Room 实体全保留——备份引擎按「表列名 = 实体字段名」读写、种子 JSON 按字段名解析，字段名即磁盘数据格式，混淆即损坏
+  - kotlinx.serialization 官方规则——Navigation-Compose 类型安全路由（Routes.kt 全部 @Serializable）经 `$$serializer` 合成方法反射查找，混淆会在运行时导航崩溃
+  - Room / Compose / Navigation 由各自 AAR 自带 consumer rules 覆盖；manifest 组件 AGP 自动 keep；枚举常量名 R8 不混淆（`valueOf` 语义）
+- 产物：mapping.txt 随构建生成于 `outputs/mapping/release/`（崩溃堆栈还原用，不随 APK 分发）
+- 装机冒烟验证点（上架前必验）：冷启动 → 五 Tab 导航与二级页（路由反射）→ 备份导出 / 恢复演练 → WebDAV 探针 → PDF 导出
+
 ## [v1.0.15] — 2026-09-18
 
 待办池清理第一批（A 组小修 + README 对齐）。v1.0.14 可直接覆盖安装。
