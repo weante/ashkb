@@ -14,6 +14,7 @@ import com.ashkb.app.data.entity.LedgerType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import java.io.File
 import java.time.LocalDate
@@ -112,17 +113,26 @@ class BackupRepository(private val context: Context) {
 
     // ======================= WebDAV =======================
 
-    /** WebDAV 立即备份：导出 → 加密 → 上传 → 回读校验 → 轮换（协议 §4 全链路）。 */
-    suspend fun backupWebdav(password: CharArray): String = withContext(Dispatchers.IO) {
+    /** WebDAV 立即备份：导出 → 加密 → 上传 → 回读校验 → 轮换（协议 §4 全链路）。
+     *  W1：onStage 阶段回调驱动 UI 实时反馈；withTimeout 总兜底防任何未预期挂起。 */
+    suspend fun backupWebdav(
+        password: CharArray,
+        onStage: (String) -> Unit = {},
+    ): String = withContext(Dispatchers.IO) {
+        withTimeout(120_000) {
         val (url, user, pass) = webdavConfig()
         if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
         requireHttps(url) // R3：旧版本存的 http:// 配置给出明确报错，而非网络层异常
         val client = WebDavClient(url, user, pass)
+        onStage("正在导出数据库快照…")
         val exported = BackupEngine.export(supportDb(), nowIso())
+        onStage("正在加密（AES-256-GCM）…")
         val bytes = VaultCipher.encrypt(password, exported.payload, BackupEngine.schemaVersion(supportDb()), nowIso())
         val name = "ashkb-backup-${LocalDate.now()}.ashkb"
         try {
+            onStage("正在上传到 WebDAV…")
             val upMsg = client.upload(name, bytes)
+            onStage("正在清理过期备份…")
             val removed = client.rotate()
             log(LedgerType.BACKUP, true, "webdav", name, exported.rowTotal, true,
                 "$upMsg；轮换清理 ${removed.size} 份过期备份")
@@ -131,6 +141,7 @@ class BackupRepository(private val context: Context) {
         } catch (e: Exception) {
             log(LedgerType.BACKUP, false, "webdav", name, null, false, e.message)
             throw e
+        }
         }
     }
 

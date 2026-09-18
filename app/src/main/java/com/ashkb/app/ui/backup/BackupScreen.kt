@@ -72,6 +72,7 @@ private val PassKeyboard = KeyboardOptions(
 @Composable
 fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
     val busy by vm.busy.collectAsState()
+    val stage by vm.stage.collectAsState()
     val message by vm.message.collectAsState()
     val pending by vm.pendingRestore.collectAsState()
     val pendingName by vm.pendingFileName.collectAsState()
@@ -363,7 +364,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
             }
 
             if (busy) {
-                LoadingBlock(label = stringResource(R.string.backup_processing))
+                LoadingBlock(label = if (stage.isNotBlank()) stage else stringResource(R.string.backup_processing))
             }
             Spacer(Modifier.height(Spacing.xxl))
         }

@@ -1,5 +1,6 @@
 package com.ashkb.app.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -160,8 +161,24 @@ fun ScoreInput(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(lowLabel, style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
-            Text(highLabel, style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
+            // W3：两端标签可点——滑杆对「点当前值」零回调的手势缺陷两轮修复后真机仍不可靠，
+            // 「点「无」= 显式答 0」提供一条 100% 命中的可靠路径（点「最重」对称设 range.last）。
+            Text(
+                lowLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (value == range.first) cs.primary else cs.onSurfaceVariant,
+                modifier = Modifier
+                    .clickable { onValueChange(range.first) }
+                    .padding(horizontal = Spacing.xs, vertical = Spacing.xxs),
+            )
+            Text(
+                highLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (value == range.last) cs.primary else cs.onSurfaceVariant,
+                modifier = Modifier
+                    .clickable { onValueChange(range.last) }
+                    .padding(horizontal = Spacing.xs, vertical = Spacing.xxs),
+            )
         }
     }
 }

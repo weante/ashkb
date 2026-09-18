@@ -92,4 +92,41 @@ class BackupEngineTest {
         val tables = JSONObject("""{"zeta":[],"alpha":[],"profile":[]}""")
         assertEquals(listOf("alpha", "zeta"), BackupEngine.unknownTables(tables, knownTables))
     }
+
+    // ======================= W1 WebDAV 轮换：PROPFIND 响应解析 =======================
+
+    @Test
+    fun `标准 d 命名空间的 PROPFIND 响应提取备份文件名`() {
+        val xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <d:multistatus xmlns:d="DAV:">
+              <d:response><d:href>/dav/ashkb/backup/</d:href></d:response>
+              <d:response><d:href>/dav/ashkb/backup/ashkb-backup-2026-09-18.ashkb</d:href></d:response>
+              <d:response><d:href>/dav/ashkb/backup/ashkb-backup-2026-09-17.ashkb</d:href></d:response>
+              <d:response><d:href>/dav/ashkb/backup/.probe-123</d:href></d:response>
+            </d:multistatus>
+        """.trimIndent()
+        assertEquals(
+            listOf("ashkb-backup-2026-09-18.ashkb", "ashkb-backup-2026-09-17.ashkb"),
+            WebDavClient.parseBackupFileNames(xml),
+        )
+    }
+
+    @Test
+    fun `无命名空间前缀与其他干扰内容不误报`() {
+        val xml = """
+            <D:multistatus xmlns:D="DAV:">
+              <D:response><D:href>https://example.com/dav/ashkb/backup/ashkb-backup-2026-09-01.ashkb</D:href></D:response>
+              <D:response><D:href>/dav/ashkb/backup/notes-about-ashkb-backup-not-mine.txt</D:href></D:response>
+            </D:multistatus>
+        """.trimIndent()
+        // 绝对 URL 取最后路径段；非 .ashkb 后缀的干扰文件不收
+        assertEquals(listOf("ashkb-backup-2026-09-01.ashkb"), WebDavClient.parseBackupFileNames(xml))
+    }
+
+    @Test
+    fun `空响应与非备份目录内容返回空列表`() {
+        assertTrue(WebDavClient.parseBackupFileNames("").isEmpty())
+        assertTrue(WebDavClient.parseBackupFileNames("<d:multistatus></d:multistatus>").isEmpty())
+    }
 }

@@ -25,6 +25,10 @@ class BackupViewModel(
 ) : ViewModel() {
 
     val busy: StateFlow<Boolean> = MutableStateFlow(false)
+
+    /** W1：长操作（WebDAV 备份）的阶段文案，busy 期间 UI 实时显示当前步骤。 */
+    private val _stage = MutableStateFlow("")
+    val stage: StateFlow<String> = _stage
     val message: StateFlow<String?> = MutableStateFlow(null)
 
     val ledger: StateFlow<List<BackupLedger>> = repo.observeLedger()
@@ -106,10 +110,13 @@ class BackupViewModel(
         viewModelScope.launch {
             (busy as MutableStateFlow).value = true
             try {
-                info(repo.backupWebdav(password.toCharArray()))
+                info(repo.backupWebdav(password.toCharArray()) { stage -> _stage.value = stage })
             } catch (e: Exception) {
                 fail("WebDAV 备份失败：${e.message}")
-            } finally { (busy as MutableStateFlow).value = false }
+            } finally {
+                _stage.value = ""
+                (busy as MutableStateFlow).value = false
+            }
         }
     }
 

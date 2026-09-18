@@ -32,8 +32,8 @@ class WebDavClient(
 
     private fun open(path: String, method: String, depth: Int? = null): HttpURLConnection {
         val conn = url(path).openConnection() as HttpURLConnection
-        conn.connectTimeout = 15_000
-        conn.readTimeout = 30_000
+        conn.connectTimeout = 10_000
+        conn.readTimeout = 20_000
         val auth = Base64.getEncoder().encodeToString("$username:$password".toByteArray(Charsets.UTF_8))
         conn.setRequestProperty("Authorization", "Basic $auth")
         conn.setRequestProperty("User-Agent", "ASHKB-Backup/1.0")
@@ -189,8 +189,9 @@ class WebDavClient(
 
     /**
      * 轮换清理（协议 §4：日 7 + 周 4 + 月 6）。
-     * 无需 PROPFIND 列目录：按「今日往前推各保留窗口」计算应保留的文件名集合，
-     * 超窗文件直接 DELETE（404 = 不存在，忽略）。
+     * W1：PROPFIND Depth:1 一次列目录，只 DELETE 服务器上真实存在且超窗的备份——
+     * 原实现逐日盲发 173 个 DELETE（多数 404 也各要一次完整 TLS 握手），坚果云上
+     * 数分钟无反馈；列目录失败（服务器禁列）则本轮跳过，下轮再清，不阻塞备份。
      */
     fun rotate(keepDaily: Int = 7, keepWeekly: Int = 4, keepMonthly: Int = 6): List<String> {
         val today = java.time.LocalDate.now()
@@ -199,20 +200,39 @@ class WebDavClient(
             (0 until keepWeekly).forEach { add(today.minusWeeks(it.toLong())) }
             (0 until keepMonthly).forEach { add(today.minusMonths(it.toLong())) }
         }.map { "ashkb-backup-${it}.ashkb" }.toSet()
+        val existing = listBackupFileNames()
         val removed = mutableListOf<String>()
-        // 检查过去 180 天内的非保留文件并删除
-        (keepDaily until 180).forEach { d ->
-            val date = today.minusDays(d.toLong())
-            val name = "ashkb-backup-${date}.ashkb"
-            if (name !in keep) {
-                val conn = open("ashkb/backup/$name", "DELETE")
-                try {
-                    val code = conn.responseCode
-                    if (code in 200..299) removed.add(name)
-                } catch (_: Exception) { /* 网络抖动忽略，下次再清 */ }
-                finally { conn.disconnect() }
-            }
+        existing.filter { it !in keep }.forEach { name ->
+            val conn = open("ashkb/backup/$name", "DELETE")
+            try {
+                if (conn.responseCode in 200..299) removed.add(name)
+            } catch (_: Exception) { /* 网络抖动忽略，下次再清 */ }
+            finally { conn.disconnect() }
         }
         return removed
+    }
+
+    /** PROPFIND Depth:1 列 backup 目录；任何失败都返回空（轮换跳过，不影响备份主流程）。 */
+    private fun listBackupFileNames(): List<String> {
+        val conn = open("ashkb/backup/", "PROPFIND", depth = 1)
+        return try {
+            if (conn.responseCode !in 200..299) return emptyList()
+            val xml = conn.inputStream.use { it.readBytes().decodeToString() }
+            parseBackupFileNames(xml)
+        } catch (_: Exception) {
+            emptyList()
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    companion object {
+        /** 从 PROPFIND 多状态响应中提取本应用的备份文件名（纯 JVM 可单测）。 */
+        fun parseBackupFileNames(xml: String): List<String> =
+            Regex(">([^<>]*ashkb-backup-[^<>]*\\.ashkb)<").findAll(xml)
+                .map { m -> m.groupValues[1].substringAfterLast('/').substringBefore('?') }
+                .filter { it.startsWith("ashkb-backup-") && it.endsWith(".ashkb") }
+                .distinct()
+                .toList()
     }
 }

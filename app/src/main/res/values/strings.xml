@@ -70,7 +70,8 @@
     <string name="basdai_self_high">自评偏高</string>
     <string name="basdai_title">BASDAI 疾病活动度自评</string>
     <string name="basdai_total_score">BASDAI 总分</string>
-    <string name="basdai_weekly_note">回顾最近一周的感受作答（0=无，10=最重）。全部作答后可提交。</string>
+    <string name="basdai_weekly_note">回顾最近一周的感受作答（0=无，10=最重）。未作答的题按 0（无症状）计入总分。</string>
+    <string name="basdai_default_zero_note">已作答 %1$d/6 题，未作答的按 0（无症状）计入总分</string>
     <string name="checkup_add_item">添加项目</string>
     <string name="checkup_add_item_button">添加复诊项目</string>
     <string name="checkup_add_item_note">添加周期性检查项目（如血常规、眼科年检），系统将自动追踪</string>
