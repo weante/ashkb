@@ -693,4 +693,147 @@
     <string name="lab_parse_result">解析结果：%1$s 项</string>
     <string name="lab_parse_result_abnormal">解析结果：%1$s 项 · %2$s 项异常</string>
     <string name="report_share_fail">打开分享面板失败：%1$s</string>
-    <string name="emergency_dial_fail">无法打开拨号面板：%1$s</string></resources>
+    <string name="emergency_dial_fail">无法打开拨号面板：%1$s</string>
+
+    <!-- ========== v1.0.24：通知 / ViewModel / PDF 层文案资源化 ========== -->
+
+    <!-- 通知（NotificationHelper） -->
+    <string name="notif_channel_med_name">用药提醒</string>
+    <string name="notif_channel_med_desc">服药 / 注射计划提醒与未确认重复提醒</string>
+    <string name="notif_channel_sys_name">系统提示</string>
+    <string name="notif_channel_sys_desc">备份结果 / 复核到期等系统级提示</string>
+    <string name="notif_med_escalated_title">仍未确认：%1$s %2$s</string>
+    <string name="notif_med_title">该服药了：%1$s %2$s</string>
+    <string name="notif_med_escalated_text">刚才的提醒尚未确认，请完成打卡或说明跳过原因</string>
+    <string name="notif_med_text">点击查看今日计划</string>
+    <string name="notif_action_taken">已服用</string>
+
+    <!-- ViewModel · 备份与数据（BackupViewModel） -->
+    <string name="vm_backup_password_min">备份口令至少 6 位</string>
+    <string name="vm_backup_password_min_note">备份口令至少 6 位——恢复时唯一解密依据，请牢记</string>
+    <string name="vm_backup_local_done">本机备份完成：%1$s（%2$s 表 %3$s 行，SHA-256 %4$s…）。文件已存 app 私有目录，可通过分享另存。</string>
+    <string name="vm_backup_failed">备份失败：%1$s</string>
+    <string name="vm_dav_need_url_user">请填写 WebDAV 服务器地址与用户名</string>
+    <string name="vm_dav_connect_failed">连接失败：%1$s</string>
+    <string name="vm_dav_not_configured">请先配置并测试 WebDAV 连接</string>
+    <string name="vm_dav_backup_failed">WebDAV 备份失败：%1$s</string>
+    <string name="vm_dav_list_failed">拉取远程备份列表失败：%1$s</string>
+    <string name="vm_dav_downloading">正在从 WebDAV 下载 %1$s…</string>
+    <string name="vm_dav_downloaded">已下载 %1$s（%2$s 字节）——请输入该备份的口令做旁路解密与校验</string>
+    <string name="vm_dav_download_failed">下载远程备份失败：%1$s</string>
+    <string name="vm_restore_verify_ok">解密与文件自校验通过（schema v%1$s，备份于 %2$s，约 %3$s 行）。下一步将先做 pre-restore 快照再覆盖写入。</string>
+    <string name="vm_restore_verify_failed">备份文件校验失败</string>
+    <string name="vm_restore_password_expired">恢复口令已失效，请重新选择备份文件并输入口令</string>
+    <string name="vm_restore_mode_full">完整回滚（回到备份时点）</string>
+    <string name="vm_restore_mode_merge">按表合并</string>
+    <string name="vm_restore_done">恢复完成（%1$s）：双校验（行数 + SHA-256）全部通过，共 %2$s 行。误恢复退路快照已留存（口令与本次备份口令相同）。请重启应用以刷新界面数据。</string>
+    <string name="vm_restore_incomplete">恢复未完成：双校验未通过，已整体回滚——库保持恢复前状态（%1$s）。</string>
+    <string name="vm_restore_failed">恢复失败：%1$s</string>
+    <string name="vm_drill_pass">恢复演练通过：%1$s。备份→加密→解密→恢复→双校验全链路可用。</string>
+    <string name="vm_drill_incomplete">演练未完全通过：%1$s</string>
+    <string name="vm_drill_failed">恢复演练失败：%1$s</string>
+    <string name="vm_profile_export_done">档案 JSON 已导出（%1$s 字节，明文）——用于换机建档，不含打卡日志。</string>
+    <string name="vm_profile_export_failed">导出失败：%1$s</string>
+    <string name="vm_profile_import_done">档案导入完成：%1$s（%2$s 种在用药）。已导入项与现有数据并存，请检查重复。</string>
+    <string name="vm_profile_import_failed">导入失败：%1$s</string>
+
+    <!-- ViewModel · 报表 / 紧急（vm_emergency_pdf_failed 由两处复用） -->
+    <string name="vm_report_stats_failed">统计加载失败：%1$s</string>
+    <string name="vm_report_pdf_failed">报告生成失败：%1$s</string>
+    <string name="vm_emergency_pdf_failed">紧急卡 PDF 生成失败：%1$s</string>
+
+    <!-- ViewModel · 知识库分类标签 -->
+    <string name="vm_kb_category_all">全部</string>
+    <string name="vm_kb_category_interaction">相互作用</string>
+    <string name="vm_kb_category_food_drug">食物药物</string>
+    <string name="vm_kb_category_exercise">运动</string>
+    <string name="vm_kb_category_emergency">应急</string>
+    <string name="vm_kb_category_edu">教育</string>
+
+    <!-- PDF · 公共（页眉 / 页脚） -->
+    <string name="pdf_page_no">第 %1$s 页</string>
+    <string name="pdf_page_footer">第 %1$s 页 · %2$s</string>
+
+    <!-- PDF · 复诊报告（M9） -->
+    <string name="pdf_checkup_title">AS 复诊报告（患者自备摘要）</string>
+    <string name="pdf_checkup_footer">由 ASHKB 生成于 %1$s · 供复诊参考，不构成医疗建议</string>
+    <string name="pdf_section_basic_info">基本信息</string>
+    <string name="pdf_no_profile_full">（未建档——请在「我的」中完善健康档案）</string>
+    <string name="pdf_label_name">姓名</string>
+    <string name="pdf_label_diagnosis">诊断</string>
+    <string name="pdf_label_diagnose_year">确诊年份</string>
+    <string name="pdf_value_not_filled">未填</string>
+    <string name="pdf_label_disease_stage">病情分期</string>
+    <string name="pdf_label_allergies">过敏史</string>
+    <string name="pdf_label_blood_type">血型</string>
+    <string name="pdf_section_meds">当前用药（%1$s 种）</string>
+    <string name="pdf_no_meds">（无在用药物记录）</string>
+    <string name="pdf_route_injection">注射</string>
+    <string name="pdf_route_oral">口服</string>
+    <string name="pdf_med_inj_cycle">每 %1$s 天</string>
+    <string name="pdf_section_adherence">近 30 天依从与症状</string>
+    <string name="pdf_label_med_checkin">服药打卡</string>
+    <string name="pdf_value_med_checkin">%1$s 完成 / %2$s 部分 / %3$s 跳过</string>
+    <string name="pdf_label_adherence_rate">依从率</string>
+    <string name="pdf_label_exercise">运动</string>
+    <string name="pdf_value_exercise">%1$s 次完成，共 %2$s 分钟（跳过 %3$s）</string>
+    <string name="pdf_label_symptom_days">症状记录天数</string>
+    <string name="pdf_label_avg_pain">平均疼痛</string>
+    <string name="pdf_value_not_recorded">未记录</string>
+    <string name="pdf_label_avg_stiffness">平均晨僵</string>
+    <string name="pdf_value_minutes">%1$s 分钟</string>
+    <string name="pdf_label_night_pain_days">夜间痛天数</string>
+    <string name="pdf_label_avg_fatigue">疲乏均值</string>
+    <string name="pdf_label_eye_days">眼部症状天数</string>
+    <string name="pdf_value_eye_days">%1$s（&gt;0 需眼科评估）</string>
+    <string name="pdf_label_fever_days">发热天数</string>
+    <string name="pdf_label_flare_count">发作次数</string>
+    <string name="pdf_value_flare_active">（目前处于发作期）</string>
+    <string name="pdf_section_basdai">BASDAI 走势（近 90 天 %1$s 次）</string>
+    <string name="pdf_no_basdai">（期间无 BASDAI 自评记录）</string>
+    <string name="pdf_label_latest">最新</string>
+    <string name="pdf_value_latest">%1$s：%2$s / 10</string>
+    <string name="pdf_label_average">均值</string>
+    <string name="pdf_label_change">环比变化</string>
+    <string name="pdf_basdai_high">⚠ ≥4.0 活动度高</string>
+    <string name="pdf_section_labs">近 180 天化验异常项（%1$s / %2$s 项）</string>
+    <string name="pdf_no_labs">（无化验记录）</string>
+    <string name="pdf_labs_all_normal">（期间化验均在参考范围内——仅列异常项，正常项略）</string>
+    <string name="pdf_lab_flag_high">↑ 高</string>
+    <string name="pdf_lab_flag_low">↓ 低</string>
+    <string name="pdf_lab_flag_abnormal">⚠ 异常</string>
+    <string name="pdf_lab_ref_range">（参考 %1$s–%2$s）</string>
+    <string name="pdf_labs_more">…另有 %1$s 项异常未列出</string>
+    <string name="pdf_section_checkups">近 180 天复诊记录（%1$s 次）</string>
+    <string name="pdf_no_checkups">（无复诊记录）</string>
+    <string name="pdf_section_next_checkups">下次复诊</string>
+    <string name="pdf_no_next_checkups">（暂无登记的下次复诊日期）</string>
+    <string name="pdf_section_vaccines">疫苗记录（%1$s 条）</string>
+    <string name="pdf_none">（无）</string>
+    <string name="pdf_vaccine_next">（下次 %1$s）</string>
+    <string name="pdf_checkup_disclaimer">说明：本报告由患者个人健康工具 ASHKB 汇总自记录数据，供复诊沟通参考。所有诊疗以主治医师医嘱为准。</string>
+
+    <!-- PDF · 紧急卡打印版（M7） -->
+    <string name="pdf_emergency_title">AS 紧急信息卡</string>
+    <string name="pdf_emergency_footer">ASHKB 生成于 %1$s · 急救人员参考 · 明文展示为设计例外（协议 §1）</string>
+    <string name="pdf_section_patient_info">患者信息</string>
+    <string name="pdf_no_profile">（未建档）</string>
+    <string name="pdf_section_contacts">紧急联系人（%1$s）</string>
+    <string name="pdf_no_contacts">（未添加）</string>
+    <string name="pdf_marker_doctor">[主治医生]</string>
+    <string name="pdf_section_emergency_cards">应急处理卡（五场景）</string>
+    <string name="pdf_emergency_call">紧急情况请直接拨打 120 或就近就医。</string>
+
+    <!-- PDF · 分期 / 频次映射 -->
+    <string name="pdf_stage_stable">缓解期</string>
+    <string name="pdf_stage_controlled">控制中</string>
+    <string name="pdf_stage_flare">发作期</string>
+    <string name="pdf_stage_unknown">未评估（按发作期保守）</string>
+    <string name="pdf_freq_daily">每日</string>
+    <string name="pdf_freq_bid">每日两次</string>
+    <string name="pdf_freq_q8h">每8小时</string>
+    <string name="pdf_freq_weekly">每周一次</string>
+    <string name="pdf_freq_biw">每周两次</string>
+    <string name="pdf_freq_q2w">每两周一次</string>
+    <string name="pdf_freq_prn">按需</string>
+</resources>

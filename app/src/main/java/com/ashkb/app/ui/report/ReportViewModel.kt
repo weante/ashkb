@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import com.ashkb.app.AshkbApplication
+import com.ashkb.app.R
 import com.ashkb.app.data.repo.ReportRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,7 +43,7 @@ class ReportViewModel(
                 _overview.value = repo.overview()
                 _trends.value = repo.trends()
             } catch (e: Exception) {
-                _message.value = "统计加载失败：${e.message}"
+                _message.value = app.getString(R.string.vm_report_stats_failed, e.message)
             } finally {
                 _busy.value = false
             }
@@ -62,7 +63,7 @@ class ReportViewModel(
                 val pdf = ReportPdfWriter.writeCheckupReport(app, snapshot)
                 onReady(shareIntent(pdf, "application/pdf"))
             } catch (e: Exception) {
-                onError("报告生成失败：${e.message}")
+                onError(app.getString(R.string.vm_report_pdf_failed, e.message))
             } finally {
                 _busy.value = false
             }
@@ -78,7 +79,7 @@ class ReportViewModel(
                 val pdf = ReportPdfWriter.writeEmergencyCard(app, card)
                 onReady(shareIntent(pdf, "application/pdf"))
             } catch (e: Exception) {
-                onError("紧急卡 PDF 生成失败：${e.message}")
+                onError(app.getString(R.string.vm_emergency_pdf_failed, e.message))
             } finally {
                 _busy.value = false
             }

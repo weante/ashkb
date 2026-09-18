@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.ashkb.app.AshkbApplication
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.domain.KbSearch
@@ -24,13 +25,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** K 模块分类（与种子五类对应） */
-val KB_CATEGORIES = listOf(
-    null to "全部",
-    "interaction" to "相互作用",
-    "food_drug" to "食物药物",
-    "exercise" to "运动",
-    "emergency" to "应急",
-    "edu" to "教育",
+val KB_CATEGORIES: List<Pair<String?, Int>> = listOf(
+    null to R.string.vm_kb_category_all,
+    "interaction" to R.string.vm_kb_category_interaction,
+    "food_drug" to R.string.vm_kb_category_food_drug,
+    "exercise" to R.string.vm_kb_category_exercise,
+    "emergency" to R.string.vm_kb_category_emergency,
+    "edu" to R.string.vm_kb_category_edu,
 )
 
 data class KnowledgeUiState(

@@ -4,6 +4,36 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.24] — 2026-09-18
+
+文案资源化收尾（v1.0.10 §遗留项）：通知 / ViewModel / PDF 三层硬编码中文下沉 strings.xml；顺带修复 PDF 用药行打印 `null` 的缺陷。v1.0.23 可直接覆盖安装（无数据库与功能变更）。
+
+### 修复 · 复诊报告 PDF 口服药行打印字面量 `null`
+
+- **现象**：复诊报告 PDF 的「当前用药」区，成分为口服的药（以及未设注射周期的注射药）会打印成 `· 甲氨蝶呤｜10mg｜每日两次｜口服null`
+- **根因**：`x + y + z?.let{…} ?: ""` 中 `+` 的优先级**高于** `?:`，实际解析为 `(x + y + z?.let{…}) ?: ""`——elvis 作用于整个拼接结果（恒非空）从不触发；`injCycleDays` 为 null 时 Kotlin 的 `String.plus(Any?)` 把字面量 `"null"` 拼了进去
+- **修复**：注射周期段先落成局部值再拼接。**这是打印给医生的报告，属影响输出正确性的缺陷**
+
+### 改进 · 文案资源化（三层共 124 条下沉 strings.xml）
+
+- **通知层**（`NotificationHelper`，9 条，`notif_` 前缀）：渠道名称 / 描述、服药提醒标题与正文（含加急态）、「已服用」动作按钮
+- **ViewModel 层**（`Backup` / `Report` / `Knowledge` / `Emergency`，36 条，`vm_` 前缀）：全部 snackbar 提示（备份 / WebDAV / 恢复五步 / 演练 / 档案 JSON / 报表与紧急卡 PDF 失败）
+  - `KnowledgeViewModel` 无 Context，其分类标签 `KB_CATEGORIES` 改存资源 ID（Int），在 `KnowledgeScreen` 的 `FilterChip` 内用 `stringResource` 解析——与 v1.0.10 对「底栏 Tab / 复诊五 Tab」的处置方式一致
+  - `vm_emergency_pdf_failed` 被 `ReportViewModel` 与 `EmergencyViewModel` 两处复用（原文相同，合并为一条）
+- **PDF 层**（`ReportPdfWriter`，79 条，`pdf_` 前缀）：复诊报告与紧急卡的全部标题 / 字段名 / 分节标题 / 空态说明 / 免责声明，以及分期与用药频次的映射文案
+- **保持不变**（非 UI 文案，属标识符而非可翻译文本）：MIME 类型、`exports` 目录与文件名、FileProvider authority、通知渠道 ID、DB 枚举比较键（`injection`/`high`/`stable` 等）、`joinToString("；")` 的数据分隔符、KDoc 与注释
+- PDF 版式零影响：79 条资源的渲染结果与原字面量逐字符等价（含分隔符与空格位置），行数 / 分页点 / 折行位置均不变
+
+### 边界说明
+
+`data/` 与 `domain/` 层的异常消息与领域标签（如 `WebDavClient` 的 `DavException` 文案、`Labels` 枚举标签、`ClinicalThresholds` 说明、AI 导入模板）**未资源化**，原因：①domain 层按设计保持纯 JVM（无 Android 依赖、可单测），注入 Context 会破坏该边界 ②AI 导入模板是提示词文本而非界面文案 ③种子数据与枚举键是数据而非 UI。
+
+### 验证
+
+- 既有 114 条单测全部通过（本次为文案搬迁 + 一处缺陷修复，无新可测纯逻辑）
+- release / debug 双包构建成功 + 正式签名验签
+- 装机回归重点：导出复诊报告 PDF，确认「当前用药」口服药行**不再出现 `null`**；服药提醒通知（含加急重复提醒）文案正常；备份 / WebDAV / 恢复 / 档案导入导出的提示文案与 v1.0.23 一致
+
 ## [v1.0.23] — 2026-09-18
 
 体验优化：化验 Tab 日期分组折叠（HANDOFF 待办池遗留项）。v1.0.22 可直接覆盖安装（无数据库与功能变更）。

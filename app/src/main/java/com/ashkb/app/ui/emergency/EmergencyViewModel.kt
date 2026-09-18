@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import com.ashkb.app.AshkbApplication
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.EmergencyContact
 import com.ashkb.app.data.entity.EmergencyEvent
 import com.ashkb.app.data.entity.EmergencyScene
@@ -66,7 +67,7 @@ class EmergencyViewModel(
                     }
                 )
             } catch (e: Exception) {
-                onError("紧急卡 PDF 生成失败：${e.message}")
+                onError(app.getString(R.string.vm_emergency_pdf_failed, e.message))
             }
         }
     }

@@ -73,11 +73,11 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
-                KB_CATEGORIES.forEach { (key, label) ->
+                KB_CATEGORIES.forEach { (key, labelRes) ->
                     FilterChip(
                         selected = ui.category == key,
                         onClick = { vm.setCategory(key) },
-                        label = { Text(label) },
+                        label = { Text(stringResource(labelRes)) },
                         modifier = Modifier.heightIn(min = Size.touchMin),
                     )
                 }

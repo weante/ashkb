@@ -19,14 +19,14 @@ object NotificationHelper {
     fun ensureChannels(context: Context) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_MED, "用药提醒", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "服药 / 注射计划提醒与未确认重复提醒"
+            NotificationChannel(CHANNEL_MED, context.getString(R.string.notif_channel_med_name), NotificationManager.IMPORTANCE_HIGH).apply {
+                description = context.getString(R.string.notif_channel_med_desc)
                 enableVibration(true)
             }
         )
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_SYS, "系统提示", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "备份结果 / 复核到期等系统级提示"
+            NotificationChannel(CHANNEL_SYS, context.getString(R.string.notif_channel_sys_name), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = context.getString(R.string.notif_channel_sys_desc)
             }
         )
     }
@@ -65,8 +65,12 @@ object NotificationHelper {
             context, (medId + (slotKey ?: "prn")).hashCode(), doneIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val title = if (escalation > 0) "仍未确认：$medName $dose" else "该服药了：$medName $dose"
-        val text = if (escalation > 0) "刚才的提醒尚未确认，请完成打卡或说明跳过原因" else "点击查看今日计划"
+        val title = if (escalation > 0)
+            context.getString(R.string.notif_med_escalated_title, medName, dose)
+        else context.getString(R.string.notif_med_title, medName, dose)
+        val text = if (escalation > 0)
+            context.getString(R.string.notif_med_escalated_text)
+        else context.getString(R.string.notif_med_text)
         val n = NotificationCompat.Builder(context, CHANNEL_MED)
             .setSmallIcon(R.drawable.ic_stat_pill)
             .setContentTitle(title)
@@ -75,7 +79,7 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(open)
-            .addAction(0, "已服用", done)
+            .addAction(0, context.getString(R.string.notif_action_taken), done)
             .build()
         runCatching { NotificationManagerCompat.from(context).notify(notifId(medId, slotKey), n) }
     }

@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
+import com.ashkb.app.R
 import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.domain.Labels
 import java.io.File
@@ -21,7 +22,11 @@ object ReportPdfWriter {
     private const val PH = 842   // A4 高（pt）
     private const val M = 48f    // 页边距
 
-    class Doc(private val title: String, private val footer: String) {
+    class Doc(
+        private val context: Context,
+        private val title: String,
+        private val footer: String
+    ) {
         val doc = PdfDocument()
         private var page: PdfDocument.Page? = null
         private var canvas: Canvas? = null
@@ -71,14 +76,17 @@ object ReportPdfWriter {
                 y += 18f
             } else {
                 canvas!!.drawText(title, M, y + 8f, smallPaint)
-                canvas!!.drawText("第 $pageNo 页", PW - M - 40f, y + 8f, smallPaint)
+                canvas!!.drawText(context.getString(R.string.pdf_page_no, pageNo), PW - M - 40f, y + 8f, smallPaint)
                 y += 20f
             }
         }
 
         private fun finishPage() {
             page?.let { p ->
-                canvas!!.drawText("第 $pageNo 页 · $footer", M, PH - 22f, smallPaint)
+                canvas!!.drawText(
+                    context.getString(R.string.pdf_page_footer, pageNo, footer),
+                    M, PH - 22f, smallPaint
+                )
                 doc.finishPage(p)
             }
             page = null
@@ -139,96 +147,149 @@ object ReportPdfWriter {
 
     fun writeCheckupReport(context: Context, r: ReportRepository.CheckupReport): File {
         val today = LocalDate.now().toString()
-        val d = Doc("AS 复诊报告（患者自备摘要）",
-            "由 ASHKB 生成于 $today · 供复诊参考，不构成医疗建议")
+        val d = Doc(
+            context,
+            context.getString(R.string.pdf_checkup_title),
+            context.getString(R.string.pdf_checkup_footer, today)
+        )
 
-        d.h2("基本信息")
+        d.h2(context.getString(R.string.pdf_section_basic_info))
         val p = r.profile
-        if (p == null) d.line("（未建档——请在「我的」中完善健康档案）")
+        if (p == null) d.line(context.getString(R.string.pdf_no_profile_full))
         else {
-            d.kv("姓名", p.displayName)
-            d.kv("诊断", p.diagnosis)
-            d.kv("确诊年份", p.diagnoseYear?.toString() ?: "未填")
+            d.kv(context.getString(R.string.pdf_label_name), p.displayName)
+            d.kv(context.getString(R.string.pdf_label_diagnosis), p.diagnosis)
+            d.kv(
+                context.getString(R.string.pdf_label_diagnose_year),
+                p.diagnoseYear?.toString() ?: context.getString(R.string.pdf_value_not_filled)
+            )
             d.kv("HLA-B27", Labels.hlaB27(p.hlaB27))
-            d.kv("病情分期", stage(p.diseaseStage))
-            p.allergies?.let { d.kv("过敏史", it) }
-            p.emergencyBloodType?.let { d.kv("血型", it) }
+            d.kv(context.getString(R.string.pdf_label_disease_stage), stage(context, p.diseaseStage))
+            p.allergies?.let { d.kv(context.getString(R.string.pdf_label_allergies), it) }
+            p.emergencyBloodType?.let { d.kv(context.getString(R.string.pdf_label_blood_type), it) }
         }
 
-        d.h2("当前用药（${r.meds.size} 种）")
-        if (r.meds.isEmpty()) d.line("（无在用药物记录）")
+        d.h2(context.getString(R.string.pdf_section_meds, r.meds.size))
+        if (r.meds.isEmpty()) d.line(context.getString(R.string.pdf_no_meds))
         r.meds.forEach { m ->
-            d.line("· ${m.name}${m.brandName?.let { "（$it）" } ?: ""}｜${m.dose}｜${freq(m.frequency)}" +
-                "｜${if (m.route == "injection") "注射" else "口服"}" +
-                m.injCycleDays?.let { "｜每 $it 天" } ?: "")
+            // 注：注射周期段必须先落成局部值再接续拼接——`x + y + z?.let{} ?: ""` 会因 `+`
+            // 优先级高于 `?:` 而解析为 `(x + y + z?.let{}) ?: ""`，口服药（injCycleDays 为 null）
+            // 会把字面量 "null" 拼进 PDF（曾出现「…｜口服null」）
+            val injCycle = m.injCycleDays?.let { "｜" + context.getString(R.string.pdf_med_inj_cycle, it) } ?: ""
+            d.line("· ${m.name}${m.brandName?.let { "（$it）" } ?: ""}｜${m.dose}｜${freq(context, m.frequency)}" +
+                "｜${if (m.route == "injection") context.getString(R.string.pdf_route_injection) else context.getString(R.string.pdf_route_oral)}" +
+                injCycle)
         }
 
-        d.h2("近 30 天依从与症状")
+        d.h2(context.getString(R.string.pdf_section_adherence))
         val o = r.overview
-        d.kv("服药打卡", "${o.adherence.medDone} 完成 / ${o.adherence.medPartial} 部分 / ${o.adherence.medSkipped} 跳过")
-        d.kv("依从率", "${o.adherence.medRatePct}%")
-        d.kv("运动", "${o.exercise.doneCount} 次完成，共 ${o.exercise.totalMinutes} 分钟（跳过 ${o.exercise.skippedCount}）")
-        d.kv("症状记录天数", "${o.symptom.daysRecorded} / 30")
-        d.kv("平均疼痛", o.symptom.avgPain?.let { "%.1f / 10".format(it) } ?: "未记录")
-        d.kv("平均晨僵", o.symptom.avgStiffnessMin?.let { "%.0f 分钟".format(it) } ?: "未记录")
-        d.kv("夜间痛天数", "${o.symptom.nightPainDays}")
-        d.kv("疲乏均值", o.symptom.avgFatigue?.let { "%.1f / 10".format(it) } ?: "未记录")
-        d.kv("眼部症状天数", "${o.symptom.eyeDays}（>0 需眼科评估）", o.symptom.eyeDays > 0)
-        d.kv("发热天数", "${o.symptom.feverDays}")
-        d.kv("发作次数", "${o.flareCount}" + if (o.flareActive) "（目前处于发作期）" else "")
+        d.kv(
+            context.getString(R.string.pdf_label_med_checkin),
+            context.getString(
+                R.string.pdf_value_med_checkin,
+                o.adherence.medDone, o.adherence.medPartial, o.adherence.medSkipped
+            )
+        )
+        d.kv(context.getString(R.string.pdf_label_adherence_rate), "${o.adherence.medRatePct}%")
+        d.kv(
+            context.getString(R.string.pdf_label_exercise),
+            context.getString(
+                R.string.pdf_value_exercise,
+                o.exercise.doneCount, o.exercise.totalMinutes, o.exercise.skippedCount
+            )
+        )
+        d.kv(context.getString(R.string.pdf_label_symptom_days), "${o.symptom.daysRecorded} / 30")
+        d.kv(
+            context.getString(R.string.pdf_label_avg_pain),
+            o.symptom.avgPain?.let { "%.1f / 10".format(it) }
+                ?: context.getString(R.string.pdf_value_not_recorded)
+        )
+        d.kv(
+            context.getString(R.string.pdf_label_avg_stiffness),
+            o.symptom.avgStiffnessMin?.let {
+                context.getString(R.string.pdf_value_minutes, "%.0f".format(it))
+            } ?: context.getString(R.string.pdf_value_not_recorded)
+        )
+        d.kv(context.getString(R.string.pdf_label_night_pain_days), "${o.symptom.nightPainDays}")
+        d.kv(
+            context.getString(R.string.pdf_label_avg_fatigue),
+            o.symptom.avgFatigue?.let { "%.1f / 10".format(it) }
+                ?: context.getString(R.string.pdf_value_not_recorded)
+        )
+        d.kv(
+            context.getString(R.string.pdf_label_eye_days),
+            context.getString(R.string.pdf_value_eye_days, o.symptom.eyeDays),
+            o.symptom.eyeDays > 0
+        )
+        d.kv(context.getString(R.string.pdf_label_fever_days), "${o.symptom.feverDays}")
+        d.kv(
+            context.getString(R.string.pdf_label_flare_count),
+            "${o.flareCount}" + if (o.flareActive) context.getString(R.string.pdf_value_flare_active) else ""
+        )
 
-        d.h2("BASDAI 走势（近 90 天 ${r.basdaiHistory.size} 次）")
+        d.h2(context.getString(R.string.pdf_section_basdai, r.basdaiHistory.size))
         val bas = r.basdaiHistory
-        if (bas.isEmpty()) d.line("（期间无 BASDAI 自评记录）")
+        if (bas.isEmpty()) d.line(context.getString(R.string.pdf_no_basdai))
         else {
             val avg = bas.map { it.total }.average()
-            d.kv("最新", "${bas.last().date}：${"%.1f".format(bas.last().total)} / 10")
-            d.kv("均值", "%.1f / 10".format(avg))
-            o.basdaiDelta?.let { d.kv("环比变化", "%+.1f".format(it)) }
+            d.kv(
+                context.getString(R.string.pdf_label_latest),
+                context.getString(R.string.pdf_value_latest, bas.last().date, "%.1f".format(bas.last().total))
+            )
+            d.kv(context.getString(R.string.pdf_label_average), "%.1f / 10".format(avg))
+            o.basdaiDelta?.let { d.kv(context.getString(R.string.pdf_label_change), "%+.1f".format(it)) }
             if (bas.size > 1) {
                 bas.takeLast(8).forEach {
                     d.line("  ${it.date}  ${"%.1f".format(it.total)}" +
-                        if (it.total >= 4.0) "  ⚠ ≥4.0 活动度高" else "")
+                        if (it.total >= 4.0) "  " + context.getString(R.string.pdf_basdai_high) else "")
                 }
             }
         }
 
         // U8：复诊报告只列异常项（医生关注点），正常项仅计数
         val abnormal = r.labs.filter { !it.abnormal.isNullOrBlank() && it.abnormal != "normal" }
-        d.h2("近 180 天化验异常项（${abnormal.size} / ${r.labs.size} 项）")
-        if (r.labs.isEmpty()) d.line("（无化验记录）")
-        else if (abnormal.isEmpty()) d.line("（期间化验均在参考范围内——仅列异常项，正常项略）")
+        d.h2(context.getString(R.string.pdf_section_labs, abnormal.size, r.labs.size))
+        if (r.labs.isEmpty()) d.line(context.getString(R.string.pdf_no_labs))
+        else if (abnormal.isEmpty()) d.line(context.getString(R.string.pdf_labs_all_normal))
         else {
             abnormal.take(20).forEach { l ->
                 val v = l.value?.let { "%.2f".format(it) } ?: (l.valueText ?: "-")
                 val flag = when (l.abnormal) {
-                    "high" -> " ↑ 高"; "low" -> " ↓ 低"; "abnormal" -> " ⚠ 异常"; else -> ""
+                    "high" -> " " + context.getString(R.string.pdf_lab_flag_high)
+                    "low" -> " " + context.getString(R.string.pdf_lab_flag_low)
+                    "abnormal" -> " " + context.getString(R.string.pdf_lab_flag_abnormal)
+                    else -> ""
                 }
                 d.line("  ${l.date} ${l.testName}：$v${l.unit?.let { " $it" } ?: ""}$flag" +
-                    (l.refLow?.let { lo -> l.refHigh?.let { hi -> "（参考 $lo–$hi）" } } ?: ""), flag.isNotBlank())
+                    (l.refLow?.let { lo ->
+                        l.refHigh?.let { hi -> context.getString(R.string.pdf_lab_ref_range, lo, hi) }
+                    } ?: ""), flag.isNotBlank())
             }
-            if (abnormal.size > 20) d.line("  …另有 ${abnormal.size - 20} 项异常未列出")
+            if (abnormal.size > 20) {
+                d.line("  " + context.getString(R.string.pdf_labs_more, abnormal.size - 20))
+            }
         }
 
-        d.h2("近 180 天复诊记录（${r.checkups.size} 次）")
-        if (r.checkups.isEmpty()) d.line("（无复诊记录）")
+        d.h2(context.getString(R.string.pdf_section_checkups, r.checkups.size))
+        if (r.checkups.isEmpty()) d.line(context.getString(R.string.pdf_no_checkups))
         r.checkups.take(15).forEach { c ->
             d.line("  ${c.date} ${c.itemName}" + (c.hospital?.let { " @$it" } ?: "") +
                 (c.conclusion?.let { "：${it.take(60)}" } ?: ""))
         }
 
-        d.h2("下次复诊")
-        if (r.nextCheckups.isEmpty()) d.line("（暂无登记的下次复诊日期）")
+        d.h2(context.getString(R.string.pdf_section_next_checkups))
+        if (r.nextCheckups.isEmpty()) d.line(context.getString(R.string.pdf_no_next_checkups))
         r.nextCheckups.forEach { c -> d.line("  ${c.nextDate} ${c.itemName}") }
 
-        d.h2("疫苗记录（${r.vaccines.size} 条）")
-        if (r.vaccines.isEmpty()) d.line("（无）")
+        d.h2(context.getString(R.string.pdf_section_vaccines, r.vaccines.size))
+        if (r.vaccines.isEmpty()) d.line(context.getString(R.string.pdf_none))
         r.vaccines.forEach { v ->
-            d.line("  ${v.date} ${v.vaccineName}" + (v.nextDueDate?.let { "（下次 $it）" } ?: ""))
+            d.line("  ${v.date} ${v.vaccineName}" +
+                (v.nextDueDate?.let { context.getString(R.string.pdf_vaccine_next, it) } ?: ""))
         }
 
         d.gap(10f)
-        d.line("说明：本报告由患者个人健康工具 ASHKB 汇总自记录数据，供复诊沟通参考。所有诊疗以主治医师医嘱为准。", warn = true)
+        d.line(context.getString(R.string.pdf_checkup_disclaimer), warn = true)
 
         val f = File(File(context.filesDir, "exports"), "ashkb-report-$today.pdf")
         d.close(f)
@@ -239,28 +300,32 @@ object ReportPdfWriter {
 
     fun writeEmergencyCard(context: Context, c: ReportRepository.EmergencyCard): File {
         val today = LocalDate.now().toString()
-        val d = Doc("AS 紧急信息卡",
-            "ASHKB 生成于 $today · 急救人员参考 · 明文展示为设计例外（协议 §1）")
+        val d = Doc(
+            context,
+            context.getString(R.string.pdf_emergency_title),
+            context.getString(R.string.pdf_emergency_footer, today)
+        )
 
-        d.h2("患者信息")
+        d.h2(context.getString(R.string.pdf_section_patient_info))
         val p = c.profile
-        if (p == null) d.line("（未建档）")
+        if (p == null) d.line(context.getString(R.string.pdf_no_profile))
         else {
             d.bigLine("${p.displayName} · ${p.diagnosis}")
             d.kv("HLA-B27", Labels.hlaB27(p.hlaB27))
-            d.kv("病情分期", stage(p.diseaseStage))
-            p.allergies?.let { d.kv("过敏史", it) }
-            p.emergencyBloodType?.let { d.kv("血型", it) }
+            d.kv(context.getString(R.string.pdf_label_disease_stage), stage(context, p.diseaseStage))
+            p.allergies?.let { d.kv(context.getString(R.string.pdf_label_allergies), it) }
+            p.emergencyBloodType?.let { d.kv(context.getString(R.string.pdf_label_blood_type), it) }
         }
 
-        d.h2("紧急联系人（${c.contacts.size}）")
-        if (c.contacts.isEmpty()) d.line("（未添加）")
+        d.h2(context.getString(R.string.pdf_section_contacts, c.contacts.size))
+        if (c.contacts.isEmpty()) d.line(context.getString(R.string.pdf_no_contacts))
         c.contacts.forEach { ct ->
             d.line("· ${ct.name}${ct.relation?.let { "（$it）" } ?: ""}　${ct.phone}" +
-                (ct.hospital?.let { "　$it" } ?: "") + if (ct.isDoctor) "　[主治医生]" else "")
+                (ct.hospital?.let { "　$it" } ?: "") +
+                if (ct.isDoctor) "　" + context.getString(R.string.pdf_marker_doctor) else "")
         }
 
-        d.h2("应急处理卡（五场景）")
+        d.h2(context.getString(R.string.pdf_section_emergency_cards))
         c.cards.forEach { kb ->
             d.gap(4f)
             d.line("【${kb.title}】")
@@ -268,18 +333,27 @@ object ReportPdfWriter {
         }
 
         d.gap(12f)
-        d.line("紧急情况请直接拨打 120 或就近就医。", warn = true)
+        d.line(context.getString(R.string.pdf_emergency_call), warn = true)
 
         val f = File(File(context.filesDir, "exports"), "ashkb-emergency-card-$today.pdf")
         d.close(f)
         return f
     }
 
-    private fun stage(k: String) = when (k) {
-        "stable" -> "缓解期"; "controlled" -> "控制中"; "flare" -> "发作期"; else -> "未评估（按发作期保守）"
+    private fun stage(context: Context, k: String) = when (k) {
+        "stable" -> context.getString(R.string.pdf_stage_stable)
+        "controlled" -> context.getString(R.string.pdf_stage_controlled)
+        "flare" -> context.getString(R.string.pdf_stage_flare)
+        else -> context.getString(R.string.pdf_stage_unknown)
     }
-    private fun freq(k: String) = when (k) {
-        "DAILY" -> "每日"; "BID" -> "每日两次"; "Q8H" -> "每8小时"; "WEEKLY" -> "每周一次";
-        "BIW" -> "每周两次"; "Q2W" -> "每两周一次"; "PRN" -> "按需"; else -> k
+    private fun freq(context: Context, k: String) = when (k) {
+        "DAILY" -> context.getString(R.string.pdf_freq_daily)
+        "BID" -> context.getString(R.string.pdf_freq_bid)
+        "Q8H" -> context.getString(R.string.pdf_freq_q8h)
+        "WEEKLY" -> context.getString(R.string.pdf_freq_weekly)
+        "BIW" -> context.getString(R.string.pdf_freq_biw)
+        "Q2W" -> context.getString(R.string.pdf_freq_q2w)
+        "PRN" -> context.getString(R.string.pdf_freq_prn)
+        else -> k
     }
 }

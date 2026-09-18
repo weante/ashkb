@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import com.ashkb.app.AshkbApplication
+import com.ashkb.app.R
 import com.ashkb.app.data.backup.BackupEngine
 import com.ashkb.app.data.backup.WebDavClient
 import com.ashkb.app.data.entity.BackupLedger
@@ -91,16 +92,18 @@ class BackupViewModel(
     // ======================= 本机备份 =======================
 
     fun backupLocal(password: String, onShare: (Intent) -> Unit) {
-        if (password.length < 6) { fail("备份口令至少 6 位——恢复时唯一解密依据，请牢记"); return }
+        if (password.length < 6) { fail(app.getString(R.string.vm_backup_password_min_note)); return }
         viewModelScope.launch {
             _busy.value = true
             try {
                 val out = repo.backupLocal(password.toCharArray())
-                info("本机备份完成：${out.file.name}（${out.tableCount} 表 ${out.rowTotal} 行，" +
-                    "SHA-256 ${out.sha256.take(12)}…）。文件已存 app 私有目录，可通过分享另存。")
+                info(app.getString(
+                    R.string.vm_backup_local_done,
+                    out.file.name, out.tableCount, out.rowTotal, out.sha256.take(12),
+                ))
                 onShare(shareFile(out.file, "application/octet-stream"))
             } catch (e: Exception) {
-                fail("备份失败：${e.message}")
+                fail(app.getString(R.string.vm_backup_failed, e.message))
             } finally { _busy.value = false }
         }
     }
@@ -108,7 +111,7 @@ class BackupViewModel(
     // ======================= WebDAV =======================
 
     fun saveAndProbeWebdav(url: String, user: String, pass: String) {
-        if (url.isBlank() || user.isBlank()) { fail("请填写 WebDAV 服务器地址与用户名"); return }
+        if (url.isBlank() || user.isBlank()) { fail(app.getString(R.string.vm_dav_need_url_user)); return }
         viewModelScope.launch {
             _busy.value = true
             try {
@@ -118,20 +121,20 @@ class BackupViewModel(
                 _davUser.value = user.trim()
                 info(msg)
             } catch (e: Exception) {
-                fail("连接失败：${e.message}")
+                fail(app.getString(R.string.vm_dav_connect_failed, e.message))
             } finally { _busy.value = false }
         }
     }
 
     fun backupWebdav(password: String) {
-        if (!repo.webdavConfigured()) { fail("请先配置并测试 WebDAV 连接"); return }
-        if (password.length < 6) { fail("备份口令至少 6 位"); return }
+        if (!repo.webdavConfigured()) { fail(app.getString(R.string.vm_dav_not_configured)); return }
+        if (password.length < 6) { fail(app.getString(R.string.vm_backup_password_min)); return }
         viewModelScope.launch {
             _busy.value = true
             try {
                 info(repo.backupWebdav(password.toCharArray()) { stage -> _stage.value = stage })
             } catch (e: Exception) {
-                fail("WebDAV 备份失败：${e.message}")
+                fail(app.getString(R.string.vm_dav_backup_failed, e.message))
             } finally {
                 _stage.value = ""
                 _busy.value = false
@@ -141,13 +144,13 @@ class BackupViewModel(
 
     /** W4：拉取远程备份列表（sheet 打开与手动刷新时调用）。 */
     fun loadDavBackups() {
-        if (!repo.webdavConfigured()) { fail("请先配置并测试 WebDAV 连接"); return }
+        if (!repo.webdavConfigured()) { fail(app.getString(R.string.vm_dav_not_configured)); return }
         viewModelScope.launch {
             _busy.value = true
             try {
                 _davBackups.value = repo.listWebdavBackups()
             } catch (e: Exception) {
-                fail("拉取远程备份列表失败：${e.message}")
+                fail(app.getString(R.string.vm_dav_list_failed, e.message))
             } finally { _busy.value = false }
         }
     }
@@ -156,13 +159,13 @@ class BackupViewModel(
     fun downloadDavBackup(name: String) {
         viewModelScope.launch {
             _busy.value = true
-            _stage.value = "正在从 WebDAV 下载 $name…"
+            _stage.value = app.getString(R.string.vm_dav_downloading, name)
             try {
                 val bytes = repo.downloadWebdavBackup(name)
                 _davPicked.value = name to bytes
-                info("已下载 $name（${bytes.size} 字节）——请输入该备份的口令做旁路解密与校验")
+                info(app.getString(R.string.vm_dav_downloaded, name, bytes.size))
             } catch (e: Exception) {
-                fail("下载远程备份失败：${e.message}")
+                fail(app.getString(R.string.vm_dav_download_failed, e.message))
             } finally {
                 _stage.value = ""
                 _busy.value = false
@@ -188,10 +191,12 @@ class BackupViewModel(
                     .keys().asSequence().map { k ->
                     org.json.JSONObject(d.payload).getJSONObject("tables")
                         .getJSONArray(k).length() }.sum()
-                info("解密与文件自校验通过（schema v$d.schemaVersion，备份于 ${d.createdAt.take(19)}，" +
-                    "约 $rows 行）。下一步将先做 pre-restore 快照再覆盖写入。")
+                info(app.getString(
+                    R.string.vm_restore_verify_ok,
+                    d.schemaVersion, d.createdAt.take(19), rows,
+                ))
             } catch (e: Exception) {
-                fail(e.message ?: "备份文件校验失败")
+                fail(e.message ?: app.getString(R.string.vm_restore_verify_failed))
             } finally { _busy.value = false }
         }
     }
@@ -199,22 +204,23 @@ class BackupViewModel(
     fun doRestore() {
         val d = pendingRestore.value ?: return
         val pass = restorePassword ?: run {
-            fail("恢复口令已失效，请重新选择备份文件并输入口令")
+            fail(app.getString(R.string.vm_restore_password_expired))
             return
         }
         viewModelScope.launch {
             _busy.value = true
             try {
                 val mode = _restoreMode.value
-                val modeNote = if (mode == BackupEngine.RestoreMode.FULL_ROLLBACK) "完整回滚（回到备份时点）" else "按表合并"
+                val modeNote = if (mode == BackupEngine.RestoreMode.FULL_ROLLBACK)
+                    app.getString(R.string.vm_restore_mode_full)
+                else app.getString(R.string.vm_restore_mode_merge)
                 val v = repo.restore(d, pass, mode)
                 wipeRestorePassword()
                 _restoreResult.value = v
-                if (v.rowsOk) info("恢复完成（$modeNote）：双校验（行数 + SHA-256）全部通过，共 ${v.totalRows} 行。" +
-                    "误恢复退路快照已留存（口令与本次备份口令相同）。请重启应用以刷新界面数据。")
-                else info("恢复未完成：双校验未通过，已整体回滚——库保持恢复前状态（${v.rowDetails.take(5).joinToString("；")}）。")
+                if (v.rowsOk) info(app.getString(R.string.vm_restore_done, modeNote, v.totalRows))
+                else info(app.getString(R.string.vm_restore_incomplete, v.rowDetails.take(5).joinToString("；")))
             } catch (e: Exception) {
-                fail("恢复失败：${e.message}")
+                fail(app.getString(R.string.vm_restore_failed, e.message))
             } finally { _busy.value = false }
         }
     }
@@ -234,10 +240,10 @@ class BackupViewModel(
             try {
                 val r = repo.drill()
                 info(if (r.roundtripOk)
-                    "恢复演练通过：$r.detail。备份→加密→解密→恢复→双校验全链路可用。"
-                else "演练未完全通过：$r.detail")
+                    app.getString(R.string.vm_drill_pass, r.detail)
+                else app.getString(R.string.vm_drill_incomplete, r.detail))
             } catch (e: Exception) {
-                fail("恢复演练失败：${e.message}")
+                fail(app.getString(R.string.vm_drill_failed, e.message))
             } finally { _busy.value = false }
         }
     }
@@ -254,10 +260,10 @@ class BackupViewModel(
                 f.parentFile?.mkdirs()
                 f.writeText(json)
                 repo.logExportJson(f.name, 0)
-                info("档案 JSON 已导出（${f.length()} 字节，明文）——用于换机建档，不含打卡日志。")
+                info(app.getString(R.string.vm_profile_export_done, f.length()))
                 onShare(shareFile(f, "application/json"))
             } catch (e: Exception) {
-                fail("导出失败：${e.message}")
+                fail(app.getString(R.string.vm_profile_export_failed, e.message))
             } finally { _busy.value = false }
         }
     }
@@ -267,9 +273,9 @@ class BackupViewModel(
             _busy.value = true
             try {
                 val (name, meds) = repo.importProfileJson(String(bytes, Charsets.UTF_8))
-                info("档案导入完成：$name（${meds} 种在用药）。已导入项与现有数据并存，请检查重复。")
+                info(app.getString(R.string.vm_profile_import_done, name, meds))
             } catch (e: Exception) {
-                fail("导入失败：${e.message}")
+                fail(app.getString(R.string.vm_profile_import_failed, e.message))
             } finally { _busy.value = false }
         }
     }
