@@ -695,6 +695,13 @@
     <string name="report_share_fail">打开分享面板失败：%1$s</string>
     <string name="emergency_dial_fail">无法打开拨号面板：%1$s</string>
 
+    <!-- ========== v1.0.26：紧急卡「当前用药」（自动汇总药单） ========== -->
+    <string name="emergency_meds_section">当前用药（急救参考）</string>
+    <string name="emergency_meds_tag_immunosuppressant">免疫抑制</string>
+    <string name="emergency_meds_empty">（无在用药物记录）</string>
+    <string name="emergency_meds_more">另有 %1$s 种未列出</string>
+    <string name="emergency_meds_note">含免疫抑制 / 生物制剂类用药，感染风险较高——就诊时请告知医生。</string>
+
     <!-- ========== v1.0.24：通知 / ViewModel / PDF 层文案资源化 ========== -->
 
     <!-- 通知（NotificationHelper） -->

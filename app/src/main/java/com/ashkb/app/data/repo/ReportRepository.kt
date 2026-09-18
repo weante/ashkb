@@ -12,6 +12,7 @@ import com.ashkb.app.data.entity.SymptomDaily
 import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.entity.WeightLog
+import com.ashkb.app.domain.EmergencyMeds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -68,6 +69,7 @@ class ReportRepository(private val context: Context) {
     data class EmergencyCard(
         val profile: Profile?,
         val contacts: List<EmergencyContact>,
+        val meds: EmergencyMeds.Summary,
         val cards: List<com.ashkb.app.data.entity.KbEntry>,
     )
 
@@ -162,6 +164,7 @@ class ReportRepository(private val context: Context) {
         EmergencyCard(
             profile = db.profileDao().get(),
             contacts = contactsAll(),
+            meds = EmergencyMeds.summarize(db.medicationDao().listActive(), LocalDate.now().toString()),
             cards = db.kbEntryDao().listByCategory("emergency"),
         )
     }

@@ -64,6 +64,7 @@ import com.ashkb.app.data.entity.EmergencyEvent
 import com.ashkb.app.data.entity.EmergencyScene
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.EmergencyMeds
 import com.ashkb.app.domain.Labels
 import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.ui.components.AlertBanner
@@ -77,6 +78,7 @@ import com.ashkb.app.ui.knowledge.KbDetailDialog
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
+import com.ashkb.app.ui.theme.accent
 import java.time.LocalDate
 
 private fun Context.dial(phone: String) {
@@ -94,6 +96,7 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
     val contacts by vm.contacts.collectAsStateWithLifecycle()
     val events by vm.events.collectAsStateWithLifecycle()
     val profile by vm.profile.collectAsStateWithLifecycle()
+    val meds by vm.meds.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var cards by remember { mutableStateOf<List<KbEntry>>(emptyList()) }
@@ -255,6 +258,66 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+
+                        // 当前用药：自动从药单汇总（不依赖用户手工维护），免疫抑制类置顶并标注。
+                        // 刻意放在档案之外——用药与健康档案相互独立，未建档时也必须显示（急救场景尤甚）
+                        val medsSummary = remember(meds) {
+                            EmergencyMeds.summarize(meds, LocalDate.now().toString())
+                        }
+                        Spacer(Modifier.height(Spacing.xs))
+                        Text(
+                            stringResource(R.string.emergency_meds_section),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (medsSummary.isEmpty) {
+                            Text(
+                                stringResource(R.string.emergency_meds_empty),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            medsSummary.ordered.forEach { e ->
+                                KeyValueRow(
+                                    label = e.name,
+                                    value = e.detail,
+                                    trailing = if (e.immunosuppressant) {
+                                        {
+                                            StatusChip(
+                                                stringResource(R.string.emergency_meds_tag_immunosuppressant),
+                                                StatusTone.Warning,
+                                                Icons.Rounded.WarningAmber,
+                                            )
+                                        }
+                                    } else null,
+                                )
+                            }
+                            if (medsSummary.hiddenCount > 0) {
+                                Text(
+                                    stringResource(R.string.emergency_meds_more, medsSummary.hiddenCount),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (medsSummary.hasImmunosuppressant) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.WarningAmber,
+                                        contentDescription = null,   // 装饰性：正文已承载语义
+                                        tint = StatusTone.Warning.accent(),
+                                        modifier = Modifier.size(Size.iconSm),
+                                    )
+                                    Text(
+                                        stringResource(R.string.emergency_meds_note),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = StatusTone.Warning.accent(),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 

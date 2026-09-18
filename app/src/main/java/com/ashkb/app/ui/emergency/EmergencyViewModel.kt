@@ -13,7 +13,9 @@ import com.ashkb.app.data.entity.EmergencyContact
 import com.ashkb.app.data.entity.EmergencyEvent
 import com.ashkb.app.data.entity.EmergencyScene
 import com.ashkb.app.data.entity.KbEntry
+import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.repo.HealthRepository
+import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.ui.report.ReportPdfWriter
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +28,7 @@ class EmergencyViewModel(
     private val app: Context,
     private val repo: HealthRepository,
     private val reports: ReportRepository,
+    private val medicationRepo: MedicationRepository,
 ) : ViewModel() {
 
     val contacts: StateFlow<List<EmergencyContact>> = repo.observeEmergencyContacts()
@@ -36,6 +39,10 @@ class EmergencyViewModel(
 
     val profile: StateFlow<com.ashkb.app.data.entity.Profile?> = repo.observeProfile()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /** 在用药单——供紧急卡「当前用药」自动汇总（口径见 EmergencyMeds）。 */
+    val meds: StateFlow<List<Medication>> = medicationRepo.observeMedications()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun saveContact(contact: EmergencyContact) {
         viewModelScope.launch { repo.saveContact(contact) }
@@ -76,7 +83,12 @@ class EmergencyViewModel(
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                EmergencyViewModel(app.applicationContext, app.healthRepository, app.reportRepository)
+                EmergencyViewModel(
+                    app.applicationContext,
+                    app.healthRepository,
+                    app.reportRepository,
+                    app.medicationRepository,
+                )
             }
         }
     }

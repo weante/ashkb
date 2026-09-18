@@ -317,6 +317,24 @@ object ReportPdfWriter {
             p.emergencyBloodType?.let { d.kv(context.getString(R.string.pdf_label_blood_type), it) }
         }
 
+        d.h2(context.getString(R.string.emergency_meds_section))
+        val meds = c.meds
+        if (meds.isEmpty) {
+            d.line(context.getString(R.string.emergency_meds_empty))
+        } else {
+            val tag = context.getString(R.string.emergency_meds_tag_immunosuppressant)
+            meds.ordered.forEach { e ->
+                val suffix = if (e.immunosuppressant) "　$tag" else ""
+                d.line(fit("· ${e.name}｜${e.detail}", MED_LINE_CHARS - suffix.length) + suffix)
+            }
+            if (meds.hiddenCount > 0) {
+                d.line(context.getString(R.string.emergency_meds_more, meds.hiddenCount.toString()))
+            }
+            if (meds.hasImmunosuppressant) {
+                d.line(context.getString(R.string.emergency_meds_note))
+            }
+        }
+
         d.h2(context.getString(R.string.pdf_section_contacts, c.contacts.size))
         if (c.contacts.isEmpty()) d.line(context.getString(R.string.pdf_no_contacts))
         c.contacts.forEach { ct ->
@@ -339,6 +357,13 @@ object ReportPdfWriter {
         d.close(f)
         return f
     }
+
+    /** 紧急卡单行药条字符上限（line() 折行阈值 ≈ (PW - 2M) / 10.5 ≈ 47，留余量给免疫抑制标签）。 */
+    private const val MED_LINE_CHARS = 44
+
+    /** 单行截断：超上限以省略号收尾，保证紧急卡一行一药、不折行溢出。 */
+    private fun fit(text: String, max: Int): String =
+        if (text.length <= max) text else text.take(max - 1) + "…"
 
     private fun stage(context: Context, k: String) = when (k) {
         "stable" -> context.getString(R.string.pdf_stage_stable)
