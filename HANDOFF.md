@@ -1,7 +1,7 @@
 # ASHKB 开发交接文档
 
 > 本文档面向接手本仓库开发的 AI 会话（TraeWork Code 模式 / TraeCode）或人类工程师。
-> 记录截至 **v1.0.8**（远端 `35fe1fd`，2026-09-17）的全部工程知识。
+> 记录截至 **v1.0.20**（versionCode 25，2026-09-18）的全部工程知识。
 > 应用本身介绍见 `README.md`，版本历史见 `CHANGELOG.md`。
 
 ## 1. 项目一句话
@@ -27,7 +27,7 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）：面向强直性脊柱�
 $env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.7\bin\gradle.bat" -p patient-health-app assembleDebug assembleRelease testDebugUnitTest
 ```
 
-- 全量构建约 2~3 分钟；**86 条单测**必须全过才算交付
+- 全量构建约 2~3 分钟；**107 条单测**必须全过才算交付
 - 单测结果统计：`app\build\test-results\testDebugUnitTest\*.xml`
 - Windows 侧无 git；**git 在 WSL 里**（仓库路径 `/mnt/c/<工作区>/patient-health-app`）
 
@@ -61,15 +61,16 @@ $env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.7\bin\g
 
 **推送流程**（本地 WSL commit → gh API 逐文件上远端）：
 
-1. WSL 提交：`git add -A && git commit -m "..."`，记录 `git log -1 --format="%H %T"`
-2. PowerShell 脚本经 gh API 操作（**必须在当前 shell 内 dot-source 执行，禁止 `powershell -File` 子进程**——子进程里 `gh api --input -` 的 stdin 会损坏导致全部 400）：
-   - `GET /repos/weante/ashkb/git/ref/heads/main` 取远端 HEAD，校验是预期的父提交
-   - 逐文件 `POST /git/blobs`（content=base64）→ `POST /git/trees`（base_tree=远端 HEAD 的 tree）→ `POST /git/commits` → `PATCH /git/refs/heads/main`
+1. WSL 提交：`git add <改动文件> && git commit -m "..."`，记录 `git log -1 --format="%H %T"`（HEAD 与 HEAD~1 各取一次：前者给 `$expected`，后者给 `$parent`）
+2. PowerShell 脚本经 gh API 操作（模板见工作区 `push-tmp/push-v1020.ps1`，每次更新 5 个变量：`$parent` / `$baseTree` / `$expected` / `$date` / `$files`，消息正文写 `msg-*.txt`）：
+   - **请求体一律写临时文件 + `gh api --input <file>`**（禁用 stdin 管道——PowerShell 5.1 下长 JSON 走 stdin 会损坏导致全部 400）；`--input` 方式在 `powershell -File` 子进程里执行正常
+   - 逐文件 `POST /git/blobs`（content=base64）→ `POST /git/trees`（base_tree=父 commit 的 tree）→ `POST /git/commits` → `PATCH /git/refs/heads/main`
    - **tree SHA 必须与本地 commit 的 tree 一致**，否则说明文件清单有漏
-3. 本地对齐：GitHub API 生成的 commit 对象与本地 `git commit` SHA 不同。在 WSL 用 `printf`（消息**不带结尾换行**，时区 **+0800**，与 API 传入的 date 偏移一致）构造同款对象，`git hash-object -t commit -w --stdin` 写入后 `git update-ref refs/heads/main` 和 `refs/remotes/origin/main` 对齐
-4. Release：`gh.exe release create vX.Y.Z --target <远端sha> --title "..." --notes-file <md>` + `gh.exe release upload vX.Y.Z <两个APK> -R weante/ashkb --clobber`
+3. **SHA 逐字节对齐**（v1.0.19/v1.0.20 验证）：`POST /git/commits` 传 `message`（正文尾**加一个 `\n`**）、`author` 与 `committer` 的 name/email，以及 date（取本地 `git log -1 --format=%aI`，形如 `+08:00` 偏移）——完全一致时 API 生成的 commit SHA 与本地 `git commit` **逐字节相同**，脚本内直接断言 `$commitSha -eq $expected`，不符即中止（早期用 `git hash-object` 回写本地的绕行方法已不需要）
+4. Release：`gh release create vX.Y.Z --repo weante/ashkb --target <远端sha> --title "..." --notes-file <md>`；两个 APK 用 `curl.exe` 上传：`gh api repos/weante/ashkb/releases/tags/vX.Y.Z --jq .id` 取 release id → `curl.exe -sS -X POST -H "Authorization: Bearer $(gh auth token)" -H "Content-Type: application/octet-stream" --data-binary "@<apk路径>" "https://uploads.github.com/repos/weante/ashkb/releases/<id>/assets?name=ashkb-X.Y.Z-{debug,release}.apk"`
+5. 资产核验：`gh api repos/weante/ashkb/releases/<id>/assets --jq '.[].digest'`（输出 `sha256:...`）与本地 `Get-FileHash -Algorithm SHA256` 逐字节比对
 
-**网络偶发 500/超时重试即可**；release create 报 422 "tag already exists" 说明其实已成功。
+**网络偶发 500 / 超时重试即可**（`api.github.com` 与 `uploads.github.com` 都会瞬断，重试即过）；`uploads.github.com` 上 `Invoke-RestMethod` 会被断连，必须用 `curl.exe`；release create 报 422 "tag already exists" 说明其实已成功。
 
 ## 6. 代码结构与约定
 
@@ -77,7 +78,7 @@ $env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.7\bin\g
 app/src/main/java/com/ashkb/app/
 ├── data/
 │   ├── backup/     # BackupEngine（全量加密备份）、WebDavClient、VaultCipher(Keystore AES/GCM)
-│   ├── db/         # AppDatabase（Room，version=7）、DAO
+│   ├── db/         # AppDatabase（Room，version=8）、DAO
 │   ├── entity/     # Room 实体
 │   └── repo/       # HealthRepository（多步写用 withTransaction）
 ├── domain/         # ClinicalThresholds（临床阈值集中）、Labels（枚举中文标签）、ExerciseEngine 等
@@ -108,9 +109,13 @@ app/src/main/java/com/ashkb/app/
 
 ## 8. 当前状态与下一步
 
-- **最新版**：v1.0.8（versionCode 13），远端 `35fe1fd`，GitHub Release v1.0.8 已发布附两 APK
-- **数据安全**：v1.0.6 起 WebDAV 凭据 Keystore 加密、备份口令化、事务化写入，均已稳定
+- **最新版**：v1.0.20（versionCode 25），GitHub Release v1.0.20 已发布附两 APK（release 1.98 MB / debug 16.9 MB），发布点 commit `cd7f989`
+- **数据安全**：v1.0.6 起 WebDAV 凭据 Keystore 加密、备份口令化、事务化写入，均已稳定；v1.0.19 起支持登录 WebDAV 后直接拉取远程备份列表选择恢复（新机无需先生成本地备份）；v1.0.20 起备份文件名带时间戳，同天多份不互相覆盖
 - **待办池**（用户视角，无承诺）：
-  - UI 改版方案（附件《ASHKB-UI改版方案.md》）中未完成的 PR 项
-  - 化验 Tab 若历史数据继续增长可考虑分组折叠优化
-- **测试基线**：86 条单测全绿；新增功能须同步补测（`app/src/test/.../`，6 个测试文件覆盖 backup/domain/导入解析/排程计算）
+  - 知识库搜索现为 `title / summary / payload LIKE '%q%'` 全表扫（`data/db/Daos.kt`），数据量增长后拟迁 Room FTS4 虚表，或至少对 title 建索引并限制 LIKE 前缀（代码审查报告 P1 未完成项）
+  - `as MutableStateFlow` 强转约 44 处（审查报告 P2）：可改为私有 `MutableStateFlow` + 只读 `StateFlow` 暴露
+  - 化验 Tab 若历史数据继续增长可考虑分组折叠优化（现为异常置顶 + 正常项折叠 + 翻页，v1.0.7 已做）
+  - WebDAV 非标准方法（PROPFIND / MKCOL）依赖反射改 `HttpURLConnection` 内部字段：换 Android 15 / 16 真机需回归验证（无替代方案，属设计取舍）
+  - ViewModel 层 snackbar 文案 / NotificationHelper 通知文案 / PDF 直绘文本仍为硬编码（需注入 context，模式与 UI 层资源化不同，v1.0.10 §遗留）
+- **已关闭的旧待办**：UI 改版方案未完成 PR 项——已核实唯一可确认编号的 PR4（文案资源化）在 v1.0.10 完成，方案原文已不在工作区
+- **测试基线**：107 条单测全绿；新增功能须同步补测（`app/src/test/.../`，6 个测试文件覆盖 backup / 加密 / 通用名键 / 运动分级 / 导入解析 / 排程计算）
