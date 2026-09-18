@@ -19,6 +19,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.TrendingDown
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material3.AlertDialog
@@ -38,6 +40,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -203,14 +206,34 @@ internal fun LabsList(
                     modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
                 ) { Text(stringResource(R.string.lab_ai_import_title)) }
             }
+            // Y1：日期分组折叠——历史数据多时页面不再被全展开的旧日期撑长；
+            // 默认展开规则贴合复诊沟通导向：有异常的日期或最近一次化验展开，其余收起
+            val latestDate = labs.maxOfOrNull { it.date }
             labs.groupBy { it.date }.forEach { (date, rows) ->
                 item(key = "lab-$date") {
                     val abnormalCount = rows.count { it.isAbnormal() }
+                    // item key 稳定 + rememberSaveable：翻页加载更早记录、滚动回收、旋转屏均保持折叠状态
+                    var expanded by rememberSaveable {
+                        mutableStateOf(abnormalCount > 0 || date == latestDate)
+                    }
                     SectionCard(
                         title = date,
                         subtitle = if (abnormalCount > 0) stringResource(R.string.lab_count_abnormal, rows.size, abnormalCount) else stringResource(R.string.lab_count_plain, rows.size),
+                        action = {
+                            TextButton(
+                                onClick = { expanded = !expanded },
+                                modifier = Modifier.heightIn(min = Size.touchMin),
+                            ) {
+                                Icon(
+                                    if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                                    contentDescription = null, // 语义由文字承载
+                                    modifier = Modifier.size(Size.iconSm),
+                                )
+                                Text(stringResource(if (expanded) R.string.lab_group_collapse else R.string.lab_group_expand))
+                            }
+                        },
                     ) {
-                        LabGroup(rows)
+                        if (expanded) LabGroup(rows)
                     }
                 }
             }

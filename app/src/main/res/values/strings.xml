@@ -635,6 +635,8 @@
     <string name="lab_count_plain">%1$s 项</string>
     <string name="lab_dialog_title">%1$s 化验结果</string>
     <string name="lab_expand_normal">展开正常项（%1$s）</string>
+    <string name="lab_group_collapse">收起</string>
+    <string name="lab_group_expand">展开</string>
     <string name="lab_hospital_suffix">" · 医院：%1$s"</string>
     <string name="lab_ref_range_both">参考范围 %1$s – %2$s</string>
     <string name="lab_ref_range_max">参考范围 ≤%1$s</string>
