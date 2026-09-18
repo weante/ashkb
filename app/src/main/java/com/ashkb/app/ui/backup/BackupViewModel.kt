@@ -19,18 +19,25 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 
-/** P4 R20 备份与数据自主 ViewModel。 */
+/**
+ * P4 R20 备份与数据自主 ViewModel。
+ * v1.0.22：状态流统一为私有 MutableStateFlow + 只读 StateFlow 暴露，
+ * 清除 `as MutableStateFlow` 强转（审查报告 P2，运行时非受检向下转型）。
+ */
 class BackupViewModel(
     private val app: Context,
     private val repo: BackupRepository,
 ) : ViewModel() {
 
-    val busy: StateFlow<Boolean> = MutableStateFlow(false)
+    private val _busy = MutableStateFlow(false)
+    val busy: StateFlow<Boolean> = _busy
 
     /** W1：长操作（WebDAV 备份）的阶段文案，busy 期间 UI 实时显示当前步骤。 */
     private val _stage = MutableStateFlow("")
     val stage: StateFlow<String> = _stage
-    val message: StateFlow<String?> = MutableStateFlow(null)
+
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message
 
     val ledger: StateFlow<List<BackupLedger>> = repo.observeLedger()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -42,7 +49,8 @@ class BackupViewModel(
     val davUser: StateFlow<String> = _davUser
 
     // ---- W4：WebDAV 远程恢复（列表 + 下载） ----
-    val davBackups: StateFlow<List<WebDavClient.DavBackupFile>> = MutableStateFlow(emptyList())
+    private val _davBackups = MutableStateFlow<List<WebDavClient.DavBackupFile>>(emptyList())
+    val davBackups: StateFlow<List<WebDavClient.DavBackupFile>> = _davBackups
 
     /** 一次性事件：远程备份下载完成（Screen 消费后清空，等价本地选好文件）。 */
     private val _davPicked = MutableStateFlow<Pair<String, ByteArray>?>(null)
@@ -56,9 +64,12 @@ class BackupViewModel(
 
     // ---- 恢复流程状态（协议 §6 五步） ----
     /** 已旁路解密 + 自校验通过的备份（尚未写入主库）。 */
-    val pendingRestore: StateFlow<BackupRepository.DecryptedFile?> = MutableStateFlow(null)
-    val pendingFileName: StateFlow<String?> = MutableStateFlow(null)
-    val restoreResult: StateFlow<BackupEngine.VerifyResult?> = MutableStateFlow(null)
+    private val _pendingRestore = MutableStateFlow<BackupRepository.DecryptedFile?>(null)
+    val pendingRestore: StateFlow<BackupRepository.DecryptedFile?> = _pendingRestore
+    private val _pendingFileName = MutableStateFlow<String?>(null)
+    val pendingFileName: StateFlow<String?> = _pendingFileName
+    private val _restoreResult = MutableStateFlow<BackupEngine.VerifyResult?>(null)
+    val restoreResult: StateFlow<BackupEngine.VerifyResult?> = _restoreResult
 
     /** R2：恢复语义二选一，默认完整回滚（用户拍板）。 */
     private val _restoreMode = MutableStateFlow(BackupEngine.RestoreMode.FULL_ROLLBACK)
@@ -73,16 +84,16 @@ class BackupViewModel(
         restorePassword = null
     }
 
-    fun clearMessage() { (message as MutableStateFlow).value = null }
-    private fun info(msg: String) { (message as MutableStateFlow).value = msg }
-    private fun fail(msg: String) { (message as MutableStateFlow).value = msg }
+    fun clearMessage() { _message.value = null }
+    private fun info(msg: String) { _message.value = msg }
+    private fun fail(msg: String) { _message.value = msg }
 
     // ======================= 本机备份 =======================
 
     fun backupLocal(password: String, onShare: (Intent) -> Unit) {
         if (password.length < 6) { fail("备份口令至少 6 位——恢复时唯一解密依据，请牢记"); return }
         viewModelScope.launch {
-            (busy as MutableStateFlow).value = true
+            _busy.value = true
             try {
                 val out = repo.backupLocal(password.toCharArray())
                 info("本机备份完成：${out.file.name}（${out.tableCount} 表 ${out.rowTotal} 行，" +
@@ -90,7 +101,7 @@ class BackupViewModel(
                 onShare(shareFile(out.file, "application/octet-stream"))
             } catch (e: Exception) {
                 fail("备份失败：${e.message}")
-            } finally { (busy as MutableStateFlow).value = false }
+            } finally { _busy.value = false }
         }
     }
 
@@ -99,7 +110,7 @@ class BackupViewModel(
     fun saveAndProbeWebdav(url: String, user: String, pass: String) {
         if (url.isBlank() || user.isBlank()) { fail("请填写 WebDAV 服务器地址与用户名"); return }
         viewModelScope.launch {
-            (busy as MutableStateFlow).value = true
+            _busy.value = true
             try {
                 val msg = repo.probeWebdav(url.trim(), user.trim(), pass)
                 repo.saveWebdavConfig(url.trim(), user.trim(), pass)
@@ -108,7 +119,7 @@ class BackupViewModel(
                 info(msg)
             } catch (e: Exception) {
                 fail("连接失败：${e.message}")
-            } finally { (busy as MutableStateFlow).value = false }
+            } finally { _busy.value = false }
         }
     }
 
@@ -116,14 +127,14 @@ class BackupViewModel(
         if (!repo.webdavConfigured()) { fail("请先配置并测试 WebDAV 连接"); return }
         if (password.length < 6) { fail("备份口令至少 6 位"); return }
         viewModelScope.launch {
-            (busy as MutableStateFlow).value = true
+            _busy.value = true
             try {
                 info(repo.backupWebdav(password.toCharArray()) { stage -> _stage.value = stage })
             } catch (e: Exception) {
                 fail("WebDAV 备份失败：${e.message}")
             } finally {
                 _stage.value = ""
-                (busy as MutableStateFlow).value = false
+                _busy.value = false
             }
         }
     }
@@ -132,45 +143,45 @@ class BackupViewModel(
     fun loadDavBackups() {
         if (!repo.webdavConfigured()) { fail("请先配置并测试 WebDAV 连接"); return }
         viewModelScope.launch {
-            (busy as MutableStateFlow).value = true
+            _busy.value = true
             try {
-                (davBackups as MutableStateFlow).value = repo.listWebdavBackups()
+                _davBackups.value = repo.listWebdavBackups()
             } catch (e: Exception) {
                 fail("拉取远程备份列表失败：${e.message}")
-            } finally { (busy as MutableStateFlow).value = false }
+            } finally { _busy.value = false }
         }
     }
 
     /** W4：下载选中的远程备份，完成后经 davPicked 交给 Screen（等价本地选好文件）。 */
     fun downloadDavBackup(name: String) {
         viewModelScope.launch {
-            (busy as MutableStateFlow).value = true
+            _busy.value = true
             _stage.value = "正在从 WebDAV 下载 $name…"
             try {
                 val bytes = repo.downloadWebdavBackup(name)
-                (davPicked as MutableStateFlow).value = name to bytes
+                _davPicked.value = name to bytes
                 info("已下载 $name（${bytes.size} 字节）——请输入该备份的口令做旁路解密与校验")
             } catch (e: Exception) {
                 fail("下载远程备份失败：${e.message}")
             } finally {
                 _stage.value = ""
-                (busy as MutableStateFlow).value = false
+                _busy.value = false
             }
         }
     }
 
-    fun consumeDavPicked() { (davPicked as MutableStateFlow).value = null }
+    fun consumeDavPicked() { _davPicked.value = null }
 
     // ======================= 恢复（协议 §6 五步） =======================
 
     fun verifyBackup(fileName: String, bytes: ByteArray, password: String) {
         viewModelScope.launch {
-            (busy as MutableStateFlow).value = true
+            _busy.value = true
             try {
                 val d = repo.decryptAndSelfCheck(bytes, password.toCharArray())
-                (pendingRestore as MutableStateFlow).value = d
-                (pendingFileName as MutableStateFlow).value = fileName
-                (restoreResult as MutableStateFlow).value = null
+                _pendingRestore.value = d
+                _pendingFileName.value = fileName
+                _restoreResult.value = null
                 wipeRestorePassword()
                 restorePassword = password.toCharArray()
                 val rows = org.json.JSONObject(d.payload).getJSONObject("manifest")
@@ -181,7 +192,7 @@ class BackupViewModel(
                     "约 $rows 行）。下一步将先做 pre-restore 快照再覆盖写入。")
             } catch (e: Exception) {
                 fail(e.message ?: "备份文件校验失败")
-            } finally { (busy as MutableStateFlow).value = false }
+            } finally { _busy.value = false }
         }
     }
 
@@ -192,34 +203,34 @@ class BackupViewModel(
             return
         }
         viewModelScope.launch {
-            (busy as MutableStateFlow).value = true
+            _busy.value = true
             try {
                 val mode = _restoreMode.value
                 val modeNote = if (mode == BackupEngine.RestoreMode.FULL_ROLLBACK) "完整回滚（回到备份时点）" else "按表合并"
                 val v = repo.restore(d, pass, mode)
                 wipeRestorePassword()
-                (restoreResult as MutableStateFlow).value = v
+                _restoreResult.value = v
                 if (v.rowsOk) info("恢复完成（$modeNote）：双校验（行数 + SHA-256）全部通过，共 ${v.totalRows} 行。" +
                     "误恢复退路快照已留存（口令与本次备份口令相同）。请重启应用以刷新界面数据。")
                 else info("恢复未完成：双校验未通过，已整体回滚——库保持恢复前状态（${v.rowDetails.take(5).joinToString("；")}）。")
             } catch (e: Exception) {
                 fail("恢复失败：${e.message}")
-            } finally { (busy as MutableStateFlow).value = false }
+            } finally { _busy.value = false }
         }
     }
 
     fun cancelRestore() {
         wipeRestorePassword()
-        (pendingRestore as MutableStateFlow).value = null
-        (pendingFileName as MutableStateFlow).value = null
-        (restoreResult as MutableStateFlow).value = null
+        _pendingRestore.value = null
+        _pendingFileName.value = null
+        _restoreResult.value = null
         _restoreMode.value = BackupEngine.RestoreMode.FULL_ROLLBACK
     }
 
     /** 一键恢复演练（协议 §7 首次恢复演练）。 */
     fun drill() {
         viewModelScope.launch {
-            (busy as MutableStateFlow).value = true
+            _busy.value = true
             try {
                 val r = repo.drill()
                 info(if (r.roundtripOk)
@@ -227,7 +238,7 @@ class BackupViewModel(
                 else "演练未完全通过：$r.detail")
             } catch (e: Exception) {
                 fail("恢复演练失败：${e.message}")
-            } finally { (busy as MutableStateFlow).value = false }
+            } finally { _busy.value = false }
         }
     }
 
@@ -235,7 +246,7 @@ class BackupViewModel(
 
     fun exportProfileJson(onShare: (Intent) -> Unit) {
         viewModelScope.launch {
-            (busy as MutableStateFlow).value = true
+            _busy.value = true
             try {
                 val json = repo.exportProfileJson()
                 val f = File(File(app.filesDir, "exports"),
@@ -247,19 +258,19 @@ class BackupViewModel(
                 onShare(shareFile(f, "application/json"))
             } catch (e: Exception) {
                 fail("导出失败：${e.message}")
-            } finally { (busy as MutableStateFlow).value = false }
+            } finally { _busy.value = false }
         }
     }
 
     fun importProfileJson(bytes: ByteArray) {
         viewModelScope.launch {
-            (busy as MutableStateFlow).value = true
+            _busy.value = true
             try {
                 val (name, meds) = repo.importProfileJson(String(bytes, Charsets.UTF_8))
                 info("档案导入完成：$name（${meds} 种在用药）。已导入项与现有数据并存，请检查重复。")
             } catch (e: Exception) {
                 fail("导入失败：${e.message}")
-            } finally { (busy as MutableStateFlow).value = false }
+            } finally { _busy.value = false }
         }
     }
 

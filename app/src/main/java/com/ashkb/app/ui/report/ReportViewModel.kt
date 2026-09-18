@@ -16,41 +16,47 @@ import java.io.File
 
 /**
  * P4 M9 报表 ViewModel：统计概览 + 趋势序列 + 复诊报告 / 紧急卡 PDF 生成与分享。
+ * v1.0.22：状态流统一为私有 MutableStateFlow + 只读 StateFlow 暴露，
+ * 清除 `as MutableStateFlow` 强转（审查报告 P2，运行时非受检向下转型）。
  */
 class ReportViewModel(
     private val app: Context,
     private val repo: ReportRepository,
 ) : ViewModel() {
 
-    val overview: StateFlow<ReportRepository.Overview?> = MutableStateFlow(null)
-    val trends: StateFlow<ReportRepository.Trends?> = MutableStateFlow(null)
-    val busy: StateFlow<Boolean> = MutableStateFlow(false)
-    val message: StateFlow<String?> = MutableStateFlow(null)
+    private val _overview = MutableStateFlow<ReportRepository.Overview?>(null)
+    val overview: StateFlow<ReportRepository.Overview?> = _overview
+    private val _trends = MutableStateFlow<ReportRepository.Trends?>(null)
+    val trends: StateFlow<ReportRepository.Trends?> = _trends
+    private val _busy = MutableStateFlow(false)
+    val busy: StateFlow<Boolean> = _busy
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message
 
     init { refresh() }
 
     fun refresh() {
         viewModelScope.launch {
-            (busy as MutableStateFlow).value = true
+            _busy.value = true
             try {
-                (overview as MutableStateFlow).value = repo.overview()
-                (trends as MutableStateFlow).value = repo.trends()
+                _overview.value = repo.overview()
+                _trends.value = repo.trends()
             } catch (e: Exception) {
-                (message as MutableStateFlow).value = "统计加载失败：${e.message}"
+                _message.value = "统计加载失败：${e.message}"
             } finally {
-                (busy as MutableStateFlow).value = false
+                _busy.value = false
             }
         }
     }
 
-    fun clearMessage() { (message as MutableStateFlow).value = null }
+    fun clearMessage() { _message.value = null }
 
-    fun reportError(msg: String) { (message as MutableStateFlow).value = msg }
+    fun reportError(msg: String) { _message.value = msg }
 
     /** 生成复诊报告 PDF 并返回分享 Intent；调用方负责 startActivity。 */
     fun generateReportPdf(onReady: (Intent) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
-            (busy as MutableStateFlow).value = true
+            _busy.value = true
             try {
                 val snapshot = repo.checkupReport()
                 val pdf = ReportPdfWriter.writeCheckupReport(app, snapshot)
@@ -58,7 +64,7 @@ class ReportViewModel(
             } catch (e: Exception) {
                 onError("报告生成失败：${e.message}")
             } finally {
-                (busy as MutableStateFlow).value = false
+                _busy.value = false
             }
         }
     }
@@ -66,7 +72,7 @@ class ReportViewModel(
     /** M7 紧急卡打印版 PDF。 */
     fun generateEmergencyCardPdf(onReady: (Intent) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
-            (busy as MutableStateFlow).value = true
+            _busy.value = true
             try {
                 val card = repo.emergencyCard()
                 val pdf = ReportPdfWriter.writeEmergencyCard(app, card)
@@ -74,7 +80,7 @@ class ReportViewModel(
             } catch (e: Exception) {
                 onError("紧急卡 PDF 生成失败：${e.message}")
             } finally {
-                (busy as MutableStateFlow).value = false
+                _busy.value = false
             }
         }
     }

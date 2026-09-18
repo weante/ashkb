@@ -1,7 +1,7 @@
 # ASHKB 开发交接文档
 
 > 本文档面向接手本仓库开发的 AI 会话（TraeWork Code 模式 / TraeCode）或人类工程师。
-> 记录截至 **v1.0.21**（versionCode 26，2026-09-18）的全部工程知识。
+> 记录截至 **v1.0.22**（versionCode 27，2026-09-18）的全部工程知识。
 > 应用本身介绍见 `README.md`，版本历史见 `CHANGELOG.md`。
 
 ## 1. 项目一句话
@@ -111,14 +111,14 @@ app/src/main/java/com/ashkb/app/
 
 ## 8. 当前状态与下一步
 
-- **最新版**：v1.0.21（versionCode 26），发布点 commit `cd7f989` 为 v1.0.20；v1.0.21 为知识库检索优化（Room v8→v9）
+- **最新版**：v1.0.22（versionCode 27）：v1.0.21 知识库检索优化（Room v8→v9）+ v1.0.22 清除 `as MutableStateFlow` 强转 44 处（BackupViewModel / ReportViewModel 统一为私有可变 + 只读暴露）
 - **数据安全**：v1.0.6 起 WebDAV 凭据 Keystore 加密、备份口令化、事务化写入，均已稳定；v1.0.19 起支持登录 WebDAV 后直接拉取远程备份列表选择恢复（新机无需先生成本地备份）；v1.0.20 起备份文件名带时间戳，同天多份不互相覆盖；v1.0.21 起知识库检索走单列 `search_text` + 查询防抖（旧备份恢复后自动回填该列）
 - **待办池**（用户视角，无承诺）：
-  - `as MutableStateFlow` 强转约 44 处（审查报告 P2）：可改为私有 `MutableStateFlow` + 只读 `StateFlow` 暴露
   - 化验 Tab 若历史数据继续增长可考虑分组折叠优化（现为异常置顶 + 正常项折叠 + 翻页，v1.0.7 已做）
   - WebDAV 非标准方法（PROPFIND / MKCOL）依赖反射改 `HttpURLConnection` 内部字段：换 Android 15 / 16 真机需回归验证（无替代方案，属设计取舍）
   - ViewModel 层 snackbar 文案 / NotificationHelper 通知文案 / PDF 直绘文本仍为硬编码（需注入 context，模式与 UI 层资源化不同，v1.0.10 §遗留）
 - **已关闭的旧待办**：
   - UI 改版方案未完成 PR 项——已核实唯一可确认编号的 PR4（文案资源化）在 v1.0.10 完成，方案原文已不在工作区
   - 知识库搜索 FTS4/索引（审查报告 P1）——v1.0.21 以「单列检索文本 + 防抖 + 上限」结项；**FTS4 方案经实测否决**（对中文子串零命中，详见 `domain/KbSearch.kt` 注释与 CHANGELOG v1.0.21）
+  - `as MutableStateFlow` 强转（审查报告 P2）——v1.0.22 清除全部 44 处，VM 状态流统一「私有 `_xxx` 可变 + 公开只读」
 - **测试基线**：114 条单测全绿；新增功能须同步补测（`app/src/test/.../`，7 个测试文件覆盖 backup / 加密 / 通用名键 / 运动分级 / 导入解析 / 排程计算 / 知识库检索）

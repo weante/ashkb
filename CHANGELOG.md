@@ -4,6 +4,21 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.22] — 2026-09-18
+
+技术债清理：ViewModel 状态流封装（代码审查报告 P2 项）。v1.0.21 可直接覆盖安装（无数据库与功能变更）。
+
+### 改进 · 清除 `as MutableStateFlow` 强转（44 处）
+
+- **背景**：`BackupViewModel` 与 `ReportViewModel` 此前的写法是 `val busy: StateFlow<Boolean> = MutableStateFlow(false)`——声明为只读类型、实参是可变实例，写入时再 `(busy as MutableStateFlow).value = true` 向下强转。这是运行时非受检转型：一旦有人把声明改成真正的只读实现（如 `stateIn` 产物），写入处会直接抛 `ClassCastException`，而编译期毫无提示
+- **改法**：统一为 MVVM 惯用的「私有可变 + 公开只读」——`private val _busy = MutableStateFlow(false)` 搭配 `val busy: StateFlow<Boolean> = _busy`，写入走 `_busy.value`。与既有 `_stage` / `_davUrl` 等正确写法对齐，外部（Screen）只能 collect 只读流，可变性收口在 VM 内部
+- 涉及 `BackupViewModel`（busy / message / davBackups / pendingRestore / pendingFileName / restoreResult，28 处）与 `ReportViewModel`（overview / trends / busy / message，16 处）；纯结构性重写，所有业务逻辑、消息文案、执行顺序逐行保持不变
+
+### 验证
+
+- 既有 114 条单测全部通过（本项为纯内部结构改动，无新可测纯逻辑，不新增测试）
+- release / debug 双包构建成功 + 正式签名验签；装机回归重点：备份 / WebDAV / 恢复 / 报表 PDF 各入口的 busy 与提示行为应与 v1.0.21 完全一致
+
 ## [v1.0.21] — 2026-09-18
 
 技术债清理：知识库检索优化（代码审查报告 P1 项）。v1.0.20 可直接覆盖安装（Room v8→v9 自动迁移）。
