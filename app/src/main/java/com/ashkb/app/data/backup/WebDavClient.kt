@@ -22,6 +22,9 @@ class WebDavClient(
 ) {
     class DavException(msg: String) : Exception(msg)
 
+    /** W4：远程备份条目——name 含备份日期，size 供列表展示（服务器未报告时为 -1）。 */
+    data class DavBackupFile(val name: String, val size: Long, val modified: String)
+
     private fun normalizedRoot(): String = serverUrl.trim().trimEnd('/')
 
     private fun url(path: String): URL {
@@ -226,6 +229,23 @@ class WebDavClient(
         }
     }
 
+    /**
+     * W4：PROPFIND Depth:1 列 backup 目录的备份文件（含大小/修改时间）。
+     * 与轮换用的 listBackupFileNames 不同——恢复场景用户必须知道失败原因，异常直接抛出。
+     */
+    fun listBackupFiles(): List<DavBackupFile> {
+        val conn = open("ashkb/backup/", "PROPFIND", depth = 1)
+        return try {
+            val code = conn.responseCode
+            if (code !in 200..299)
+                throw DavException("服务器拒绝列出目录（HTTP $code）——无法获取远程备份列表")
+            val xml = conn.inputStream.use { it.readBytes().decodeToString() }
+            parseDavBackups(xml)
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     companion object {
         /** 从 PROPFIND 多状态响应中提取本应用的备份文件名（纯 JVM 可单测）。 */
         fun parseBackupFileNames(xml: String): List<String> =
@@ -234,5 +254,29 @@ class WebDavClient(
                 .filter { it.startsWith("ashkb-backup-") && it.endsWith(".ashkb") }
                 .distinct()
                 .toList()
+
+        /**
+         * W4：按 response 块解析远程备份条目（href + getcontentlength + getlastmodified；
+         * 纯 JVM 可单测）。目录项与非 .ashkb 干扰文件被过滤；同名去重，按文件名倒序（最新在前）。
+         */
+        fun parseDavBackups(xml: String): List<DavBackupFile> {
+            val block = Regex("<(?:\\w+:)?response[^>]*>(.*?)</(?:\\w+:)?response>", RegexOption.DOT_MATCHES_ALL)
+            val href = Regex("<(?:\\w+:)?href>([^<]+)<")
+            val len = Regex("<(?:\\w+:)?getcontentlength>(\\d+)<")
+            val mod = Regex("<(?:\\w+:)?getlastmodified>([^<]+)<")
+            return block.findAll(xml).mapNotNull { m ->
+                val b = m.groupValues[1]
+                val name = href.find(b)?.groupValues?.get(1)
+                    ?.substringAfterLast('/')?.substringBefore('?') ?: return@mapNotNull null
+                if (!name.startsWith("ashkb-backup-") || !name.endsWith(".ashkb")) return@mapNotNull null
+                DavBackupFile(
+                    name = name,
+                    size = len.find(b)?.groupValues?.get(1)?.toLongOrNull() ?: -1L,
+                    modified = mod.find(b)?.groupValues?.get(1)?.trim() ?: "",
+                )
+            }.distinctBy { it.name }
+                .sortedByDescending { it.name }
+                .toList()
+        }
     }
 }

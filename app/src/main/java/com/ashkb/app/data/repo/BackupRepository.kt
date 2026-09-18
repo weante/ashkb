@@ -151,6 +151,30 @@ class BackupRepository(private val context: Context) {
             WebDavClient(url, user, pass).probe()
         }
 
+    // ---- W4：WebDAV 远程恢复 ----
+
+    /** 列出服务器 /ashkb/backup/ 下的备份；失败直接抛出——恢复场景用户须知道原因。 */
+    suspend fun listWebdavBackups(): List<WebDavClient.DavBackupFile> =
+        withContext(Dispatchers.IO) {
+            val (url, user, pass) = webdavConfig()
+            if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
+            requireHttps(url)
+            WebDavClient(url, user, pass).listBackupFiles()
+        }
+
+    /** 下载指定远程备份（随后走既有五步恢复：旁路解密 → pre-restore 快照 → 覆盖写入）。 */
+    suspend fun downloadWebdavBackup(name: String): ByteArray =
+        withContext(Dispatchers.IO) {
+            // name 来自刚拉取的远程列表，拼 URL 前再守一道：只放行本应用备份文件名形状
+            if (!name.startsWith("ashkb-backup-") || !name.endsWith(".ashkb") ||
+                name.contains('/') || name.contains('?')
+            ) throw WebDavClient.DavException("非法备份文件名：$name")
+            val (url, user, pass) = webdavConfig()
+            if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
+            requireHttps(url)
+            WebDavClient(url, user, pass).download(name)
+        }
+
     // ======================= 恢复 =======================
 
     class DecryptedFile(val payload: String, val schemaVersion: Int, val createdAt: String)

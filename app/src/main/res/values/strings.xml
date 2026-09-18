@@ -13,6 +13,11 @@
     <string name="backup_content_review">内容复核</string>
     <string name="backup_dav_config_title">WebDAV 远程备份配置</string>
     <string name="backup_dav_password_field">密码 / 应用密码（保存后加密存储，不回显）</string>
+    <string name="backup_dav_pick_empty">服务器上暂无备份——先用上方「备份到 WebDAV」生成第一份</string>
+    <string name="backup_dav_pick_loading">正在拉取远程备份列表…</string>
+    <string name="backup_dav_pick_note">服务器 /ashkb/backup/ 下的备份（保留日 7 / 周 4 / 月 6 份）。点击下载到本机，随后走旁路解密五步恢复。</string>
+    <string name="backup_dav_pick_refresh">刷新列表</string>
+    <string name="backup_dav_pick_title">从 WebDAV 选择备份</string>
     <string name="backup_dav_probe_note">三步探针：目录可写 → 写入探针回读一致 → 清理。上传后自动回读比对 SHA-256，</string>
     <string name="backup_dav_retention_note">保留日 7 / 周 4 / 月 6 份，路径 /ashkb/backup/。</string>
     <string name="backup_dav_section_title">WebDAV 远程备份（可选）</string>
@@ -43,6 +48,7 @@
     <string name="backup_profile_json_title">健康档案 JSON（换机建档）</string>
     <string name="backup_profile_save_share">保存 / 分享档案</string>
     <string name="backup_restore_execute">执行恢复（覆盖当前数据）</string>
+    <string name="backup_restore_from_dav">从 WebDAV 恢复</string>
     <string name="backup_restore_mode_full">完整回滚</string>
     <string name="backup_restore_mode_full_desc">先清空全部数据，再按备份重建——真正回到备份时点。备份时点之后新增的数据将全部丢失（误恢复可用 pre-restore 快照兜底找回）。</string>
     <string name="backup_restore_mode_merge">按表合并</string>

@@ -5,9 +5,11 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,6 +52,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 
 import com.ashkb.app.R
 import com.ashkb.app.data.backup.BackupEngine
+import com.ashkb.app.data.backup.WebDavClient
 import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.entity.LedgerStatus
 import com.ashkb.app.data.entity.LedgerType
@@ -88,7 +91,9 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
     var pickedBytes by remember { mutableStateOf<ByteArray?>(null) }
     var pickedName by remember { mutableStateOf<String?>(null) }
     var showDavSheet by remember { mutableStateOf(false) }
+    var showDavPickSheet by remember { mutableStateOf(false) }
     var showAllLedger by remember { mutableStateOf(false) }
+    val davPicked by vm.davPicked.collectAsState()
 
     val pickRestoreFile = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -118,6 +123,17 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
         message?.let {
             GlobalMessages.post(it)
             vm.clearMessage()
+        }
+    }
+
+    // W4：远程备份下载完成 → 等价本地选好文件，关 sheet 走五步恢复
+    LaunchedEffect(davPicked) {
+        davPicked?.let { (name, bytes) ->
+            pickedBytes = bytes
+            pickedName = name
+            vm.cancelRestore()
+            vm.consumeDavPicked()
+            showDavPickSheet = false
         }
     }
 
@@ -191,22 +207,28 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
 
             // ---- 恢复（协议 §6 五步） ----
             SectionCard(title = stringResource(R.string.backup_restore_title)) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Text(
-                        pickedName ?: stringResource(R.string.backup_no_file_selected),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
-                        color = if (pickedName == null) MaterialTheme.colorScheme.onSurfaceVariant
-                        else MaterialTheme.colorScheme.onSurface,
-                    )
+                Text(
+                    pickedName ?: stringResource(R.string.backup_no_file_selected),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.fillMaxWidth(),
+                    color = if (pickedName == null) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(Spacing.xs))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     OutlinedButton(
                         onClick = { pickRestoreFile.launch(arrayOf("*/*")) },
                         enabled = !busy,
+                        modifier = Modifier.heightIn(min = Size.touchMin),
                     ) { Text(stringResource(R.string.backup_select_file)) }
+                    OutlinedButton(
+                        onClick = {
+                            showDavPickSheet = true
+                            vm.loadDavBackups()
+                        },
+                        enabled = !busy && davUrl.isNotBlank(),
+                        modifier = Modifier.heightIn(min = Size.touchMin),
+                    ) { Text(stringResource(R.string.backup_restore_from_dav)) }
                 }
                 Spacer(Modifier.height(Spacing.xs))
                 OutlinedTextField(
@@ -378,6 +400,10 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
             onDismiss = { showDavSheet = false },
         )
     }
+
+    if (showDavPickSheet) {
+        DavBackupPickerSheet(vm = vm, busy = busy, onDismiss = { showDavPickSheet = false })
+    }
 }
 
 @Composable
@@ -418,6 +444,76 @@ private fun LedgerRow(l: BackupLedger) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+// ===== W4：WebDAV 远程备份选择 sheet =====
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DavBackupPickerSheet(vm: BackupViewModel, busy: Boolean, onDismiss: () -> Unit) {
+    val backups by vm.davBackups.collectAsState()
+    val stage by vm.stage.collectAsState()
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(stringResource(R.string.backup_dav_pick_title), style = MaterialTheme.typography.titleLarge)
+            Text(
+                stringResource(R.string.backup_dav_pick_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = { vm.loadDavBackups() }, enabled = !busy) {
+                Text(stringResource(R.string.backup_dav_pick_refresh))
+            }
+            if (busy) {
+                LoadingBlock(
+                    label = if (stage.isNotBlank()) stage
+                    else stringResource(R.string.backup_dav_pick_loading),
+                )
+            }
+            if (!busy && backups.isEmpty()) {
+                Text(
+                    stringResource(R.string.backup_dav_pick_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else if (backups.isNotEmpty()) {
+                DividerList(items = backups, key = { it.name }) { f ->
+                    DavBackupRow(f) { vm.downloadDavBackup(f.name) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.DavBackupRow(f: WebDavClient.DavBackupFile, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .weight(1f)
+            .clickable(onClick = onClick)
+            .padding(vertical = Spacing.xs),
+    ) {
+        Text(f.name, style = MaterialTheme.typography.titleSmall)
+        if (f.size >= 0) {
+            Text(
+                formatFileSize(f.size),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** 字节大小格式化（固定 Locale.US，避免部分 locale 小数点变逗号）。 */
+private fun formatFileSize(bytes: Long): String = when {
+    bytes >= 1_048_576L -> String.format(java.util.Locale.US, "%.1f MB", bytes / 1_048_576.0)
+    bytes >= 1_024L -> String.format(java.util.Locale.US, "%.0f KB", bytes / 1_024.0)
+    else -> "$bytes B"
 }
 
 // ===== WebDAV 配置 sheet（密码不回显，重新输入） =====

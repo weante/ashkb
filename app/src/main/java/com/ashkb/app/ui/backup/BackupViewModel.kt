@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import com.ashkb.app.AshkbApplication
 import com.ashkb.app.data.backup.BackupEngine
+import com.ashkb.app.data.backup.WebDavClient
 import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.repo.BackupRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +40,13 @@ class BackupViewModel(
     private val _davUser = MutableStateFlow("")
     val davUrl: StateFlow<String> = _davUrl
     val davUser: StateFlow<String> = _davUser
+
+    // ---- W4：WebDAV 远程恢复（列表 + 下载） ----
+    val davBackups: StateFlow<List<WebDavClient.DavBackupFile>> = MutableStateFlow(emptyList())
+
+    /** 一次性事件：远程备份下载完成（Screen 消费后清空，等价本地选好文件）。 */
+    private val _davPicked = MutableStateFlow<Pair<String, ByteArray>?>(null)
+    val davPicked: StateFlow<Pair<String, ByteArray>?> = _davPicked
 
     init {
         val (u, usr) = repo.webdavConfig()
@@ -119,6 +127,39 @@ class BackupViewModel(
             }
         }
     }
+
+    /** W4：拉取远程备份列表（sheet 打开与手动刷新时调用）。 */
+    fun loadDavBackups() {
+        if (!repo.webdavConfigured()) { fail("请先配置并测试 WebDAV 连接"); return }
+        viewModelScope.launch {
+            (busy as MutableStateFlow).value = true
+            try {
+                (davBackups as MutableStateFlow).value = repo.listWebdavBackups()
+            } catch (e: Exception) {
+                fail("拉取远程备份列表失败：${e.message}")
+            } finally { (busy as MutableStateFlow).value = false }
+        }
+    }
+
+    /** W4：下载选中的远程备份，完成后经 davPicked 交给 Screen（等价本地选好文件）。 */
+    fun downloadDavBackup(name: String) {
+        viewModelScope.launch {
+            (busy as MutableStateFlow).value = true
+            _stage.value = "正在从 WebDAV 下载 $name…"
+            try {
+                val bytes = repo.downloadWebdavBackup(name)
+                (davPicked as MutableStateFlow).value = name to bytes
+                info("已下载 $name（${bytes.size} 字节）——请输入该备份的口令做旁路解密与校验")
+            } catch (e: Exception) {
+                fail("下载远程备份失败：${e.message}")
+            } finally {
+                _stage.value = ""
+                (busy as MutableStateFlow).value = false
+            }
+        }
+    }
+
+    fun consumeDavPicked() { (davPicked as MutableStateFlow).value = null }
 
     // ======================= 恢复（协议 §6 五步） =======================
 

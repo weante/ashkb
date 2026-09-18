@@ -129,4 +129,76 @@ class BackupEngineTest {
         assertTrue(WebDavClient.parseBackupFileNames("").isEmpty())
         assertTrue(WebDavClient.parseBackupFileNames("<d:multistatus></d:multistatus>").isEmpty())
     }
+
+    // ======================= W4 远程恢复：PROPFIND 条目解析（含大小） =======================
+
+    @Test
+    fun `标准 PROPFIND 响应解析出备份条目（名称+大小+修改时间）`() {
+        val xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <d:multistatus xmlns:d="DAV:">
+              <d:response>
+                <d:href>/dav/ashkb/backup/ashkb-backup-2026-09-18.ashkb</d:href>
+                <d:propstat><d:prop>
+                  <d:getcontentlength>20480</d:getcontentlength>
+                  <d:getlastmodified>Fri, 18 Sep 2026 08:00:00 GMT</d:getlastmodified>
+                </d:prop></d:propstat>
+              </d:response>
+              <d:response>
+                <d:href>/dav/ashkb/backup/</d:href>
+              </d:response>
+            </d:multistatus>
+        """.trimIndent()
+        val files = WebDavClient.parseDavBackups(xml)
+        assertEquals(1, files.size)
+        assertEquals("ashkb-backup-2026-09-18.ashkb", files[0].name)
+        assertEquals(20480L, files[0].size)
+        assertEquals("Fri, 18 Sep 2026 08:00:00 GMT", files[0].modified)
+    }
+
+    @Test
+    fun `按文件名倒序（最新在前）且同名去重`() {
+        val xml = """
+            <D:multistatus xmlns:D="DAV:">
+              <D:response>
+                <D:href>https://example.com/dav/ashkb/backup/ashkb-backup-2026-09-17.ashkb</D:href>
+                <D:propstat><D:prop><D:getcontentlength>10240</D:getcontentlength></D:prop></D:propstat>
+              </D:response>
+              <D:response>
+                <D:href>/dav/ashkb/backup/ashkb-backup-2026-09-18.ashkb</D:href>
+              </D:response>
+              <D:response>
+                <D:href>/dav/ashkb/backup/ashkb-backup-2026-09-18.ashkb</D:href>
+              </D:response>
+            </D:multistatus>
+        """.trimIndent()
+        val files = WebDavClient.parseDavBackups(xml)
+        // 重复条目去重；无 getcontentlength 时 size 为 -1（UI 不显示大小行）；日期倒序
+        assertEquals(
+            listOf("ashkb-backup-2026-09-18.ashkb", "ashkb-backup-2026-09-17.ashkb"),
+            files.map { it.name },
+        )
+        assertEquals(-1L, files[0].size)
+        assertEquals(10240L, files[1].size)
+    }
+
+    @Test
+    fun `无命名空间与干扰内容不误收`() {
+        val xml = """
+            <multistatus xmlns="DAV:">
+              <response>
+                <href>/dav/ashkb/backup/ashkb-backup-2026-09-01.ashkb?x=1</href>
+              </response>
+              <response>
+                <href>/dav/ashkb/backup/notes-about-ashkb-backup-not-mine.txt</href>
+              </response>
+            </multistatus>
+        """.trimIndent()
+        // 带查询串的 href 取问号前文件名；非 .ashkb 干扰项过滤
+        val files = WebDavClient.parseDavBackups(xml)
+        assertEquals(listOf("ashkb-backup-2026-09-01.ashkb"), files.map { it.name })
+        // 空响应 / 无 response 块返回空
+        assertTrue(WebDavClient.parseDavBackups("").isEmpty())
+        assertTrue(WebDavClient.parseDavBackups("<d:multistatus></d:multistatus>").isEmpty())
+    }
 }
