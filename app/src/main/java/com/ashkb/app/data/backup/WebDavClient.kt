@@ -195,15 +195,17 @@ class WebDavClient(
      * W1：PROPFIND Depth:1 一次列目录，只 DELETE 服务器上真实存在且超窗的备份——
      * 原实现逐日盲发 173 个 DELETE（多数 404 也各要一次完整 TLS 握手），坚果云上
      * 数分钟无反馈；列目录失败（服务器禁列）则本轮跳过，下轮再清，不阻塞备份。
+     * X2：文件名带时间戳后同日可有多份——按日分组，保留集合内每天只留最晚一份。
      */
     fun rotate(keepDaily: Int = 7, keepWeekly: Int = 4, keepMonthly: Int = 6): List<String> {
         val today = java.time.LocalDate.now()
-        val keep = buildSet {
+        val keepDates = buildSet {
             (0 until keepDaily).forEach { add(today.minusDays(it.toLong())) }
             (0 until keepWeekly).forEach { add(today.minusWeeks(it.toLong())) }
             (0 until keepMonthly).forEach { add(today.minusMonths(it.toLong())) }
-        }.map { "ashkb-backup-${it}.ashkb" }.toSet()
+        }.map { it.toString() }.toSet()
         val existing = listBackupFileNames()
+        val keep = dailyKeep(existing, keepDates)
         val removed = mutableListOf<String>()
         existing.filter { it !in keep }.forEach { name ->
             val conn = open("ashkb/backup/$name", "DELETE")
@@ -256,8 +258,30 @@ class WebDavClient(
                 .toList()
 
         /**
+         * X2：备份文件名 → 可比较的规范化 key。
+         * 新格式（带 HHmmss）取原样；旧按日格式补 -000000（视为当日 00:00:00，
+         * 避免裸字典序里 '.' > '-' 把旧文件排到新文件之后）。
+         */
+        fun backupSortKey(name: String): String {
+            val stem = name.removePrefix("ashkb-backup-").removeSuffix(".ashkb")
+            return if (stem.length > 10) stem else "$stem-000000"
+        }
+
+        /**
+         * X2：按日分组的轮换保留集合——保留日期内每天只留最晚一份（同日多份时间戳不
+         * 互相覆盖，但在下次轮换时旧的清掉，维持「日 7 + 周 4 + 月 6」的总量语义）。
+         */
+        fun dailyKeep(existing: List<String>, keepDates: Set<String>): Set<String> =
+            existing
+                .groupBy { it.removePrefix("ashkb-backup-").take(10) }
+                .mapNotNull { (day, names) ->
+                    if (day in keepDates) names.maxByOrNull { backupSortKey(it) } else null
+                }
+                .toSet()
+
+        /**
          * W4：按 response 块解析远程备份条目（href + getcontentlength + getlastmodified；
-         * 纯 JVM 可单测）。目录项与非 .ashkb 干扰文件被过滤；同名去重，按文件名倒序（最新在前）。
+         * 纯 JVM 可单测）。目录项与非 .ashkb 干扰文件被过滤；同名去重，按备份时间倒序（最新在前）。
          */
         fun parseDavBackups(xml: String): List<DavBackupFile> {
             val block = Regex("<(?:\\w+:)?response[^>]*>(.*?)</(?:\\w+:)?response>", RegexOption.DOT_MATCHES_ALL)
@@ -275,7 +299,7 @@ class WebDavClient(
                     modified = mod.find(b)?.groupValues?.get(1)?.trim() ?: "",
                 )
             }.distinctBy { it.name }
-                .sortedByDescending { it.name }
+                .sortedByDescending { backupSortKey(it.name) }
                 .toList()
         }
     }

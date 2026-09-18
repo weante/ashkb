@@ -14,6 +14,7 @@
     <string name="backup_dav_config_title">WebDAV 远程备份配置</string>
     <string name="backup_dav_password_field">密码 / 应用密码（保存后加密存储，不回显）</string>
     <string name="backup_dav_pick_empty">服务器上暂无备份——先用上方「备份到 WebDAV」生成第一份</string>
+    <string name="backup_dav_restore_hint">换新机恢复：先在上方「配置 WebDAV」登录同一账号，即可直接拉取服务器上的历史备份恢复，无需先在本机生成备份。</string>
     <string name="backup_dav_pick_loading">正在拉取远程备份列表…</string>
     <string name="backup_dav_pick_note">服务器 /ashkb/backup/ 下的备份（保留日 7 / 周 4 / 月 6 份）。点击下载到本机，随后走旁路解密五步恢复。</string>
     <string name="backup_dav_pick_refresh">刷新列表</string>
@@ -635,6 +636,10 @@
     <string name="lab_dialog_title">%1$s 化验结果</string>
     <string name="lab_expand_normal">展开正常项（%1$s）</string>
     <string name="lab_hospital_suffix">" · 医院：%1$s"</string>
+    <string name="lab_ref_range_both">参考范围 %1$s – %2$s</string>
+    <string name="lab_ref_range_max">参考范围 ≤%1$s</string>
+    <string name="lab_ref_range_min">参考范围 ≥%1$s</string>
+    <string name="lab_ref_range_missing">该指标未记录参考范围（录入/AI 导入时未提供）</string>
     <string name="lab_value_high">%1$s 偏高</string>
     <string name="lab_value_low">%1$s 偏低</string>
     <string name="me_in_use_prefix">"在用 %1$s 种 · "</string>

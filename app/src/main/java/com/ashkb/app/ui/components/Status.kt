@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,12 +52,15 @@ fun StatusChip(
     text: String,
     tone: StatusTone = StatusTone.Neutral,
     icon: ImageVector? = null,
+    onClick: (() -> Unit)? = null,
 ) {
     val (bg, fg) = tone.colors()
     Surface(
         shape = CircleShape,
         color = bg,
-        modifier = Modifier.height(Size.chipHeight),
+        modifier = Modifier
+            .height(Size.chipHeight)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = Spacing.sm),

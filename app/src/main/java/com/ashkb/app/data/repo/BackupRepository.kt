@@ -23,7 +23,7 @@ import java.time.format.DateTimeFormatter
 
 /**
  * P4 备份仓库（R20）：编排 BackupEngine + VaultCipher + WebDavClient + 备份台账。
- * 全量备份文件名遵循协议：本机导出 ashkb-YYYYMMDD.ashkb，WebDAV ashkb-backup-YYYYMMDD.ashkb。
+ * 全量备份文件名遵循协议：本机导出 ashkb-YYYYMMDD.ashkb，WebDAV ashkb-backup-YYYY-MM-DD-HHmmss.ashkb（X2 带时间戳，同天多份不覆盖）。
  */
 class BackupRepository(private val context: Context) {
     private val db = AppDatabase.get(context)
@@ -128,7 +128,10 @@ class BackupRepository(private val context: Context) {
         val exported = BackupEngine.export(supportDb(), nowIso())
         onStage("正在加密（AES-256-GCM）…")
         val bytes = VaultCipher.encrypt(password, exported.payload, BackupEngine.schemaVersion(supportDb()), nowIso())
-        val name = "ashkb-backup-${LocalDate.now()}.ashkb"
+        // X2：文件名带时间戳——同一天多次备份不再互相覆盖（旧按日命名 PUT 同名即覆盖）
+        val name = "ashkb-backup-" +
+            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmmss")) +
+            ".ashkb"
         try {
             onStage("正在上传到 WebDAV…")
             val upMsg = client.upload(name, bytes)

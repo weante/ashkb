@@ -201,4 +201,70 @@ class BackupEngineTest {
         assertTrue(WebDavClient.parseDavBackups("").isEmpty())
         assertTrue(WebDavClient.parseDavBackups("<d:multistatus></d:multistatus>").isEmpty())
     }
+
+    // ======================= X2 时间戳文件名：排序键与按日轮换保留 =======================
+
+    @Test
+    fun `backupSortKey 旧按日格式补零视为当日零点`() {
+        // 新格式（带 HHmmss）原样；旧格式补 -000000——裸字典序里 '.' > '-' 会把旧文件排错
+        assertEquals("2026-09-18-000000", WebDavClient.backupSortKey("ashkb-backup-2026-09-18.ashkb"))
+        assertEquals(
+            "2026-09-18-142530",
+            WebDavClient.backupSortKey("ashkb-backup-2026-09-18-142530.ashkb"),
+        )
+        // 同日新旧混合时：旧（00:00:00）早于任何带时间戳的新份
+        assertTrue(
+            WebDavClient.backupSortKey("ashkb-backup-2026-09-18.ashkb") <
+                WebDavClient.backupSortKey("ashkb-backup-2026-09-18-010101.ashkb"),
+        )
+    }
+
+    @Test
+    fun `dailyKeep 保留日内取最晚一份且超窗日期全清`() {
+        val existing = listOf(
+            "ashkb-backup-2026-09-18.ashkb",           // 今日旧格式（00:00:00）
+            "ashkb-backup-2026-09-18-093000.ashkb",     // 今日上午
+            "ashkb-backup-2026-09-18-142530.ashkb",     // 今日下午（应保留）
+            "ashkb-backup-2026-09-17-080000.ashkb",     // 昨日（在保留窗口）
+            "ashkb-backup-2026-09-10.ashkb",            // 8 天前旧格式（超窗，清）
+        )
+        val keep = WebDavClient.dailyKeep(existing, setOf("2026-09-18", "2026-09-17"))
+        assertEquals(
+            setOf("ashkb-backup-2026-09-18-142530.ashkb", "ashkb-backup-2026-09-17-080000.ashkb"),
+            keep,
+        )
+    }
+
+    @Test
+    fun `dailyKeep 保留日内旧格式与旧时间戳并存取时间戳份`() {
+        // 同日：旧按日格式 vs 旧时间戳份（如 07:00:00）——时间戳份更晚
+        val existing = listOf(
+            "ashkb-backup-2026-09-18.ashkb",
+            "ashkb-backup-2026-09-18-070000.ashkb",
+        )
+        val keep = WebDavClient.dailyKeep(existing, setOf("2026-09-18"))
+        assertEquals(setOf("ashkb-backup-2026-09-18-070000.ashkb"), keep)
+    }
+
+    @Test
+    fun `parseDavBackups 时间戳文件按时间倒序（新在前）`() {
+        val xml = """
+            <d:multistatus xmlns:d="DAV:">
+              <d:response><d:href>/dav/ashkb/backup/ashkb-backup-2026-09-18.ashkb</d:href></d:response>
+              <d:response><d:href>/dav/ashkb/backup/ashkb-backup-2026-09-18-142530.ashkb</d:href></d:response>
+              <d:response><d:href>/dav/ashkb/backup/ashkb-backup-2026-09-18-093000.ashkb</d:href></d:response>
+              <d:response><d:href>/dav/ashkb/backup/ashkb-backup-2026-09-17.ashkb</d:href></d:response>
+            </d:multistatus>
+        """.trimIndent()
+        // 同日三份：下午 > 上午 > 旧按日（零点）；17 日排最后
+        assertEquals(
+            listOf(
+                "ashkb-backup-2026-09-18-142530.ashkb",
+                "ashkb-backup-2026-09-18-093000.ashkb",
+                "ashkb-backup-2026-09-18.ashkb",
+                "ashkb-backup-2026-09-17.ashkb",
+            ),
+            WebDavClient.parseDavBackups(xml).map { it.name },
+        )
+    }
 }

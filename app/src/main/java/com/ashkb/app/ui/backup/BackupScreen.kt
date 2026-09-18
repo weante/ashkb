@@ -230,6 +230,14 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                         modifier = Modifier.heightIn(min = Size.touchMin),
                     ) { Text(stringResource(R.string.backup_restore_from_dav)) }
                 }
+                if (davUrl.isBlank()) {
+                    // X3：新机引导——无需先在本机生成任何备份，配置好 WebDAV 即可拉取服务器历史备份
+                    Text(
+                        stringResource(R.string.backup_dav_restore_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Spacer(Modifier.height(Spacing.xs))
                 OutlinedTextField(
                     value = restorePass, onValueChange = { restorePass = it },

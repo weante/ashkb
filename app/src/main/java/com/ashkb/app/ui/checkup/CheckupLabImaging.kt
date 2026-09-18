@@ -66,24 +66,52 @@ import com.ashkb.app.ui.theme.StatusTone
 // ===== 化验值展示：异常不再只用红色——偏高/偏低分方向三重编码 =====
 
 @Composable
-private fun LabValue(valueText: String, unit: String?, abnormal: String?) {
+private fun LabValue(valueText: String, unit: String?, abnormal: String?, onClick: (() -> Unit)? = null) {
     val text = listOfNotNull(valueText, unit).joinToString(" ")
     when (abnormal) {
-        "high" -> StatusChip(text = stringResource(R.string.lab_value_high, text), tone = StatusTone.Danger, icon = Icons.Rounded.TrendingUp)
-        "low" -> StatusChip(text = stringResource(R.string.lab_value_low, text), tone = StatusTone.Warning, icon = Icons.Rounded.TrendingDown)
+        "high" -> StatusChip(text = stringResource(R.string.lab_value_high, text), tone = StatusTone.Danger, icon = Icons.Rounded.TrendingUp, onClick = onClick)
+        "low" -> StatusChip(text = stringResource(R.string.lab_value_low, text), tone = StatusTone.Warning, icon = Icons.Rounded.TrendingDown, onClick = onClick)
         else -> Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
+private fun fmtDouble(v: Double): String = "%.2f".format(v).trimEnd('0').trimEnd('.')
+
 private fun labValueText(lab: LabResult): String =
-    lab.value?.let { "%.2f".format(it).trimEnd('0').trimEnd('.') } ?: lab.valueText ?: "-"
+    lab.value?.let { fmtDouble(it) } ?: lab.valueText ?: "-"
 
 private fun LabResult.isAbnormal() = abnormal == "high" || abnormal == "low"
 
+/** X1：该指标的参考范围文案（refLow/refHigh 缺一侧时按 ≥/≤ 表述；都缺则如实说明）。 */
+@Composable
+private fun refRangeText(lab: LabResult): String {
+    val unit = lab.unit?.let { " $it" } ?: ""
+    return when {
+        lab.refLow != null && lab.refHigh != null ->
+            stringResource(R.string.lab_ref_range_both, fmtDouble(lab.refLow!!), fmtDouble(lab.refHigh!!)) + unit
+        lab.refHigh != null -> stringResource(R.string.lab_ref_range_max, fmtDouble(lab.refHigh!!)) + unit
+        lab.refLow != null -> stringResource(R.string.lab_ref_range_min, fmtDouble(lab.refLow!!)) + unit
+        else -> stringResource(R.string.lab_ref_range_missing)
+    }
+}
+
+/** X1：点击偏高/偏低胶囊展开该指标的参考范围——复诊沟通时「正常值是多少」张口就来。 */
 @Composable
 private fun RowScope.LabRow(lab: LabResult) {
-    Text(lab.testName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-    LabValue(labValueText(lab), lab.unit, lab.abnormal)
+    var showRef by remember { mutableStateOf(false) }
+    Column(Modifier.weight(1f)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(lab.testName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            LabValue(labValueText(lab), lab.unit, lab.abnormal, onClick = if (lab.isAbnormal()) ({ showRef = !showRef }) else null)
+        }
+        if (showRef) {
+            Text(
+                refRangeText(lab),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 /** 化验分组：异常项置顶，正常项默认折叠——复诊沟通先看要紧的。 */
