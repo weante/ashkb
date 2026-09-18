@@ -193,11 +193,13 @@ object ReportPdfWriter {
             }
         }
 
-        d.h2("近 180 天化验（${r.labs.size} 项）")
+        // U8：复诊报告只列异常项（医生关注点），正常项仅计数
         val abnormal = r.labs.filter { !it.abnormal.isNullOrBlank() && it.abnormal != "normal" }
+        d.h2("近 180 天化验异常项（${abnormal.size} / ${r.labs.size} 项）")
         if (r.labs.isEmpty()) d.line("（无化验记录）")
+        else if (abnormal.isEmpty()) d.line("（期间化验均在参考范围内——仅列异常项，正常项略）")
         else {
-            r.labs.take(20).forEach { l ->
+            abnormal.take(20).forEach { l ->
                 val v = l.value?.let { "%.2f".format(it) } ?: (l.valueText ?: "-")
                 val flag = when (l.abnormal) {
                     "high" -> " ↑ 高"; "low" -> " ↓ 低"; "abnormal" -> " ⚠ 异常"; else -> ""
@@ -205,7 +207,7 @@ object ReportPdfWriter {
                 d.line("  ${l.date} ${l.testName}：$v${l.unit?.let { " $it" } ?: ""}$flag" +
                     (l.refLow?.let { lo -> l.refHigh?.let { hi -> "（参考 $lo–$hi）" } } ?: ""), flag.isNotBlank())
             }
-            if (r.labs.size > 20) d.line("  …另有 ${r.labs.size - 20} 项未列出")
+            if (abnormal.size > 20) d.line("  …另有 ${abnormal.size - 20} 项异常未列出")
         }
 
         d.h2("近 180 天复诊记录（${r.checkups.size} 次）")

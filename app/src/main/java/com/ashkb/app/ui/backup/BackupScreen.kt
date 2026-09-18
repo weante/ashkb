@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cancel
@@ -44,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 
 import com.ashkb.app.R
@@ -59,6 +61,12 @@ import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.theme.Clinical
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
+
+/** U6：口令框统一密码键盘——Password 类型让输入法（含微信输入法）关闭候选词/联想。 */
+private val PassKeyboard = KeyboardOptions(
+    keyboardType = KeyboardType.Password,
+    autoCorrect = false,
+)
 
 /** P4 R20 备份与数据自主页（协议 §3–§6）。 */
 @Composable
@@ -137,6 +145,8 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                     value = backupPass, onValueChange = { backupPass = it },
                     label = { Text(stringResource(R.string.backup_password_field)) },
                     visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = PassKeyboard,
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(Spacing.sm))
@@ -202,6 +212,8 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                     value = restorePass, onValueChange = { restorePass = it },
                     label = { Text(stringResource(R.string.backup_file_password)) },
                     visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = PassKeyboard,
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(Spacing.sm))
@@ -441,6 +453,8 @@ private fun WebDavSheet(vm: BackupViewModel, initialUrl: String, initialUser: St
                 value = davPass, onValueChange = { davPass = it },
                 label = { Text(stringResource(R.string.backup_dav_password_field)) },
                 visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = PassKeyboard,
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             Button(

@@ -1,6 +1,7 @@
 package com.ashkb.app.ui.wellness
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -83,10 +85,12 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
 
     var showVitals by remember { mutableStateOf(false) }
     var showWeight by remember { mutableStateOf(false) }
+    var showWeightManage by remember { mutableStateOf(false) }
     var showBodyMeasure by remember { mutableStateOf(false) }
     var showSupplementForm by remember { mutableStateOf(false) }
     var showDietForm by remember { mutableStateOf(false) }
     var showAvoidManage by remember { mutableStateOf(false) }
+    var historySup by remember { mutableStateOf<Supplement?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         ScreenTopBar(title = stringResource(R.string.nutrition_bone_health_title), onBack = onBack)
@@ -110,8 +114,15 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
                     title = stringResource(R.string.wellness_weight_tracking),
                     subtitle = if (weightList.isEmpty()) null else stringResource(R.string.wellness_weight_records, weightList.size),
                     action = {
-                        OutlinedButton(onClick = { showWeight = true }) {
-                            Text(if (weight != null) stringResource(R.string.common_edit) else stringResource(R.string.common_record))
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                            OutlinedButton(onClick = { showWeight = true }) {
+                                Text(if (weight != null) stringResource(R.string.common_edit) else stringResource(R.string.common_record))
+                            }
+                            if (weightList.isNotEmpty()) {
+                                TextButton(onClick = { showWeightManage = true }) {
+                                    Text(stringResource(R.string.common_manage))
+                                }
+                            }
                         }
                     },
                 ) {
@@ -173,7 +184,7 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
                     } else {
                         DividerList(supplements, key = { it.id }) { sup ->
                             Column(
-                                Modifier.weight(1f),
+                                Modifier.weight(1f).clickable { historySup = sup },
                                 verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
                             ) {
                                 Text("${sup.name} ${sup.dose}", style = MaterialTheme.typography.bodyMedium)
@@ -191,7 +202,18 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
                                     vm.checkInSupplement(sup, "done", null, null)
                                 }) { Text(stringResource(R.string.exercise_checkin_short)) }
                             }
+                            DestructiveAction(
+                                label = stringResource(R.string.common_delete),
+                                confirmTitle = stringResource(R.string.wellness_delete_confirm, sup.name),
+                                confirmBody = stringResource(R.string.nutrition_supplement_delete_note),
+                                onConfirm = { vm.deleteSupplement(sup.id) },
+                            )
                         }
+                        Text(
+                            stringResource(R.string.nutrition_supplement_history_hint),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
@@ -262,10 +284,12 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
 
     if (showVitals) VitalsSheet(vm = vm, onDismiss = { showVitals = false })
     if (showWeight) WeightSheet(vm = vm, onDismiss = { showWeight = false })
+    if (showWeightManage) WeightManageSheet(vm = vm, onDismiss = { showWeightManage = false })
     if (showBodyMeasure) BodyMeasureSheet(vm = vm, onDismiss = { showBodyMeasure = false })
     if (showSupplementForm) SupplementSheet(vm = vm, onDismiss = { showSupplementForm = false })
     if (showDietForm) DietSheet(vm = vm, current = diet, onDismiss = { showDietForm = false })
     if (showAvoidManage) AvoidManageSheet(vm = vm, onDismiss = { showAvoidManage = false })
+    historySup?.let { sup -> SupplementHistorySheet(vm = vm, sup = sup, onDismiss = { historySup = null }) }
 }
 
 /** 分组头：sticky。吸附时用页面底色融入背景，底边 1dp 分隔。 */
@@ -407,6 +431,18 @@ private fun VitalsSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
                     onDismiss()
                 },
             )
+            if (current != null) {
+                DestructiveAction(
+                    label = stringResource(R.string.wellness_delete_today_vitals),
+                    confirmTitle = stringResource(R.string.wellness_delete_vitals_confirm),
+                    confirmBody = stringResource(R.string.wellness_delete_vitals_note),
+                    onConfirm = {
+                        vm.deleteVitalsToday()
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }
@@ -441,11 +477,20 @@ private fun WeightSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
 @Composable
 private fun BodyMeasureSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
     val current by vm.bodyMeasureLatest.collectAsState()
+    val weightList by vm.weightRecent.collectAsState()
     var height by remember { mutableStateOf(current?.heightCm?.toString() ?: "") }
     var waist by remember { mutableStateOf(current?.waistCm?.toString() ?: "") }
     var hip by remember { mutableStateOf(current?.hipCm?.toString() ?: "") }
     var bmi by remember { mutableStateOf(current?.bmi?.toString() ?: "") }
     var notes by remember { mutableStateOf(current?.notes ?: "") }
+
+    // U2：身高 + 最新体重齐备 → BMI 自动回填（仍可手动覆盖）；身高明显异常（<50 或 >250cm）不参与计算
+    val weightKg = weightList.firstOrNull()?.weightKg
+    val heightNum = height.toDoubleOrNull()
+    val autoBmi = if (weightKg != null && heightNum != null && heightNum in 50.0..250.0) {
+        String.format(java.util.Locale.US, "%.1f", weightKg / ((heightNum / 100) * (heightNum / 100)))
+    } else null
+    LaunchedEffect(autoBmi) { if (autoBmi != null) bmi = autoBmi }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
@@ -454,6 +499,12 @@ private fun BodyMeasureSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
             OutlinedTextField(waist, { waist = it }, label = { Text(stringResource(R.string.vitals_waist_cm)) }, singleLine = true)
             OutlinedTextField(hip, { hip = it }, label = { Text(stringResource(R.string.vitals_hip_cm)) }, singleLine = true)
             OutlinedTextField(bmi, { bmi = it }, label = { Text(stringResource(R.string.profile_bmi_auto)) }, singleLine = true)
+            Text(
+                if (weightKg != null) stringResource(R.string.vitals_bmi_auto_note, "%.1f".format(weightKg))
+                else stringResource(R.string.vitals_bmi_need_weight),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
@@ -468,6 +519,18 @@ private fun BodyMeasureSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
                     onDismiss()
                 },
             )
+            if (current != null) {
+                DestructiveAction(
+                    label = stringResource(R.string.wellness_delete_this_record),
+                    confirmTitle = stringResource(R.string.wellness_delete_body_confirm),
+                    confirmBody = stringResource(R.string.wellness_delete_body_note),
+                    onConfirm = {
+                        vm.deleteBodyMeasureLatest()
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }
@@ -566,6 +629,18 @@ private fun DietSheet(vm: WellnessViewModel, current: DietProfile?, onDismiss: (
                     onDismiss()
                 },
             )
+            if (current != null) {
+                DestructiveAction(
+                    label = stringResource(R.string.wellness_clear_diet_profile),
+                    confirmTitle = stringResource(R.string.nutrition_delete_profile_confirm),
+                    confirmBody = stringResource(R.string.nutrition_delete_profile_note),
+                    onConfirm = {
+                        vm.deleteDietProfile()
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }
@@ -715,6 +790,88 @@ private fun ChipGroup(options: List<Pair<String, String>>, selected: String, onS
                 label = { Text(label) },
                 modifier = Modifier.heightIn(min = Size.touchMin),
             )
+        }
+    }
+}
+
+/** U3 补剂服用历史：近 90 天打卡（done）按日倒序；「我什么时候吃过」一查即知。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SupplementHistorySheet(vm: WellnessViewModel, sup: Supplement, onDismiss: () -> Unit) {
+    val history by remember(sup.id) { vm.observeSupplementHistory(sup) }.collectAsState(initial = emptyList())
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        SheetColumn {
+            Text("${sup.name} ${sup.dose}", style = MaterialTheme.typography.titleLarge)
+            Text(
+                if (history.isEmpty()) stringResource(R.string.nutrition_supplement_history_empty, sup.name)
+                else stringResource(R.string.nutrition_supplement_history_count, history.size),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (history.isNotEmpty()) {
+                DividerList(history, key = { it.id }) { log ->
+                    Column(
+                        Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+                    ) {
+                        Text(log.date, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            stringResource(
+                                R.string.nutrition_supplement_history_entry,
+                                (log.takenAt ?: log.recordedAt).take(16).replace("T", " "),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** U4 体重记录管理：近 30 天逐条删除（误录）。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WeightManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
+    val weightList by vm.weightRecent.collectAsState()
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        SheetColumn {
+            Text(stringResource(R.string.wellness_weight_manage_title), style = MaterialTheme.typography.titleLarge)
+            if (weightList.isEmpty()) {
+                Text(
+                    stringResource(R.string.common_no_records),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                DividerList(weightList, key = { it.id }) { log ->
+                    Column(
+                        Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+                    ) {
+                        Text(
+                            stringResource(R.string.wellness_weight_entry, log.date, "%.1f".format(log.weightKg)),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        log.notes?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    DestructiveAction(
+                        label = stringResource(R.string.common_delete),
+                        confirmTitle = stringResource(R.string.wellness_delete_weight_confirm, log.date),
+                        confirmBody = stringResource(R.string.wellness_delete_weight_note),
+                        onConfirm = { vm.deleteWeight(log.id) },
+                    )
+                }
+            }
         }
     }
 }

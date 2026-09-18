@@ -69,9 +69,19 @@ class WellnessViewModel(private val repo: HealthRepository) : ViewModel() {
         }
     }
 
+    /** U4 删除今日体征（误录） */
+    fun deleteVitalsToday() {
+        viewModelScope.launch { vitalsToday.value?.let { repo.deleteVitals(it.id) } }
+    }
+
     // ---- 体重 ----
     fun saveWeight(weightKg: Double, notes: String?) {
         viewModelScope.launch { repo.saveWeight(dateStr, weightKg, notes) }
+    }
+
+    /** U4 删除单条体重记录（误录） */
+    fun deleteWeight(id: String) {
+        viewModelScope.launch { repo.deleteWeight(id) }
     }
 
     // ---- 身体指标 ----
@@ -87,6 +97,11 @@ class WellnessViewModel(private val repo: HealthRepository) : ViewModel() {
         }
     }
 
+    /** U4 删除最新一条身体指标（误录） */
+    fun deleteBodyMeasureLatest() {
+        viewModelScope.launch { bodyMeasureLatest.value?.let { repo.deleteBodyMeasure(it.id) } }
+    }
+
     // ---- 补剂 ----
     fun saveSupplement(supp: Supplement) {
         viewModelScope.launch { repo.saveSupplement(supp) }
@@ -95,6 +110,14 @@ class WellnessViewModel(private val repo: HealthRepository) : ViewModel() {
     fun archiveSupplement(id: String) {
         viewModelScope.launch { repo.archiveSupplement(id) }
     }
+
+    fun deleteSupplement(id: String) {
+        viewModelScope.launch { repo.deleteSupplement(id) }
+    }
+
+    /** U3 单个补剂的服用历史流（近 90 天，仅 done） */
+    fun observeSupplementHistory(sup: Supplement) =
+        repo.observeSupplementHistory(sup.id, sup.name)
 
     fun checkInSupplement(supp: Supplement, status: String, reason: String?, notes: String?) {
         viewModelScope.launch {
@@ -113,6 +136,11 @@ class WellnessViewModel(private val repo: HealthRepository) : ViewModel() {
     // ---- 饮食画像 ----
     fun saveDietProfile(profile: DietProfile) {
         viewModelScope.launch { repo.saveDietProfile(profile) }
+    }
+
+    /** U4 清除饮食画像（回到未设置态） */
+    fun deleteDietProfile() {
+        viewModelScope.launch { repo.deleteDietProfile() }
     }
 
     // ---- 忌口清单 ----

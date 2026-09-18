@@ -256,6 +256,10 @@ interface SupplementDao {
 
     @Query("UPDATE supplements SET is_archived = 1, updated_at = :now WHERE id = :id")
     suspend fun archive(id: String, now: String)
+
+    /** U1 真删（误录/停用后清理档案）；历史 supplement_logs 快照自持，不受影响 */
+    @Query("DELETE FROM supplements WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao
@@ -268,6 +272,11 @@ interface SupplementLogDao {
 
     @Query("SELECT * FROM supplement_logs WHERE sup_id = :supId AND date = :date AND slot_key = :slotKey")
     suspend fun find(supId: String, date: String, slotKey: String?): SupplementLog?
+
+    /** U3 服用历史：按 sup_id 弱引用或名称快照匹配（补剂真删后仍可按快照追历史），日期窗口近 90 天 */
+    @Query("SELECT * FROM supplement_logs WHERE (sup_id = :supId OR (sup_id IS NULL AND sup_name = :name)) " +
+        "AND status = 'done' AND date >= :fromDate ORDER BY date DESC, recorded_at DESC")
+    fun observeHistoryFor(supId: String, name: String, fromDate: String): Flow<List<SupplementLog>>
 
     @Upsert
     suspend fun upsert(log: SupplementLog)
@@ -283,6 +292,10 @@ interface VitalsDao {
 
     @Query("SELECT * FROM vitals WHERE date BETWEEN :from AND :to ORDER BY date, recorded_at")
     fun observeBetween(from: String, to: String): Flow<List<Vitals>>
+
+    /** U4 误录删除 */
+    @Query("DELETE FROM vitals WHERE id = :id")
+    suspend fun delete(id: String)
 
     @Upsert
     suspend fun upsert(vitals: Vitals)
@@ -303,6 +316,10 @@ interface WeightLogDao {
     @Query("SELECT * FROM weight_logs ORDER BY date DESC LIMIT :limit")
     suspend fun recent(limit: Int = 90): List<WeightLog>
 
+    /** U4 误录删除 */
+    @Query("DELETE FROM weight_logs WHERE id = :id")
+    suspend fun delete(id: String)
+
     @Upsert
     suspend fun upsert(log: WeightLog)
 }
@@ -315,6 +332,10 @@ interface BodyMeasureDao {
     @Query("SELECT * FROM body_measures ORDER BY date DESC LIMIT :limit")
     fun observeRecent(limit: Int = 10): Flow<List<BodyMeasure>>
 
+    /** U4 误录删除 */
+    @Query("DELETE FROM body_measures WHERE id = :id")
+    suspend fun delete(id: String)
+
     @Upsert
     suspend fun upsert(measure: BodyMeasure)
 }
@@ -326,6 +347,10 @@ interface DietProfileDao {
 
     @Query("SELECT * FROM diet_profile WHERE id = 1")
     suspend fun get(): DietProfile?
+
+    /** U4 清除画像（回到未设置态） */
+    @Query("DELETE FROM diet_profile WHERE id = 1")
+    suspend fun delete()
 
     @Upsert
     suspend fun upsert(profile: DietProfile)

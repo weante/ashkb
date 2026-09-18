@@ -255,6 +255,10 @@ class HealthRepository(private val context: Context) {
     fun observeSupplements(): Flow<List<Supplement>> = supplementDao.observeActive()
     fun observeSupplementLogs(date: String): Flow<List<SupplementLog>> = supplementLogDao.observeByDate(date)
 
+    /** U3 单个补剂的服用历史（近 90 天，仅 done） */
+    fun observeSupplementHistory(supId: String, name: String): Flow<List<SupplementLog>> =
+        supplementLogDao.observeHistoryFor(supId, name, LocalDate.now().minusDays(90).toString())
+
     suspend fun saveSupplement(supp: Supplement) {
         val now = nowIso()
         val toSave = if (supp.id.isBlank()) supp.copy(id = Ids.new("sup"), createdAt = now, updatedAt = now)
@@ -263,6 +267,9 @@ class HealthRepository(private val context: Context) {
     }
 
     suspend fun archiveSupplement(id: String) = supplementDao.archive(id, nowIso())
+
+    /** U1 真删（supplement_logs 快照自持，历史不受影响） */
+    suspend fun deleteSupplement(id: String) = supplementDao.delete(id)
 
     suspend fun checkInSupplement(log: SupplementLog) = db.withTransaction {
         val existing = log.supId?.let { supplementLogDao.find(it, log.date, log.slotKey) }
@@ -283,6 +290,9 @@ class HealthRepository(private val context: Context) {
         vitalsDao.upsert(log)
     }
 
+    /** U4 误录删除 */
+    suspend fun deleteVitals(id: String) = vitalsDao.delete(id)
+
     // ---- M3 体重 ----
     fun observeWeightRecent(limit: Int = 30): Flow<List<WeightLog>> = weightDao.observeRecent(limit)
     fun observeWeightToday(date: String): Flow<WeightLog?> = weightDao.observeByDate(date)
@@ -294,6 +304,9 @@ class HealthRepository(private val context: Context) {
         weightDao.upsert(log)
     }
 
+    /** U4 误录删除 */
+    suspend fun deleteWeight(id: String) = weightDao.delete(id)
+
     // ---- M3 身体指标 ----
     fun observeBodyMeasureLatest(): Flow<BodyMeasure?> = bodyMeasureDao.observeLatest()
     fun observeBodyMeasureRecent(limit: Int = 10): Flow<List<BodyMeasure>> = bodyMeasureDao.observeRecent(limit)
@@ -303,10 +316,16 @@ class HealthRepository(private val context: Context) {
         bodyMeasureDao.upsert(toSave)
     }
 
+    /** U4 误录删除 */
+    suspend fun deleteBodyMeasure(id: String) = bodyMeasureDao.delete(id)
+
     // ---- M3 饮食画像 + 忌口 ----
     fun observeDietProfile(): Flow<DietProfile?> = dietProfileDao.observe()
     suspend fun saveDietProfile(profile: DietProfile) =
         dietProfileDao.upsert(profile.copy(updatedAt = nowIso()))
+
+    /** U4 清除画像（回到未设置态） */
+    suspend fun deleteDietProfile() = dietProfileDao.delete()
 
     fun observeFoodAvoidAll(): Flow<List<FoodAvoidItem>> = foodAvoidDao.observeAll()
     fun observeFoodAvoidByCategory(category: String): Flow<List<FoodAvoidItem>> = foodAvoidDao.observeByCategory(category)

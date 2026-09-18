@@ -1,6 +1,9 @@
 package com.ashkb.app.ui.components
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +29,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -60,9 +65,12 @@ fun ScoreInput(
 ) {
     val cs = MaterialTheme.colorScheme
     val accent = if (unrecorded) cs.onSurfaceVariant else tone(value).accent()
-    // M3 Slider 对落在当前值上的点按不回调 onValueChange（dispatchRawDelta 值相等即丢弃），
-    // 未作答态显示 0 时「答 0」的点按会被静默吞掉、该题永远提交不了。
-    // 记录手势期最近原始值，onValueChangeFinished（任何点按/拖动收尾必回调）按它兜底提交。
+    // M3 Slider 对落在当前值上的点按不产生任何回调（dispatchRawDelta 值相等即丢弃，
+    // onValueChangeFinished 也只在拖动收尾必发）——未作答态滑杆停在 0 时「直接点 0」永远无响应，
+    // 只能先动一下再归零。双层修复：
+    // ① 记录手势期最近原始值，onValueChangeFinished 按它兜底提交（点轨道跳转收尾）。
+    // ② 叠一层不消费事件的旁听手势：真点按（位移 < 触摸阈值）按落点换算刻度并显式提交，
+    //    与滑杆自身的拖动 / 点轨道跳转互不干扰（从不 consume）。
     var gestureValue by remember { mutableFloatStateOf(value.toFloat()) }
     LaunchedEffect(value) { gestureValue = value.toFloat() }
     val sliderDesc = stringResource(R.string.forms_slider_a11y, label, value, range.last)
@@ -98,22 +106,49 @@ fun ScoreInput(
             ) {
                 Icon(Icons.Rounded.Remove, contentDescription = stringResource(R.string.symptom_decrease_one))
             }
-            Slider(
-                value = value.toFloat(),
-                onValueChange = {
-                    gestureValue = it
-                    onValueChange(it.roundToInt().coerceIn(range.first, range.last))
-                },
-                onValueChangeFinished = {
-                    onValueChange(gestureValue.roundToInt().coerceIn(range.first, range.last))
-                },
-                valueRange = range.first.toFloat()..range.last.toFloat(),
-                steps = (range.last - range.first - 1).coerceAtLeast(0),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(Size.touchMin)
-                    .semantics { contentDescription = sliderDesc },
-            )
+            Box(Modifier.weight(1f)) {
+                Slider(
+                    value = value.toFloat(),
+                    onValueChange = {
+                        gestureValue = it
+                        onValueChange(it.roundToInt().coerceIn(range.first, range.last))
+                    },
+                    onValueChangeFinished = {
+                        onValueChange(gestureValue.roundToInt().coerceIn(range.first, range.last))
+                    },
+                    valueRange = range.first.toFloat()..range.last.toFloat(),
+                    steps = (range.last - range.first - 1).coerceAtLeast(0),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(Size.touchMin)
+                        .semantics { contentDescription = sliderDesc },
+                )
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .pointerInput(range) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                val downX = down.position.x
+                                var moved = false
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    if (event.changes.any {
+                                            it.positionChangeIgnoreConsumed().getDistance() > viewConfiguration.touchSlop
+                                        }
+                                    ) moved = true
+                                    if (event.changes.all { !it.pressed }) break
+                                }
+                                if (!moved && size.width > 0) {
+                                    val fraction = (downX / size.width).coerceIn(0f, 1f)
+                                    val tapped = (range.first + (range.last - range.first) * fraction).roundToInt()
+                                    gestureValue = tapped.toFloat()
+                                    onValueChange(tapped.coerceIn(range.first, range.last))
+                                }
+                            }
+                        },
+                )
+            }
             FilledTonalIconButton(
                 onClick = { onValueChange((value + 1).coerceAtMost(range.last)) },
                 modifier = Modifier.size(Size.touchMin),
