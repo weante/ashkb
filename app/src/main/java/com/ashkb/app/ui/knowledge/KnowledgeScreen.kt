@@ -25,7 +25,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.KbEntry
@@ -50,7 +50,7 @@ import java.time.LocalDate
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KnowledgeScreen(vm: KnowledgeViewModel) {
-    val ui by vm.uiState.collectAsState()
+    val ui by vm.uiState.collectAsStateWithLifecycle()
     var detail by remember { mutableStateOf<KbEntry?>(null) }
     val today = LocalDate.now().toString()
 

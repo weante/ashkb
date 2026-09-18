@@ -4,6 +4,68 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.25] — 2026-09-18
+
+依据《ashkb Compose/UI 性能审查报告》（基线 v1.0.23）执行第一批：**用户可感知的功能性缺陷 + 低风险性能项**。v1.0.24 可直接覆盖安装（无数据库与功能变更）。
+
+### 修复 · 跨零点日期冻结（5 个 ViewModel）
+
+- **现象**：晚上打开 App 放到零点之后回来，「今日」页仍是**昨天**的日程 / 打卡 / 运动计划；症状、复诊页同理
+- **根因**：`TodayViewModel` / `WellnessViewModel` / `ExerciseViewModel` / `CheckupViewModel` / `SymptomViewModel` 都在**构造时**求值 `val date: LocalDate = LocalDate.now()`，而 ViewModel 绑定 Activity，进程存活期间该值永不更新
+- **修复**：改为 `MutableStateFlow<LocalDate>` + `init` 内的**到下一零点触发并循环**的 ticker；所有依赖日期的查询流走 `_date.flatMapLatest { ... }`。对外 `date` 仍是同名取值属性，调用点无需改动
+- 注：审查报告只列了 3 个 VM，实测本库有 **5 个**（复诊、症状两处一并修掉）
+
+### 修复 · 换药表单旋转屏幕丢输入（MedEditScreen）
+
+- 17 个表单字段原先全是 `remember { mutableStateOf(...) }`——旋转屏幕即清空全部已填内容，医疗录入场景属严重体验缺陷
+- 改为 `rememberSaveable`（共 21 处，含后续新增字段），旋转 / 系统回收后输入保留
+
+### 修复 · 药品列表溢出屏幕且不可滚动（MedsScreen）
+
+- 药品列表原先用普通 `Column` + `forEachIndexed`，**既无虚拟化也无滚动容器**——药品超过一屏即溢出，后面的药看不到也点不到
+- 改用 `LazyColumn` + `items(meds, key = { it.id })`
+
+### 修复 · 列表 item 缺 key（CheckupLists）
+
+- 化验 / 复诊 / 疫苗三处 `items(...)` 未指定 key，补 `key = { it.id }`——避免列表状态错位，也为后续增删动画留出正确语义
+
+### 改进 · 67 处 `collectAsState()` → `collectAsStateWithLifecycle()`（13 个文件）
+
+- 原先所有屏幕用 `collectAsState()`，**不感知生命周期**：App 进后台后 Room 的 InvalidationTracker 观察者仍在收流，回前台时多条流同时发射触发重组风暴
+- 依赖 `androidx.lifecycle:lifecycle-runtime-compose` 早已引入，无需新增依赖；带 `initial` 参数的调用点同步改为 `initialValue =`
+
+### 改进 · TrendChart 绘制期零分配
+
+- Canvas 绘制 lambda 内原先每帧新建 2 个 `Path`、1 个 `Brush`、`ticks.size` 个 `PathEffect`，并调 5 次 `textMeasurer.measure`（走 Skia paragraph 构建，最贵）——动画期 60fps 下必然掉帧，报表页 6 图并排时最明显
+- 全部提到绘制外并用 `remember` 缓存（虚线样式、折线/填充 Path 复用 + `reset()`、填充 Brush、Y/X 轴刻度文本布局、阈值 chip 与选中气泡文本）；绘制结果与原实现逐字符等价，**函数签名与调用点未变**
+
+### 改进 · 图表数据源 remember（修复折线图入场动画反复重播）
+
+- `ReportScreen` 6 处 `TrendPoint` 映射与 `WellnessScreen` 体重点集原先未 `remember`——`List.map` 每次返回新实例，而 `TrendChart` 的入场动画以 `points` 为 key，导致任意一次父级重组都会让图表**从头重播动画**（表现为闪烁）
+- 各自 `remember(源数据) { ... }` 包一层
+
+### 改进 · 化验页派生计算 remember
+
+- `CheckupLabImaging` 的 `groupBy` / `maxOfOrNull`（上一版新增的日期分组折叠代码）与 `partition` 原先每次重组重跑；前者还写在 `LazyListScope` 内（非 Composable 作用域），现上提到 `LazyColumn` 之外并 `remember`
+- `CheckupViewModel.labResultsFor(id)` 原先每次调用返回**新冷流**，导致化验详情对话框列表在父级任何状态变化时闪一下；改为按 id 缓存的 `StateFlow`
+
+### 审查报告事实更正（据实测）
+
+- Room 版本：报告写「v6」，实为 **v9**（报告自身架构图处又写「v9 迁移」，前后矛盾）
+- 实体数：报告写 27，实为 **25**
+- 冻结日期的 ViewModel：报告列 3 个，实为 **5 个**
+- 「任意一次数据变化都重组整个屏幕」略有夸大——Compose 仍会跳过参数未变的子 Composable，准确说法是父函数体每次重跑（含列表构造、闭包构造、派生计算）
+
+### 本批未做（属结构性重构，另行排期）
+
+MedEdit / Backup / Knowledge 的字段级 Composable 拆分、`BackupViewModel`/`ReportViewModel` 合并为单一 UiState、Compose Strong Skipping Mode、`DividerList` 展平进父 `LazyListScope`、Sheet 内嵌套滚动改造、`AppShell` 按需创建 ViewModel。
+
+### 验证
+
+- 既有 114 条单测全部通过；release / debug 双包构建成功 + 正式签名验签
+- 装机回归重点：①零点后（或把系统时间调过零点）回 App，今日页应切到新的一天 ②换药表单填一半旋转屏幕，内容不丢 ③药品列表超过一屏时可滚动 ④报表页 6 个折线图入场动画只播一次、不闪烁
+- 说明：本次改动以 UI 结构为主，属设备实测项，建议装机后按上述四点验证
+
 ## [v1.0.24] — 2026-09-18
 
 文案资源化收尾（v1.0.10 §遗留项）：通知 / ViewModel / PDF 三层硬编码中文下沉 strings.xml；顺带修复 PDF 用药行打印 `null` 的缺陷。v1.0.23 可直接覆盖安装（无数据库与功能变更）。

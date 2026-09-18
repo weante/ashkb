@@ -15,21 +15,40 @@ import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.entity.WeightLog
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.nowIso
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class WellnessViewModel(private val repo: HealthRepository) : ViewModel() {
-    val date: LocalDate = LocalDate.now()
-    private val dateStr = date.toString()
+    private val _date = MutableStateFlow(LocalDate.now())
+    val date: LocalDate get() = _date.value
+    private val dateStr: String get() = _date.value.toString()
+
+    init {
+        viewModelScope.launch {
+            while (true) {
+                val now = LocalDateTime.now()
+                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
+                delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
+                _date.value = LocalDate.now()
+            }
+        }
+    }
 
     // ---- 观察 ----
-    val vitalsToday: StateFlow<Vitals?> = repo.observeVitals(dateStr)
+    val vitalsToday: StateFlow<Vitals?> = _date.flatMapLatest { repo.observeVitals(it.toString()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val weightToday: StateFlow<WeightLog?> = repo.observeWeightToday(dateStr)
+    val weightToday: StateFlow<WeightLog?> = _date.flatMapLatest { repo.observeWeightToday(it.toString()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val weightRecent: StateFlow<List<WeightLog>> = repo.observeWeightRecent(30)
@@ -41,7 +60,7 @@ class WellnessViewModel(private val repo: HealthRepository) : ViewModel() {
     val supplements: StateFlow<List<Supplement>> = repo.observeSupplements()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val supplementLogsToday: StateFlow<List<SupplementLog>> = repo.observeSupplementLogs(dateStr)
+    val supplementLogsToday: StateFlow<List<SupplementLog>> = _date.flatMapLatest { repo.observeSupplementLogs(it.toString()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val dietProfile: StateFlow<DietProfile?> = repo.observeDietProfile()

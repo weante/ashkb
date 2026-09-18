@@ -41,7 +41,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +53,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.Medication
@@ -81,11 +81,11 @@ fun TodayScreen(
     onOpenSymptom: () -> Unit = {},
     onOpenExercise: () -> Unit = {},
 ) {
-    val profile by vm.profile.collectAsState()
-    val items by vm.today.collectAsState()
-    val alerts by vm.alerts.collectAsState()
-    val symptomRecorded by vm.symptomRecorded.collectAsState()
-    val exerciseDone by vm.exerciseDone.collectAsState()
+    val profile by vm.profile.collectAsStateWithLifecycle()
+    val items by vm.today.collectAsStateWithLifecycle()
+    val alerts by vm.alerts.collectAsStateWithLifecycle()
+    val symptomRecorded by vm.symptomRecorded.collectAsStateWithLifecycle()
+    val exerciseDone by vm.exerciseDone.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var skipTarget by remember { mutableStateOf<TodayItem?>(null) }
     var injTarget by remember { mutableStateOf<TodayItem?>(null) }

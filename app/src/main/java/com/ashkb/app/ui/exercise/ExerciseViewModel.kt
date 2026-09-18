@@ -13,11 +13,18 @@ import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.ExerciseEngine
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -29,18 +36,24 @@ data class ExerciseUiState(
     val cervicalInvolved: Boolean = false,
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ExerciseViewModel(private val repo: HealthRepository) : ViewModel() {
 
-    val date: LocalDate = LocalDate.now()
-    private val yesterday = date.minusDays(1).toString()
+    private val _date = MutableStateFlow(LocalDate.now())
+    val date: LocalDate get() = _date.value
 
     private val library = MutableStateFlow<List<KbEntry>>(emptyList())
-    private val pendingFeedback = MutableStateFlow<List<ExerciseLog>>(emptyList())
+    private val feedbackRefresh = MutableStateFlow(0)
 
     init {
+        viewModelScope.launch { library.value = repo.exerciseLibrary() }
         viewModelScope.launch {
-            library.value = repo.exerciseLibrary()
-            pendingFeedback.value = repo.pendingFeedbackLogs(yesterday)
+            while (true) {
+                val now = LocalDateTime.now()
+                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
+                delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
+                _date.value = LocalDate.now()
+            }
         }
     }
 
@@ -59,16 +72,19 @@ class ExerciseViewModel(private val repo: HealthRepository) : ViewModel() {
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExerciseUiState())
 
     val todayLogs: StateFlow<List<ExerciseLog>> =
-        repo.observeExerciseLogs(date.toString())
+        _date.flatMapLatest { repo.observeExerciseLogs(it.toString()) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** 昨日症状（疼痛 / 晨僵 / 体温）——处方 hero 的判读依据 */
     val yesterdaySymptom: StateFlow<com.ashkb.app.data.entity.SymptomDaily?> =
-        repo.observeSymptom(yesterday)
+        _date.flatMapLatest { repo.observeSymptom(it.minusDays(1).toString()) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     /** R21：昨日已完成但未反馈的打卡 */
-    val feedbackPending: StateFlow<List<ExerciseLog>> = pendingFeedback
+    val feedbackPending: StateFlow<List<ExerciseLog>> =
+        _date.flatMapLatest { d -> feedbackRefresh.map { d } }
+            .flatMapLatest { d -> flow { emit(repo.pendingFeedbackLogs(d.minusDays(1).toString())) } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** M4 打卡：写入当日 exercise_logs（exc 快照字段齐备，可自持） */
     fun checkIn(card: ExerciseEngine.ExerciseCard, durationMin: Int?, intensity: String?, notes: String?) {
@@ -93,7 +109,7 @@ class ExerciseViewModel(private val repo: HealthRepository) : ViewModel() {
     ) {
         viewModelScope.launch {
             repo.saveExerciseFeedback(logId, painChange, stiffnessChange, isMuscleSoreness, note)
-            pendingFeedback.value = repo.pendingFeedbackLogs(yesterday)
+            feedbackRefresh.value += 1
         }
     }
 

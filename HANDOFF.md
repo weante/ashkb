@@ -1,7 +1,7 @@
 # ASHKB 开发交接文档
 
 > 本文档面向接手本仓库开发的 AI 会话（TraeWork Code 模式 / TraeCode）或人类工程师。
-> 记录截至 **v1.0.24**（versionCode 29，2026-09-18）的全部工程知识。
+> 记录截至 **v1.0.25**（versionCode 30，2026-09-18）的全部工程知识。
 > 应用本身介绍见 `README.md`，版本历史见 `CHANGELOG.md`。
 
 ## 1. 项目一句话
@@ -108,13 +108,16 @@ app/src/main/java/com/ashkb/app/
 - **化验列表翻页**：`CheckupViewModel` 用 `_labLimit` MutableStateFlow + `flatMapLatest` 实现窗口增长（初始 100 行，+100 递增），列表底部按钮 `canLoadMore = list.size >= limit` 判断隐藏。
 - **FTS4 不能用于中文子串搜索（v1.0.21 实测，勿再尝试）**：SQLite 的 FTS3/FTS4 分词器（`simple` / `unicode61`）按「字母数字连续段」切词，中文无空格分隔 → 一整句变成一个 token。实测对「强直性脊柱炎患者用药注意事项」执行 `MATCH '强直'` 命中 **0** 条（`LIKE '%强直%'` 命中 1 条），`MATCH '强直*'` 仅在查询恰为句首时命中。即**为了「优化搜索」把 LIKE 换成 FTS4 会让中文搜索直接失效**。CJK 若确需全文索引，只有 FTS5 的 `trigram` 分词器（Room 无 `@Fts5` 注解，且 minSdk 26 上 FTS5 不可靠）或自建字符级 n-gram 索引——本项目知识库为固定 47 条种子，LIKE 足够。
 - **新增列与备份恢复的兼容（v1.0.21）**：`BackupEngine.insertTable` 按「备份行自身的列集」按名 INSERT，故旧备份缺新列**不会**报错，但要求 Room 侧新列**可空**（NOT NULL 无默认值会插入失败）；而 `verifyAgainst` 按备份自身列集比对（R9），加列不会让旧备份 SHA 误判。**真正的坑**：恢复后新列为 NULL，会让依赖该列的查询整库失配（知识库搜索会搜不到任何条目）——必须在 `BackupEngine.restore` 双校验通过后、提交前按当前口径回填，位置与 R1 的 profile 归一化相同。
+- **批量改代码脚本务必先探测行尾（v1.0.25 踩坑）**：本仓库的 `.kt` 文件是 **LF** 行尾（个别文件末尾有 1 个 CRLF），若脚本按 `\r\n` 切分，整块 import 会被当成单行 → 替换静默不生效（表现为「调用点改了但 import 没加」，编译才暴露）。正确做法：先 `-replace "\r\n","\n"` 归一化处理，写完再按原风格还原；同时注意**一个文件可能有两段 import 块（中间空行分隔）**，按块处理会给两块各插一次导致 import 重复。
+- **Compose 反模式速查（v1.0.25 已修，勿回退）**：①屏幕一律用 `collectAsStateWithLifecycle()`，禁用 `collectAsState()`（后者不感知生命周期，后台仍在收 Room 流）②`Canvas` 绘制 lambda 内不得新建 `Path`/`Brush`/`PathEffect` 或调 `textMeasurer.measure`，须 `remember` 到绘制外 ③传给 `TrendChart` 的 `points` 必须 `remember(源数据)`——其入场动画以 `points` 为 key，新 List 实例会让动画反复重播 ④派生计算（`groupBy`/`partition`/`map`）注意 `remember`，且**不能写在 `LazyListScope` 内**（那不是 @Composable 作用域，需上提到 `LazyColumn` 之前）⑤ViewModel 中禁止在构造时求值 `LocalDate.now()`（跨零点冻结），须用 `MutableStateFlow` + ticker 驱动。
 
 ## 8. 当前状态与下一步
 
-- **最新版**：v1.0.24（versionCode 29）：v1.0.21 知识库检索优化（Room v8→v9）+ v1.0.22 清除 `as MutableStateFlow` 强转 44 处 + v1.0.23 化验 Tab 日期分组折叠 + v1.0.24 通知/VM/PDF 三层文案资源化（124 条）并修复 PDF 口服药行打印 `null`
+- **最新版**：v1.0.25（versionCode 30）：v1.0.21 知识库检索优化（Room v8→v9）+ v1.0.22 清除 `as MutableStateFlow` 强转 + v1.0.23 化验 Tab 分组折叠 + v1.0.24 通知/VM/PDF 文案资源化 + v1.0.25 Compose 性能审查第一批（跨零点日期、旋转丢输入、67 处 lifecycle 收集、TrendChart 绘制期零分配）
 - **数据安全**：v1.0.6 起 WebDAV 凭据 Keystore 加密、备份口令化、事务化写入，均已稳定；v1.0.19 起支持登录 WebDAV 后直接拉取远程备份列表选择恢复（新机无需先生成本地备份）；v1.0.20 起备份文件名带时间戳，同天多份不互相覆盖；v1.0.21 起知识库检索走单列 `search_text` + 查询防抖（旧备份恢复后自动回填该列）
 - **待办池**（用户视角，无承诺）：
   - WebDAV 非标准方法（PROPFIND / MKCOL）依赖反射改 `HttpURLConnection` 内部字段：换 Android 15 / 16 真机需回归验证（无替代方案，属设计取舍）——**需真机，本机无法完成**
+  - **Compose 性能审查剩余项**（第一批已做功能性缺陷 + 低风险项，以下属结构性重构，改动面大）：MedEdit / Backup / Knowledge 的字段级 Composable 拆分、`BackupViewModel`/`ReportViewModel` 合并单一 UiState、Compose Strong Skipping Mode、`AppShell` 按需创建 ViewModel（现一次性创建 10 个）、`DividerList` 展平进父 `LazyListScope`、Sheet 内嵌套 `verticalScroll` 冲突、`TodayScreen` 的 `items` key 字符串拼接（多 PRN 项可能撞 key）、若干 `derivedStateOf` / `remember` 打磨项
 - **已关闭的旧待办**：
   - UI 改版方案未完成 PR 项——已核实唯一可确认编号的 PR4（文案资源化）在 v1.0.10 完成，方案原文已不在工作区
   - 知识库搜索 FTS4/索引（审查报告 P1）——v1.0.21 以「单列检索文本 + 防抖 + 上限」结项；**FTS4 方案经实测否决**（对中文子串零命中，详见 `domain/KbSearch.kt` 注释与 CHANGELOG v1.0.21）

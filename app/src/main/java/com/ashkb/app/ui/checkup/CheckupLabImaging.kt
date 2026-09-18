@@ -2,18 +2,18 @@ package com.ashkb.app.ui.checkup
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -36,7 +36,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,8 +47,9 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-import com.ashkb.app.R
+
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.data.entity.ImagingRecord
 import com.ashkb.app.data.entity.LabResult
@@ -59,6 +59,7 @@ import com.ashkb.app.domain.ImportTemplates
 import com.ashkb.app.domain.LabImport
 import com.ashkb.app.domain.LabImportRow
 import com.ashkb.app.domain.ReportImportParser
+import com.ashkb.app.R
 import com.ashkb.app.ui.components.DividerList
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.StatusChip
@@ -120,7 +121,7 @@ private fun RowScope.LabRow(lab: LabResult) {
 /** 化验分组：异常项置顶，正常项默认折叠——复诊沟通先看要紧的。 */
 @Composable
 private fun LabGroup(rows: List<LabResult>) {
-    val (abnormal, normal) = rows.partition { it.isAbnormal() }
+    val (abnormal, normal) = remember(rows) { rows.partition { it.isAbnormal() } }
     var showNormal by remember { mutableStateOf(false) }
     if (abnormal.isNotEmpty()) {
         DividerList(items = abnormal, key = { it.id }) { lab -> LabRow(lab) }
@@ -147,7 +148,7 @@ private fun LabGroup(rows: List<LabResult>) {
 // ===== 化验详情弹窗 =====
 @Composable
 internal fun LabDetailDialog(record: CheckupRecord, vm: CheckupViewModel, onDismiss: () -> Unit) {
-    val labs by vm.labResultsFor(record.id).collectAsState(initial = emptyList())
+    val labs by vm.labResultsFor(record.id).collectAsStateWithLifecycle(initialValue = emptyList())
     var showAdd by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -180,6 +181,10 @@ internal fun LabsList(
     onLoadMore: () -> Unit,
     onImport: () -> Unit,
 ) {
+    // 派生计算上提到 LazyColumn 之外并 remember：LazyListScope 不是 @Composable 作用域，
+    // 写在 item/forEach 内会随每次重组重跑 groupBy / maxOfOrNull（数十条化验 × 每次重组）
+    val grouped = remember(labs) { labs.groupBy { it.date } }
+    val latestDate = remember(labs) { labs.maxOfOrNull { it.date } }
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -208,8 +213,7 @@ internal fun LabsList(
             }
             // Y1：日期分组折叠——历史数据多时页面不再被全展开的旧日期撑长；
             // 默认展开规则贴合复诊沟通导向：有异常的日期或最近一次化验展开，其余收起
-            val latestDate = labs.maxOfOrNull { it.date }
-            labs.groupBy { it.date }.forEach { (date, rows) ->
+            grouped.forEach { (date, rows) ->
                 item(key = "lab-$date") {
                     val abnormalCount = rows.count { it.isAbnormal() }
                     // item key 稳定 + rememberSaveable：翻页加载更早记录、滚动回收、旋转屏均保持折叠状态
@@ -633,3 +637,4 @@ internal fun SheetSaveButton(text: String, onClick: () -> Unit, enabled: Boolean
         modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
     ) { Text(text) }
 }
+

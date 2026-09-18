@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,31 +66,31 @@ fun MedEditScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var step by remember { mutableStateOf(1) }
+    var step by rememberSaveable { mutableStateOf(1) }
 
     // ---- 第一步字段 ----
-    var name by remember { mutableStateOf("") }
-    var brand by remember { mutableStateOf("") }
-    var nameKey by remember { mutableStateOf("") }
-    var medClass by remember { mutableStateOf(MedClass.OTHER) }
-    var route by remember { mutableStateOf("oral") }
-    var dose by remember { mutableStateOf("") }
-    var frequency by remember { mutableStateOf(MedFrequency.DAILY) }
-    var times by remember { mutableStateOf(listOf("08:00")) }
-    var customTime by remember { mutableStateOf("") }
-    var weekday by remember { mutableStateOf(1) }
-    var weekday2 by remember { mutableStateOf(4) }
-    var biwError by remember { mutableStateOf(false) }
-    var cycleDays by remember { mutableStateOf("14") }
-    var food by remember { mutableStateOf("any") }
-    var prnReason by remember { mutableStateOf("") }
-    var storage by remember { mutableStateOf("") }
-    var startDate by remember { mutableStateOf(LocalDate.now().toString()) }
+    var name by rememberSaveable { mutableStateOf("") }
+    var brand by rememberSaveable { mutableStateOf("") }
+    var nameKey by rememberSaveable { mutableStateOf("") }
+    var medClass by rememberSaveable { mutableStateOf(MedClass.OTHER) }
+    var route by rememberSaveable { mutableStateOf("oral") }
+    var dose by rememberSaveable { mutableStateOf("") }
+    var frequency by rememberSaveable { mutableStateOf(MedFrequency.DAILY) }
+    var times by rememberSaveable { mutableStateOf(listOf("08:00")) }
+    var customTime by rememberSaveable { mutableStateOf("") }
+    var weekday by rememberSaveable { mutableStateOf(1) }
+    var weekday2 by rememberSaveable { mutableStateOf(4) }
+    var biwError by rememberSaveable { mutableStateOf(false) }
+    var cycleDays by rememberSaveable { mutableStateOf("14") }
+    var food by rememberSaveable { mutableStateOf("any") }
+    var prnReason by rememberSaveable { mutableStateOf("") }
+    var storage by rememberSaveable { mutableStateOf("") }
+    var startDate by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
 
     // ---- 第二步 R03 ----
     var hits by remember { mutableStateOf<List<KbEntry>?>(null) }
-    var doctorTold by remember { mutableStateOf(false) }
-    var leafletRead by remember { mutableStateOf(false) }
+    var doctorTold by rememberSaveable { mutableStateOf(false) }
+    var leafletRead by rememberSaveable { mutableStateOf(false) }
 
     val prnFallback = stringResource(R.string.med_reason_backup)
 

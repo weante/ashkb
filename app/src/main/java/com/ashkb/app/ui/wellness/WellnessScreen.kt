@@ -1,21 +1,21 @@
 package com.ashkb.app.ui.wellness
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -27,8 +27,8 @@ import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Straighten
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -38,17 +38,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-import com.ashkb.app.R
+
 import com.ashkb.app.data.entity.DietProfile
 import com.ashkb.app.data.entity.FoodAvoidItem
 import com.ashkb.app.data.entity.Supplement
@@ -57,6 +57,7 @@ import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.Labels
+import com.ashkb.app.R
 import com.ashkb.app.ui.components.DestructiveAction
 import com.ashkb.app.ui.components.DividerList
 import com.ashkb.app.ui.components.EmptyState
@@ -74,14 +75,14 @@ import com.ashkb.app.ui.theme.StatusTone
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
-    val vitals by vm.vitalsToday.collectAsState()
-    val weight by vm.weightToday.collectAsState()
-    val weightList by vm.weightRecent.collectAsState()
-    val bm by vm.bodyMeasureLatest.collectAsState()
-    val supplements by vm.supplements.collectAsState()
-    val supLogs by vm.supplementLogsToday.collectAsState()
-    val diet by vm.dietProfile.collectAsState()
-    val avoids by vm.foodAvoidItems.collectAsState()
+    val vitals by vm.vitalsToday.collectAsStateWithLifecycle()
+    val weight by vm.weightToday.collectAsStateWithLifecycle()
+    val weightList by vm.weightRecent.collectAsStateWithLifecycle()
+    val bm by vm.bodyMeasureLatest.collectAsStateWithLifecycle()
+    val supplements by vm.supplements.collectAsStateWithLifecycle()
+    val supLogs by vm.supplementLogsToday.collectAsStateWithLifecycle()
+    val diet by vm.dietProfile.collectAsStateWithLifecycle()
+    val avoids by vm.foodAvoidItems.collectAsStateWithLifecycle()
 
     var showVitals by remember { mutableStateOf(false) }
     var showWeight by remember { mutableStateOf(false) }
@@ -126,8 +127,12 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
                         }
                     },
                 ) {
-                    // DAO 按日期倒序返回，趋势图需要从旧到新
-                    val points = weightList.asReversed().map { TrendPoint(it.date, it.weightKg.toFloat()) }
+                    // DAO 按日期倒序返回，趋势图需要从旧到新。
+                    // 必须 remember：List.map 每次返回新实例，会让 TrendChart 的入场动画（以 points 为 key）
+                    // 在任何一次父级重组时反复从头播放
+                    val points = remember(weightList) {
+                        weightList.asReversed().map { TrendPoint(it.date, it.weightKg.toFloat()) }
+                    }
                     if (points.isNotEmpty()) {
                         TrendChart(points = points, unit = "kg", label = stringResource(R.string.vitals_weight))
                         Spacer(Modifier.height(Spacing.md))
@@ -399,7 +404,7 @@ private fun VitalsHero(vitals: Vitals?, onEdit: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun VitalsSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
-    val current by vm.vitalsToday.collectAsState()
+    val current by vm.vitalsToday.collectAsStateWithLifecycle()
     var temp by remember { mutableStateOf(current?.temperature?.toString() ?: "") }
     var sys by remember { mutableStateOf(current?.bpSys?.toString() ?: "") }
     var dia by remember { mutableStateOf(current?.bpDia?.toString() ?: "") }
@@ -450,7 +455,7 @@ private fun VitalsSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WeightSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
-    val current by vm.weightToday.collectAsState()
+    val current by vm.weightToday.collectAsStateWithLifecycle()
     var weight by remember { mutableStateOf(current?.weightKg?.toString() ?: "") }
     var notes by remember { mutableStateOf(current?.notes ?: "") }
 
@@ -476,8 +481,8 @@ private fun WeightSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BodyMeasureSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
-    val current by vm.bodyMeasureLatest.collectAsState()
-    val weightList by vm.weightRecent.collectAsState()
+    val current by vm.bodyMeasureLatest.collectAsStateWithLifecycle()
+    val weightList by vm.weightRecent.collectAsStateWithLifecycle()
     var height by remember { mutableStateOf(current?.heightCm?.toString() ?: "") }
     var waist by remember { mutableStateOf(current?.waistCm?.toString() ?: "") }
     var hip by remember { mutableStateOf(current?.hipCm?.toString() ?: "") }
@@ -652,7 +657,7 @@ private fun DietSheet(vm: WellnessViewModel, current: DietProfile?, onDismiss: (
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun AvoidManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
-    val items by vm.foodAvoidItems.collectAsState()
+    val items by vm.foodAvoidItems.collectAsStateWithLifecycle()
     var adding by remember { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -798,7 +803,7 @@ private fun ChipGroup(options: List<Pair<String, String>>, selected: String, onS
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SupplementHistorySheet(vm: WellnessViewModel, sup: Supplement, onDismiss: () -> Unit) {
-    val history by remember(sup.id) { vm.observeSupplementHistory(sup) }.collectAsState(initial = emptyList())
+    val history by remember(sup.id) { vm.observeSupplementHistory(sup) }.collectAsStateWithLifecycle(initialValue = emptyList())
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
@@ -835,7 +840,7 @@ private fun SupplementHistorySheet(vm: WellnessViewModel, sup: Supplement, onDis
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WeightManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
-    val weightList by vm.weightRecent.collectAsState()
+    val weightList by vm.weightRecent.collectAsStateWithLifecycle()
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
@@ -875,3 +880,4 @@ private fun WeightManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
         }
     }
 }
+

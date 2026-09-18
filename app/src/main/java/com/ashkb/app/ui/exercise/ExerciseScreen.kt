@@ -35,7 +35,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.ExerciseLog
@@ -67,10 +67,10 @@ import com.ashkb.app.ui.theme.container
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
-    val ui by vm.uiState.collectAsState()
-    val todayLogs by vm.todayLogs.collectAsState()
-    val pending by vm.feedbackPending.collectAsState()
-    val yesterday by vm.yesterdaySymptom.collectAsState()
+    val ui by vm.uiState.collectAsStateWithLifecycle()
+    val todayLogs by vm.todayLogs.collectAsStateWithLifecycle()
+    val pending by vm.feedbackPending.collectAsStateWithLifecycle()
+    val yesterday by vm.yesterdaySymptom.collectAsStateWithLifecycle()
 
     var checkInTarget by remember { mutableStateOf<ExerciseEngine.ExerciseCard?>(null) }
     var feedbackTarget by remember { mutableStateOf<ExerciseLog?>(null) }

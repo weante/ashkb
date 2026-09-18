@@ -57,7 +57,7 @@ internal fun CheckupItemsList(items: List<CheckupItem>, onAdd: () -> Unit, onDea
                 }
             }
         } else {
-            items(items) { item ->
+            items(items, key = { it.id }) { item ->
                 SectionCard(
                     title = item.name,
                     subtitle = buildString {
@@ -113,7 +113,7 @@ internal fun CheckupRecordsList(
                 }
             }
         } else {
-            items(records) { rec ->
+            items(records, key = { it.id }) { rec ->
                 SectionCard(
                     title = rec.date,
                     subtitle = CheckupType.fromKey(rec.checkType).label,
@@ -179,7 +179,7 @@ internal fun VaccineList(vaccines: List<VaccineRecord>, onAdd: () -> Unit) {
                 }
             }
         } else {
-            items(vaccines) { vac ->
+            items(vaccines, key = { it.id }) { vac ->
                 SectionCard(
                     title = vac.date,
                     subtitle = vac.vaccineName,

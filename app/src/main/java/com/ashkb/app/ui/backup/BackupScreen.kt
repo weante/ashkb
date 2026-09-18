@@ -38,7 +38,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
 import com.ashkb.app.data.backup.BackupEngine
@@ -74,16 +74,16 @@ private val PassKeyboard = KeyboardOptions(
 /** P4 R20 备份与数据自主页（协议 §3–§6）。 */
 @Composable
 fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
-    val busy by vm.busy.collectAsState()
-    val stage by vm.stage.collectAsState()
-    val message by vm.message.collectAsState()
-    val pending by vm.pendingRestore.collectAsState()
-    val pendingName by vm.pendingFileName.collectAsState()
-    val restoreResult by vm.restoreResult.collectAsState()
-    val restoreMode by vm.restoreMode.collectAsState()
-    val ledger by vm.ledger.collectAsState()
-    val davUrl by vm.davUrl.collectAsState()
-    val davUser by vm.davUser.collectAsState()
+    val busy by vm.busy.collectAsStateWithLifecycle()
+    val stage by vm.stage.collectAsStateWithLifecycle()
+    val message by vm.message.collectAsStateWithLifecycle()
+    val pending by vm.pendingRestore.collectAsStateWithLifecycle()
+    val pendingName by vm.pendingFileName.collectAsStateWithLifecycle()
+    val restoreResult by vm.restoreResult.collectAsStateWithLifecycle()
+    val restoreMode by vm.restoreMode.collectAsStateWithLifecycle()
+    val ledger by vm.ledger.collectAsStateWithLifecycle()
+    val davUrl by vm.davUrl.collectAsStateWithLifecycle()
+    val davUser by vm.davUser.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var backupPass by remember { mutableStateOf("") }
@@ -93,7 +93,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
     var showDavSheet by remember { mutableStateOf(false) }
     var showDavPickSheet by remember { mutableStateOf(false) }
     var showAllLedger by remember { mutableStateOf(false) }
-    val davPicked by vm.davPicked.collectAsState()
+    val davPicked by vm.davPicked.collectAsStateWithLifecycle()
 
     val pickRestoreFile = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -458,8 +458,8 @@ private fun LedgerRow(l: BackupLedger) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DavBackupPickerSheet(vm: BackupViewModel, busy: Boolean, onDismiss: () -> Unit) {
-    val backups by vm.davBackups.collectAsState()
-    val stage by vm.stage.collectAsState()
+    val backups by vm.davBackups.collectAsStateWithLifecycle()
+    val stage by vm.stage.collectAsStateWithLifecycle()
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             Modifier

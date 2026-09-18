@@ -46,7 +46,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +56,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.EmergencyContact
@@ -91,9 +91,9 @@ private fun Context.dial(phone: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
-    val contacts by vm.contacts.collectAsState()
-    val events by vm.events.collectAsState()
-    val profile by vm.profile.collectAsState()
+    val contacts by vm.contacts.collectAsStateWithLifecycle()
+    val events by vm.events.collectAsStateWithLifecycle()
+    val profile by vm.profile.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var cards by remember { mutableStateOf<List<KbEntry>>(emptyList()) }

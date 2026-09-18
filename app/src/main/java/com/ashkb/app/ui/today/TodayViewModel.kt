@@ -12,25 +12,45 @@ import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.data.repo.TodayItem
 import com.ashkb.app.reminder.ReminderScheduler
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class TodayViewModel(
     private val repo: MedicationRepository,
     private val healthRepo: HealthRepository,
 ) : ViewModel() {
 
-    val date: LocalDate = LocalDate.now()
+    private val _date = MutableStateFlow(LocalDate.now())
+    val date: LocalDate get() = _date.value
+
+    init {
+        viewModelScope.launch {
+            while (true) {
+                val now = LocalDateTime.now()
+                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
+                delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
+                _date.value = LocalDate.now()
+            }
+        }
+    }
 
     val profile: StateFlow<Profile?> =
         repo.observeProfile().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val today: StateFlow<List<TodayItem>> =
-        repo.observeToday(date).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        _date.flatMapLatest { repo.observeToday(it) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** P2：未读警报（红旗三通道 / BASDAI / 发作 / 复核到期） */
     val alerts: StateFlow<List<Alert>> =
@@ -38,12 +58,12 @@ class TodayViewModel(
 
     /** 今日症状是否已记录（false = 未记录，区分实际为 0） */
     val symptomRecorded: StateFlow<Boolean> =
-        healthRepo.observeSymptom(date.toString()).map { it != null }
+        _date.flatMapLatest { healthRepo.observeSymptom(it.toString()) }.map { it != null }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     /** 今日运动打卡数 */
     val exerciseDone: StateFlow<Int> =
-        healthRepo.observeExerciseLogs(date.toString()).map { it.size }
+        _date.flatMapLatest { healthRepo.observeExerciseLogs(it.toString()) }.map { it.size }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     fun checkIn(item: TodayItem, injSite: String? = null, reaction: String = "none") {

@@ -3,12 +3,12 @@ package com.ashkb.app.ui.report
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -26,9 +26,8 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,31 +37,33 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-import com.ashkb.app.R
-import com.ashkb.app.ui.GlobalMessages
+
+import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.domain.ClinicalThresholds
+import com.ashkb.app.R
 import com.ashkb.app.ui.components.LoadingBlock
 import com.ashkb.app.ui.components.NavRow
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.components.TrendChart
 import com.ashkb.app.ui.components.TrendPoint
+import com.ashkb.app.ui.GlobalMessages
+import com.ashkb.app.ui.theme.accent
 import com.ashkb.app.ui.theme.DataLarge
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
-import com.ashkb.app.ui.theme.accent
-import com.ashkb.app.data.repo.ReportRepository
 import kotlinx.coroutines.launch
 
 /** P4 M9 报表页：概览 / 趋势 / 报告导出 三页签。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
-    val overview by vm.overview.collectAsState()
-    val trends by vm.trends.collectAsState()
-    val busy by vm.busy.collectAsState()
-    val message by vm.message.collectAsState()
+    val overview by vm.overview.collectAsStateWithLifecycle()
+    val trends by vm.trends.collectAsStateWithLifecycle()
+    val busy by vm.busy.collectAsStateWithLifecycle()
+    val message by vm.message.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val pager = rememberPagerState(pageCount = { 3 })
@@ -256,8 +257,9 @@ private fun TrendsPage(t: ReportRepository.Trends?) {
         item { Spacer(Modifier.height(12.dp)) }
         item {
             SectionCard(title = stringResource(R.string.report_basdai_trend), subtitle = stringResource(R.string.report_threshold_note2)) {
+                val basdaiPoints = remember(t.basdai) { t.basdai.map { TrendPoint(it.date, it.total.toFloat()) } }
                 TrendChart(
-                    points = t.basdai.map { TrendPoint(it.date, it.total.toFloat()) },
+                    points = basdaiPoints,
                     unit = "",
                     label = stringResource(R.string.basdai_total_score),
                     threshold = ClinicalThresholds.BASDAI_HIGH,
@@ -267,10 +269,11 @@ private fun TrendsPage(t: ReportRepository.Trends?) {
         }
         item {
             SectionCard(title = stringResource(R.string.symptom_pain_score), subtitle = stringResource(R.string.common_score_range)) {
+                val painPoints = remember(t.symptom) {
+                    t.symptom.mapNotNull { s -> s.painScore?.let { TrendPoint(s.date, it.toFloat()) } }
+                }
                 TrendChart(
-                    points = t.symptom.mapNotNull { s ->
-                        s.painScore?.let { TrendPoint(s.date, it.toFloat()) }
-                    },
+                    points = painPoints,
                     unit = stringResource(R.string.exercise_minute_suffix),
                     label = stringResource(R.string.symptom_pain_score),
                 )
@@ -278,10 +281,11 @@ private fun TrendsPage(t: ReportRepository.Trends?) {
         }
         item {
             SectionCard(title = stringResource(R.string.symptom_morning_stiffness), subtitle = stringResource(R.string.exercise_minutes)) {
+                val stiffPoints = remember(t.symptom) {
+                    t.symptom.mapNotNull { s -> s.morningStiffnessMin?.let { TrendPoint(s.date, it.toFloat()) } }
+                }
                 TrendChart(
-                    points = t.symptom.mapNotNull { s ->
-                        s.morningStiffnessMin?.let { TrendPoint(s.date, it.toFloat()) }
-                    },
+                    points = stiffPoints,
                     unit = stringResource(R.string.exercise_minute_space_suffix),
                     label = stringResource(R.string.symptom_morning_stiffness),
                 )
@@ -289,8 +293,9 @@ private fun TrendsPage(t: ReportRepository.Trends?) {
         }
         item {
             SectionCard(title = stringResource(R.string.vitals_weight), subtitle = "kg") {
+                val weightPoints = remember(t.weight) { t.weight.map { TrendPoint(it.date, it.weightKg.toFloat()) } }
                 TrendChart(
-                    points = t.weight.map { TrendPoint(it.date, it.weightKg.toFloat()) },
+                    points = weightPoints,
                     unit = " kg",
                     label = stringResource(R.string.vitals_weight),
                 )
@@ -298,10 +303,11 @@ private fun TrendsPage(t: ReportRepository.Trends?) {
         }
         item {
             SectionCard(title = stringResource(R.string.vitals_bp_systolic), subtitle = "mmHg") {
+                val bpPoints = remember(t.vitals) {
+                    t.vitals.mapNotNull { v -> v.bpSys?.let { TrendPoint(v.date, it.toFloat()) } }
+                }
                 TrendChart(
-                    points = t.vitals.mapNotNull { v ->
-                        v.bpSys?.let { TrendPoint(v.date, it.toFloat()) }
-                    },
+                    points = bpPoints,
                     unit = " mmHg",
                     label = stringResource(R.string.vitals_bp_systolic),
                     accent = MaterialTheme.colorScheme.error,
@@ -310,10 +316,11 @@ private fun TrendsPage(t: ReportRepository.Trends?) {
         }
         item {
             SectionCard(title = stringResource(R.string.vitals_heart_rate), subtitle = "bpm") {
+                val hrPoints = remember(t.vitals) {
+                    t.vitals.mapNotNull { v -> v.heartRate?.let { TrendPoint(v.date, it.toFloat()) } }
+                }
                 TrendChart(
-                    points = t.vitals.mapNotNull { v ->
-                        v.heartRate?.let { TrendPoint(v.date, it.toFloat()) }
-                    },
+                    points = hrPoints,
                     unit = " bpm",
                     label = stringResource(R.string.vitals_heart_rate),
                     accent = MaterialTheme.colorScheme.tertiary,
@@ -399,3 +406,4 @@ private fun ExportPage(vm: ReportViewModel, busy: Boolean, context: android.cont
 
 // ======================= 公共 =======================
 // SectionCard 已统一到 ui/components/Cards.kt（此前 5 份同名实现在此收口）
+

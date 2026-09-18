@@ -2,6 +2,7 @@ package com.ashkb.app.ui.me
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,6 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Medication
@@ -26,7 +29,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.MedFrequency
@@ -56,7 +59,7 @@ fun MedsScreen(
     onAdd: () -> Unit,
     onBack: () -> Unit,
 ) {
-    val meds by vm.meds.collectAsState()
+    val meds by vm.meds.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var stopTarget by remember { mutableStateOf<Medication?>(null) }
 
@@ -73,49 +76,57 @@ fun MedsScreen(
             )
         },
     ) { padding ->
-        Column(
+        LazyColumn(
             Modifier
                 .padding(padding)
-                .fillMaxSize()
-                .padding(horizontal = Spacing.lg),
+                .fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = Spacing.lg,
+                end = Spacing.lg,
+                top = Spacing.md,
+                bottom = Spacing.xxl,
+            ),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Spacer(Modifier.height(Spacing.md))
             if (meds.isEmpty()) {
-                SectionCard(title = stringResource(R.string.nav_meds)) {
-                    EmptyState(
-                        icon = Icons.Rounded.Medication,
-                        title = stringResource(R.string.med_empty_hint),
-                        body = stringResource(R.string.med_add_plan_note),
-                        actionLabel = stringResource(R.string.med_add_medication),
-                        onAction = onAdd,
-                    )
-                }
-            } else {
-                SectionCard(title = stringResource(R.string.me_meds_count, meds.size)) {
-                    meds.forEachIndexed { index, med ->
-                        MedRow(
-                            med = med,
-                            onStop = { stopTarget = med },
+                item(key = "meds-empty") {
+                    SectionCard(title = stringResource(R.string.nav_meds)) {
+                        EmptyState(
+                            icon = Icons.Rounded.Medication,
+                            title = stringResource(R.string.med_empty_hint),
+                            body = stringResource(R.string.med_add_plan_note),
+                            actionLabel = stringResource(R.string.med_add_medication),
+                            onAction = onAdd,
                         )
-                        if (index != meds.lastIndex) {
-                            androidx.compose.material3.HorizontalDivider(
-                                Modifier.padding(vertical = Spacing.sm),
-                                color = MaterialTheme.colorScheme.outlineVariant,
-                            )
-                        }
                     }
                 }
-                FilledTonalButton(
-                    onClick = onAdd,
-                    modifier = Modifier.fillMaxWidth().height(Size.touchComfort),
-                ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null)
-                    Spacer(Modifier.width(Spacing.sm))
-                    Text(stringResource(R.string.med_add_medication))
+            } else {
+                item(key = "meds-header") {
+                    SectionCard(title = stringResource(R.string.me_meds_count, meds.size)) {}
+                }
+                items(meds, key = { it.id }) { med ->
+                    MedRow(
+                        med = med,
+                        onStop = { stopTarget = med },
+                    )
+                    if (med != meds.last()) {
+                        androidx.compose.material3.HorizontalDivider(
+                            Modifier.padding(vertical = Spacing.sm),
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                        )
+                    }
+                }
+                item(key = "meds-add") {
+                    FilledTonalButton(
+                        onClick = onAdd,
+                        modifier = Modifier.fillMaxWidth().height(Size.touchComfort),
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = null)
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(stringResource(R.string.med_add_medication))
+                    }
                 }
             }
-            Spacer(Modifier.height(Spacing.xxl))
         }
     }
 

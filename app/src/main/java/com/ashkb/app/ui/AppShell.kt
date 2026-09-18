@@ -28,11 +28,11 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -227,7 +227,7 @@ fun AppShell() {
                 )
             }
             composable<ProfileEdit> {
-                val profile by meVm.profile.collectAsState()
+                val profile by meVm.profile.collectAsStateWithLifecycle()
                 ProfileEditScreen(
                     initial = profile,
                     onSave = {
@@ -251,11 +251,11 @@ private fun HealthHub(
     onOpenCheckup: () -> Unit,
     onOpenEmergency: () -> Unit,
 ) {
-    val vitals by wellnessVm.vitalsToday.collectAsState()
-    val weight by wellnessVm.weightToday.collectAsState()
-    val checkupItems by checkupVm.checkupItems.collectAsState()
-    val labRecent by checkupVm.labRecent.collectAsState()
-    val contacts by emergencyVm.contacts.collectAsState()
+    val vitals by wellnessVm.vitalsToday.collectAsStateWithLifecycle()
+    val weight by wellnessVm.weightToday.collectAsStateWithLifecycle()
+    val checkupItems by checkupVm.checkupItems.collectAsStateWithLifecycle()
+    val labRecent by checkupVm.labRecent.collectAsStateWithLifecycle()
+    val contacts by emergencyVm.contacts.collectAsStateWithLifecycle()
 
     val wellnessSub = buildList {
         add(if (vitals != null) stringResource(R.string.vitals_today_recorded) else stringResource(R.string.vitals_today_not_recorded))

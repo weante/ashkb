@@ -14,7 +14,11 @@ import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.LabImport
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,10 +26,21 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 
 class CheckupViewModel(private val repo: HealthRepository) : ViewModel() {
-    val date: LocalDate = LocalDate.now()
+    private val _date = MutableStateFlow(LocalDate.now())
+    val date: LocalDate get() = _date.value
+
+    init {
+        viewModelScope.launch {
+            while (true) {
+                val now = LocalDateTime.now()
+                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
+                delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
+                _date.value = LocalDate.now()
+            }
+        }
+    }
 
     val checkupItems: StateFlow<List<CheckupItem>> = repo.observeCheckupItems()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -62,7 +77,13 @@ class CheckupViewModel(private val repo: HealthRepository) : ViewModel() {
     }
 
     // ---- 化验结果 ----
-    fun labResultsFor(checkupId: String) = repo.observeLabByCheckup(checkupId)
+    private val labByCheckup = mutableMapOf<String, StateFlow<List<LabResult>>>()
+
+    fun labResultsFor(checkupId: String): StateFlow<List<LabResult>> =
+        labByCheckup.getOrPut(checkupId) {
+            repo.observeLabByCheckup(checkupId)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        }
 
     fun saveLabResult(result: LabResult) {
         viewModelScope.launch { repo.saveLabResult(result) }

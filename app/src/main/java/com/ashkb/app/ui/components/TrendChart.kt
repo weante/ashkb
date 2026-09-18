@@ -88,6 +88,23 @@ fun TrendChart(
 
     val axisStyle: TextStyle = MaterialTheme.typography.labelSmall.copy(color = cs.onSurfaceVariant)
 
+    val gridDash = remember { PathEffect.dashPathEffect(floatArrayOf(6f, 6f)) }
+    val thresholdDash = remember { PathEffect.dashPathEffect(floatArrayOf(10f, 8f)) }
+    val linePx = with(density) { 2.dp.toPx() }
+    val lineStroke = remember(linePx) {
+        Stroke(width = linePx, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    }
+    val linePath = remember { Path() }
+    val fillPath = remember { Path() }
+    val fillBrush = remember(accent) {
+        Brush.verticalGradient(colors = listOf(accent.copy(alpha = 0.16f), Color.Transparent))
+    }
+    val thresholdTextStyle = remember(axisStyle, cl.warning) { axisStyle.copy(color = cl.warning) }
+    val thresholdLayout = remember(thresholdLabel, thresholdTextStyle) {
+        thresholdLabel?.let { textMeasurer.measure(it, thresholdTextStyle) }
+    }
+    val selectedTextStyle = remember(axisStyle, cs.onSurface) { axisStyle.copy(color = cs.onSurface) }
+
     val scale = remember(points, threshold) { niceScale(points.map { it.value }, threshold) }
     val vMin = scale.first
     val vMax = scale.second
@@ -112,7 +129,25 @@ fun TrendChart(
     val axisWidthPx = (tickLayouts.maxOfOrNull { it.size.width }?.toFloat() ?: 0f) +
         with(density) { Spacing.sm.toPx() }
 
+    val xTickItems = remember(points, axisStyle) {
+        listOf(0, (points.size - 1) / 2, points.lastIndex).distinct().map { i ->
+            i to textMeasurer.measure(
+                dateTick(points.first().date, points.last().date, points[i].date),
+                axisStyle,
+            )
+        }
+    }
+
     var selected by remember(points) { mutableStateOf<Int?>(null) }
+
+    val selectedLayout = remember(selected, points, unit, selectedTextStyle) {
+        selected?.let { i ->
+            val idx = i.coerceIn(0, points.lastIndex)
+            val txt = "${dateTick(points.first().date, points.last().date, points[idx].date)} · " +
+                "${fmtValue(points[idx].value)}$unit"
+            textMeasurer.measure(txt, selectedTextStyle)
+        }
+    }
 
     val progress = remember { Animatable(0f) }
     LaunchedEffect(points) {
@@ -149,15 +184,12 @@ fun TrendChart(
         val top = padH
         val bottom = size.height - Spacing.xxl.toPx()
         val gridPx = Size.divider.toPx()
-        val linePx = 2.dp.toPx()
 
-        val xAt: (Int) -> Float = { i ->
+        fun xAt(i: Int): Float =
             if (points.size == 1) (left + right) / 2f
             else left + (right - left) * i / (points.size - 1).toFloat()
-        }
-        val yAt: (Float) -> Float = { v ->
+        fun yAt(v: Float): Float =
             bottom - (bottom - top) * ((v - vMin) / (vMax - vMin)).coerceIn(0f, 1f)
-        }
 
         // ---- 虚线网格 + Y 轴刻度 ----
         ticks.forEachIndexed { i, v ->
@@ -167,7 +199,7 @@ fun TrendChart(
                 start = Offset(left, y),
                 end = Offset(right, y),
                 strokeWidth = gridPx,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)),
+                pathEffect = gridDash,
             )
             val layout = tickLayouts[i]
             drawText(
@@ -181,17 +213,16 @@ fun TrendChart(
         drawLine(cs.outlineVariant, Offset(left, bottom), Offset(right, bottom), gridPx)
 
         // ---- 阈值线 + 右侧 chip（先测宽再定位，窄屏不溢出）----
-        if (threshold != null && threshold in vMin..vMax) {
+        if (threshold != null && threshold >= vMin && threshold <= vMax) {
             val y = yAt(threshold)
             drawLine(
                 color = cl.warning,
                 start = Offset(left, y),
                 end = Offset(right, y),
                 strokeWidth = Size.chartStroke.toPx(),
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
+                pathEffect = thresholdDash,
             )
-            thresholdLabel?.let { tl ->
-                val l = textMeasurer.measure(tl, axisStyle.copy(color = cl.warning))
+            thresholdLayout?.let { l ->
                 val padBoxH = Spacing.xs.toPx()
                 val padBoxV = Spacing.xxs.toPx()
                 val bw = l.size.width + padBoxH * 2
@@ -210,10 +241,11 @@ fun TrendChart(
 
         // ---- 数据线（按进度从左到右描出）+ 渐变填充 ----
         val visible = (points.size * progress.value).roundToInt().coerceIn(1, points.size)
-        val linePath = Path().apply {
-            points.take(visible).forEachIndexed { i, p ->
-                if (i == 0) moveTo(xAt(0), yAt(p.value)) else lineTo(xAt(i), yAt(p.value))
-            }
+        linePath.reset()
+        for (i in 0 until visible) {
+            val px = xAt(i)
+            val py = yAt(points[i].value)
+            if (i == 0) linePath.moveTo(px, py) else linePath.lineTo(px, py)
         }
 
         if (points.size == 1) {
@@ -221,63 +253,48 @@ fun TrendChart(
             val y = yAt(points[0].value)
             drawLine(accent.copy(alpha = 0.45f), Offset(left, y), Offset(right, y), linePx)
         } else if (visible > 1) {
-            val fill = Path().apply {
-                addPath(linePath)
-                lineTo(xAt(visible - 1), bottom)
-                lineTo(xAt(0), bottom)
-                close()
-            }
-            drawPath(
-                path = fill,
-                brush = Brush.verticalGradient(
-                    colors = listOf(accent.copy(alpha = 0.16f), Color.Transparent),
-                    startY = top,
-                    endY = bottom,
-                ),
-            )
+            fillPath.reset()
+            fillPath.addPath(linePath)
+            fillPath.lineTo(xAt(visible - 1), bottom)
+            fillPath.lineTo(xAt(0), bottom)
+            fillPath.close()
+            drawPath(path = fillPath, brush = fillBrush)
         }
 
         if (points.size > 1) {
-            drawPath(
-                path = linePath,
-                color = accent,
-                style = Stroke(width = linePx, cap = StrokeCap.Round, join = StrokeJoin.Round),
-            )
+            drawPath(path = linePath, color = accent, style = lineStroke)
         }
 
         // ---- 选中点读数 ----
-        selected?.let { i ->
-            val idx = i.coerceIn(0, points.lastIndex)
-            val x = xAt(idx)
-            val y = yAt(points[idx].value)
+        val selIdx = selected?.coerceIn(0, points.lastIndex)
+        if (selIdx != null) {
+            val x = xAt(selIdx)
+            val y = yAt(points[selIdx].value)
             drawLine(cs.outline, Offset(x, top), Offset(x, bottom), gridPx)
             drawCircle(accent, Size.chartDot.toPx(), Offset(x, y))
             drawCircle(cs.surfaceContainerLowest, Size.chartDot.toPx() / 2, Offset(x, y))
 
-            val txt = "${dateTick(points.first().date, points.last().date, points[idx].date)} · " +
-                "${fmtValue(points[idx].value)}$unit"
-            val l = textMeasurer.measure(txt, axisStyle.copy(color = cs.onSurface))
-            val padBoxH = Spacing.sm.toPx()
-            val padBoxV = Spacing.xs.toPx()
-            val bw = l.size.width + padBoxH * 2
-            val bh = l.size.height + padBoxV * 2
-            val bx = (x - bw / 2f).coerceIn(left, (right - bw).coerceAtLeast(left))
-            drawRoundRect(
-                color = cs.surfaceContainerHigh,
-                topLeft = Offset(bx, top),
-                size = GeometrySize(bw, bh),
-                cornerRadius = CornerRadius(Spacing.sm.toPx()),
-            )
-            drawText(l, topLeft = Offset(bx + padBoxH, top + padBoxV))
+            selectedLayout?.let { l ->
+                val padBoxH = Spacing.sm.toPx()
+                val padBoxV = Spacing.xs.toPx()
+                val bw = l.size.width + padBoxH * 2
+                val bh = l.size.height + padBoxV * 2
+                val bx = (x - bw / 2f).coerceIn(left, (right - bw).coerceAtLeast(left))
+                drawRoundRect(
+                    color = cs.surfaceContainerHigh,
+                    topLeft = Offset(bx, top),
+                    size = GeometrySize(bw, bh),
+                    cornerRadius = CornerRadius(Spacing.sm.toPx()),
+                )
+                drawText(l, topLeft = Offset(bx + padBoxH, top + padBoxV))
+            }
         }
 
         // ---- X 轴：首 / 中 / 尾三个日期刻度（不再显示"${points.size} 点"）----
-        val idxList = listOf(0, (points.size - 1) / 2, points.lastIndex).distinct()
-        idxList.forEach { i ->
-            val text = dateTick(points.first().date, points.last().date, points[i].date)
-            val l = textMeasurer.measure(text, axisStyle)
+        val padTick = Spacing.xs.toPx()
+        xTickItems.forEach { (i, l) ->
             val x = (xAt(i) - l.size.width / 2f).coerceIn(left, (right - l.size.width).coerceAtLeast(left))
-            drawText(l, topLeft = Offset(x, bottom + Spacing.xs.toPx()))
+            drawText(l, topLeft = Offset(x, bottom + padTick))
         }
     }
 }

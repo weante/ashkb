@@ -27,11 +27,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
 import com.ashkb.app.domain.Labels
@@ -51,8 +51,8 @@ fun MeScreen(
     onOpenBackup: () -> Unit = {},
     onEditProfile: () -> Unit = {},
 ) {
-    val profile by vm.profile.collectAsState()
-    val meds by vm.meds.collectAsState()
+    val profile by vm.profile.collectAsStateWithLifecycle()
+    val meds by vm.meds.collectAsStateWithLifecycle()
 
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = Spacing.lg),

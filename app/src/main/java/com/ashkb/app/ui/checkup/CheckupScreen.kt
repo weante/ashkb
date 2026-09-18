@@ -20,7 +20,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 
 import com.ashkb.app.R
@@ -55,12 +55,12 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
     // 改为 ScrollableTabRow + HorizontalPager，与报表页统一，并自带 selectedTabIndex 语义。
     val pager = rememberPagerState(pageCount = { CheckupTab.entries.size })
     val scope = rememberCoroutineScope()
-    val items by vm.checkupItems.collectAsState()
-    val records by vm.checkupRecords.collectAsState()
-    val vaccines by vm.vaccineRecords.collectAsState()
-    val labRecent by vm.labRecent.collectAsState()
-    val labLimit by vm.labLimit.collectAsState()
-    val imagingRecords by vm.imagingRecords.collectAsState()
+    val items by vm.checkupItems.collectAsStateWithLifecycle()
+    val records by vm.checkupRecords.collectAsStateWithLifecycle()
+    val vaccines by vm.vaccineRecords.collectAsStateWithLifecycle()
+    val labRecent by vm.labRecent.collectAsStateWithLifecycle()
+    val labLimit by vm.labLimit.collectAsStateWithLifecycle()
+    val imagingRecords by vm.imagingRecords.collectAsStateWithLifecycle()
 
     var showItemForm by remember { mutableStateOf(false) }
     var showRecordForm by remember { mutableStateOf(false) }

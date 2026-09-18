@@ -16,9 +16,12 @@ import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.entity.SymptomDaily
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.nowIso
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,7 +33,19 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 class SymptomViewModel(private val repo: HealthRepository) : ViewModel() {
 
-    val today: LocalDate = LocalDate.now()
+    private val _date = MutableStateFlow(LocalDate.now())
+    val today: LocalDate get() = _date.value
+
+    init {
+        viewModelScope.launch {
+            while (true) {
+                val now = LocalDateTime.now()
+                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
+                delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
+                _date.value = LocalDate.now()
+            }
+        }
+    }
 
     /** 自评记录日期：今天 / 昨天（补写漏记） */
     private val _selectedDate = MutableStateFlow(today)
@@ -47,7 +62,8 @@ class SymptomViewModel(private val repo: HealthRepository) : ViewModel() {
 
     /** null = 当日未记录（与「实际为 0」严格区分） */
     val symptom: StateFlow<SymptomDaily?> =
-        _selectedDate
+        _date
+            .flatMapLatest { _selectedDate }
             .flatMapLatest { repo.observeSymptom(it.toString()) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
