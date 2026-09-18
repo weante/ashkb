@@ -11,6 +11,7 @@ import com.ashkb.app.data.db.Ids
 import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.entity.LedgerStatus
 import com.ashkb.app.data.entity.LedgerType
+import com.ashkb.app.domain.RecoveryCode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -75,6 +76,32 @@ class BackupRepository(private val context: Context) {
 
     fun webdavConfigured(): Boolean = webdavConfig().first.isNotBlank()
 
+    // ---- 备份恢复码（规划 A2，v1.0.27）：Keystore AES-256-GCM 加密落盘，同 WebDAV 凭据模式 ----
+    private val vaultPrefs: SharedPreferences =
+        context.getSharedPreferences("vault_config", Context.MODE_PRIVATE)
+
+    fun hasRecoveryCode(): Boolean = vaultPrefs.contains("recovery_code_v1")
+
+    /** 读出恢复码（分组形态）；未设置或 Keystore 解密失败返回 null。 */
+    fun recoveryCode(): String? =
+        vaultPrefs.getString("recovery_code_v1", null)
+            ?.let { runCatching { KeystoreCipher.decryptFromB64(it) }.getOrNull() }
+            ?.takeIf { it.isNotBlank() }
+
+    /** 生成并落盘新恢复码（覆盖旧码：旧码对既有旧备份仍有效，但不再用于新备份）。 */
+    fun generateRecoveryCode(): String {
+        val code = RecoveryCode.generate()
+        vaultPrefs.edit()
+            .putString("recovery_code_v1", KeystoreCipher.encryptToB64(code))
+            .apply()
+        return code
+    }
+
+    /** 备份加密用：已设恢复码则带恢复码槽（口令 / 恢复码任一可解），否则仅口令槽。
+     *  槽秘密统一用归一化形态（去连字符大写 32 字符）——解密侧对用户任意抄写形态归一化后即可命中。 */
+    private fun recoverySlot(): CharArray? =
+        recoveryCode()?.let { RecoveryCode.normalize(it).toCharArray() }
+
     // ---- 台账 ----
     private suspend fun log(type: LedgerType, ok: Boolean, target: String,
                             fileName: String? = null, rows: Int? = null,
@@ -98,7 +125,8 @@ class BackupRepository(private val context: Context) {
     /** 全量加密备份到本机（协议 §3 全量导出：ashkb-YYYYMMDD.ashkb）。 */
     suspend fun backupLocal(password: CharArray): BackupOutcome = withContext(Dispatchers.IO) {
         val exported = BackupEngine.export(supportDb(), nowIso())
-        val bytes = VaultCipher.encrypt(password, exported.payload, BackupEngine.schemaVersion(supportDb()), nowIso())
+        val bytes = VaultCipher.encrypt(password, recoverySlot(), exported.payload,
+            BackupEngine.schemaVersion(supportDb()), nowIso())
         val dir = File(context.filesDir, "backups").apply { mkdirs() }
         // 同日多次备份保留时分秒后缀
         val name = "ashkb-${LocalDate.now()}" +
@@ -127,7 +155,8 @@ class BackupRepository(private val context: Context) {
         onStage("正在导出数据库快照…")
         val exported = BackupEngine.export(supportDb(), nowIso())
         onStage("正在加密（AES-256-GCM）…")
-        val bytes = VaultCipher.encrypt(password, exported.payload, BackupEngine.schemaVersion(supportDb()), nowIso())
+        val bytes = VaultCipher.encrypt(password, recoverySlot(), exported.payload,
+            BackupEngine.schemaVersion(supportDb()), nowIso())
         // X2：文件名带时间戳——同一天多次备份不再互相覆盖（旧按日命名 PUT 同名即覆盖）
         val name = "ashkb-backup-" +
             LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmmss")) +
@@ -221,8 +250,10 @@ class BackupRepository(private val context: Context) {
         withContext(Dispatchers.IO) {
             // 1. pre-restore 快照（退路）
             val snapshot = BackupEngine.export(supportDb(), nowIso())
+            // 快照同样带恢复码槽——用户用恢复码完成恢复时，快照仍可用同一恢复码解开
             val snapBytes = VaultCipher.encrypt(
-                snapshotPassword, snapshot.payload, BackupEngine.schemaVersion(supportDb()), nowIso())
+                snapshotPassword, recoverySlot(), snapshot.payload,
+                BackupEngine.schemaVersion(supportDb()), nowIso())
             val dir = File(context.filesDir, "backups").apply { mkdirs() }
             val snapFile = dir.resolve("pre-restore-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))}.ashkb")
             snapFile.writeBytes(snapBytes)
@@ -270,7 +301,9 @@ class BackupRepository(private val context: Context) {
             val before = BackupEngine.export(copy, now)
             // 2. 加密 → 解密（证明加密链路）
             val drillPass = "drill-${java.util.UUID.randomUUID()}"
-            val bytes = VaultCipher.encrypt(drillPass.toCharArray(), before.payload, BackupEngine.schemaVersion(copy), now)
+            // 演练口令随机即弃，无恢复码槽（单口令槽，v2 格式）
+            val bytes = VaultCipher.encrypt(drillPass.toCharArray(), null, before.payload,
+                BackupEngine.schemaVersion(copy), now)
             val decrypted = VaultCipher.decrypt(drillPass.toCharArray(), bytes)
             // 3. 副本上恢复写入 + 双校验
             val verify = BackupEngine.restore(copy, decrypted.payload)

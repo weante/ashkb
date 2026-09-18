@@ -19,12 +19,14 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -44,8 +46,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -95,6 +100,13 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
     var showAllLedger by remember { mutableStateOf(false) }
     val davPicked by vm.davPicked.collectAsStateWithLifecycle()
 
+    // ---- A2：备份恢复码 ----
+    val recoveryCodeSet by vm.recoveryCodeSet.collectAsStateWithLifecycle()
+    val recoveryReveal by vm.recoveryReveal.collectAsStateWithLifecycle()
+    var showRecoveryDialog by remember { mutableStateOf<String?>(null) }
+    var showRegenConfirm by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+
     val pickRestoreFile = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -137,6 +149,14 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
         }
     }
 
+    // A2：恢复码生成/查看完成 → 弹窗展示（分组等宽字体 + 抄写提示）
+    LaunchedEffect(recoveryReveal) {
+        recoveryReveal?.let {
+            showRecoveryDialog = it
+            vm.consumeRecoveryReveal()
+        }
+    }
+
     Column(Modifier.fillMaxSize()) {
         ScreenTopBar(title = stringResource(R.string.me_backup_section), onBack = onBack)
 
@@ -154,6 +174,98 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+
+            // ---- 备份恢复码（A2）----
+            SectionCard(title = stringResource(R.string.backup_recovery_section)) {
+                Text(
+                    stringResource(if (recoveryCodeSet) R.string.backup_recovery_set_note
+                    else R.string.backup_recovery_not_set_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    if (!recoveryCodeSet) {
+                        Button(
+                            onClick = { vm.generateRecoveryCode() },
+                            enabled = !busy,
+                            modifier = Modifier.heightIn(min = Size.touchMin),
+                        ) { Text(stringResource(R.string.backup_recovery_generate)) }
+                    } else {
+                        OutlinedButton(
+                            onClick = { vm.revealRecoveryCode() },
+                            enabled = !busy,
+                            modifier = Modifier.heightIn(min = Size.touchMin),
+                        ) { Text(stringResource(R.string.backup_recovery_view)) }
+                        OutlinedButton(
+                            onClick = { showRegenConfirm = true },
+                            enabled = !busy,
+                            modifier = Modifier.heightIn(min = Size.touchMin),
+                        ) { Text(stringResource(R.string.backup_recovery_regenerate)) }
+                    }
+                }
+
+                // A2：恢复码展示弹窗（生成 / 查看共用）——等宽分组显示 + 可选中复制
+                showRecoveryDialog?.let { code ->
+                    AlertDialog(
+                        onDismissRequest = { showRecoveryDialog = null },
+                        title = { Text(stringResource(R.string.backup_recovery_dialog_title)) },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                                Text(
+                                    stringResource(R.string.backup_recovery_dialog_body),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Surface(
+                                    shape = MaterialTheme.shapes.medium,
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    SelectionContainer {
+                                        Text(
+                                            code,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontFamily = FontFamily.Monospace,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(Spacing.md),
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showRecoveryDialog = null }) {
+                                Text(stringResource(R.string.backup_recovery_dialog_saved))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { clipboard.setText(AnnotatedString(code)) }) {
+                                Text(stringResource(R.string.backup_recovery_dialog_copy))
+                            }
+                        },
+                    )
+                }
+                if (showRegenConfirm) {
+                    AlertDialog(
+                        onDismissRequest = { showRegenConfirm = false },
+                        title = { Text(stringResource(R.string.backup_recovery_regenerate)) },
+                        text = { Text(stringResource(R.string.backup_recovery_regen_confirm)) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showRegenConfirm = false
+                                vm.generateRecoveryCode()
+                            }) { Text(stringResource(R.string.backup_recovery_regenerate)) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showRegenConfirm = false }) {
+                                Text(stringResource(R.string.common_cancel))
+                            }
+                        },
+                    )
+                }
             }
 
             // ---- 本机全量备份 ----
@@ -245,6 +357,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = PassKeyboard,
                     singleLine = true,
+                    supportingText = { Text(stringResource(R.string.backup_recovery_hint_for_restore)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(Spacing.sm))

@@ -1,7 +1,7 @@
 # ASHKB 开发交接文档
 
 > 本文档面向接手本仓库开发的 AI 会话（TraeWork Code 模式 / TraeCode）或人类工程师。
-> 记录截至 **v1.0.26**（versionCode 31，2026-09-18）的全部工程知识。
+> 记录截至 **v1.0.27**（versionCode 32，2026-09-19）的全部工程知识。
 > 应用本身介绍见 `README.md`，版本历史见 `CHANGELOG.md`。
 
 ## 1. 项目一句话
@@ -27,7 +27,7 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）：面向强直性脊柱�
 $env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.7\bin\gradle.bat" -p patient-health-app assembleDebug assembleRelease testDebugUnitTest
 ```
 
-- 全量构建约 2~3 分钟；**130 条单测**必须全过才算交付
+- 全量构建约 2~3 分钟；**149 条单测**必须全过才算交付
 - 单测结果统计：`app\build\test-results\testDebugUnitTest\*.xml`
 - Windows 侧无 git；**git 在 WSL 里**（仓库路径 `/mnt/c/<工作区>/patient-health-app`）
 
@@ -113,7 +113,7 @@ app/src/main/java/com/ashkb/app/
 
 ## 8. 当前状态与下一步
 
-- **最新版**：v1.0.26（versionCode 31）：v1.0.21 知识库检索优化（Room v8→v9）+ v1.0.22 清除 `as MutableStateFlow` 强转 + v1.0.23 化验 Tab 分组折叠 + v1.0.24 通知/VM/PDF 文案资源化 + v1.0.25 Compose 性能审查第一批 + v1.0.26 紧急卡「当前用药」（规划缺口 A1）
+- **最新版**：v1.0.27（versionCode 32）：v1.0.21 知识库检索优化（Room v8→v9）+ v1.0.22 清除 `as MutableStateFlow` 强转 + v1.0.23 化验 Tab 分组折叠 + v1.0.24 通知/VM/PDF 文案资源化 + v1.0.25 Compose 性能审查第一批 + v1.0.26 紧急卡「当前用药」（A1）+ v1.0.27 备份恢复码（A2，v2 信封格式）
 - **数据安全**：v1.0.6 起 WebDAV 凭据 Keystore 加密、备份口令化、事务化写入，均已稳定；v1.0.19 起支持登录 WebDAV 后直接拉取远程备份列表选择恢复（新机无需先生成本地备份）；v1.0.20 起备份文件名带时间戳，同天多份不互相覆盖；v1.0.21 起知识库检索走单列 `search_text` + 查询防抖（旧备份恢复后自动回填该列）
 - **待办池**（用户视角，无承诺）：
   - WebDAV 非标准方法（PROPFIND / MKCOL）依赖反射改 `HttpURLConnection` 内部字段：换 Android 15 / 16 真机需回归验证（无替代方案，属设计取舍）——**需真机，本机无法完成**
@@ -130,8 +130,8 @@ app/src/main/java/com/ashkb/app/
 | # | 缺口 | 核实依据 |
 |---|---|---|
 | ~~A1~~ | ~~紧急卡缺「当前用药」~~ —— **已于 v1.0.26 落地**（紧急卡页面 + 打印版 PDF 自动汇总在用药单，免疫抑制类置顶标注；见「已关闭的旧待办」） | — |
-| A2 ✅ | **备份无「恢复码」**——口令遗忘即数据永久不可恢复（规划中恢复码是砍掉设备层后仅存的两层密钥之一） | grep `恢复码` / `recoveryCode` 零命中 |
-| A3 ✅ | **KDF 为 PBKDF2 而非规划写的 Argon2id**——抗暴力破解强度弱于计划（PBKDF2 本身可接受，属实现偏差非漏洞） | `VaultCipher.kt` 注释自承「后续 Argon2id 升级」 |
+| ~~A2~~ | ~~备份无「恢复码」~~ —— **已于 v1.0.27 落地**（v2 信封格式双密钥槽，口令/恢复码任一可解；见「已关闭的旧待办」） | — |
+| ~~A3~~ | ~~KDF 为 PBKDF2 而非规划写的 Argon2id~~ —— **评估结论文档化（v1.0.27）**：不引入 Argon2id（Android 无内置；BC 有 provider 冲突史 / argon2 native +1MB APK）；v2 每槽自带 `kdf`/`iter` 参数，将来可在新槽内无破坏切换，旧文件按头内参数解。架构铺路完成，实现延后 | — |
 
 **B. 功能缺口（规划写了、代码里没有）**
 
@@ -187,4 +187,5 @@ M8 家属协作全部（家属端 / 共享子集 / 设备令牌 / 命令协议 /
   - 化验 Tab 分组折叠——v1.0.23 落地（有异常或最近一次的日期默认展开，其余收起；`rememberSaveable` + 稳定 item key 保持状态）
   - VM / 通知 / PDF 硬编码文案（v1.0.10 §遗留）——v1.0.24 三层共 124 条下沉 strings.xml（`notif_` / `vm_` / `pdf_` 前缀）。**边界**：`data/` 与 `domain/` 层的异常消息与领域标签保持硬编码——domain 层按设计纯 JVM 无 Context，且那些是数据/提示词而非界面文案
   - **规划缺口 A1：紧急卡缺「当前用药」**——v1.0.26 落地。放弃闲置的 `Profile.emergency_med_summary`（无读写），改为纯函数 `domain/EmergencyMeds.kt` 从在用药单自动汇总：未归档 + 结束日期口径筛选 → 免疫抑制类（BIOLOGIC / JAK / CSDMARD / GLUCOCORTICOID）置顶标注 → 12 条封顶；紧急卡页面（`EmergencyScreen`，刻意放在 `profile?.let` 之外，未建档也显示）与打印版 PDF（`EmergencyCard.meds` 字段）两处同源。单测 +16 条
-- **测试基线**：130 条单测全绿；新增功能须同步补测（`app/src/test/.../`，8 个测试文件覆盖 backup / 加密 / 通用名键 / 运动分级 / 导入解析 / 排程计算 / 知识库检索 / 紧急卡用药汇总）
+   - **规划缺口 A2：备份恢复码**——v1.0.27 落地。备份文件格式升级 **v2 信封（magic `ASHKBAK2`）**：随机 256-bit DEK 加密内容，DEK 再被口令/恢复码分别包装进两个密钥槽（类 LUKS keyslot），任一可解；槽 id 进 AAD 防槽交换。恢复码 160-bit Base32（32 字符 8 组，`domain/RecoveryCode.kt` 纯函数），Keystore 加密落盘（`vault_config` prefs）。**解密归一化兜底**：先按原样逐槽尝试，输入形似恢复码再按归一化形态重试（任意抄写形态可解；口令第一轮命中不受影响）。`ASHKBAK1` 旧格式永久兼容读取（`encryptLegacy` 仅测试用）；未设恢复码也用 v2 单槽（格式不分裂）。pre-restore 快照同带恢复码槽。**A3 决策**：不引入 Argon2id（Android 无内置 / BC 冲突史 / native +1MB），v2 槽自带 KDF 参数可将来无破坏升级
+- **测试基线**：149 条单测全绿；新增功能须同步补测（`app/src/test/.../`，9 个测试文件覆盖 backup / 加密 / 通用名键 / 运动分级 / 导入解析 / 排程计算 / 知识库检索 / 紧急卡用药汇总 / 恢复码）

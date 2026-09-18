@@ -695,6 +695,22 @@
     <string name="report_share_fail">打开分享面板失败：%1$s</string>
     <string name="emergency_dial_fail">无法打开拨号面板：%1$s</string>
 
+    <!-- ========== v1.0.27：备份恢复码（规划缺口 A2） ========== -->
+    <string name="backup_recovery_section">备份恢复码</string>
+    <string name="backup_recovery_not_set_note">忘记备份口令时的最后退路。设置后，之后的新备份可凭口令或恢复码任一解密；恢复码仅存本机加密空间，不随备份文件上传。强烈建议设置。</string>
+    <string name="backup_recovery_set_note">已设置。之后的新备份可凭口令或恢复码任一解密（已存在的备份不受影响）。</string>
+    <string name="backup_recovery_generate">生成恢复码</string>
+    <string name="backup_recovery_view">查看</string>
+    <string name="backup_recovery_regenerate">重新生成</string>
+    <string name="backup_recovery_dialog_title">备份恢复码</string>
+    <string name="backup_recovery_dialog_body">请抄写并离线妥善保存（如纸质卡片，与手机分开放）。恢复码不随备份文件存储，仅存于本机加密空间——本机丢失或卸载重装后，只能靠你抄下的这份。</string>
+    <string name="backup_recovery_dialog_copy">复制</string>
+    <string name="backup_recovery_dialog_saved">我已妥善保存</string>
+    <string name="backup_recovery_regen_confirm">重新生成仅影响之后的新备份；已存在的备份仍用生成时的恢复码。确定重新生成？</string>
+    <string name="backup_recovery_hint_for_restore">忘记口令？可输入备份时设置的恢复码代替</string>
+    <string name="vm_recovery_generate_failed">恢复码生成失败：%1$s</string>
+    <string name="vm_recovery_not_set">尚未设置恢复码</string>
+
     <!-- ========== v1.0.26：紧急卡「当前用药」（自动汇总药单） ========== -->
     <string name="emergency_meds_section">当前用药（急救参考）</string>
     <string name="emergency_meds_tag_immunosuppressant">免疫抑制</string>

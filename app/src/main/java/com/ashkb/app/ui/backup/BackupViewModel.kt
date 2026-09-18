@@ -57,6 +57,14 @@ class BackupViewModel(
     private val _davPicked = MutableStateFlow<Pair<String, ByteArray>?>(null)
     val davPicked: StateFlow<Pair<String, ByteArray>?> = _davPicked
 
+    // ---- A2：备份恢复码（v1.0.27）----
+    private val _recoveryCodeSet = MutableStateFlow(repo.hasRecoveryCode())
+    val recoveryCodeSet: StateFlow<Boolean> = _recoveryCodeSet
+
+    /** 一次性事件：恢复码明文待展示（生成 / 查看后，Screen 弹窗展示并消费）。 */
+    private val _recoveryReveal = MutableStateFlow<String?>(null)
+    val recoveryReveal: StateFlow<String?> = _recoveryReveal
+
     init {
         val (u, usr) = repo.webdavConfig()
         _davUrl.value = u
@@ -174,6 +182,33 @@ class BackupViewModel(
     }
 
     fun consumeDavPicked() { _davPicked.value = null }
+
+    // ======================= 备份恢复码（A2） =======================
+
+    /** 生成（或重新生成）恢复码：落盘 Keystore 加密存储，并经 recoveryReveal 展示一次。 */
+    fun generateRecoveryCode() {
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                val code = repo.generateRecoveryCode()
+                _recoveryCodeSet.value = true
+                _recoveryReveal.value = code
+            } catch (e: Exception) {
+                fail(app.getString(R.string.vm_recovery_generate_failed, e.message))
+            } finally { _busy.value = false }
+        }
+    }
+
+    /** 查看已存恢复码（自用 App 可再查看：Keystore 解密后经 recoveryReveal 展示）。 */
+    fun revealRecoveryCode() {
+        val code = repo.recoveryCode() ?: run {
+            fail(app.getString(R.string.vm_recovery_not_set))
+            return
+        }
+        _recoveryReveal.value = code
+    }
+
+    fun consumeRecoveryReveal() { _recoveryReveal.value = null }
 
     // ======================= 恢复（协议 §6 五步） =======================
 
