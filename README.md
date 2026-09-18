@@ -43,7 +43,7 @@ Ankylosing Spondylitis Health Knowledge Base —— 一款面向强直性脊柱�
 | 项 | 说明 |
 |---|---|
 | 语言 / UI | Kotlin · Jetpack Compose（Material 3） |
-| 存储 | Room（v8，含 1→8 链式迁移，25 实体表） |
+| 存储 | Room（v9，含 1→9 链式迁移，25 实体表） |
 | 依赖 | **仅 AndroidX / Kotlin 官方库**，零第三方 UI / 网络 / 图表库 |
 | 图表 | Canvas 自绘折线图 |
 | PDF | `android.graphics.pdf` 原生导出 |
@@ -58,7 +58,7 @@ git clone https://github.com/weante/ashkb.git
 cd ashkb
 ./gradlew assembleDebug        # Debug APK
 ./gradlew assembleRelease      # Release APK（注意：签名配置请自行修改）
-./gradlew testDebugUnitTest    # 107 条单元测试
+./gradlew testDebugUnitTest    # 114 条单元测试
 ```
 
 要求：JDK 17+，Android SDK 34。或直接用 Android Studio 打开。
@@ -72,11 +72,11 @@ cd ashkb
 
 ## 测试
 
-107 条 JVM 单元测试覆盖核心 domain 逻辑：排程计算（含 BIW 每周两针边界）、运动分级矩阵 R27（三态分期 + 发作期 L1 兜底）、检查报告 AI 导入解析（化验 / 影像 / 参考范围 / 未识别行提示）、备份加密 / 恢复表名白名单与 SHA / WebDAV 远程列表解析与轮换保留、通用名键目录。
+114 条 JVM 单元测试覆盖核心 domain 逻辑：排程计算（含 BIW 每周两针边界）、运动分级矩阵 R27（三态分期 + 发作期 L1 兜底）、检查报告 AI 导入解析（化验 / 影像 / 参考范围 / 未识别行提示）、备份加密 / 恢复表名白名单与 SHA / WebDAV 远程列表解析与轮换保留、知识库检索口径（单列检索文本 + 中文子串语义）、通用名键目录。
 
 ## 版本
 
-当前 `v1.0.20`（versionCode 25）。P0~P5 阶段开发完成，处于自用验证（dogfooding）阶段。
+当前 `v1.0.21`（versionCode 26）。P0~P5 阶段开发完成，处于自用验证（dogfooding）阶段。
 
 ## License
 

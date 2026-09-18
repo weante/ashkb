@@ -28,6 +28,7 @@ import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.entity.WeightLog
 import com.ashkb.app.domain.ImagingImport
+import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.LabImport
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
@@ -218,7 +219,8 @@ class HealthRepository(private val context: Context) {
     fun observeKbAll(): Flow<List<KbEntry>> = kbDao.observeAll()
     fun observeKbByCategory(category: String): Flow<List<KbEntry>> = kbDao.observeByCategory(category)
     suspend fun kbByCategory(category: String): List<KbEntry> = kbDao.listByCategory(category)
-    fun searchKb(q: String): Flow<List<KbEntry>> = kbDao.search(q)
+    /** v9：走单列 search_text 检索 + 结果上限；输入侧防抖在 KnowledgeViewModel */
+    fun searchKb(q: String): Flow<List<KbEntry>> = kbDao.search(q, KbSearch.MAX_RESULTS)
     suspend fun kbEntry(id: String): KbEntry? = kbDao.byId(id)
 
     /** 复核到期警报：按条目去重（refDate 存条目 id），启动与知识库入口各查一次 */

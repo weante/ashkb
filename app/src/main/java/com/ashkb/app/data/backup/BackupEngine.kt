@@ -131,8 +131,9 @@ object BackupEngine {
      * 真正回到备份时点；MERGE_TABLES 保持旧行为（备份里没有的表保留现状）。
      * 双校验在事务内进行（审查 P2「事务后无回滚」）：任一表行数或 SHA-256 不匹配
      * 即不 setTransactionSuccessful——endTransaction 整体回滚，库保持恢复前状态。
-     * 校验针对备份原文；R1 归一化（active→controlled，与迁移 v7→v8 同义）在
-     * 校验通过后、提交前执行（否则归一化改值必致 profile 表 SHA 误报不匹配）。
+     * 校验针对备份原文；R1 归一化（active→controlled，与迁移 v7→v8 同义）与 v9 检索列回填
+     * （kb_entries.search_text，与迁移 v8→v9 同义）都在校验通过后、提交前执行
+     * （否则改值必致对应表 SHA 误报不匹配）。
      */
     fun restore(
         db: SupportSQLiteDatabase, payload: String,
@@ -169,6 +170,16 @@ object BackupEngine {
                 // 校验已按备份原文通过，此处等价于恢复旧备份后补跑 v7→v8 的数据迁移
                 if (tables.has("profile")) {
                     db.execSQL("UPDATE `profile` SET `disease_stage` = 'controlled' WHERE `disease_stage` = 'active'")
+                }
+                // v9：旧备份不含 kb_entries.search_text 列（insertTable 按名列表 INSERT，缺列即 NULL）——
+                // 按当前口径回填，等价于恢复旧备份后补跑 v8→v9；不回填则知识库搜索在恢复后整库失配。
+                // 表达式与 MIGRATION_8_9 / KbSearch.searchText 完全一致。
+                if (tables.has("kb_entries")) {
+                    db.execSQL(
+                        "UPDATE `kb_entries` SET `search_text` = " +
+                            "`title` || char(10) || `summary` || char(10) || `payload` " +
+                            "WHERE `search_text` IS NULL"
+                    )
                 }
                 db.setTransactionSuccessful()
             }

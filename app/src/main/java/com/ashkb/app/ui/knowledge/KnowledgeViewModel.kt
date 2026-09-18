@@ -8,13 +8,17 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.ashkb.app.AshkbApplication
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.repo.HealthRepository
+import com.ashkb.app.domain.KbSearch
 import java.time.LocalDate
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -43,8 +47,20 @@ class KnowledgeViewModel(private val repo: HealthRepository) : ViewModel() {
     private val category = MutableStateFlow<String?>(null)
     private val today = LocalDate.now().toString()
 
+    /**
+     * v9 优化：检索防抖——输入停顿 [KbSearch.DEBOUNCE_MS] 后才真正查库，
+     * 替代此前「每敲一键就查一次」（原实现对 query 直接 flatMapLatest 连 DAO）。
+     * 空串（含初始态与清空）不进延迟分支，立即回落列表 / 分类视图，
+     * 避免清空输入后仍停留在上一次检索结果。
+     */
+    private val searchQuery: kotlinx.coroutines.flow.Flow<String> = query
+        .flatMapLatest { q ->
+            if (q.isBlank()) flowOf("") else flow { delay(KbSearch.DEBOUNCE_MS); emit(q) }
+        }
+        .distinctUntilChanged()
+
     private val entries: kotlinx.coroutines.flow.Flow<List<KbEntry>> =
-        combine(query, category) { q, c -> q to c }
+        combine(searchQuery, category) { q, c -> q to c }
             .flatMapLatest { (q, c) ->
                 when {
                     q.isNotBlank() -> repo.searchKb(q.trim())

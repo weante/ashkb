@@ -151,6 +151,9 @@ data class KbEntry(
     @ColumnInfo(name = "review_due") val reviewDue: String,
     @ColumnInfo(name = "version") val version: Int,
     @ColumnInfo(name = "payload") val payload: String, // JSON，按 category 五种 schema
+    // v9：检索专用拼接列（title + summary + payload，口径见 domain/KbSearch）。
+    // 可空——旧版本备份不含此列，恢复时按名列表 INSERT 会留空，由恢复后回填补齐。
+    @ColumnInfo(name = "search_text") val searchText: String? = null,
 )
 
 /** R17 停药原因分类分级（D-2 §7：自行停药触发警示） */

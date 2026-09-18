@@ -1,7 +1,7 @@
 # ASHKB 开发交接文档
 
 > 本文档面向接手本仓库开发的 AI 会话（TraeWork Code 模式 / TraeCode）或人类工程师。
-> 记录截至 **v1.0.20**（versionCode 25，2026-09-18）的全部工程知识。
+> 记录截至 **v1.0.21**（versionCode 26，2026-09-18）的全部工程知识。
 > 应用本身介绍见 `README.md`，版本历史见 `CHANGELOG.md`。
 
 ## 1. 项目一句话
@@ -27,7 +27,7 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）：面向强直性脊柱�
 $env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.7\bin\gradle.bat" -p patient-health-app assembleDebug assembleRelease testDebugUnitTest
 ```
 
-- 全量构建约 2~3 分钟；**107 条单测**必须全过才算交付
+- 全量构建约 2~3 分钟；**114 条单测**必须全过才算交付
 - 单测结果统计：`app\build\test-results\testDebugUnitTest\*.xml`
 - Windows 侧无 git；**git 在 WSL 里**（仓库路径 `/mnt/c/<工作区>/patient-health-app`）
 
@@ -78,7 +78,7 @@ $env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.7\bin\g
 app/src/main/java/com/ashkb/app/
 ├── data/
 │   ├── backup/     # BackupEngine（全量加密备份）、WebDavClient、VaultCipher(Keystore AES/GCM)
-│   ├── db/         # AppDatabase（Room，version=8）、DAO
+│   ├── db/         # AppDatabase（Room，version=9）、DAO
 │   ├── entity/     # Room 实体
 │   └── repo/       # HealthRepository（多步写用 withTransaction）
 ├── domain/         # ClinicalThresholds（临床阈值集中）、Labels（枚举中文标签）、ExerciseEngine 等
@@ -106,16 +106,19 @@ app/src/main/java/com/ashkb/app/
 - **WebDAV HTTPS 反射坑**：`HttpsURLConnectionImpl` 的 `method` 字段在 `delegate` 指向的 `HttpURLConnectionImpl` 上；对包装类直接反射会找到无效影子字段且静默失败（MKCOL 实际按 GET 发出报 404）。修复见 `WebDavClient.forceMethod()`——先解引用 delegate 再沿类层级找字段。
 - **回调透传**：页面嵌套 composable（如 ReportScreen 内的 ExportPage）新增参数时要逐层透传，编译错误 `Unresolved reference` 先查函数签名链。
 - **化验列表翻页**：`CheckupViewModel` 用 `_labLimit` MutableStateFlow + `flatMapLatest` 实现窗口增长（初始 100 行，+100 递增），列表底部按钮 `canLoadMore = list.size >= limit` 判断隐藏。
+- **FTS4 不能用于中文子串搜索（v1.0.21 实测，勿再尝试）**：SQLite 的 FTS3/FTS4 分词器（`simple` / `unicode61`）按「字母数字连续段」切词，中文无空格分隔 → 一整句变成一个 token。实测对「强直性脊柱炎患者用药注意事项」执行 `MATCH '强直'` 命中 **0** 条（`LIKE '%强直%'` 命中 1 条），`MATCH '强直*'` 仅在查询恰为句首时命中。即**为了「优化搜索」把 LIKE 换成 FTS4 会让中文搜索直接失效**。CJK 若确需全文索引，只有 FTS5 的 `trigram` 分词器（Room 无 `@Fts5` 注解，且 minSdk 26 上 FTS5 不可靠）或自建字符级 n-gram 索引——本项目知识库为固定 47 条种子，LIKE 足够。
+- **新增列与备份恢复的兼容（v1.0.21）**：`BackupEngine.insertTable` 按「备份行自身的列集」按名 INSERT，故旧备份缺新列**不会**报错，但要求 Room 侧新列**可空**（NOT NULL 无默认值会插入失败）；而 `verifyAgainst` 按备份自身列集比对（R9），加列不会让旧备份 SHA 误判。**真正的坑**：恢复后新列为 NULL，会让依赖该列的查询整库失配（知识库搜索会搜不到任何条目）——必须在 `BackupEngine.restore` 双校验通过后、提交前按当前口径回填，位置与 R1 的 profile 归一化相同。
 
 ## 8. 当前状态与下一步
 
-- **最新版**：v1.0.20（versionCode 25），GitHub Release v1.0.20 已发布附两 APK（release 1.98 MB / debug 16.9 MB），发布点 commit `cd7f989`
-- **数据安全**：v1.0.6 起 WebDAV 凭据 Keystore 加密、备份口令化、事务化写入，均已稳定；v1.0.19 起支持登录 WebDAV 后直接拉取远程备份列表选择恢复（新机无需先生成本地备份）；v1.0.20 起备份文件名带时间戳，同天多份不互相覆盖
+- **最新版**：v1.0.21（versionCode 26），发布点 commit `cd7f989` 为 v1.0.20；v1.0.21 为知识库检索优化（Room v8→v9）
+- **数据安全**：v1.0.6 起 WebDAV 凭据 Keystore 加密、备份口令化、事务化写入，均已稳定；v1.0.19 起支持登录 WebDAV 后直接拉取远程备份列表选择恢复（新机无需先生成本地备份）；v1.0.20 起备份文件名带时间戳，同天多份不互相覆盖；v1.0.21 起知识库检索走单列 `search_text` + 查询防抖（旧备份恢复后自动回填该列）
 - **待办池**（用户视角，无承诺）：
-  - 知识库搜索现为 `title / summary / payload LIKE '%q%'` 全表扫（`data/db/Daos.kt`），数据量增长后拟迁 Room FTS4 虚表，或至少对 title 建索引并限制 LIKE 前缀（代码审查报告 P1 未完成项）
   - `as MutableStateFlow` 强转约 44 处（审查报告 P2）：可改为私有 `MutableStateFlow` + 只读 `StateFlow` 暴露
   - 化验 Tab 若历史数据继续增长可考虑分组折叠优化（现为异常置顶 + 正常项折叠 + 翻页，v1.0.7 已做）
   - WebDAV 非标准方法（PROPFIND / MKCOL）依赖反射改 `HttpURLConnection` 内部字段：换 Android 15 / 16 真机需回归验证（无替代方案，属设计取舍）
   - ViewModel 层 snackbar 文案 / NotificationHelper 通知文案 / PDF 直绘文本仍为硬编码（需注入 context，模式与 UI 层资源化不同，v1.0.10 §遗留）
-- **已关闭的旧待办**：UI 改版方案未完成 PR 项——已核实唯一可确认编号的 PR4（文案资源化）在 v1.0.10 完成，方案原文已不在工作区
-- **测试基线**：107 条单测全绿；新增功能须同步补测（`app/src/test/.../`，6 个测试文件覆盖 backup / 加密 / 通用名键 / 运动分级 / 导入解析 / 排程计算）
+- **已关闭的旧待办**：
+  - UI 改版方案未完成 PR 项——已核实唯一可确认编号的 PR4（文案资源化）在 v1.0.10 完成，方案原文已不在工作区
+  - 知识库搜索 FTS4/索引（审查报告 P1）——v1.0.21 以「单列检索文本 + 防抖 + 上限」结项；**FTS4 方案经实测否决**（对中文子串零命中，详见 `domain/KbSearch.kt` 注释与 CHANGELOG v1.0.21）
+- **测试基线**：114 条单测全绿；新增功能须同步补测（`app/src/test/.../`，7 个测试文件覆盖 backup / 加密 / 通用名键 / 运动分级 / 导入解析 / 排程计算 / 知识库检索）

@@ -125,11 +125,15 @@ interface KbEntryDao {
     @Query("SELECT * FROM kb_entries ORDER BY id")
     fun observeAll(): Flow<List<KbEntry>>
 
-    @Query(
-        "SELECT * FROM kb_entries WHERE title LIKE '%' || :q || '%' OR summary LIKE '%' || :q || '%' " +
-            "OR payload LIKE '%' || :q || '%' ORDER BY id"
-    )
-    fun search(q: String): Flow<List<KbEntry>>
+    /**
+     * v9 检索：单列 `search_text` LIKE 替代原「title OR summary OR payload」三列 OR——
+     * 每行谓词求值由 3 次降为 1 次，并加结果上限（KbSearch.MAX_RESULTS）。
+     * 列由迁移 v8→v9 回填、种子导入时写入；旧备份恢复后由 BackupEngine 统一回填
+     * （未回填的行 search_text 为 NULL，LIKE 结果为 NULL，不参与匹配）。
+     * 不迁 FTS4 的原因见 domain/KbSearch 注释（FTS4 分词器对中文子串零命中）。
+     */
+    @Query("SELECT * FROM kb_entries WHERE `search_text` LIKE '%' || :q || '%' ORDER BY id LIMIT :limit")
+    fun search(q: String, limit: Int): Flow<List<KbEntry>>
 
     @Query("SELECT * FROM kb_entries WHERE review_due < :today ORDER BY review_due")
     suspend fun overdueReview(today: String): List<KbEntry>

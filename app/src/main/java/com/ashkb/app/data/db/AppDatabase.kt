@@ -40,7 +40,7 @@ import com.ashkb.app.data.entity.WeightLog
         DietProfile::class, FoodAvoidItem::class, CheckupItem::class, CheckupRecord::class, LabResult::class,
         ImagingRecord::class, VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class, BackupLedger::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -297,13 +297,29 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v9：K 知识库检索优化——kb_entries 新增 search_text 拼接列。
+         * 检索由「title OR summary OR payload 三列 LIKE」改为单列 LIKE（减少每行谓词求值），
+         * 列可空以兼容旧备份恢复（旧备份无此列，由 BackupEngine 恢复后回填）。
+         * 表达式必须与 domain/KbSearch.searchText 完全一致：换行（char(10)）分隔三字段。
+         */
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `kb_entries` ADD COLUMN `search_text` TEXT")
+                db.execSQL(
+                    "UPDATE `kb_entries` SET `search_text` = " +
+                        "`title` || char(10) || `summary` || char(10) || `payload`"
+                )
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext, AppDatabase::class.java, "ashkb.db"
                 ).addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-                    MIGRATION_7_8
+                    MIGRATION_7_8, MIGRATION_8_9
                 ).build().also { instance = it }
             }
     }

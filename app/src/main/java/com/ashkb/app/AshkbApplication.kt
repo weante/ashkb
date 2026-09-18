@@ -8,6 +8,7 @@ import com.ashkb.app.data.repo.BackupRepository
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.data.repo.MedicationRepository
+import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
 import java.io.File
@@ -72,11 +73,14 @@ class AshkbApplication : Application() {
             (0 until arr.length()).mapNotNull { i ->
                 val o = arr.getJSONObject(i)
                 if (o.getString("id").isBlank()) return@mapNotNull null
+                val title = o.getString("title")
+                val summary = o.getString("summary")
+                val payload = o.getJSONObject("payload").toString()
                 KbEntry(
                     id = o.getString("id"),
                     category = o.getString("category"),
-                    title = o.getString("title"),
-                    summary = o.getString("summary"),
+                    title = title,
+                    summary = summary,
                     severityLevel = o.getString("severity_level"),
                     applicableScene = o.getString("applicable_scene"),
                     sourceName = o.getString("source_name"),
@@ -85,7 +89,9 @@ class AshkbApplication : Application() {
                     adaptedAt = o.getString("adapted_at"),
                     reviewDue = o.getString("review_due"),
                     version = o.optInt("version", 1),
-                    payload = o.getJSONObject("payload").toString(),
+                    payload = payload,
+                    // v9：检索列与迁移 v8→v9 / KbSearch.searchText 同一口径
+                    searchText = KbSearch.searchText(title, summary, payload),
                 )
             }
         }.getOrDefault(emptyList())
