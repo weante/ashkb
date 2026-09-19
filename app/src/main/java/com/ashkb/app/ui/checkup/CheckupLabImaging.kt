@@ -148,7 +148,8 @@ private fun LabGroup(rows: List<LabResult>) {
 // ===== 化验详情弹窗 =====
 @Composable
 internal fun LabDetailDialog(record: CheckupRecord, vm: CheckupViewModel, onDismiss: () -> Unit) {
-    val labs by vm.labResultsFor(record.id).collectAsStateWithLifecycle(initialValue = emptyList())
+    val labFlow = remember(record.id) { vm.labResultsFor(record.id) }
+    val labs by labFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     var showAdd by remember { mutableStateOf(false) }
 
     AlertDialog(

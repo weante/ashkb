@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -43,6 +44,13 @@ class SymptomViewModel(private val repo: HealthRepository) : ViewModel() {
                 val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
                 delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
                 _date.value = LocalDate.now()
+            }
+        }
+        // 跨零点后「所选日期」可能既不是今天也不是昨天（如 23:50 选的"昨天"），回落今天防两个 Chip 都不选中
+        viewModelScope.launch {
+            _date.collect { d ->
+                val cur = _selectedDate.value
+                if (cur != d && cur != d.minusDays(1)) _selectedDate.value = d
             }
         }
     }

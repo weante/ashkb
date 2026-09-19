@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.KbEntry
+import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.ScreenTopBar
@@ -44,7 +46,7 @@ import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
-import java.time.LocalDate
+import kotlinx.coroutines.delay
 
 /** K 知识库：47 条种子的浏览 / 搜索 / 详情 + 复核到期提示 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,7 +54,16 @@ import java.time.LocalDate
 fun KnowledgeScreen(vm: KnowledgeViewModel) {
     val ui by vm.uiState.collectAsStateWithLifecycle()
     var detail by remember { mutableStateOf<KbEntry?>(null) }
-    val today = LocalDate.now().toString()
+    val todayDate by vm.date.collectAsStateWithLifecycle()
+    val today = remember(todayDate) { todayDate.toString() }
+
+    // 搜索框本地态 + 防抖：避免每敲一键就重算 uiState 导致整屏重组（VM 内防抖只护住了 DAO 查询）
+    var queryText by rememberSaveable { mutableStateOf(ui.query) }
+    LaunchedEffect(queryText) {
+        if (queryText == ui.query) return@LaunchedEffect
+        delay(KbSearch.DEBOUNCE_MS)
+        vm.setQuery(queryText)
+    }
 
     LaunchedEffect(Unit) { vm.refreshReviewCheck() }
 
@@ -62,8 +73,8 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
         // 搜索 + 分类筛选固定吸顶，滚动不消失
         Column(Modifier.padding(horizontal = Spacing.lg)) {
             OutlinedTextField(
-                value = ui.query,
-                onValueChange = { vm.setQuery(it) },
+                value = queryText,
+                onValueChange = { queryText = it },
                 label = { Text(stringResource(R.string.knowledge_search_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,

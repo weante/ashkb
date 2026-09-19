@@ -1,7 +1,7 @@
 # ASHKB 开发交接文档
 
 > 本文档面向接手本仓库开发的 AI 会话（TraeWork Code 模式 / TraeCode）或人类工程师。
-> 记录截至 **v1.0.27**（versionCode 32，2026-09-19）的全部工程知识。
+> 记录截至 **v1.0.28**（versionCode 33，2026-09-19）的全部工程知识。
 > 应用本身介绍见 `README.md`，版本历史见 `CHANGELOG.md`。
 
 ## 1. 项目一句话
@@ -110,14 +110,19 @@ app/src/main/java/com/ashkb/app/
 - **新增列与备份恢复的兼容（v1.0.21）**：`BackupEngine.insertTable` 按「备份行自身的列集」按名 INSERT，故旧备份缺新列**不会**报错，但要求 Room 侧新列**可空**（NOT NULL 无默认值会插入失败）；而 `verifyAgainst` 按备份自身列集比对（R9），加列不会让旧备份 SHA 误判。**真正的坑**：恢复后新列为 NULL，会让依赖该列的查询整库失配（知识库搜索会搜不到任何条目）——必须在 `BackupEngine.restore` 双校验通过后、提交前按当前口径回填，位置与 R1 的 profile 归一化相同。
 - **批量改代码脚本务必先探测行尾（v1.0.25 踩坑）**：本仓库的 `.kt` 文件是 **LF** 行尾（个别文件末尾有 1 个 CRLF），若脚本按 `\r\n` 切分，整块 import 会被当成单行 → 替换静默不生效（表现为「调用点改了但 import 没加」，编译才暴露）。正确做法：先 `-replace "\r\n","\n"` 归一化处理，写完再按原风格还原；同时注意**一个文件可能有两段 import 块（中间空行分隔）**，按块处理会给两块各插一次导致 import 重复。
 - **Compose 反模式速查（v1.0.25 已修，勿回退）**：①屏幕一律用 `collectAsStateWithLifecycle()`，禁用 `collectAsState()`（后者不感知生命周期，后台仍在收 Room 流）②`Canvas` 绘制 lambda 内不得新建 `Path`/`Brush`/`PathEffect` 或调 `textMeasurer.measure`，须 `remember` 到绘制外 ③传给 `TrendChart` 的 `points` 必须 `remember(源数据)`——其入场动画以 `points` 为 key，新 List 实例会让动画反复重播 ④派生计算（`groupBy`/`partition`/`map`）注意 `remember`，且**不能写在 `LazyListScope` 内**（那不是 @Composable 作用域，需上提到 `LazyColumn` 之前）⑤ViewModel 中禁止在构造时求值 `LocalDate.now()`（跨零点冻结），须用 `MutableStateFlow` + ticker 驱动。
+- **LazyColumn key 不要用字符串拼接（v1.0.28）**：`key = { a + b }` 在组合值可能重复时会抛 `IllegalArgumentException`（key 冲突崩溃），且每帧新建 String。直接用 `key = { a to b }`（`Pair` 有稳定 equals/hashCode，Compose 的 key 类型是 `Any`）。排查时注意：`MedicationRepository.buildTodayItems` 对每个 PRN 药只产 1 条（`slotKey=null`），真正会撞 key 的是同一药**重复 `take_times`**（旧 / 导入数据）。
+- **日期 ticker 已覆盖 7 个 VM（v1.0.28 补齐）**：Today / Wellness / Exercise / Checkup / Symptom / **Emergency** / **Knowledge**。判定口径：任何在 Composable 里用 `remember(数据) { ... LocalDate.now() ... }` 的地方都是隐藏的日期冻结（`remember` key 不含日期 → 跨零点不重算），必须改由 `vm.date` 驱动。`ReportViewModel` 是**例外**（`ReportRepository.overview/trends` 在 `refresh()` 内取 `now`，非组合期冻结，无需 ticker）。
+- **Compose Strong Skipping 在 Kotlin 2.0.20 已默认开启（v1.0.28 查证）**：审查报告建议的 `composeCompiler { featureFlags = setOf(StrongSkipping) }` 与 `rememberUpdatedState` 手动 memoize lambda **都不需要**（编译器已自动 remember 所有 lambda）。仅当将来降级到 2.0.20 以下才需显式开启。
+- **VM 内不要缓存 StateFlow（v1.0.28 教训）**：`CheckupViewModel` 曾用 `mutableMapOf<String, StateFlow<...>>` 按 id 缓存——无界增长、非线程安全、`onCleared` 不清理。正确做法是 VM 返回冷 `Flow`，调用点 `remember(id) { vm.flowFor(id) }` 记住订阅：identity 稳定、切 id 自动重订阅、随组合销毁而释放。
 
 ## 8. 当前状态与下一步
 
-- **最新版**：v1.0.27（versionCode 32）：v1.0.21 知识库检索优化（Room v8→v9）+ v1.0.22 清除 `as MutableStateFlow` 强转 + v1.0.23 化验 Tab 分组折叠 + v1.0.24 通知/VM/PDF 文案资源化 + v1.0.25 Compose 性能审查第一批 + v1.0.26 紧急卡「当前用药」（A1）+ v1.0.27 备份恢复码（A2，v2 信封格式）
+- **最新版**：v1.0.28（versionCode 33）：v1.0.21 知识库检索优化（Room v8→v9）+ v1.0.22 清除 `as MutableStateFlow` 强转 + v1.0.23 化验 Tab 分组折叠 + v1.0.24 通知/VM/PDF 文案资源化 + v1.0.25 Compose 性能审查第一批 + v1.0.26 紧急卡「当前用药」（A1）+ v1.0.27 备份恢复码（A2，v2 信封格式）+ v1.0.28 Compose 性能审查第二批（crash / 无界缓存 / 三处跨零点日期 / 搜索框重组 / O(N·M) 扫描）
 - **数据安全**：v1.0.6 起 WebDAV 凭据 Keystore 加密、备份口令化、事务化写入，均已稳定；v1.0.19 起支持登录 WebDAV 后直接拉取远程备份列表选择恢复（新机无需先生成本地备份）；v1.0.20 起备份文件名带时间戳，同天多份不互相覆盖；v1.0.21 起知识库检索走单列 `search_text` + 查询防抖（旧备份恢复后自动回填该列）
 - **待办池**（用户视角，无承诺）：
   - WebDAV 非标准方法（PROPFIND / MKCOL）依赖反射改 `HttpURLConnection` 内部字段：换 Android 15 / 16 真机需回归验证（无替代方案，属设计取舍）——**需真机，本机无法完成**
-  - **Compose 性能审查剩余项**（第一批已做功能性缺陷 + 低风险项，以下属结构性重构，改动面大）：MedEdit / Backup / Knowledge 的字段级 Composable 拆分、`BackupViewModel`/`ReportViewModel` 合并单一 UiState、Compose Strong Skipping Mode、`AppShell` 按需创建 ViewModel（现一次性创建 10 个）、`DividerList` 展平进父 `LazyListScope`、Sheet 内嵌套 `verticalScroll` 冲突、`TodayScreen` 的 `items` key 字符串拼接（多 PRN 项可能撞 key）、若干 `derivedStateOf` / `remember` 打磨项
+  - **Compose 性能审查剩余项**（第一 / 第二批已做功能性缺陷 + 低风险项，以下属结构性重构，改动面大）：MedEdit / Backup 的字段级 Composable 拆分、6 个屏幕顶层 Flow 收集下沉到叶子、`BackupViewModel`/`ReportViewModel` 合并单一 UiState、`AppShell` 按需创建 ViewModel（现一次性创建 10 个）、`DividerList` 展平进父 `LazyListScope`、Sheet 内嵌套 `verticalScroll` 冲突、`DateProvider` 抽象（统一 7 个 VM 的日期 ticker 样板）
+  - **Compose Strong Skipping 无需配置**：Kotlin 2.0.20 起编译器**默认开启**（勿再按审查报告建议加 `composeCompiler { featureFlags = ... }`）；`collectAsState()` 全库残留 0、日期 ticker 已覆盖 Today/Wellness/Exercise/Checkup/Symptom/Emergency/Knowledge 7 个 VM
 
   #### 规划文档需求缺口（2026-09-18 逐条核对）
 

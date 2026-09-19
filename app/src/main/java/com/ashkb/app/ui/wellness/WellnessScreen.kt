@@ -171,6 +171,10 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
             // ---- 分组三：营养与饮食 ----
             stickyHeader { GroupHeader(stringResource(R.string.wellness_nutrition_section)) }
             item {
+                // 补剂打卡态集合一次性算好：避免每行对全部 supLogs 做 O(N·M) 线性扫描
+                val doneIds: Set<String?> = remember(supLogs) {
+                    supLogs.asSequence().filter { it.status == "done" }.map { it.supId }.toSet()
+                }
                 SectionCard(
                     title = stringResource(R.string.nutrition_supplement_archive),
                     subtitle = stringResource(R.string.wellness_supplements_count, supplements.size),
@@ -200,7 +204,7 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            if (supLogs.any { it.supId == sup.id && it.status == "done" }) {
+                            if (sup.id in doneIds) {
                                 StatusChip(text = stringResource(R.string.med_status_taken_short), tone = StatusTone.Success, icon = Icons.Rounded.CheckCircle)
                             } else {
                                 TextButton(onClick = {

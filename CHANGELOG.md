@@ -4,6 +4,41 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.28] — 2026-09-19
+
+Compose 性能审查**第二批**：按第二轮审查报告的建议顺序，先做「低风险、高收益」的一组——1 个潜在崩溃、1 个无界缓存（内存泄漏）、3 处跨零点日期错误、搜索框敲键整屏重组、1 处 O(N·M) 扫描。v1.0.27 可直接覆盖安装（无数据库结构变更）。
+
+### 修复 · 潜在崩溃与内存泄漏
+
+- **Today 页打卡列表 key 冲突（潜在崩溃）**：`items(key = { med.id + slotKey })` 用字符串拼接做 key——同一药品若出现重复时间槽（旧数据 / 导入数据里 `take_times` 有重复值）会产生重复 key，LazyColumn 抛 `IllegalArgumentException` 直接崩溃。改为 `med.id to slotKey`（`Pair` 有稳定 `equals`/`hashCode`，Compose 接受任意类型作 key），顺带去掉每帧新建 String 的分配
+- **化验详情按复诊缓存 StateFlow 无界增长**：`CheckupViewModel.labByCheckup` 每打开一条复诊详情就新增一个 entry（浏览 100 条 = 常驻 100 个 StateFlow），且 `mutableMapOf` 非线程安全、`onCleared` 不清理。改为 VM 返回**冷 Flow**，由调用点 `remember(record.id)` 记住订阅（状态在 UI 层记住）——无泄漏、无并发写、切换记录自动重订阅
+
+### 修复 · 跨零点日期正确性（急救 + 知识库 + 症状）
+
+- **紧急卡「当前用药」跨零点仍显示昨天的在用判断**：`EmergencyScreen` 的 `medsSummary` 用 `remember(meds) { summarize(meds, LocalDate.now()) }`——日期被冻结在首次求值（23:59 打开，过零点后仍按昨天算「在用」）。`EmergencyViewModel` 补日期 ticker，页面改用 `vm.date` 驱动重算（急救场景日期错误不可容忍）
+- **知识库「复核到期」计数跨零点错误**：`KnowledgeViewModel.today` 是构造时的 `LocalDate.now()` 字符串。补 ticker，`overdue` 改由 `combine(observeKbAll(), _date)` 驱动重算；`KnowledgeScreen` 的条目到期标记同步改用 `vm.date`
+- **症状页「所选日期」跨零点悬空**：23:50 点「昨天」后过零点，`_selectedDate` 既不是今天也不是昨天 → 两个日期 Chip 都不选中。`_date` 变化时若所选日期不再合法则回落到今天
+
+### 优化 · 重组与计算
+
+- **知识库搜索框敲键整屏重组**：VM 里的防抖只护住了 DAO 查询，`uiState` 的 combine 仍随原始 query 立即重算 → 每敲一键，顶栏计数 / Chip 行 / 告警 Banner / 列表全部重组。搜索框改为**本地 state + 防抖后再推 VM**（`LaunchedEffect(queryText)` + `delay(DEBOUNCE_MS)`），敲键期间只有输入框自身重组
+- **知识库冗余 Flow 清理**：`overdue` 的 `combine(flowOf(Unit))` 等价于 `map`，改为 `combine(observeKbAll(), _date)`（同时修了上一条的日期冻结）；`uiState` 里对分类结果的 `filter { it.category == c }` 属冗余（分类已走 `observeKbByCategory`，DAO SQL 自带 `WHERE category`），去掉
+- **补剂打卡 O(N·M) 扫描**：`WellnessScreen` 每个补剂行都对全部 `supLogs` 做 `any {}` 线性扫描（15×15=225 次比较/帧）。改为外层一次性算 `doneIds: Set`，行内改 `in` 查询
+- **运动处方组合在主线程**：`ExerciseViewModel.uiState` 的 `ExerciseEngine.todayPlan`（含 filter + sort）加 `.flowOn(Dispatchers.Default)`，KB 扩容后不阻塞主线程；`feedbackPending` 的双层 `flatMapLatest` 简化为 `combine(_date, feedbackRefresh)` + 单层
+
+### 对第二轮审查报告的三处更正（实测 / 查证）
+
+1. **Strong Skipping 无需开启**：报告建议在 `build.gradle.kts` 加 `composeCompiler { featureFlags = setOf(StrongSkipping) }`——本仓库 Kotlin **2.0.20 已默认开启 Strong Skipping**（JetBrains 2.0.20 发布说明 + Android 官方文档均确认），无需配置；lambda 已由编译器自动 memoize，报告建议的 `rememberUpdatedState` 亦非必需
+2. **Today 页 key 崩溃的真实路径**：报告称「同一药品的多个 PRN 项会 key 冲突」——实测 `MedicationRepository.buildTodayItems` 对每个 PRN 药只产出 **1 条**（`slotKey = null`），不会因此冲突；真实路径是同一药品**重复时间槽**（`take_times` 有重复值，旧 / 导入数据可能造成）。修法（`Pair` key）两者都覆盖
+3. **ReportViewModel 无需日期 ticker**：`ReportRepository.overview()/trends()` 内部各自取 `LocalDate.now()`，且只在 `refresh()`（含 init）时求值——不存在「冻结在组合时」的问题（跨零点不自动刷新属可接受行为，非缺陷）
+
+### 验证
+
+- 单测 **149 条全过**（本批为纯结构性 / 时序修复，无新增可单测的纯函数；报告建议的 PDF 运算符优先级回归测试因需 Android `Context` 暂缓）
+- release / debug 双包构建成功 + 正式签名验签
+- 装机回归重点：①知识库搜索框敲键是否顺滑 ②复诊详情依次打开多条（内存无持续增长）③紧急卡用药区（若有结束日为昨天的药，跨零点后应消失）④补记症状后跨零点日期 Chip 状态 ⑤旧版备份恢复不受影响
+- **仍在报告待办池**（改动面大的结构性重构，留待下一批）：6 个屏幕顶层 Flow 收集下沉到叶子、`MedEditScreen` 字段级拆分、`BackupScreen` 密码框拆分、`AppShell` 按需创建 ViewModel、`DateProvider` 抽象
+
 ## [v1.0.27] — 2026-09-19
 
 补上规划缺口 A2：**备份恢复码**——口令遗忘的最后退路（此前口令遗忘 = 数据永久不可恢复）。v1.0.26 可直接覆盖安装（无数据库结构变更）。

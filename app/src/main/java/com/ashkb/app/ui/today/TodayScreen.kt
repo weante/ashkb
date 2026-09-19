@@ -164,7 +164,7 @@ fun TodayScreen(
                 }
             }
         } else {
-            items(items, key = { (it.med.id) + (it.slotKey ?: "prn") }) { item ->
+            items(items, key = { it.med.id to it.slotKey }) { item ->
                 MedCheckCard(
                     item = item,
                     today = todayDate,

@@ -10,12 +10,15 @@ import com.ashkb.app.R
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.domain.KbSearch
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -46,7 +49,21 @@ class KnowledgeViewModel(private val repo: HealthRepository) : ViewModel() {
 
     private val query = MutableStateFlow("")
     private val category = MutableStateFlow<String?>(null)
-    private val today = LocalDate.now().toString()
+
+    /** 跨零点日期 ticker：复核到期计数依赖今天，不能冻结在构造时。 */
+    private val _date = MutableStateFlow(LocalDate.now())
+    val date: StateFlow<LocalDate> = _date.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            while (true) {
+                val now = LocalDateTime.now()
+                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
+                delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
+                _date.value = LocalDate.now()
+            }
+        }
+    }
 
     /**
      * v9 优化：检索防抖——输入停顿 [KbSearch.DEBOUNCE_MS] 后才真正查库，
@@ -70,16 +87,19 @@ class KnowledgeViewModel(private val repo: HealthRepository) : ViewModel() {
                 }
             }
 
-    /** 复核到期条目数（今日已过 review_due） */
+    /** 复核到期条目数（今日已过 review_due）——随跨零点日期重算（原 combine(flowOf(Unit)) 等价于 map）。 */
     private val overdue: kotlinx.coroutines.flow.Flow<Int> =
-        repo.observeKbAll().combine(flowOf(Unit)) { list, _ ->
+        combine(repo.observeKbAll(), _date) { list, d ->
+            val today = d.toString()
             list.count { it.reviewDue < today }
         }
 
     val uiState: StateFlow<KnowledgeUiState> =
         combine(entries, query, category, overdue) { list, q, c, od ->
             KnowledgeUiState(
-                entries = if (c != null && q.isBlank()) list.filter { it.category == c } else list,
+                // entries 已由 searchQuery + category 决定（分类走 observeKbByCategory，DAO 已按 category 过滤），
+                // 无需在此再 filter 一次。
+                entries = list,
                 category = c, query = q, overdueCount = od,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), KnowledgeUiState())
@@ -88,6 +108,7 @@ class KnowledgeViewModel(private val repo: HealthRepository) : ViewModel() {
     fun setCategory(c: String?) { category.value = c }
 
     fun refreshReviewCheck() {
+        val today = _date.value.toString()
         viewModelScope.launch { repo.checkReviewDue(today) }
     }
 

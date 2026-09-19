@@ -97,6 +97,7 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
     val events by vm.events.collectAsStateWithLifecycle()
     val profile by vm.profile.collectAsStateWithLifecycle()
     val meds by vm.meds.collectAsStateWithLifecycle()
+    val today by vm.date.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var cards by remember { mutableStateOf<List<KbEntry>>(emptyList()) }
@@ -261,8 +262,8 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
 
                         // 当前用药：自动从药单汇总（不依赖用户手工维护），免疫抑制类置顶并标注。
                         // 刻意放在档案之外——用药与健康档案相互独立，未建档时也必须显示（急救场景尤甚）
-                        val medsSummary = remember(meds) {
-                            EmergencyMeds.summarize(meds, LocalDate.now().toString())
+                        val medsSummary = remember(meds, today) {
+                            EmergencyMeds.summarize(meds, today.toString())
                         }
                         Spacer(Modifier.height(Spacing.xs))
                         Text(

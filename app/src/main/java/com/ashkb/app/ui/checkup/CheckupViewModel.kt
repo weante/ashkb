@@ -19,6 +19,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -77,13 +78,11 @@ class CheckupViewModel(private val repo: HealthRepository) : ViewModel() {
     }
 
     // ---- 化验结果 ----
-    private val labByCheckup = mutableMapOf<String, StateFlow<List<LabResult>>>()
-
-    fun labResultsFor(checkupId: String): StateFlow<List<LabResult>> =
-        labByCheckup.getOrPut(checkupId) {
-            repo.observeLabByCheckup(checkupId)
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-        }
+    // v1.0.28：不再在 VM 内缓存 StateFlow（原实现无界增长 + 非线程安全 + onCleared 不清理）。
+    // 改为返回冷 Flow，由调用点 remember(record.id) 记住订阅——符合「状态在 UI 层记住」的 Compose 哲学，
+    // 也保证同一条记录 Flow identity 稳定、切换记录时自动重订阅。
+    fun labResultsFor(checkupId: String): Flow<List<LabResult>> =
+        repo.observeLabByCheckup(checkupId)
 
     fun saveLabResult(result: LabResult) {
         viewModelScope.launch { repo.saveLabResult(result) }
