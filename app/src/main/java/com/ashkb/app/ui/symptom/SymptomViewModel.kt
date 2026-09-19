@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -37,27 +36,25 @@ class SymptomViewModel(private val repo: HealthRepository) : ViewModel() {
     private val _date = MutableStateFlow(LocalDate.now())
     val today: LocalDate get() = _date.value
 
+    /** 自评记录日期：今天 / 昨天（补写漏记） */
+    private val _selectedDate = MutableStateFlow(today)
+    val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
+
     init {
         viewModelScope.launch {
             while (true) {
                 val now = LocalDateTime.now()
                 val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
                 delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
-                _date.value = LocalDate.now()
-            }
-        }
-        // 跨零点后「所选日期」可能既不是今天也不是昨天（如 23:50 选的"昨天"），回落今天防两个 Chip 都不选中
-        viewModelScope.launch {
-            _date.collect { d ->
+                val d = LocalDate.now()
+                _date.value = d
+                // 跨零点后「所选日期」可能既不是今天也不是昨天（如 23:50 选的"昨天"），回落今天防两个 Chip 都不选中。
+                // 刻意写在 delay 之后（构造已完成），避免依赖属性声明顺序。
                 val cur = _selectedDate.value
                 if (cur != d && cur != d.minusDays(1)) _selectedDate.value = d
             }
         }
     }
-
-    /** 自评记录日期：今天 / 昨天（补写漏记） */
-    private val _selectedDate = MutableStateFlow(today)
-    val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
 
     fun selectDate(date: LocalDate) {
         if (date == today || date == today.minusDays(1)) _selectedDate.value = date

@@ -1,7 +1,7 @@
 # ASHKB 开发交接文档
 
 > 本文档面向接手本仓库开发的 AI 会话（TraeWork Code 模式 / TraeCode）或人类工程师。
-> 记录截至 **v1.0.28**（versionCode 33，2026-09-19）的全部工程知识。
+> 记录截至 **v1.0.29**（versionCode 34，2026-09-20）的全部工程知识。
 > 应用本身介绍见 `README.md`，版本历史见 `CHANGELOG.md`。
 
 ## 1. 项目一句话
@@ -114,10 +114,13 @@ app/src/main/java/com/ashkb/app/
 - **日期 ticker 已覆盖 7 个 VM（v1.0.28 补齐）**：Today / Wellness / Exercise / Checkup / Symptom / **Emergency** / **Knowledge**。判定口径：任何在 Composable 里用 `remember(数据) { ... LocalDate.now() ... }` 的地方都是隐藏的日期冻结（`remember` key 不含日期 → 跨零点不重算），必须改由 `vm.date` 驱动。`ReportViewModel` 是**例外**（`ReportRepository.overview/trends` 在 `refresh()` 内取 `now`，非组合期冻结，无需 ticker）。
 - **Compose Strong Skipping 在 Kotlin 2.0.20 已默认开启（v1.0.28 查证）**：审查报告建议的 `composeCompiler { featureFlags = setOf(StrongSkipping) }` 与 `rememberUpdatedState` 手动 memoize lambda **都不需要**（编译器已自动 remember 所有 lambda）。仅当将来降级到 2.0.20 以下才需显式开启。
 - **VM 内不要缓存 StateFlow（v1.0.28 教训）**：`CheckupViewModel` 曾用 `mutableMapOf<String, StateFlow<...>>` 按 id 缓存——无界增长、非线程安全、`onCleared` 不清理。正确做法是 VM 返回冷 `Flow`，调用点 `remember(id) { vm.flowFor(id) }` 记住订阅：identity 稳定、切 id 自动重订阅、随组合销毁而释放。
+- **⚠️ `init` 块读「声明在其后」的字段 = 构造期 NPE（v1.0.29 血泪）**：Kotlin 属性初始化器与 `init` 块按**声明顺序**执行；而 `viewModelScope` 用 `Dispatchers.Main.immediate`——已在主线程时 `launch` 体**同步执行到第一个挂起点**，`StateFlow.collect` 的**首个发射不挂起**。于是 `init { viewModelScope.launch { _date.collect { _selectedDate.value } } }` + `private val _selectedDate = ...`（声明在后）会直接 NPE，**且 149 条单测完全拦不住**（测试只覆盖 domain 纯函数，不构造 ViewModel）。v1.0.28 因此启动即闪退，只能发 v1.0.29 热修（versionCode 递增后**无法降级**，Android 不允许低版本覆盖）。
+  - **两条防御**：① 凡 `init` 里要用的字段，一律声明在 `init` **之前**；② 更稳的做法是把「需要延迟到构造完成后才执行」的逻辑放进 `delay(...)` **之后**（或 `LaunchedEffect`），彻底不依赖声明顺序。
+  - **新增 VM 后必查**：`init` 块内引用的每个字段，声明位置是否在其前。
 
 ## 8. 当前状态与下一步
 
-- **最新版**：v1.0.28（versionCode 33）：v1.0.21 知识库检索优化（Room v8→v9）+ v1.0.22 清除 `as MutableStateFlow` 强转 + v1.0.23 化验 Tab 分组折叠 + v1.0.24 通知/VM/PDF 文案资源化 + v1.0.25 Compose 性能审查第一批 + v1.0.26 紧急卡「当前用药」（A1）+ v1.0.27 备份恢复码（A2，v2 信封格式）+ v1.0.28 Compose 性能审查第二批（crash / 无界缓存 / 三处跨零点日期 / 搜索框重组 / O(N·M) 扫描）
+- **最新版**：v1.0.29（versionCode 34）：v1.0.21 知识库检索优化（Room v8→v9）+ v1.0.22 清除 `as MutableStateFlow` 强转 + v1.0.23 化验 Tab 分组折叠 + v1.0.24 通知/VM/PDF 文案资源化 + v1.0.25 Compose 性能审查第一批 + v1.0.26 紧急卡「当前用药」（A1）+ v1.0.27 备份恢复码（A2，v2 信封格式）+ v1.0.28 Compose 性能审查第二批 + **v1.0.29 热修 v1.0.28 启动闪退（`SymptomViewModel` 构造期 NPE）**
 - **数据安全**：v1.0.6 起 WebDAV 凭据 Keystore 加密、备份口令化、事务化写入，均已稳定；v1.0.19 起支持登录 WebDAV 后直接拉取远程备份列表选择恢复（新机无需先生成本地备份）；v1.0.20 起备份文件名带时间戳，同天多份不互相覆盖；v1.0.21 起知识库检索走单列 `search_text` + 查询防抖（旧备份恢复后自动回填该列）
 - **待办池**（用户视角，无承诺）：
   - **手动验证项统一见 §9「装机回归清单」**（可勾选；合并 P5 手册 + 上架冒烟 + 逐版本回归重点，并已修正过时项）

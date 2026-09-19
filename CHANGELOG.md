@@ -4,7 +4,49 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.29] — 2026-09-20
+
+**紧急热修：v1.0.28 启动即闪退。** v1.0.28 引入了严重缺陷，请务必升级本版（v1.0.28 无法降级——versionCode 已递增，Android 不允许用低版本覆盖）。数据库结构无变更，直接覆盖安装即可，数据完整保留。
+
+### 根因 · `SymptomViewModel` 属性初始化顺序错误（NPE）
+
+v1.0.28 为修「症状页所选日期跨零点悬空」，在 `init` 块里加了一个 `_date.collect { ... }` 去读 `_selectedDate`——但 `_selectedDate` **声明在 `init` 块之后**：
+
+```kotlin
+init {
+    viewModelScope.launch { /* ticker */ }
+    viewModelScope.launch {
+        _date.collect { d ->            // StateFlow.collect 首个发射不挂起
+            _selectedDate.value          // ← 此刻 _selectedDate 尚未初始化 = null → NPE
+        }
+    }
+}
+private val _selectedDate = MutableStateFlow(today)   // ← 声明在后面
+```
+
+- Kotlin 的属性初始化器与 `init` 块**按声明顺序执行**；
+- `viewModelScope` 使用 `Dispatchers.Main.immediate`——已在主线程时 `launch` 体**同步执行到第一个挂起点**，而 `StateFlow.collect` 的首个发射**不挂起**，于是直接读到尚未赋值的字段；
+- `AppShell` 在启动时一次性创建全部 10 个 ViewModel（含 `SymptomViewModel`），因此**每次冷启动必崩**。
+
+### 修复
+
+- `_selectedDate` 上移到 `init` 之前（语义正确）；
+- 更关键的是**不再依赖声明顺序**：把跨零点回落逻辑合并进 ticker 协程内、写在 `delay(...)` **之后**——此时构造早已完成，字段必然可用。少一个常驻协程，也消除这类脆弱性。
+- 顺带清理不再使用的 `kotlinx.coroutines.flow.collect` import。
+
+### 排查过程（为何单测没拦住）
+
+本批改动全是结构性 / 时序修复，无新增可单测的纯函数；且 149 条单测**不覆盖 ViewModel 构造**（`HealthRepository` 需 Android `Context`，测试用 `isReturnDefaultValues = true` 只跑 domain 纯逻辑）。这类「构造期 NPE」只能靠装机发现——已记入 HANDOFF §7 教训。
+
+### 验证
+
+- 149 条单测全过 + release / debug 双包构建成功 + 正式签名验签
+- **已逐个人工核对全部 10 个 ViewModel 的 `init` 块**，确认仅 `SymptomViewModel` 存在「init 读后置字段」问题；其余 6 个带 ticker 的 VM（Today / Wellness / Exercise / Checkup / Emergency / Knowledge）`_date` 均声明在 `init` 之前且 `init` 不触碰后续字段
+- 装机验证重点：**冷启动不崩** → 五 Tab 正常切换 → 症状页「今天 / 昨天」日期 Chip 正常
+
 ## [v1.0.28] — 2026-09-19
+
+> ⚠️ **本版存在启动即闪退缺陷，已被 v1.0.29 修复，请勿安装本版。**（原因见 v1.0.29 条目：`SymptomViewModel` 属性初始化顺序 NPE）
 
 Compose 性能审查**第二批**：按第二轮审查报告的建议顺序，先做「低风险、高收益」的一组——1 个潜在崩溃、1 个无界缓存（内存泄漏）、3 处跨零点日期错误、搜索框敲键整屏重组、1 处 O(N·M) 扫描。v1.0.27 可直接覆盖安装（无数据库结构变更）。
 
