@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -149,10 +150,20 @@ fun TrendChart(
         }
     }
 
+    // 入场动画只对「新数据」播一次：页签切换（HorizontalPager 回收视口外页面）或旋转屏回来时，
+    // points 内容未变则直接呈现终态、不重播。dataKey 用内容 hash（List.hashCode 按元素计算），
+    // 上游 Room 流重新发射的新 List 实例只要内容相同也不触发。
+    val dataKey = remember(points) { points.hashCode() }
     val progress = remember { Animatable(0f) }
-    LaunchedEffect(points) {
-        progress.snapTo(0f)
-        progress.animateTo(1f, tween(Motion.SlowMs, easing = EaseOut))
+    var playedKey by rememberSaveable { mutableStateOf(Int.MIN_VALUE) }
+    LaunchedEffect(dataKey) {
+        if (playedKey == dataKey) {
+            progress.snapTo(1f)
+        } else {
+            progress.snapTo(0f)
+            progress.animateTo(1f, tween(Motion.SlowMs, easing = EaseOut))
+            playedKey = dataKey
+        }
     }
 
     val dirRise = stringResource(R.string.trend_up_to)
