@@ -277,6 +277,7 @@
     <string name="me_report_nav">报表与数据</string>
     <string name="med_add_hint_today">添加后，这里会显示今天该服用的药</string>
     <string name="med_add_medication">添加药品</string>
+    <string name="med_edit_medication">编辑药品</string>
     <string name="med_add_new">新增药品</string>
     <string name="med_add_plan_note">添加后，这里会生成每日打卡计划与用药提醒</string>
     <string name="med_bio_stop_warning">生物制剂自行停药可能导致病情反弹，请务必先咨询风湿科医生。</string>

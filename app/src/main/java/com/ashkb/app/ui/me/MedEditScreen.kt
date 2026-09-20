@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,23 +45,27 @@ import com.ashkb.app.data.entity.MedFrequency
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.DrugKeyCatalog
+import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import java.time.LocalDate
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 
 /**
- * M1 添加药品：两步流程（route `meds/edit`）。
+ * M1 添加 / 编辑药品：两步流程（route `meds/edit`）。
  *
  * 原为 15 字段的两步 `AlertDialog`，弹窗里必然局促且无法保存草稿 —— 改为全屏表单：
  * 顶栏承载步骤标题与返回，底部固定操作条，内容区整屏滚动。
+ * v1.0.31：[editId] 非空 = 编辑既有在用药品（预填全部参数，保留 id / createdAt / 核对记录）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MedEditScreen(
     vm: MeViewModel,
+    editId: String? = null,
     onSaved: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -94,8 +99,36 @@ fun MedEditScreen(
 
     val prnFallback = stringResource(R.string.med_reason_backup)
 
+    // ---- 编辑模式：预填在用药品参数（仅按 editId 跑一次，不覆盖用户后续输入） ----
+    var original by remember { mutableStateOf<Medication?>(null) }
+    LaunchedEffect(editId) {
+        if (editId == null) return@LaunchedEffect
+        // meds 是 observeActive 的 StateFlow：从列表页进来时已有值；first{} 兜底冷直达的加载等待
+        val med = vm.meds.first { list -> list.any { it.id == editId } }
+            .firstOrNull { it.id == editId } ?: return@LaunchedEffect
+        original = med
+        name = med.name
+        brand = med.brandName ?: ""
+        nameKey = med.nameKey
+        medClass = MedClass.fromKey(med.medClass)
+        route = med.route
+        dose = med.dose
+        frequency = MedFrequency.fromKey(med.frequency)
+        times = ScheduleCalc.takeTimesOf(med).ifEmpty { listOf("08:00") }
+        weekday = med.weeklyWeekday ?: 1
+        weekday2 = med.weeklyWeekday2 ?: 4
+        cycleDays = med.injCycleDays?.toString() ?: "14"
+        food = med.takeWithFood ?: "any"
+        prnReason = med.prnReason ?: ""
+        storage = med.storage ?: ""
+        startDate = med.startDate
+        doctorTold = med.checkDoctorTold
+        leafletRead = med.checkLeafletRead
+    }
+
     fun buildMed(): Medication = Medication(
-        id = Ids.new("med"),
+        // 编辑模式保留身份与创建时间（updatedAt 由仓库层 upsert 刷新）；新增模式维持原逻辑
+        id = original?.id ?: Ids.new("med"),
         name = name.trim(),
         brandName = brand.trim().ifBlank { null },
         nameKey = nameKey.trim().lowercase(),
@@ -117,8 +150,9 @@ fun MedEditScreen(
         takeWithFood = if (route == "oral") food else null,
         checkDoctorTold = doctorTold,
         checkLeafletRead = leafletRead,
-        interactionCheckDate = if (step >= 2) LocalDate.now().toString() else null,
-        createdAt = nowIso(),
+        interactionCheckDate = original?.interactionCheckDate
+            ?: if (step >= 2) LocalDate.now().toString() else null,
+        createdAt = original?.createdAt ?: nowIso(),
         updatedAt = nowIso(),
     )
 
@@ -130,7 +164,11 @@ fun MedEditScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             ScreenTopBar(
-                title = if (step == 1) stringResource(R.string.med_add_medication) else stringResource(R.string.med_verify_checklist),
+                title = when {
+                    editId != null && step == 1 -> stringResource(R.string.med_edit_medication)
+                    step == 1 -> stringResource(R.string.med_add_medication)
+                    else -> stringResource(R.string.med_verify_checklist)
+                },
                 onBack = ::goBackStep,
             )
         },

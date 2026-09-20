@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
@@ -57,6 +58,7 @@ import com.ashkb.app.ui.theme.StatusTone
 fun MedsScreen(
     vm: MeViewModel,
     onAdd: () -> Unit,
+    onEdit: (Medication) -> Unit,
     onBack: () -> Unit,
 ) {
     val meds by vm.meds.collectAsStateWithLifecycle()
@@ -107,6 +109,7 @@ fun MedsScreen(
                 items(meds, key = { it.id }) { med ->
                     MedRow(
                         med = med,
+                        onEdit = { onEdit(med) },
                         onStop = { stopTarget = med },
                     )
                     if (med != meds.last()) {
@@ -144,7 +147,7 @@ fun MedsScreen(
 }
 
 @Composable
-private fun MedRow(med: Medication, onStop: () -> Unit) {
+private fun MedRow(med: Medication, onEdit: () -> Unit, onStop: () -> Unit) {
     val needsCheck = !med.checkDoctorTold || !med.checkLeafletRead
     Row(
         Modifier.fillMaxWidth().padding(vertical = Spacing.sm),
@@ -169,6 +172,10 @@ private fun MedRow(med: Medication, onStop: () -> Unit) {
                     StatusChip(stringResource(R.string.med_verify_todo_tag), StatusTone.Warning, Icons.Rounded.WarningAmber)
                 }
             }
+        }
+        // v1.0.31：编辑在用药品参数（剂量 / 频次 / 时刻 / 周期等）
+        IconButton(onClick = onEdit, modifier = Modifier.size(Size.touchMin)) {
+            Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.med_edit_medication))
         }
         TextButton(onClick = onStop) { Text(stringResource(R.string.med_deactivate)) }
     }

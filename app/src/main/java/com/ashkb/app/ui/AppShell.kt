@@ -41,6 +41,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 
 import com.ashkb.app.R
 import com.ashkb.app.ui.backup.BackupScreen
@@ -214,14 +215,16 @@ fun AppShell() {
                 MedsScreen(
                     vm = meVm,
                     onAdd = { nav.navigate(MedEdit()) },
+                    onEdit = { nav.navigate(MedEdit(it.id)) },
                     onBack = { nav.popBackStack() },
                 )
             }
 
             // ---- L3 ----
-            composable<MedEdit> {
+            composable<MedEdit> { entry ->
                 MedEditScreen(
                     vm = meVm,
+                    editId = entry.toRoute<MedEdit>().id,
                     onSaved = { nav.popBackStack() },
                     onBack = { nav.popBackStack() },
                 )
