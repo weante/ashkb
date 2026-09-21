@@ -31,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -43,6 +44,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 
+import com.ashkb.app.CrashLogger
 import com.ashkb.app.R
 import com.ashkb.app.ui.backup.BackupScreen
 import com.ashkb.app.ui.backup.BackupViewModel
@@ -121,6 +123,15 @@ fun AppShell() {
         GlobalMessages.events.collect { snackbar.showSnackbar(it) }
     }
 
+    // v1.0.40：上次启动若有未捕获异常，本次启动弹一条摘要（便于截图反馈）；读后即清，不重复打扰。
+    // 完整堆栈留在 filesDir/last_crash.txt（adb pull 可取）。
+    val appContext = LocalContext.current.applicationContext
+    LaunchedEffect(Unit) {
+        CrashLogger.takeLast(appContext)?.let { log ->
+            snackbar.showSnackbar("上次启动异常：" + CrashLogger.summary(log).take(300))
+        }
+    }
+
     val todayVm: TodayViewModel = viewModel(factory = TodayViewModel.Factory)
     val meVm: MeViewModel = viewModel(factory = MeViewModel.Factory)
     val symptomVm: SymptomViewModel = viewModel(factory = SymptomViewModel.Factory)
@@ -131,8 +142,9 @@ fun AppShell() {
     val emergencyVm: EmergencyViewModel = viewModel(factory = EmergencyViewModel.Factory)
     val reportVm: ReportViewModel = viewModel(factory = ReportViewModel.Factory)
     val backupVm: BackupViewModel = viewModel(factory = BackupViewModel.Factory)
-    val recipesVm: RecipesViewModel = viewModel(factory = RecipesViewModel.Factory)
-    val plansVm: ExercisePlansViewModel = viewModel(factory = ExercisePlansViewModel.Factory)
+    // v1.0.40：Recipes / ExercisePlans 两个 VM 改为**进页面才创建**（见下方 L2 注册）。
+    // 这两个 VM 的属性初始化会即时创建 Room Flow（进而触发数据库打开），放在这里会让冷启动
+    // 多背两份构建成本与失败面；移入路由后，冷启动与它们彻底解耦。
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -240,8 +252,18 @@ fun AppShell() {
                 )
             }
 
-            composable<Recipes> { RecipesScreen(vm = recipesVm, onBack = { nav.popBackStack() }) }
-            composable<ExercisePlans> { ExercisePlansScreen(vm = plansVm, onBack = { nav.popBackStack() }) }
+            composable<Recipes> {
+                RecipesScreen(
+                    vm = viewModel(factory = RecipesViewModel.Factory),
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable<ExercisePlans> {
+                ExercisePlansScreen(
+                    vm = viewModel(factory = ExercisePlansViewModel.Factory),
+                    onBack = { nav.popBackStack() },
+                )
+            }
 
             // ---- L3 ----
             composable<MedEdit> { entry ->
