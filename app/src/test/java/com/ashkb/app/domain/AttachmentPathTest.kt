@@ -84,6 +84,34 @@ class AttachmentPathTest {
         assertFalse(AttachmentPath.isManagedRemotePath("../2026-09-21/x.enc"))
     }
 
+    // ---- v1.0.43：段字符白名单（收紧百分号编码等绕过） ----
+
+    /**
+     * 百分号编码可绕过原先的 `..` 字面检查：`a%2f%2e%2e%2fx.enc` 只有 1 个字面 `/`、
+     * 无字面 `..`、以 `.enc` 结尾 —— 旧实现会放行，服务端解码后即越出附件目录。
+     */
+    @Test
+    fun `percent encoded traversal is rejected`() {
+        assertFalse(AttachmentPath.isValidRemotePath("2026-09-21/a%2f%2e%2e%2fx.enc"))
+        assertFalse(AttachmentPath.isManagedRemotePath("2026-09-21/a%2f%2e%2e%2fx.enc"))
+        assertFalse(AttachmentPath.isValidRemotePath("2026-09-21/a%2fb.enc"))
+    }
+
+    /** `?` / `#` 会截断 URL，空白与控制字符同理——都在白名单之外。 */
+    @Test
+    fun `url delimiter and whitespace characters are rejected`() {
+        assertFalse(AttachmentPath.isValidRemotePath("2026-09-21/x?.enc"))
+        assertFalse(AttachmentPath.isValidRemotePath("2026-09-21/x#.enc"))
+        assertFalse(AttachmentPath.isValidRemotePath("2026-09-21/x .enc"))
+        assertFalse(AttachmentPath.isValidRemotePath("2026-09-21/x\ty.enc"))
+    }
+
+    /** 文件名主干不得为空（`.enc` 本身不是附件）。 */
+    @Test
+    fun `bare enc extension is rejected`() {
+        assertFalse(AttachmentPath.isValidRemotePath("2026-09-21/.enc"))
+    }
+
     @Test
     fun `reconcile splits missing and orphans`() {
         val expected = setOf("2026-09-21/catt-a.enc", "2026-09-21/catt-b.enc")

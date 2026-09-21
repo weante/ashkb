@@ -4,6 +4,61 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.43] — 2026-09-21
+
+**代码审查后的 A / B 类问题集中修复，外加口令框「长按显明文」。**
+
+⚠️ **无数据库结构变更**（仍为 Room v15），可覆盖安装。
+
+### A 类：功能性缺陷
+
+1. **A1 冷启动把当天的升级提醒链清空**。`ReminderScheduler.rescheduleAll` 每次冷启动都
+   `cancelAllFuture` 后只重排 `esc=0`，于是「当天已过点但**尚未打卡**」的 `+30 / +60` 追问
+   被一并清掉——用户点「稍后提醒」后再冷启动，就再也收不到追问。
+   现改为：调用方传入「今日已打卡槽位」集合（`slotRef = medId|slotKey`），对当天**已过点且未打卡**
+   的槽位重建**尚未到时**的升级链。`MAX_ESCALATION` / `ESCALATION_STEP_MINUTES` 上提到
+   `ReminderScheduler`，`ReminderReceiver` 复用同一份常量，避免两处漂移。
+2. **A2 恢复码状态误报**。`hasRecoveryCode()` 原用 `vaultPrefs.contains(...)`，只要键存在就认为
+   「已设置」，与「能否解密 / 是否真的写入备份」脱节。改为 `recoveryCode() != null`。
+3. **A3 编辑药品可能永久挂起并产生重复药**。编辑页原用 `vm.meds.first { it.id == editId }` 从
+   「在用药品流」取记录：药一旦停用 / 归档，`first` 永不返回 → 页面卡死 → 用户重试保存即产生重复。
+   改为按 id 直查（`medicationById`，不限「在用」）；查不到时明确提示并禁用保存；
+   保存时保留 `isArchived`，**避免把已归档的药重新激活**。
+4. **A4 附件删除确认可能串行**。`AttachmentSheet` 列表未加 `key()`，`DestructiveAction` 的
+   `remember` 确认态会串到相邻行。补 `key(a.id)`（含导入项）。
+
+### B 类：健壮性与安全加固
+
+1. **B1 远端附件路径校验收紧**。`AttachmentPath` 新增严格段白名单（`[A-Za-z0-9._-]+`，排除
+   `% ? #` 与空白，防 URL 编码穿越与查询串注入）；`isManagedRemotePath` 直接复用该校验；
+   `WebDavClient.requirePath` 改用 `isManagedRemotePath`。
+2. **B2 备份恢复列名白名单**。`BackupEngine.insertTable` 对备份文件中的列名做白名单校验，
+   未知列直接报错（原 `colTypes[col] ?: "TEXT"` 会把任意列名拼进 SQL）。
+3. **B3 https 白名单**。`requireHttps` 改为显式 `https://` 前缀白名单；`WebDavClient.url()`
+   自校验协议，非 https 抛 `DavException`（纵深防御，防止绕过配置层直接构造 URL）。
+4. **B4 KDF 参数上下界**。`VaultCipher` 对迭代次数加 `[1e3, 1e7]` 区间校验；v1 格式补齐
+   salt / iv 长度校验，异常统一转 `VaultException`（防畸形备份触发超大 KDF 迭代 DoS 或越界）。
+5. **B5 本机附件密钥不再静默轮换**。`VaultKeyStore` 区分 `ABSENT / PRESENT / UNREADABLE`：
+   密钥存在但**无法解密**（系统密钥库异常 / 换机丢失）时**不再生成新密钥**，而是抛出可操作错误
+   「请先恢复一份本机或云端的 v3 备份以取回密钥」。原行为会静默换新密钥，导致云端已上传的附件
+   **永久不可解**。
+
+### C0：口令框长按显明文
+
+WebDAV 配置 / 本机备份 / 恢复三处口令框统一封装为 `SecretField`：默认掩码，右侧「眼睛」图标
+**长按**显示明文、松手立即恢复掩码（带无障碍描述）。用于输错口令时当场核对，避免「输错即不可挽回」。
+
+### 验证
+
+- 单测 **268 条全过**（新增 3 条附件路径校验用例：百分号编码穿越 / URL 分隔符与空白 / 裸 `.enc`）。
+- release APK 验签通过：证书 SHA-256 `38CA80A6…012D7D`，与历史版本一致，可覆盖升级。
+
+### 教训
+
+- 「只重排未来」的清理逻辑很容易顺手把「今天稍后还要用的」一起清掉——重排类函数必须显式区分
+  **已过点未完成** 与 **未到点** 两种状态，并把「已完成」作为入参传入。
+- 从「在用」流里按 id 取单条记录做编辑，天然会在记录被归档后挂起；编辑态一律走**按 id 直查**。
+
 ## [v1.0.42] — 2026-09-21
 
 **真正修复「康复计划 → 添加模板」闪退**（v1.0.41 的 R8 结论是错的）。

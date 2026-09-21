@@ -21,7 +21,6 @@ class ReminderReceiver : BroadcastReceiver() {
         const val EXTRA_SLOT_TIME = "slot_time"
         const val EXTRA_ESCALATION = "escalation"
         const val EXTRA_FIRE_ISO = "fire_iso"
-        private const val MAX_ESCALATION = 2
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -58,12 +57,12 @@ class ReminderReceiver : BroadcastReceiver() {
                 NotificationHelper.postMedReminder(
                     context, medId, slotKey, slotTime, med.name, med.dose, escalation
                 )
-                if (escalation < MAX_ESCALATION) {
+                if (escalation < ReminderScheduler.MAX_ESCALATION) {
                     val fire = runCatching { LocalDateTime.parse(fireIso) }
-                        .getOrDefault(LocalDateTime.now().plusMinutes(30))
+                        .getOrDefault(LocalDateTime.now().plusMinutes(ReminderScheduler.ESCALATION_STEP_MINUTES))
                     ReminderScheduler.scheduleEscalation(
                         context, medId, slotKey, slotTime,
-                        fire.plusMinutes(30), escalation + 1
+                        fire.plusMinutes(ReminderScheduler.ESCALATION_STEP_MINUTES), escalation + 1
                     )
                 }
             } finally {

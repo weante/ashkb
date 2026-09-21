@@ -35,7 +35,12 @@ class WebDavClient(
     private fun url(path: String): URL {
         val root = normalizedRoot()
         val full = if (path.isEmpty()) root else "$root/$path"
-        return URL(full.replace(" ", "%20"))
+        val u = URL(full.replace(" ", "%20"))
+        // v1.0.43：客户端自校验 scheme。此前唯一防线是 BackupRepository.requireHttps，而它是
+        // 「拦 http://」的黑名单——任何非 http:// 的畸形基址都能带着 Basic 凭据发出去。
+        if (!u.protocol.equals("https", ignoreCase = true))
+            throw DavException("WebDAV 基址必须是 https:// 地址（当前为 ${u.protocol}://）")
+        return u
     }
 
     private fun open(path: String, method: String, depth: Int? = null): HttpURLConnection {
@@ -197,9 +202,10 @@ class WebDavClient(
         delete(AttachmentPath.fullPathOf(remotePath))
     }
 
-    /** 拼 URL 前的最后一道防线：只放行本应用生成的路径形状，防备份脏值拼出越权路径。 */
+    /** 拼 URL 前的最后一道防线：只放行本应用生成的路径形状，防备份脏值拼出越权路径。
+     *  v1.0.43：改用 [AttachmentPath.isManagedRemotePath]（含日期目录校验），与「可清理形状」同强度。 */
     private fun requirePath(remotePath: String) {
-        if (!AttachmentPath.isValidRemotePath(remotePath))
+        if (!AttachmentPath.isManagedRemotePath(remotePath))
             throw DavException("非法附件路径：$remotePath")
     }
 

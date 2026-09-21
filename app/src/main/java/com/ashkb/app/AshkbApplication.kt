@@ -58,10 +58,16 @@ class AshkbApplication : Application() {
                 recipeRepository.seedIfMissing()
                 healthRepository.seedExercisePlans()
                 // 启动即重排未来 7 天闹钟（覆盖跨日 / 杀后台遗漏）
-                val meds = AppDatabase.get(this@AshkbApplication).medicationDao().observeActive().first()
-                ReminderScheduler.rescheduleAll(this@AshkbApplication, meds)
-                // P2 例行检查：发作第 7 天警报 + 知识条目复核到期（insertAlertOnce 幂等）
+                // v1.0.43：带上「今日已打卡槽位」——rescheduleAll 会重建今日未打卡槽位尚未到时的
+                // 升级重查，避免每次冷启动都清掉当天的 +30 / +60 提醒
                 val today = LocalDate.now()
+                val meds = AppDatabase.get(this@AshkbApplication).medicationDao().observeActive().first()
+                val doneRefs = medicationRepository.logsForDate(today)
+                    .filter { it.status == "done" }
+                    .map { ReminderScheduler.slotRef(it.medId, it.slotKey) }
+                    .toSet()
+                ReminderScheduler.rescheduleAll(this@AshkbApplication, meds, doneRefs)
+                // P2 例行检查：发作第 7 天警报 + 知识条目复核到期（insertAlertOnce 幂等）
                 healthRepository.checkFlareDayAlert(today)
                 healthRepository.checkReviewDue(today.toString())
             }.onFailure {

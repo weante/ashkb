@@ -43,6 +43,7 @@
     <string name="backup_modify_dav">修改 WebDAV 配置</string>
     <string name="backup_no_file_selected">未选择备份文件</string>
     <string name="backup_password_field">备份口令（≥6 位）</string>
+    <string name="backup_password_longpress_hint">长按右侧图标可显示明文</string>
     <string name="backup_prerestore_note">「执行恢复」将先对当前数据做 pre-restore 快照（可撤销退路），</string>
     <string name="backup_processing">处理中…（加密 / 网络操作可能需要数十秒）</string>
     <string name="backup_profile_json_note">明文 JSON：档案 + 在用药清单（不含打卡日志）。新设备导入后可快速建档。</string>
@@ -281,6 +282,7 @@
     <string name="med_add_hint_today">添加后，这里会显示今天该服用的药</string>
     <string name="med_add_medication">添加药品</string>
     <string name="med_edit_medication">编辑药品</string>
+    <string name="med_edit_missing">未找到该药品记录，可能已被删除。请返回列表重新选择。</string>
     <string name="med_add_new">新增药品</string>
     <string name="med_add_plan_note">添加后，这里会生成每日打卡计划与用药提醒</string>
     <string name="med_bio_stop_warning">生物制剂自行停药可能导致病情反弹，请务必先咨询风湿科医生。</string>
@@ -1040,3 +1042,4 @@
     <string name="attach_download_failed">云端未找到该附件，或网络异常</string>
     <string name="attach_download_ok">已从云端取回</string>
 </resources>
+

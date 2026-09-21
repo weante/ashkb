@@ -6,7 +6,9 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -26,6 +28,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +51,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -54,6 +59,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
@@ -76,6 +82,52 @@ private val PassKeyboard = KeyboardOptions(
     keyboardType = KeyboardType.Password,
     autoCorrect = false,
 )
+
+/**
+ * v1.0.43：口令输入框统一封装。
+ * 默认掩码显示；右侧「眼睛」图标**长按**才显示明文（松手立即恢复掩码），
+ * 避免误触泄露，同时让输错口令的用户能当场核对。
+ */
+@Composable
+private fun SecretField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    supportingText: (@Composable () -> Unit)? = null,
+) {
+    var revealed by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        visualTransformation = if (revealed) VisualTransformation.None else PasswordVisualTransformation(),
+        keyboardOptions = PassKeyboard,
+        singleLine = true,
+        supportingText = supportingText,
+        trailingIcon = {
+            Box(
+                modifier = Modifier
+                    .size(Size.touchMin)
+                    .pointerInput(Unit) {
+                        detectTapGestures(onPress = {
+                            revealed = true
+                            tryAwaitRelease()
+                            revealed = false
+                        })
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (revealed) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                    contentDescription = stringResource(R.string.backup_password_longpress_hint),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        modifier = modifier,
+    )
+}
 
 /** P4 R20 备份与数据自主页（协议 §3–§6）。 */
 @Composable
@@ -283,12 +335,9 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
 
             // ---- 本机全量备份 ----
             SectionCard(title = stringResource(R.string.backup_local_full)) {
-                OutlinedTextField(
+                SecretField(
                     value = backupPass, onValueChange = { backupPass = it },
-                    label = { Text(stringResource(R.string.backup_password_field)) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = PassKeyboard,
-                    singleLine = true,
+                    label = stringResource(R.string.backup_password_field),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(Spacing.sm))
@@ -470,12 +519,9 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                     )
                 }
                 Spacer(Modifier.height(Spacing.xs))
-                OutlinedTextField(
+                SecretField(
                     value = restorePass, onValueChange = { restorePass = it },
-                    label = { Text(stringResource(R.string.backup_file_password)) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = PassKeyboard,
-                    singleLine = true,
+                    label = stringResource(R.string.backup_file_password),
                     supportingText = { Text(stringResource(R.string.backup_recovery_hint_for_restore)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -791,12 +837,9 @@ private fun WebDavSheet(vm: BackupViewModel, initialUrl: String, initialUser: St
                 label = { Text(stringResource(R.string.backup_dav_username_field)) }, modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-            OutlinedTextField(
+            SecretField(
                 value = davPass, onValueChange = { davPass = it },
-                label = { Text(stringResource(R.string.backup_dav_password_field)) },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = PassKeyboard,
-                singleLine = true,
+                label = stringResource(R.string.backup_dav_password_field),
                 modifier = Modifier.fillMaxWidth(),
             )
             Button(

@@ -54,8 +54,8 @@ class BackupRepository(private val context: Context) {
                 prefs.getString("user", "") ?: "",
                 prefs.getString("pass", "") ?: "",
             )
-            // R3：旧明文配置若为 http:// 则不再迁移——强制 HTTPS 后无法使用，删除即失效
-            if (!old.first.trim().startsWith("http://", ignoreCase = true)) {
+            // R3：只迁移 https:// 的旧明文配置；其余（http:// 或畸形 scheme）一律删除即失效
+            if (old.first.trim().startsWith("https://", ignoreCase = true)) {
                 saveWebdavConfig(old.first, old.second, old.third)
             }
             prefs.edit().remove("url").remove("user").remove("pass").apply()
@@ -67,9 +67,12 @@ class BackupRepository(private val context: Context) {
         return Triple(readEnc("url_v2"), readEnc("user_v2"), readEnc("pass_v2"))
     }
 
-    /** R3：强制 HTTPS——明文 http 会把账号密码暴露给链路上任何人，入口直接拒绝。 */
+    /**
+     * R3：强制 HTTPS。v1.0.43 改为**白名单**——原先只拦 `http://`，于是 `ftp://`、畸形 URL
+     * 全部放行（Basic 凭据会照发）。
+     */
     private fun requireHttps(url: String) {
-        if (url.trim().startsWith("http://", ignoreCase = true))
+        if (!url.trim().startsWith("https://", ignoreCase = true))
             throw WebDavClient.DavException("仅支持 https:// 地址——明文 http 会把账号密码暴露给链路上任何人")
     }
 
@@ -88,7 +91,12 @@ class BackupRepository(private val context: Context) {
     private val vaultPrefs: SharedPreferences =
         context.getSharedPreferences("vault_config", Context.MODE_PRIVATE)
 
-    fun hasRecoveryCode(): Boolean = vaultPrefs.contains("recovery_code_v1")
+    /**
+     * v1.0.43 修复：原先只看 `prefs.contains(...)`，于是 Keystore 异常（能读到一个解不开的密文）时
+     * 界面显示「已设置恢复码」，但 [recoverySlot] 返回 null → 备份**实际只写了口令槽**，
+     * 用户以为有退路，直到忘掉口令那一刻才发现没有。改为以「能真正解出非空码」为准。
+     */
+    fun hasRecoveryCode(): Boolean = recoveryCode() != null
 
     /** 读出恢复码（分组形态）；未设置或 Keystore 解密失败返回 null。 */
     fun recoveryCode(): String? =
@@ -126,6 +134,18 @@ class BackupRepository(private val context: Context) {
 
     private fun supportDb() = db.openHelper.writableDatabase
 
+    /**
+     * 取稳定 vault key 用于加密。
+     *
+     * v1.0.43：本机有密钥但**读不出**（Keystore 失效）时明确报错，而不是生成新密钥覆盖——
+     * 后者会让云端已上传的附件永久不可解且用户毫无察觉。恢复一份 v3 备份即可取回密钥。
+     */
+    private fun vaultKeyOrThrow(): ByteArray = vaultKeys.getOrCreate()
+        ?: throw BackupEngine.BackupException(
+            "本机附件密钥无法解密（系统密钥库异常）。为避免云端已上传的附件永久不可解，已停止生成新密钥。" +
+                "请先恢复一份本机或云端的 v3 备份以取回密钥。"
+        )
+
     // ======================= 本机备份 =======================
 
     class BackupOutcome(val file: File, val rowTotal: Int, val tableCount: Int, val sha256: String)
@@ -134,7 +154,7 @@ class BackupRepository(private val context: Context) {
     suspend fun backupLocal(password: CharArray): BackupOutcome = withContext(Dispatchers.IO) {
         val exported = BackupEngine.export(supportDb(), nowIso())
         // v3：用稳定 vault key 加密（附件与备份同密钥域，换机后附件才解得开）
-        val bytes = VaultCipher.encryptV3(vaultKeys.getOrCreate(), password, recoverySlot(), exported.payload,
+        val bytes = VaultCipher.encryptV3(vaultKeyOrThrow(), password, recoverySlot(), exported.payload,
             BackupEngine.schemaVersion(supportDb()), nowIso())
         val dir = File(context.filesDir, "backups").apply { mkdirs() }
         // 同日多次备份保留时分秒后缀
@@ -164,7 +184,7 @@ class BackupRepository(private val context: Context) {
         onStage("正在导出数据库快照…")
         val exported = BackupEngine.export(supportDb(), nowIso())
         onStage("正在加密（AES-256-GCM）…")
-        val bytes = VaultCipher.encryptV3(vaultKeys.getOrCreate(), password, recoverySlot(), exported.payload,
+        val bytes = VaultCipher.encryptV3(vaultKeyOrThrow(), password, recoverySlot(), exported.payload,
             BackupEngine.schemaVersion(supportDb()), nowIso())
         // X2：文件名带时间戳——同一天多次备份不再互相覆盖（旧按日命名 PUT 同名即覆盖）
         val name = "ashkb-backup-" +
@@ -264,7 +284,7 @@ class BackupRepository(private val context: Context) {
             val snapshot = BackupEngine.export(supportDb(), nowIso())
             // 快照同样带恢复码槽——用户用恢复码完成恢复时，快照仍可用同一恢复码解开
             val snapBytes = VaultCipher.encryptV3(
-                vaultKeys.getOrCreate(), snapshotPassword, recoverySlot(), snapshot.payload,
+                vaultKeyOrThrow(), snapshotPassword, recoverySlot(), snapshot.payload,
                 BackupEngine.schemaVersion(supportDb()), nowIso())
             val dir = File(context.filesDir, "backups").apply { mkdirs() }
             val snapFile = dir.resolve("pre-restore-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))}.ashkb")
@@ -314,7 +334,7 @@ class BackupRepository(private val context: Context) {
             // 2. 加密 → 解密（证明加密链路）
             val drillPass = "drill-${java.util.UUID.randomUUID()}"
             // 演练口令随机即弃，无恢复码槽（单口令槽）；v3 格式——演练走的就是生产加密路径
-            val bytes = VaultCipher.encryptV3(vaultKeys.getOrCreate(), drillPass.toCharArray(), null, before.payload,
+            val bytes = VaultCipher.encryptV3(vaultKeyOrThrow(), drillPass.toCharArray(), null, before.payload,
                 BackupEngine.schemaVersion(copy), now)
             val decrypted = VaultCipher.decrypt(drillPass.toCharArray(), bytes)
             // 3. 副本上恢复写入 + 双校验
@@ -481,7 +501,7 @@ class BackupRepository(private val context: Context) {
         if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
         requireHttps(url)
         val client = WebDavClient(url, user, pass)
-        val vaultKey = vaultKeys.getOrCreate()
+        val vaultKey = vaultKeyOrThrow()
 
         // 1. 先清墓碑：释放服务器空间，也让「删除」尽快闭环
         val tc = clearTombstones(client)
@@ -571,7 +591,7 @@ class BackupRepository(private val context: Context) {
         if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
         requireHttps(url)
         val client = WebDavClient(url, user, pass)
-        val vaultKey = vaultKeys.getOrCreate()
+        val vaultKey = vaultKeyOrThrow()
 
         onProgress(AttachmentSyncProgress("正在列出远端附件", 0, 0, 0))
         val remote = client.listAttachmentRemotePaths()

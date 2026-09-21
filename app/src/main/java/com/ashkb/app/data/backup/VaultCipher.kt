@@ -39,6 +39,13 @@ object VaultCipher {
     const val BLOB_MAGIC = "ASHKBATT"
     private const val KDF = "pbkdf2-sha256"
     private const val ITER = 120_000
+    /**
+     * v1.0.43：KDF 迭代次数的可接受区间。备份文件是**外部输入**，其头部的 `iter` 直接进 PBKDF2——
+     * 一个 `iter = Int.MAX_VALUE` 的（口令已知的）恶意备份可让恢复过程长时间挂起（DoS）。
+     * 下界防「iter=1 快速暴力」，上界防 DoS。
+     */
+    private const val MIN_ITER = 1_000
+    private const val MAX_ITER = 10_000_000
     private const val KEY_BITS = 256
     private const val GCM_TAG_BITS = 128
     private const val SALT_LEN = 16
@@ -175,7 +182,14 @@ object VaultCipher {
         } catch (e: Exception) {
             throw VaultException("文件头损坏", e)
         }
-        val key = deriveKey(secret, salt, iter)
+        // v1.0.43：v1 分支此前完全不校验 salt / iv 长度与 iter 范围（v2/v3 槽已校验）
+        if (salt.size != SALT_LEN || iv.size != IV_LEN) throw VaultException("文件头损坏")
+        if (iter !in MIN_ITER..MAX_ITER) throw VaultException("文件头损坏：KDF 迭代次数越界")
+        val key = try {
+            deriveKey(secret, salt, iter)
+        } catch (e: Exception) {
+            throw VaultException("文件头损坏", e)
+        }
         val plain = try {
             Cipher.getInstance("AES/GCM/NoPadding").apply {
                 init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv))
@@ -219,8 +233,9 @@ object VaultCipher {
                 val iv = b64d(slot.optString("iv"))
                 val wrapped = b64d(slot.optString("wrapped"))
                 val iter = slot.optInt("iter", -1)
-                if (salt.size != SALT_LEN || iv.size != IV_LEN || wrapped.isEmpty() || iter <= 0)
-                    throw VaultException("密钥槽损坏")
+                if (salt.size != SALT_LEN || iv.size != IV_LEN || wrapped.isEmpty() ||
+                    iter !in MIN_ITER..MAX_ITER
+                ) throw VaultException("密钥槽损坏")
                 val unwrapped = try {
                     Cipher.getInstance("AES/GCM/NoPadding").apply {
                         init(Cipher.DECRYPT_MODE, deriveKey(cand, salt, iter), GCMParameterSpec(GCM_TAG_BITS, iv))

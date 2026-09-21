@@ -85,11 +85,16 @@ class TodayViewModel(
         }
     }
 
-    /** 打卡或药单变化后重排提醒（写入后取消当晚后续升级） */
+    /** 打卡或药单变化后重排提醒（v1.0.43：只取消「已打卡槽位」的后续升级，其余槽位的升级链保留） */
     fun reschedule(context: android.content.Context) {
         viewModelScope.launch {
             val meds = com.ashkb.app.data.db.AppDatabase.get(context).medicationDao().listActive()
-            ReminderScheduler.rescheduleAll(context, meds)
+            val today = LocalDate.now()
+            val doneRefs = repo.logsForDate(today)
+                .filter { it.status == "done" }
+                .map { ReminderScheduler.slotRef(it.medId, it.slotKey) }
+                .toSet()
+            ReminderScheduler.rescheduleAll(context, meds, doneRefs)
         }
     }
 

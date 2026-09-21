@@ -10,6 +10,7 @@ import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.domain.ScheduleCalc
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 
 /**
@@ -20,18 +21,57 @@ import java.time.ZoneId
 object ReminderScheduler {
     const val HORIZON_DAYS = 7L
 
-    fun rescheduleAll(context: Context, meds: List<Medication>) {
+    /** M10 升级链：未确认后最多重查次数（+30 / +60 分钟各一次）。 */
+    const val MAX_ESCALATION = 2
+
+    /** 每级升级重查的间隔（分钟）。 */
+    const val ESCALATION_STEP_MINUTES = 30L
+
+    /** 槽位标识（`medId|slotKey`）：用于「今日已打卡槽位」集合，维度与 request code 一致。 */
+    fun slotRef(medId: String?, slotKey: String?): String = "$medId|$slotKey"
+
+    /**
+     * 重排「今日剩余 + 未来 7 天」的提醒。
+     *
+     * v1.0.43 修复：本方法先 `cancelAllFuture` 取消全部闹钟（含升级重查），所以必须**同时重建**
+     * 今日「已过点但未打卡」槽位尚未到时的升级重查。此前只重建 `escalation = 0` 且跳过已过时刻，
+     * 于是每次冷启动 / 打卡 / 改药单都会把当天后续的 +30 / +60 提醒静默清掉（M10 升级链失效）。
+     *
+     * @param doneSlotRefs 今日已打卡的槽位（[slotRef] 形态）——这些不再重建升级重查
+     */
+    fun rescheduleAll(
+        context: Context,
+        meds: List<Medication>,
+        doneSlotRefs: Set<String> = emptySet(),
+    ) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         cancelAllFuture(context, meds)
-        val today = LocalDate.now()
+        val now = LocalDateTime.now()
+        val today = now.toLocalDate()
+
+        // 1) 未来（含今日未到点）槽位：按 esc=0 排首次提醒
         for (dayOffset in 0..HORIZON_DAYS) {
             val date = today.plusDays(dayOffset)
             for (med in meds) {
                 for (slot in ScheduleCalc.slotsFor(med, date)) {
                     val time = slot.time ?: continue
-                    val fire = LocalDateTime.of(date, java.time.LocalTime.parse(time))
-                    if (fire.isBefore(LocalDateTime.now().minusMinutes(1))) continue
+                    val fire = LocalDateTime.of(date, LocalTime.parse(time))
+                    if (fire.isBefore(now.minusMinutes(1))) continue
                     schedule(context, am, med.id, slot.key, time, fire, escalation = 0)
+                }
+            }
+        }
+
+        // 2) 今日已过点但未打卡的槽位：重建尚未到时的升级重查（幂等：request code 稳定，覆盖旧值）
+        for (med in meds) {
+            for (slot in ScheduleCalc.slotsFor(med, today)) {
+                val time = slot.time ?: continue
+                val base = LocalDateTime.of(today, LocalTime.parse(time))
+                if (base.isAfter(now)) continue                        // 未到点：已在第 1 步排好
+                if (slotRef(med.id, slot.key) in doneSlotRefs) continue // 已打卡：无需重查
+                for (esc in 1..MAX_ESCALATION) {
+                    val fire = base.plusMinutes(ESCALATION_STEP_MINUTES * esc)
+                    if (fire.isAfter(now)) schedule(context, am, med.id, slot.key, time, fire, esc)
                 }
             }
         }
@@ -65,8 +105,9 @@ object ReminderScheduler {
             for (med in meds) {
                 for (slot in ScheduleCalc.slotsFor(med, date)) {
                     val time = slot.time ?: continue
-                    for (esc in 0..2) {
-                        val fire = LocalDateTime.of(date, java.time.LocalTime.parse(time)).plusMinutes(30L * esc)
+                    for (esc in 0..MAX_ESCALATION) {
+                        val fire = LocalDateTime.of(date, LocalTime.parse(time))
+                            .plusMinutes(ESCALATION_STEP_MINUTES * esc)
                         am.cancel(pending(context, med.id, slot.key, time, fire, esc))
                     }
                 }

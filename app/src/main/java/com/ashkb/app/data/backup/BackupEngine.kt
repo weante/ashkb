@@ -243,12 +243,17 @@ object BackupEngine {
             val marks = mutableListOf<String>()
             row.keys().asSequence().forEach { cols.add(it); marks.add("?") }
             if (cols.isEmpty()) continue
+            // v1.0.43：**列名也必须有白名单**。表名此前已过 unknownTables 校验，但列名直接取自
+            // 备份 JSON 的键并拼进 SQL（`INSERT INTO t (`a`, `b`) ...`）——含反引号 / `)` 的键可
+            // 破坏语句结构。威胁模型正是「诱导用户导入攻击者提供、口令已知的备份」。
+            val unknown = cols.firstOrNull { it !in colTypes }
+            if (unknown != null) throw BackupException("备份含未知列：$table.$unknown")
             val stmt = db.compileStatement(
                 "INSERT OR REPLACE INTO `$table` (${cols.joinToString(separator = "`, `", prefix = "`", postfix = "`")}) " +
                     "VALUES (${marks.joinToString()})")
             try {
                 cols.forEachIndexed { idx, col ->
-                    val type = colTypes[col] ?: "TEXT"
+                    val type = colTypes.getValue(col) // 已校验存在（见上方 unknown 检查）
                     val v = row.opt(col)
                     when {
                         v == null || v == JSONObject.NULL -> stmt.bindNull(idx + 1)

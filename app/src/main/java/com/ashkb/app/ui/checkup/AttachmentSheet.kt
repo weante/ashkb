@@ -28,6 +28,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -228,40 +229,45 @@ internal fun AttachmentSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            // v1.0.43 修复：必须按附件 id 给 key。此前无 key → 列表在「确认删除」对话框打开期间
+            // 发生删除（行前移）时，行内 DestructiveAction 的 confirming 状态会留在原槽位，
+            // 而 onConfirm 已指向下一行 → 出现「确认删除 A、实际删掉 B」。
             rows.forEach { a ->
-                val onLinkRow: (() -> Unit)? = if (allowLink) {
-                    { linkTarget = a }
-                } else {
-                    null
-                }
-                AttachmentRow(
-                    attachment = a,
-                    syncOn = syncOn,
-                    onView = {
-                        // 本地文件可能已被清理：先判断在不在，不在而云端有就懒下载回来再开
-                        if (vm.attachmentHasLocal(a)) {
-                            openAttachment(context, vm, a) { msg = R.string.attach_open_failed }
-                        } else if (a.remotePath != null) {
-                            scope.launch {
-                                msg = R.string.attach_downloading
-                                val ok = vm.ensureAttachmentLocal(a)
-                                if (ok) {
-                                    msg = R.string.attach_download_ok
-                                    openAttachment(context, vm, a) { msg = R.string.attach_open_failed }
-                                } else {
-                                    msg = R.string.attach_download_failed
+                key(a.id) {
+                    val onLinkRow: (() -> Unit)? = if (allowLink) {
+                        { linkTarget = a }
+                    } else {
+                        null
+                    }
+                    AttachmentRow(
+                        attachment = a,
+                        syncOn = syncOn,
+                        onView = {
+                            // 本地文件可能已被清理：先判断在不在，不在而云端有就懒下载回来再开
+                            if (vm.attachmentHasLocal(a)) {
+                                openAttachment(context, vm, a) { msg = R.string.attach_open_failed }
+                            } else if (a.remotePath != null) {
+                                scope.launch {
+                                    msg = R.string.attach_downloading
+                                    val ok = vm.ensureAttachmentLocal(a)
+                                    if (ok) {
+                                        msg = R.string.attach_download_ok
+                                        openAttachment(context, vm, a) { msg = R.string.attach_open_failed }
+                                    } else {
+                                        msg = R.string.attach_download_failed
+                                    }
                                 }
+                            } else {
+                                msg = R.string.attach_open_failed
                             }
-                        } else {
-                            msg = R.string.attach_open_failed
-                        }
-                    },
-                    onDelete = {
-                        vm.deleteAttachment(a)
-                        msg = R.string.attach_deleted
-                    },
-                    onLink = onLinkRow,
-                )
+                        },
+                        onDelete = {
+                            vm.deleteAttachment(a)
+                            msg = R.string.attach_deleted
+                        },
+                        onLink = onLinkRow,
+                    )
+                }
             }
 
             Text(

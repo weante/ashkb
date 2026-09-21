@@ -104,12 +104,19 @@ fun MedEditScreen(
     val prnFallback = stringResource(R.string.med_reason_backup)
 
     // ---- 编辑模式：预填在用药品参数（仅按 editId 跑一次，不覆盖用户后续输入） ----
+    // v1.0.43 修复：原先在 vm.meds（**仅「在用」列表**）上 `first { 含该 id }`——目标药若已停用、
+    // 或恢复备份后 id 漂移，谓词永不为真 → 协程永久挂起 → original 恒为 null → 保存时
+    // id = Ids.new("med")，把「编辑」静默变成**新建一条重复药**，并丢掉病史核对记录。
+    // 改为按 id 一次性直查（不限在用）；查不到则明确提示并禁止保存，绝不静默新建。
     var original by remember { mutableStateOf<Medication?>(null) }
+    var editMissing by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(editId) {
         if (editId == null) return@LaunchedEffect
-        // meds 是 observeActive 的 StateFlow：从列表页进来时已有值；first{} 兜底冷直达的加载等待
-        val med = vm.meds.first { list -> list.any { it.id == editId } }
-            .firstOrNull { it.id == editId } ?: return@LaunchedEffect
+        val med = vm.medicationById(editId)
+        if (med == null) {
+            editMissing = true
+            return@LaunchedEffect
+        }
         original = med
         name = med.name
         brand = med.brandName ?: ""
@@ -164,6 +171,9 @@ fun MedEditScreen(
             ?: if (step >= 2) LocalDate.now().toString() else null,
         createdAt = original?.createdAt ?: nowIso(),
         updatedAt = nowIso(),
+        // v1.0.43：编辑模式必须保留归档态——buildMed 未列出该字段时取实体默认值 false，
+        // 会把「已停用」的药静默复活（预填改为按 id 直查后可能拿到归档药，故此处置为必需）
+        isArchived = original?.isArchived ?: false,
     )
 
     fun goBackStep() {
@@ -197,6 +207,8 @@ fun MedEditScreen(
 
                     Button(
                         onClick = {
+                            // v1.0.43：编辑目标查不到时禁止保存——否则会静默新建一条重复药
+                            if (editMissing) return@Button
                             if (step == 1) {
                                 if (name.isBlank() || nameKey.isBlank() || dose.isBlank()) return@Button
                                 if (frequency == MedFrequency.BIW && weekday == weekday2) {
@@ -213,6 +225,7 @@ fun MedEditScreen(
                                 onSaved()
                             }
                         },
+                        enabled = !editMissing,
                         modifier = Modifier.weight(1f).heightIn(min = Size.touchMin),
                     ) { Text(if (step == 1) stringResource(R.string.med_next_verify) else stringResource(R.string.checkup_save_record)) }
                 }
@@ -228,6 +241,21 @@ fun MedEditScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             if (step == 1) {
+                // v1.0.43：编辑目标不存在（已删除 / id 失效）时明确告知，不静默新建
+                if (editMissing) {
+                    Surface(
+                        Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        Text(
+                            stringResource(R.string.med_edit_missing),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(Spacing.sm),
+                        )
+                    }
+                }
                 OutlinedTextField(
                     name, { name = it },
                     label = { Text(stringResource(R.string.med_name_field)) },
