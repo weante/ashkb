@@ -561,6 +561,10 @@ interface CheckupAttachmentDao {
     @Query("SELECT * FROM checkup_attachments WHERE deleted_at IS NOT NULL ORDER BY deleted_at")
     suspend fun pendingRemoteDelete(): List<CheckupAttachment>
 
+    /** 远端校验的本地基准：已上传（有远端路径）的可见行 */
+    @Query("SELECT * FROM checkup_attachments WHERE remote_path IS NOT NULL AND deleted_at IS NULL ORDER BY created_at")
+    suspend fun withRemotePath(): List<CheckupAttachment>
+
     @Query("UPDATE checkup_attachments SET remote_path = :remotePath, remote_sha256 = :sha256, synced_at = :syncedAt WHERE id = :id")
     suspend fun markUploaded(id: String, remotePath: String, sha256: String, syncedAt: String)
 

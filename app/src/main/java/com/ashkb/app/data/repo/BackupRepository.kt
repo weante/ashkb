@@ -483,21 +483,9 @@ class BackupRepository(private val context: Context) {
         val client = WebDavClient(url, user, pass)
         val vaultKey = vaultKeys.getOrCreate()
 
-        var failed = 0
-
         // 1. 先清墓碑：释放服务器空间，也让「删除」尽快闭环
-        val tombstones = attachments.pendingRemoteDelete()
-        var deleted = 0
-        tombstones.forEach { a ->
-            val p = a.remotePath
-            if (p == null) {
-                attachments.hardDelete(a.id) // 从未上传过，无需远端清理
-                return@forEach
-            }
-            runCatching { client.deleteAttachment(p) }
-                .onSuccess { attachments.hardDelete(a.id); deleted++ }
-                .onFailure { failed++ }
-        }
+        val tc = clearTombstones(client)
+        var failed = tc.failed
 
         // 2. 补传
         val pending = attachments.pendingUpload()
@@ -520,11 +508,118 @@ class BackupRepository(private val context: Context) {
         }
         onProgress(AttachmentSyncProgress("附件同步完成", pending.size, pending.size, failed))
 
-        val detail = "上传 $uploaded / 待传 ${pending.size}；远端清理 $deleted / 待删 ${tombstones.size}" +
+        val detail = "上传 $uploaded / 待传 ${pending.size}；远端清理 ${tc.deleted} / 待删 ${tc.total}" +
             if (noLocal > 0) "；$noLocal 个本地文件缺失（无法上传）" else "" +
             if (failed > 0) "；失败 $failed" else ""
         log(LedgerType.ATTACH, failed == 0, "webdav", null, uploaded, failed == 0, detail)
-        AttachmentSyncResult(uploaded, deleted, noLocal, failed, detail)
+        AttachmentSyncResult(uploaded, tc.deleted, noLocal, failed, detail)
+    }
+
+    /** 清理墓碑（本地已删、待远端清理）；远端 404 视为已不存在（幂等）。 */
+    private suspend fun clearTombstones(client: WebDavClient): TombstoneClear {
+        val tombstones = attachments.pendingRemoteDelete()
+        var deleted = 0
+        var failed = 0
+        tombstones.forEach { a ->
+            val p = a.remotePath
+            if (p == null) {
+                attachments.hardDelete(a.id) // 从未上传过，无需远端清理
+                return@forEach
+            }
+            runCatching { client.deleteAttachment(p) }
+                .onSuccess { attachments.hardDelete(a.id); deleted++ }
+                .onFailure { failed++ }
+        }
+        return TombstoneClear(deleted, tombstones.size, failed)
+    }
+
+    private data class TombstoneClear(val deleted: Int, val total: Int, val failed: Int)
+
+    // ======================= 附件远端校验（v1.0.36） =======================
+
+    data class AttachmentVerifyResult(
+        /** 服务器上扫描到的附件文件数 */
+        val remoteCount: Int,
+        /** 本次补传成功数 */
+        val uploaded: Int,
+        /** 本地有记录但远端缺失的应补传总数 */
+        val missingTotal: Int,
+        /** 本次清理的远端多余文件数 */
+        val orphanDeleted: Int,
+        /** 远端多余文件总数（本地无记录） */
+        val orphanTotal: Int,
+        /** 本地文件已丢失、无从补传的数量 */
+        val noLocal: Int,
+        val failed: Int,
+        val detail: String,
+    )
+
+    /**
+     * v1.0.36：远端校验与补传。
+     *
+     * 比对服务器上 `ashkb/attachments/` 的实际文件集与本地记录的 `remote_path`：
+     *  ① 本地有记录、远端缺失 → 重新上传（远端被手动删除的情形）
+     *  ② 远端有文件、本地无记录 → 清理（换机残留 / 本地已删；坚果云回收站可找回）
+     * 顺带收尾墓碑行。**只处理 `AttachmentPath.isManagedRemotePath` 认可的形状**，
+     * 目录下其它文件（非日期目录、非 `.enc`）一律不碰。
+     */
+    suspend fun verifyAttachments(
+        onProgress: (AttachmentSyncProgress) -> Unit = {},
+    ): AttachmentVerifyResult = withContext(Dispatchers.IO) {
+        if (!attachments.isSyncEnabled()) throw WebDavClient.DavException("附件同步已关闭")
+        val (url, user, pass) = webdavConfig()
+        if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
+        requireHttps(url)
+        val client = WebDavClient(url, user, pass)
+        val vaultKey = vaultKeys.getOrCreate()
+
+        onProgress(AttachmentSyncProgress("正在列出远端附件", 0, 0, 0))
+        val remote = client.listAttachmentRemotePaths()
+
+        val rows = attachments.withRemotePath()
+        val plan = AttachmentPath.reconcile(rows.mapNotNull { it.remotePath }.toSet(), remote)
+
+        var failed = 0
+
+        // ① 补传：本地有记录、远端缺失（远端被手动删掉 / 换机后未传全）
+        val byPath = rows.associateBy { it.remotePath }
+        val missing = plan.missing.toList()
+        var uploaded = 0
+        var noLocal = 0
+        val ensured = mutableSetOf<String>()
+        missing.forEachIndexed { idx, path ->
+            onProgress(AttachmentSyncProgress("正在补传附件", idx, missing.size, failed))
+            val a = byPath[path] ?: return@forEachIndexed
+            val plain = attachments.readLocal(a)
+            if (plain == null) { noLocal++; return@forEachIndexed }
+            val folder = AttachmentPath.folderOf(a.createdAt)
+            if (ensured.add(folder)) runCatching { client.ensureAttachmentDir(folder) }
+            val blob = VaultCipher.encryptBlob(vaultKey, plain, a.id)
+            runCatching { client.uploadAttachment(path, blob) }
+                .onSuccess { attachments.markUploaded(a.id, path, BackupEngine.sha256Hex(blob)); uploaded++ }
+                .onFailure { failed++ }
+        }
+
+        // ② 清孤儿：远端有文件、本地无记录
+        val orphans = plan.orphans.toList()
+        var orphanDeleted = 0
+        orphans.forEachIndexed { idx, path ->
+            onProgress(AttachmentSyncProgress("正在清理远端多余文件", idx, orphans.size, failed))
+            runCatching { client.deleteAttachment(path) }
+                .onSuccess { orphanDeleted++ }
+                .onFailure { failed++ }
+        }
+
+        // ③ 收尾墓碑（远端已确认不在 → 物理删行）
+        failed += clearTombstones(client).failed
+
+        onProgress(AttachmentSyncProgress("远端校验完成", 0, 0, failed))
+        val detail = "远端 ${remote.size} 个文件；补传 $uploaded / 缺 ${missing.size}；" +
+            "清理多余 $orphanDeleted / 共 ${orphans.size}" +
+            if (noLocal > 0) "；$noLocal 个本地文件缺失（无法补传）" else "" +
+            if (failed > 0) "；失败 $failed" else ""
+        log(LedgerType.ATTACH, failed == 0, "webdav", null, uploaded, failed == 0, "远端校验：$detail")
+        AttachmentVerifyResult(remote.size, uploaded, missing.size, orphanDeleted, orphans.size, noLocal, failed, detail)
     }
 
     /**

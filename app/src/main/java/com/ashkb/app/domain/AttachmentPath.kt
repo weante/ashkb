@@ -36,6 +36,32 @@ object AttachmentPath {
         p.isNotBlank() && p.endsWith(EXT) && !p.contains("..") &&
             !p.contains('\\') && !p.startsWith('/') && p.count { it == '/' } == 1
 
+    /** 日期目录名是否为本应用可生成（合法 `YYYY-MM-DD` 或脏数据占位目录）。 */
+    fun isValidFolder(folder: String): Boolean =
+        DATE_PATTERN.matches(folder) || folder == FALLBACK_FOLDER
+
+    /**
+     * 本应用可能生成的远端路径（合法日期目录 + `.enc` 文件）。
+     *
+     * 远端校验据此决定「哪些文件才允许被清理」——`ashkb/attachments/` 是专用目录，但用户
+     * 完全可能在网页端往里放别的东西（如 `readme.txt`、非日期目录），那些一律不碰。
+     */
+    fun isManagedRemotePath(p: String): Boolean =
+        isValidRemotePath(p) && isValidFolder(p.substringBefore('/'))
+
+    /** 远端与本地记录的差集（纯函数，v1.0.36 远端校验的核心判定）。 */
+    data class Reconcile(val missing: Set<String>, val orphans: Set<String>)
+
+    /**
+     * 比对远端实际文件集与本地记录：
+     *  - `missing`：本地有记录、远端没有 → 需补传（远端被手动删除的情形）
+     *  - `orphans`：远端有文件、本地无记录 → 需清理（换机残留 / 本地已删；仅限可管理形状）
+     */
+    fun reconcile(expected: Set<String>, remote: Set<String>): Reconcile = Reconcile(
+        missing = expected - remote,
+        orphans = remote.filterTo(mutableSetOf()) { isManagedRemotePath(it) && it !in expected },
+    )
+
     private const val FALLBACK_FOLDER = "0000-00-00"
     private val DATE_PATTERN = Regex("\\d{4}-\\d{2}-\\d{2}")
 }

@@ -353,6 +353,10 @@ class BackupViewModel(
     private val _attachBytes = MutableStateFlow(0L)
     val attachBytes: StateFlow<Long> = _attachBytes.asStateFlow()
 
+    /** 远端校验结果：(是否成功, 明细)；null = 尚无结果（v1.0.36）。 */
+    private val _attachVerifyMsg = MutableStateFlow<Pair<Boolean, String>?>(null)
+    val attachVerifyMsg: StateFlow<Pair<Boolean, String>?> = _attachVerifyMsg.asStateFlow()
+
     fun setAttachSyncEnabled(on: Boolean) {
         repo.setAttachmentSyncEnabled(on)
         _attachSyncEnabled.value = on
@@ -371,6 +375,28 @@ class BackupViewModel(
                 _attachSyncMsg.value = true to r.detail
             } catch (e: Exception) {
                 _attachSyncMsg.value = false to (e.message ?: "")
+            } finally {
+                _attachSyncStage.value = null
+                refreshAttachStats()
+            }
+        }
+    }
+
+    /**
+     * v1.0.36：远端校验与补传。比对服务器文件集与本地记录：
+     * 远端缺失的补传、远端多余的清理（本地已无记录）。与同步共用进度流，两者互斥。
+     */
+    fun verifyAttachments() {
+        viewModelScope.launch {
+            _attachVerifyMsg.value = null
+            _attachSyncStage.value = null
+            try {
+                val r = repo.verifyAttachments { p ->
+                    _attachSyncStage.value = if (p.total > 0) "${p.phase} ${p.done}/${p.total}" else p.phase
+                }
+                _attachVerifyMsg.value = true to r.detail
+            } catch (e: Exception) {
+                _attachVerifyMsg.value = false to (e.message ?: "")
             } finally {
                 _attachSyncStage.value = null
                 refreshAttachStats()

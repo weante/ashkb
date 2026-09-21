@@ -27,6 +27,9 @@ class WebDavClient(
     /** W4：远程备份条目——name 含备份日期，size 供列表展示（服务器未报告时为 -1）。 */
     data class DavBackupFile(val name: String, val size: Long, val modified: String)
 
+    /** v1.0.36：PROPFIND Depth:1 的一项——名字 + 是否集合（目录）。 */
+    data class DavEntry(val name: String, val isDir: Boolean)
+
     private fun normalizedRoot(): String = serverUrl.trim().trimEnd('/')
 
     private fun url(path: String): URL {
@@ -200,6 +203,44 @@ class WebDavClient(
             throw DavException("非法附件路径：$remotePath")
     }
 
+    /**
+     * v1.0.36：列出远端全部附件相对路径（`<日期>/<附件id>.enc`）。
+     *
+     * 先 Depth:1 列 `ashkb/attachments/` 得日期子目录，再逐个列文件——坚果云等对
+     * Depth:infinity 支持不一，两级 Depth:1 最稳。目录不存在（404）返回空集：
+     * 「从未同步过」是正常态而非错误。只收 `isManagedRemotePath` 认可的形状。
+     */
+    fun listAttachmentRemotePaths(): Set<String> {
+        val rootXml = propfind("${AttachmentPath.DIR}/") ?: return emptySet()
+        val folders = parseDavEntries(rootXml)
+            .filter { it.isDir && AttachmentPath.isValidFolder(it.name) }
+            .map { it.name }
+        val out = mutableSetOf<String>()
+        folders.forEach { folder ->
+            val xml = propfind("${AttachmentPath.DIR}/$folder/") ?: return@forEach
+            parseDavEntries(xml)
+                .filter { !it.isDir && it.name.endsWith(AttachmentPath.EXT) }
+                .forEach { e ->
+                    val p = "$folder/${e.name}"
+                    if (AttachmentPath.isManagedRemotePath(p)) out.add(p)
+                }
+        }
+        return out
+    }
+
+    /** PROPFIND Depth:1；404（目录不存在）返回 null，其余非 2xx 抛错（校验必须知道失败原因）。 */
+    private fun propfind(path: String): String? {
+        val conn = open(path, "PROPFIND", depth = 1)
+        return try {
+            val code = conn.responseCode
+            when {
+                code == 404 -> null
+                code !in 200..299 -> throw DavException("服务器拒绝列出目录（HTTP $code）——无法校验远端附件")
+                else -> conn.inputStream.use { it.readBytes().decodeToString() }
+            }
+        } finally { conn.disconnect() }
+    }
+
     private fun put(path: String, data: ByteArray) {
         val conn = open(path, "PUT")
         try {
@@ -342,6 +383,28 @@ class WebDavClient(
             }.distinctBy { it.name }
                 .sortedByDescending { backupSortKey(it.name) }
                 .toList()
+        }
+
+        /**
+         * v1.0.36：解析 PROPFIND 多状态响应为 (名字, 是否目录)。
+         *
+         * 集合判定同时看 href 尾斜杠与 `<resourcetype><collection/>`——部分服务器只给其一；
+         * 名字取 href 末段（去尾斜杠、去查询串），父目录自身条目（名字为空）被滤掉。
+         * 纯 JVM 可单测。
+         */
+        fun parseDavEntries(xml: String): List<DavEntry> {
+            val block = Regex("<(?:\\w+:)?response[^>]*>(.*?)</(?:\\w+:)?response>", RegexOption.DOT_MATCHES_ALL)
+            val href = Regex("<(?:\\w+:)?href>([^<]+)<")
+            val collection = Regex("<(?:\\w+:)?collection")
+            return block.findAll(xml).mapNotNull { m ->
+                val b = m.groupValues[1]
+                val raw = href.find(b)?.groupValues?.get(1)?.substringBefore('?')?.trim()
+                    ?: return@mapNotNull null
+                if (raw.isEmpty()) return@mapNotNull null
+                val name = raw.trimEnd('/').substringAfterLast('/')
+                if (name.isEmpty()) return@mapNotNull null
+                DavEntry(name = name, isDir = raw.endsWith("/") || collection.containsMatchIn(b))
+            }.distinctBy { it.name to it.isDir }.toList()
         }
     }
 }

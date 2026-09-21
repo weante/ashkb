@@ -171,6 +171,10 @@ class AttachmentRepository(private val context: Context) {
     suspend fun pendingRemoteDelete(): List<CheckupAttachment> =
         withContext(Dispatchers.IO) { dao.pendingRemoteDelete() }
 
+    /** 远端校验基准：已上传的可见行（有远端路径）。 */
+    suspend fun withRemotePath(): List<CheckupAttachment> =
+        withContext(Dispatchers.IO) { dao.withRemotePath() }
+
     suspend fun markUploaded(id: String, remotePath: String, sha256: String) =
         withContext(Dispatchers.IO) { dao.markUploaded(id, remotePath, sha256, nowIso()) }
 

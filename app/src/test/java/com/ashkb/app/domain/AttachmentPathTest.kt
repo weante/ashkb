@@ -62,4 +62,49 @@ class AttachmentPathTest {
         assertFalse(AttachmentPath.isValidRemotePath("2026-09-21\\x.enc"))  // 反斜杠
         assertFalse(AttachmentPath.isValidRemotePath("2026-09-21/"))         // 无文件名
     }
+
+    // ---- v1.0.36：远端校验 ----
+
+    @Test
+    fun `valid folder accepts date or placeholder only`() {
+        assertTrue(AttachmentPath.isValidFolder("2026-09-21"))
+        assertTrue(AttachmentPath.isValidFolder("0000-00-00"))
+        assertFalse(AttachmentPath.isValidFolder("2026-9-1"))
+        assertFalse(AttachmentPath.isValidFolder("attachments"))
+        assertFalse(AttachmentPath.isValidFolder(""))
+    }
+
+    @Test
+    fun `managed remote path requires date folder and enc file`() {
+        assertTrue(AttachmentPath.isManagedRemotePath("2026-09-21/catt-abc.enc"))
+        assertTrue(AttachmentPath.isManagedRemotePath("0000-00-00/catt-x.enc"))
+        assertFalse(AttachmentPath.isManagedRemotePath("misc/catt-abc.enc"))   // 非日期目录
+        assertFalse(AttachmentPath.isManagedRemotePath("2026-09-21/readme.txt"))
+        assertFalse(AttachmentPath.isManagedRemotePath("2026-09-21/"))
+        assertFalse(AttachmentPath.isManagedRemotePath("../2026-09-21/x.enc"))
+    }
+
+    @Test
+    fun `reconcile splits missing and orphans`() {
+        val expected = setOf("2026-09-21/catt-a.enc", "2026-09-21/catt-b.enc")
+        val remote = setOf("2026-09-21/catt-b.enc", "2026-09-22/catt-c.enc")
+        val r = AttachmentPath.reconcile(expected, remote)
+        assertEquals(setOf("2026-09-21/catt-a.enc"), r.missing)
+        assertEquals(setOf("2026-09-22/catt-c.enc"), r.orphans)
+    }
+
+    /** 远端目录可能被用户放进无关文件：绝不能进孤儿清理集。 */
+    @Test
+    fun `reconcile never treats unmanaged remote files as orphans`() {
+        val r = AttachmentPath.reconcile(emptySet(), setOf("misc/x.enc", "2026-09-21/readme.txt"))
+        assertTrue(r.orphans.isEmpty())
+    }
+
+    @Test
+    fun `reconcile is empty when both sides agree`() {
+        val s = setOf("2026-09-21/catt-a.enc")
+        val r = AttachmentPath.reconcile(s, s)
+        assertTrue(r.missing.isEmpty())
+        assertTrue(r.orphans.isEmpty())
+    }
 }

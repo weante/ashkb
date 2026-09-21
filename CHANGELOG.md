@@ -4,6 +4,41 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.36] — 2026-09-21
+
+**附件远端校验与补传**：新增「校验远端」动作——比对服务器上 `ashkb/attachments/` 的实际文件集与本地记录，**远端缺失的自动补传**、**远端多余（本地已无记录）的一并清理**。
+
+无数据库结构变更（沿用 Room v12）、无备份格式变更，可覆盖安装。
+
+### 新增 · 备份页「校验远端」
+
+解决两类远端/本地不一致：
+
+1. **远端被手动删除**（网页端误删 / 服务商清理）→ 本地有记录、远端没有 → **重新上传**
+2. **换机后远端残留**（旧设备已删附件、或恢复后本地无对应行）→ 远端有文件、本地无记录 → **清理**
+
+顺带收尾软删除墓碑行（远端已确认不在 → 物理删行）。清理走服务器 DELETE，**坚果云可在回收站找回**。
+
+### 安全边界（只碰自己的文件）
+
+`ashkb/attachments/` 是专用目录，但用户完全可能在网页端往里放别的东西，因此**清理严格限定在可管理形状**：
+
+- 只处理 `ashkb/attachments/<合法日期目录>/<附件id>.enc`
+- 日期目录必须是 `YYYY-MM-DD` 或脏数据占位目录 `0000-00-00`
+- 非日期目录、非 `.enc` 文件（如 `readme.txt`）**一律不碰**
+- 所有远端路径先过 `AttachmentPath.isManagedRemotePath`（含路径穿越 / 绝对路径防护）
+
+### 实现要点
+
+- `WebDavClient.listAttachmentRemotePaths()`：两级 `PROPFIND Depth:1`（先列日期子目录，再逐个列文件）——坚果云等对 `Depth:infinity` 支持不一；目录不存在（404）返回空集（「从未同步过」是正常态）
+- `WebDavClient.parseDavEntries()`：集合判定同时看 href 尾斜杠与 `<resourcetype><collection/>`（服务器实现差异）
+- `AttachmentPath.reconcile()`：纯函数差集（missing / orphans），可单测
+- 抽出 `clearTombstones()` 供「同步附件」与「校验远端」共用
+
+### 测试
+
+单测 205 → 215（`AttachmentPathTest` 增 5 条 + 新增 `WebDavClientParseTest` 5 条）
+
 ## [v1.0.35] — 2026-09-21
 
 **附件接入 WebDAV 备份**：附件加密后**逐个**上传到服务器（按日期分目录），换机时**按需懒取回**；配套同步开关与同步删除。

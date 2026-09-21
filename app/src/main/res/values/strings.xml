@@ -949,6 +949,10 @@
     <string name="attach_sync_need_enable">请先开启「同步附件到 WebDAV」</string>
     <string name="attach_sync_done">附件同步完成：%1$s</string>
     <string name="attach_sync_failed">附件同步失败：%1$s</string>
+    <string name="attach_verify_button">校验远端</string>
+    <string name="attach_verify_note">比对服务器与本地记录：远端缺失的自动补传，服务器上多余的（本地已无记录）一并清理——坚果云可在回收站找回。</string>
+    <string name="attach_verify_done">远端校验完成：%1$s</string>
+    <string name="attach_verify_failed">远端校验失败：%1$s</string>
     <string name="attach_state_synced">已同步</string>
     <string name="attach_state_pending">未同步</string>
     <string name="attach_state_remote_only">仅云端</string>

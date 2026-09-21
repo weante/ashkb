@@ -97,6 +97,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
     val attachSyncStage by vm.attachSyncStage.collectAsStateWithLifecycle()
     val attachSyncMsg by vm.attachSyncMsg.collectAsStateWithLifecycle()
     val attachBytes by vm.attachBytes.collectAsStateWithLifecycle()
+    val attachVerifyMsg by vm.attachVerifyMsg.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
 
@@ -375,17 +376,25 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                         enabled = attachSyncEnabled && davUrl.isNotBlank() && attachSyncStage == null,
                         modifier = Modifier.heightIn(min = Size.touchMin),
                     ) { Text(stringResource(R.string.attach_sync_button)) }
-                    attachSyncStage?.let { progress ->
-                        Text(
-                            buildString {
-                                append(stringResource(R.string.attach_sync_running))
-                                append(" ")
-                                append(progress)
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    OutlinedButton(
+                        onClick = { vm.verifyAttachments() },
+                        // 校验与同步共用进度流，两者互斥；同样不占用全局 busy
+                        enabled = attachSyncEnabled && davUrl.isNotBlank() && attachSyncStage == null,
+                        modifier = Modifier.heightIn(min = Size.touchMin),
+                    ) { Text(stringResource(R.string.attach_verify_button)) }
+                }
+                Text(
+                    stringResource(R.string.attach_verify_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                // 阶段文案自带动作（正在补传附件 / 正在清理远端多余文件），不再叠前缀
+                attachSyncStage?.let { progress ->
+                    Text(
+                        progress,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 // 禁用态按钮自己不会解释原因，缺哪一步就直说是缺哪一步
                 if (davUrl.isBlank()) {
@@ -406,6 +415,18 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                     Text(
                         stringResource(
                             if (ok) R.string.attach_sync_done else R.string.attach_sync_failed,
+                            detail,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (ok) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error,
+                    )
+                }
+                attachVerifyMsg?.let { (ok, detail) ->
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        stringResource(
+                            if (ok) R.string.attach_verify_done else R.string.attach_verify_failed,
                             detail,
                         ),
                         style = MaterialTheme.typography.bodySmall,
