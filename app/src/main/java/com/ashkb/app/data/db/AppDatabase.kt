@@ -42,7 +42,7 @@ import com.ashkb.app.data.entity.WeightLog
         ImagingRecord::class, VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class, BackupLedger::class,
         CheckupAttachment::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -388,13 +388,28 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v14（v1.0.38）：B11 营养素每日上限警示——`supplements` 补 `dose_amount` / `dose_unit` / `daily_max`。
+         *
+         * 全部可空：旧备份无这些列 → 恢复后 = 未量化 / 未设上限，属合法业务态，**无需回填**
+         * （三列均不参与 WHERE 过滤，只在读取时做算术比较）。
+         */
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `supplements` ADD COLUMN `dose_amount` REAL")
+                db.execSQL("ALTER TABLE `supplements` ADD COLUMN `dose_unit` TEXT")
+                db.execSQL("ALTER TABLE `supplements` ADD COLUMN `daily_max` REAL")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext, AppDatabase::class.java, "ashkb.db"
                 ).addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-                    MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13
+                    MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+                    MIGRATION_12_13, MIGRATION_13_14
                 ).build().also { instance = it }
             }
     }

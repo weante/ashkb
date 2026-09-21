@@ -8,12 +8,14 @@ import com.ashkb.app.AshkbApplication
 import com.ashkb.app.data.entity.BodyMeasure
 import com.ashkb.app.data.entity.DietProfile
 import com.ashkb.app.data.entity.FoodAvoidItem
+import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.Supplement
 import com.ashkb.app.data.entity.SupplementLog
 import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.entity.WeightLog
 import com.ashkb.app.data.repo.HealthRepository
+import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.data.repo.nowIso
 import java.time.Duration
 import java.time.LocalDate
@@ -28,7 +30,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class WellnessViewModel(private val repo: HealthRepository) : ViewModel() {
+class WellnessViewModel(
+    private val repo: HealthRepository,
+    /** v1.0.38（B11）：药单仓储——补剂「时间错开」提醒与合并时间表需要今日服药时刻 */
+    private val medRepo: MedicationRepository,
+) : ViewModel() {
     private val _date = MutableStateFlow(LocalDate.now())
     val date: LocalDate get() = _date.value
     private val dateStr: String get() = _date.value.toString()
@@ -65,6 +71,10 @@ class WellnessViewModel(private val repo: HealthRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val supplementLogsToday: StateFlow<List<SupplementLog>> = _date.flatMapLatest { repo.observeSupplementLogs(it.toString()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** v1.0.38（B11）：在用药单（已归档过滤），供补剂错开提醒与合并时间表使用 */
+    val medications: StateFlow<List<Medication>> = medRepo.observeMedications()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val dietProfile: StateFlow<DietProfile?> = repo.observeDietProfile()
@@ -179,7 +189,7 @@ class WellnessViewModel(private val repo: HealthRepository) : ViewModel() {
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                WellnessViewModel(app.healthRepository)
+                WellnessViewModel(app.healthRepository, app.medicationRepository)
             }
         }
     }

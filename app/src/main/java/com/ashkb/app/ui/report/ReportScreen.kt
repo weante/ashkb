@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -43,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.R
+import com.ashkb.app.ui.components.KeyValueRow
 import com.ashkb.app.ui.components.LoadingBlock
 import com.ashkb.app.ui.components.NavRow
 import com.ashkb.app.ui.components.SectionCard
@@ -52,22 +55,30 @@ import com.ashkb.app.ui.components.TrendPoint
 import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.ui.theme.accent
 import com.ashkb.app.ui.theme.DataLarge
+import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
 import kotlinx.coroutines.launch
 
-/** P4 M9 报表页：概览 / 趋势 / 报告导出 三页签。 */
+/** P4 M9 报表页：概览 / 趋势 / 周月报 / 报告导出 四页签。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
     val overview by vm.overview.collectAsStateWithLifecycle()
     val trends by vm.trends.collectAsStateWithLifecycle()
+    val periodic by vm.periodic.collectAsStateWithLifecycle()
+    val periodDays by vm.periodDays.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val pager = rememberPagerState(pageCount = { 3 })
-    val tabs = listOf(stringResource(R.string.report_overview_tab), stringResource(R.string.report_trends_tab), stringResource(R.string.report_export_section))
+    val pager = rememberPagerState(pageCount = { 4 })
+    val tabs = listOf(
+        stringResource(R.string.report_overview_tab),
+        stringResource(R.string.report_trends_tab),
+        stringResource(R.string.report_tab_periodic),
+        stringResource(R.string.report_export_section),
+    )
 
     // 提示类消息改走全局 Snackbar（非阻塞）——不再"每个操作都要点一次知道了"
     LaunchedEffect(message) {
@@ -103,6 +114,7 @@ fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
             when (page) {
                 0 -> OverviewPage(overview)
                 1 -> TrendsPage(trends)
+                2 -> PeriodicPage(vm, periodic, periodDays)
                 else -> ExportPage(vm, busy, context, onOpenBackup)
             }
         }
@@ -378,6 +390,162 @@ private fun TrendsPage(t: ReportRepository.Trends?) {
 }
 
 // 趋势图已抽到 ui/components/TrendChart.kt（坐标轴 / 整数刻度 / 拖动读数 / 无障碍摘要）
+
+// ======================= 周月报 =======================
+
+/**
+ * B4 周报 / 月报的均值口径：统一保留 1 位小数（与概览页 "%.1f/10" 同精度）。
+ * 均值天然是小数，不做"整值去尾"，否则疼痛/晨僵/BASDAI/体重在图上与列表里的精度会不一致。
+ */
+private fun avg1(v: Double): String = "%.1f".format(v)
+
+/**
+ * B4 周月报页：7 天 / 30 天窗口的结构化小结。
+ * 逐行「标签 : 数值」直接复用 KeyValueRow（全 App 唯一键值行形态），不另起一套行样式；
+ * 这里只做"回看"，所以不摆进度条与达标色——进度语义交给概览页。
+ */
+@Composable
+private fun PeriodicPage(
+    vm: ReportViewModel,
+    p: ReportRepository.PeriodicReport?,
+    days: Int,
+) {
+    // 进入本页签时按当前窗口取一次数（保留上次结果不清空，避免来回切页签时闪空态）；
+    // 之后切窗口由 chips 走 vm.setPeriodDays 直接重载，不会重复触发这里。
+    LaunchedEffect(Unit) { vm.loadPeriodic(days) }
+
+    LazyColumn(
+        Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item { Spacer(Modifier.height(12.dp)) }
+
+        item {
+            // 窗口切换：沿用项目既有 FilterChip 形态（SymptomScreen 今天 / 昨天），并满足 48dp 触摸下限
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                FilterChip(
+                    selected = days == 7,
+                    onClick = { vm.setPeriodDays(7) },
+                    label = { Text(stringResource(R.string.report_periodic_week)) },
+                    modifier = Modifier.heightIn(min = Size.touchMin),
+                )
+                FilterChip(
+                    selected = days == 30,
+                    onClick = { vm.setPeriodDays(30) },
+                    label = { Text(stringResource(R.string.report_periodic_month)) },
+                    modifier = Modifier.heightIn(min = Size.touchMin),
+                )
+            }
+        }
+
+        if (p == null) {
+            item { LoadingBlock(minHeight = 240.dp, label = stringResource(R.string.report_stats_loading_dots)) }
+        } else {
+            item {
+                // 副标题回显"这份数据是哪一段"，与上方 chips 互为确认（取 p.days，反映真实取数窗口）
+                SectionCard(
+                    title = stringResource(R.string.report_tab_periodic),
+                    subtitle = stringResource(
+                        if (p.days == 7) R.string.report_periodic_week else R.string.report_periodic_month,
+                    ),
+                ) {
+                    // 用药依从：无打卡记录就不摆 0%（假数据），直接说"暂无"
+                    KeyValueRow(
+                        label = stringResource(R.string.report_periodic_med_adherence),
+                        value = if (p.medTotal == 0) {
+                            stringResource(R.string.report_periodic_none)
+                        } else {
+                            stringResource(
+                                R.string.report_periodic_value_adherence,
+                                p.medRatePct, p.medDone, p.medPartial, p.medSkipped,
+                            )
+                        },
+                    )
+
+                    // 补剂依从：字段与阈值口径同用药（部分完成计 0.5）
+                    KeyValueRow(
+                        label = stringResource(R.string.report_periodic_supp_adherence),
+                        value = if (p.suppTotal == 0) {
+                            stringResource(R.string.report_periodic_none)
+                        } else {
+                            stringResource(
+                                R.string.report_periodic_value_adherence,
+                                p.suppRatePct, p.suppDone, p.suppPartial, p.suppSkipped,
+                            )
+                        },
+                    )
+
+                    // 运动：exDoneDays 是"有完成记录的天数"，非完成条数
+                    KeyValueRow(
+                        label = stringResource(R.string.report_periodic_exercise),
+                        value = stringResource(R.string.report_periodic_value_exercise, p.exDoneDays, p.exMinutes),
+                    )
+
+                    // 症状：两个均值都有才带出疼痛 / 晨僵，否则退化为只报记录天数
+                    val avgPain = p.avgPain
+                    val avgStiffness = p.avgStiffnessMin
+                    KeyValueRow(
+                        label = stringResource(R.string.report_periodic_symptom),
+                        value = if (avgPain != null && avgStiffness != null) {
+                            stringResource(
+                                R.string.report_periodic_value_symptom_pain,
+                                p.symptomDays, avg1(avgPain), avg1(avgStiffness),
+                            )
+                        } else {
+                            stringResource(R.string.report_periodic_value_symptom, p.symptomDays)
+                        },
+                    )
+
+                    // BASDAI：窗口内没做过则"暂无"，避免"0 次 · 平均 —"这类残句
+                    KeyValueRow(
+                        label = stringResource(R.string.report_periodic_basdai),
+                        value = if (p.basdaiCount == 0) {
+                            stringResource(R.string.report_periodic_none)
+                        } else {
+                            stringResource(
+                                R.string.report_periodic_value_basdai,
+                                p.basdaiCount, p.basdaiAvg?.let { avg1(it) } ?: "—",
+                            )
+                        },
+                    )
+
+                    // 体重：取窗口内最近一次，不显示"波动"（那属于趋势页）
+                    KeyValueRow(
+                        label = stringResource(R.string.report_periodic_weight),
+                        value = p.weightLatest?.let { stringResource(R.string.report_periodic_value_weight, avg1(it)) }
+                            ?: stringResource(R.string.report_periodic_none),
+                    )
+
+                    // 发作
+                    KeyValueRow(
+                        label = stringResource(R.string.report_periodic_flare),
+                        value = stringResource(R.string.report_periodic_value_flare, p.flareCount),
+                    )
+
+                    // 复诊 / 检查：本期次数 + 下一次复诊（未来时，与本期计数分开陈述）
+                    KeyValueRow(
+                        label = stringResource(R.string.report_periodic_checkup),
+                        value = stringResource(R.string.report_periodic_value_checkup, p.checkupCount),
+                    )
+                    if (!p.nextCheckupDate.isNullOrBlank()) {
+                        Spacer(Modifier.height(Spacing.xs))
+                        Text(
+                            stringResource(R.string.report_periodic_next_checkup, p.nextCheckupDate),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+
+        item { Spacer(Modifier.height(20.dp)) }
+    }
+}
 
 // ======================= 报告导出 =======================
 

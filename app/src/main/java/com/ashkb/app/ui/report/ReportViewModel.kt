@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 /**
- * P4 M9 报表 ViewModel：统计概览 + 趋势序列 + 复诊报告 / 紧急卡 PDF 生成与分享。
+ * P4 M9 报表 ViewModel：统计概览 + 趋势序列 + 周报 / 月报小结 + 复诊报告 / 紧急卡 PDF 生成与分享。
  * v1.0.22：状态流统一为私有 MutableStateFlow + 只读 StateFlow 暴露，
  * 清除 `as MutableStateFlow` 强转（审查报告 P2，运行时非受检向下转型）。
  */
@@ -29,6 +29,11 @@ class ReportViewModel(
     val overview: StateFlow<ReportRepository.Overview?> = _overview
     private val _trends = MutableStateFlow<ReportRepository.Trends?>(null)
     val trends: StateFlow<ReportRepository.Trends?> = _trends
+    // B4：周报 / 月报的统计窗口（默认 7 天）与小结数据
+    private val _periodDays = MutableStateFlow(7)
+    val periodDays: StateFlow<Int> = _periodDays
+    private val _periodic = MutableStateFlow<ReportRepository.PeriodicReport?>(null)
+    val periodic: StateFlow<ReportRepository.PeriodicReport?> = _periodic
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy
     private val _message = MutableStateFlow<String?>(null)
@@ -42,6 +47,34 @@ class ReportViewModel(
             try {
                 _overview.value = repo.overview()
                 _trends.value = repo.trends()
+            } catch (e: Exception) {
+                _message.value = app.getString(R.string.vm_report_stats_failed, e.message)
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    /**
+     * B4：切换周报 / 月报的统计窗口并重新加载。
+     * 先点同一个窗口且已有数据时不重复查询（避免列表页反复横跳导致的无效 IO）。
+     */
+    fun setPeriodDays(days: Int) {
+        if (days == _periodDays.value && _periodic.value != null) return
+        loadPeriodic(days)
+    }
+
+    /**
+     * B4：加载指定窗口（7 / 30 天）的周报 / 月报小结。
+     * 口径与 overview() 完全一致（部分完成计 0.5、症状空值不计入均值），文案由 UI 侧组装。
+     * 失败时保留上一次结果而不是清空成空态，只走全局 Snackbar 提示——与 refresh() 同口径。
+     */
+    fun loadPeriodic(days: Int) {
+        _periodDays.value = days
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                _periodic.value = repo.periodicReport(days)
             } catch (e: Exception) {
                 _message.value = app.getString(R.string.vm_report_stats_failed, e.message)
             } finally {

@@ -401,6 +401,17 @@ data class Supplement(
     @ColumnInfo(name = "brand") val brand: String? = null,
     @ColumnInfo(name = "category") val category: String,
     @ColumnInfo(name = "dose") val dose: String,
+    /**
+     * B11（v1.0.38）：单次剂量数值 + 单位（如 500 / "mg"）。
+     * 用于「每日上限警示」的算术比较；`dose` 仍是给人看的自由文本。可空 = 未量化。
+     */
+    @ColumnInfo(name = "dose_amount") val doseAmount: Double? = null,
+    @ColumnInfo(name = "dose_unit") val doseUnit: String? = null,
+    /**
+     * B11：每日参考上限（由用户 / 医生 / 营养师填写）。
+     * ⚠️ **刻意不内置任何医学上限数值**——App 只做「当日累计 vs 上限」的比较，不代替专业判断。
+     */
+    @ColumnInfo(name = "daily_max") val dailyMax: Double? = null,
     @ColumnInfo(name = "frequency") val frequency: String = "daily",
     @ColumnInfo(name = "times") val times: String? = null,
     @ColumnInfo(name = "take_with_food") val takeWithFood: String? = null,

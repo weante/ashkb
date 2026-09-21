@@ -141,6 +141,79 @@ class ReportRepository(private val context: Context) {
         )
     }
 
+    /**
+     * B4（v1.0.38）：周报 / 月报的结构化小结。
+     *
+     * 只给数据，**文案由 UI 侧组装**（与项目「VM 持状态、UI 持文案」惯例一致）。
+     * 口径与 overview() 相同：部分完成计 0.5；症状字段 null 不计入均值。
+     */
+    data class PeriodicReport(
+        val days: Int,
+        val medDone: Int, val medPartial: Int, val medSkipped: Int, val medTotal: Int, val medRatePct: Int,
+        val suppDone: Int, val suppPartial: Int, val suppSkipped: Int, val suppTotal: Int, val suppRatePct: Int,
+        val exDoneDays: Int, val exMinutes: Int,
+        val symptomDays: Int, val avgPain: Double?, val avgStiffnessMin: Double?,
+        val basdaiCount: Int, val basdaiAvg: Double?, val basdaiDelta: Double?,
+        val weightLatest: Double?, val weightDelta: Double?,
+        val flareCount: Int,
+        val checkupCount: Int, val nextCheckupDate: String?,
+    )
+
+    suspend fun periodicReport(days: Int): PeriodicReport = withContext(Dispatchers.IO) {
+        val to = LocalDate.now()
+        val from = to.minusDays((days - 1).toLong())
+        val f = from.toString(); val t = to.toString()
+
+        val logDao = db.medicationLogDao()
+        val md = logDao.countBetweenStatus(f, t, "done")
+        val mp = logDao.countBetweenStatus(f, t, "partial")
+        val ms = logDao.countBetweenStatus(f, t, "skipped")
+        val mt = md + mp + ms
+        val mr = if (mt == 0) 0 else ((md + mp * 0.5) / mt * 100).toInt()
+
+        val supDao = db.supplementLogDao()
+        val sd = supDao.countBetweenStatus(f, t, "done")
+        val sp = supDao.countBetweenStatus(f, t, "partial")
+        val ss = supDao.countBetweenStatus(f, t, "skipped")
+        val st = sd + sp + ss
+        val sr = if (st == 0) 0 else ((sd + sp * 0.5) / st * 100).toInt()
+
+        val exLogs = db.exerciseLogDao().between(f, t)
+        val exDone = exLogs.filter { it.status == "done" }
+
+        val symptoms = db.symptomDailyDao().between(f, t)
+        val pains = symptoms.mapNotNull { it.painScore }
+        val stiff = symptoms.mapNotNull { it.morningStiffnessMin }
+
+        val basdai = db.basdaiDao().between(f, t).sortedBy { it.date }
+
+        val weights = db.weightLogDao().recent(30).filter { it.date >= f }.sortedByDescending { it.date }
+
+        val checkups = db.checkupRecordDao().between(f, t)
+        val nextCheckup = db.checkupRecordDao().between(t, to.plusDays(120).toString())
+            .filter { !it.nextDate.isNullOrBlank() && it.nextDate!! >= t }
+            .minByOrNull { it.nextDate!! }?.nextDate
+
+        PeriodicReport(
+            days = days,
+            medDone = md, medPartial = mp, medSkipped = ms, medTotal = mt, medRatePct = mr,
+            suppDone = sd, suppPartial = sp, suppSkipped = ss, suppTotal = st, suppRatePct = sr,
+            exDoneDays = exDone.map { it.date }.distinct().size,
+            exMinutes = exDone.sumOf { it.durationMin ?: 0 },
+            symptomDays = symptoms.size,
+            avgPain = pains.takeIf { it.isNotEmpty() }?.average(),
+            avgStiffnessMin = stiff.takeIf { it.isNotEmpty() }?.average(),
+            basdaiCount = basdai.size,
+            basdaiAvg = basdai.takeIf { it.isNotEmpty() }?.map { it.total }?.average(),
+            basdaiDelta = if (basdai.size >= 2) basdai.last().total - basdai.first().total else null,
+            weightLatest = weights.firstOrNull()?.weightKg,
+            weightDelta = if (weights.size >= 2) weights.first().weightKg - weights.last().weightKg else null,
+            flareCount = db.flareDao().between(f, t).size,
+            checkupCount = checkups.size,
+            nextCheckupDate = nextCheckup,
+        )
+    }
+
     suspend fun trends(): Trends = withContext(Dispatchers.IO) {
         val to = LocalDate.now()
         val from90 = to.minusDays(90).toString()

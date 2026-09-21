@@ -52,12 +52,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.data.entity.DietProfile
 import com.ashkb.app.data.entity.FoodAvoidItem
+import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.Supplement
 import com.ashkb.app.data.entity.SupplementCategory
 import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.Labels
+import com.ashkb.app.domain.SupplementLimits
+import com.ashkb.app.domain.SupplementTiming
 import com.ashkb.app.domain.WeightTarget
 import com.ashkb.app.R
 import com.ashkb.app.ui.components.DestructiveAction
@@ -86,6 +89,8 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
     val supLogs by vm.supplementLogsToday.collectAsStateWithLifecycle()
     val diet by vm.dietProfile.collectAsStateWithLifecycle()
     val avoids by vm.foodAvoidItems.collectAsStateWithLifecycle()
+    // v1.0.38（B11）：在用药单——补剂错开提醒与合并时间表的数据源
+    val medications by vm.medications.collectAsStateWithLifecycle()
 
     var showVitals by remember { mutableStateOf(false) }
     var showWeight by remember { mutableStateOf(false) }
@@ -95,6 +100,8 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
     var showDietForm by remember { mutableStateOf(false) }
     var showAvoidManage by remember { mutableStateOf(false) }
     var historySup by remember { mutableStateOf<Supplement?>(null) }
+    // v1.0.38（B11）：编辑补剂时复用同一表单并预填既有值
+    var editSup by remember { mutableStateOf<Supplement?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         ScreenTopBar(title = stringResource(R.string.nutrition_bone_health_title), onBack = onBack)
@@ -208,6 +215,22 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                                // B11：当日累计（单次剂量 × 每日次数）超出用户自填的每日上限 → 警示；
+                                // 未填上限 / 未量化单次剂量时 exceedsDailyMax 返回 null，静默不提示
+                                if (SupplementLimits.exceedsDailyMax(sup) == true) {
+                                    val total = SupplementLimits.dailyTotal(sup)
+                                    val max = sup.dailyMax
+                                    if (total != null && max != null) {
+                                        Text(
+                                            stringResource(
+                                                R.string.supp_over_limit,
+                                                fmtNum(total), SupplementLimits.unitLabel(sup), fmtNum(max),
+                                            ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    }
+                                }
                             }
                             if (sup.id in doneIds) {
                                 StatusChip(text = stringResource(R.string.med_status_taken_short), tone = StatusTone.Success, icon = Icons.Rounded.CheckCircle)
@@ -216,6 +239,7 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
                                     vm.checkInSupplement(sup, "done", null, null)
                                 }) { Text(stringResource(R.string.exercise_checkin_short)) }
                             }
+                            TextButton(onClick = { editSup = sup }) { Text(stringResource(R.string.common_edit)) }
                             DestructiveAction(
                                 label = stringResource(R.string.common_delete),
                                 confirmTitle = stringResource(R.string.wellness_delete_confirm, sup.name),
@@ -223,11 +247,56 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
                                 onConfirm = { vm.deleteSupplement(sup.id) },
                             )
                         }
+                        // B11：矿物类补剂与「螯合类」用药服用时间过近（间隔 < 2 小时）→ 错开提醒
+                        val conflicts = remember(supplements, medications) {
+                            SupplementTiming.conflicts(supplements, medications)
+                        }
+                        if (conflicts.isNotEmpty()) {
+                            Spacer(Modifier.height(Spacing.sm))
+                            conflicts.forEach { c ->
+                                Text(
+                                    stringResource(R.string.supp_timing_conflict, c.medName, c.gapMinutes),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
                         Text(
                             stringResource(R.string.nutrition_supplement_history_hint),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+            }
+            // ---- B11：今日服药 / 补剂合并时间表 ----
+            item {
+                SectionCard(title = stringResource(R.string.supp_merged_title)) {
+                    // 只取当前在用药单（takeTimes）与在补剂（times），按时刻升序合并
+                    val rows = remember(medications, supplements) {
+                        mergedTimeline(medications, supplements)
+                    }
+                    if (rows.isEmpty()) {
+                        Text(
+                            stringResource(R.string.supp_merged_empty),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        DividerList(rows, key = { it.key }) { row ->
+                            Text(row.time, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                row.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
+                            )
+                            StatusChip(
+                                text = stringResource(
+                                    if (row.isMed) R.string.supp_merged_med_tag else R.string.supp_merged_supp_tag
+                                ),
+                                tone = if (row.isMed) StatusTone.Info else StatusTone.Brand,
+                            )
+                        }
                     }
                 }
             }
@@ -304,6 +373,7 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
     if (showDietForm) DietSheet(vm = vm, current = diet, onDismiss = { showDietForm = false })
     if (showAvoidManage) AvoidManageSheet(vm = vm, onDismiss = { showAvoidManage = false })
     historySup?.let { sup -> SupplementHistorySheet(vm = vm, sup = sup, onDismiss = { historySup = null }) }
+    editSup?.let { sup -> SupplementSheet(vm = vm, current = sup, onDismiss = { editSup = null }) }
 }
 
 /**
@@ -365,8 +435,40 @@ private fun WeightTargetHint(weightKg: Double?, profile: com.ashkb.app.data.enti
     }
 }
 
+/** 数值显示：整数不带小数点，其余一位小数（体重、补剂剂量共用）。 */
+private fun fmtNum(v: Double): String = if (v == v.toLong().toDouble()) v.toLong().toString() else "%.1f".format(v)
+
 /** 体重数值显示：整数不带小数点，其余一位小数。 */
-private fun fmtKg(v: Double): String = if (v == v.toLong().toDouble()) v.toLong().toString() else "%.1f".format(v)
+private fun fmtKg(v: Double): String = fmtNum(v)
+
+/**
+ * B11 合并时间表的一行：时刻 + 名称 + 类别（药 / 补）。
+ * `sortKey` 为时刻的当日分钟数，非法时刻排到最后；`key` 供 DividerList 稳定复用。
+ */
+private data class TimelineRow(val time: String, val name: String, val isMed: Boolean) {
+    val sortKey: Int get() = SupplementTiming.minutesOf(time) ?: Int.MAX_VALUE
+    val key: String get() = "$time|$name|$isMed"
+}
+
+/**
+ * B11：把药单 `takeTimes` 与补剂 `times` 展平、按时刻升序合并成时间表；
+ * 非法时刻直接丢弃（不抛异常）。
+ */
+private fun mergedTimeline(
+    medications: List<Medication>,
+    supplements: List<Supplement>,
+): List<TimelineRow> {
+    val rows = mutableListOf<TimelineRow>()
+    fun add(raw: String?, name: String, isMed: Boolean) {
+        raw?.split(',')?.forEach { slot ->
+            val t = slot.trim()
+            if (SupplementTiming.minutesOf(t) != null) rows.add(TimelineRow(t, name, isMed))
+        }
+    }
+    medications.forEach { add(it.takeTimes, it.name, true) }
+    supplements.forEach { add(it.times, it.name, false) }
+    return rows.sortedWith(compareBy({ it.sortKey }, { it.name }))
+}
 
 /** 分组头：sticky。吸附时用页面底色融入背景，底边 1dp 分隔。 */
 @Composable
@@ -613,19 +715,35 @@ private fun BodyMeasureSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun SupplementSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var brand by remember { mutableStateOf("") }
-    var dose by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(SupplementCategory.OTHER) }
-    var notes by remember { mutableStateOf("") }
+private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, onDismiss: () -> Unit) {
+    // B11：编辑时预填既有值（含剂量三态字段）；新增时全空
+    var name by remember { mutableStateOf(current?.name ?: "") }
+    var brand by remember { mutableStateOf(current?.brand ?: "") }
+    var dose by remember { mutableStateOf(current?.dose ?: "") }
+    var doseAmount by remember { mutableStateOf(current?.doseAmount?.let { fmtNum(it) } ?: "") }
+    var doseUnit by remember { mutableStateOf(current?.doseUnit ?: "") }
+    var dailyMax by remember { mutableStateOf(current?.dailyMax?.let { fmtNum(it) } ?: "") }
+    var category by remember { mutableStateOf(SupplementCategory.fromKey(current?.category)) }
+    var notes by remember { mutableStateOf(current?.notes ?: "") }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
-            Text(stringResource(R.string.nutrition_add_supplement), style = MaterialTheme.typography.titleLarge)
+            Text(
+                stringResource(if (current == null) R.string.nutrition_add_supplement else R.string.common_edit),
+                style = MaterialTheme.typography.titleLarge,
+            )
             OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.common_name)) }, singleLine = true)
             OutlinedTextField(brand, { brand = it }, label = { Text(stringResource(R.string.nutrition_brand_field)) }, singleLine = true)
             OutlinedTextField(dose, { dose = it }, label = { Text(stringResource(R.string.nutrition_dose_field)) }, singleLine = true)
+            // B11：量化剂量三输入——单次剂量 / 单位 / 每日参考上限（上限由用户自填，App 不内置医学数值）
+            OutlinedTextField(doseAmount, { doseAmount = it }, label = { Text(stringResource(R.string.supp_dose_amount_label)) }, singleLine = true)
+            OutlinedTextField(doseUnit, { doseUnit = it }, label = { Text(stringResource(R.string.supp_dose_unit_label)) }, singleLine = true)
+            OutlinedTextField(dailyMax, { dailyMax = it }, label = { Text(stringResource(R.string.supp_daily_max_label)) }, singleLine = true)
+            Text(
+                stringResource(R.string.supp_daily_max_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Text(stringResource(R.string.common_category), style = MaterialTheme.typography.labelMedium)
             ChipGroup(
                 options = SupplementCategory.entries.map { it.name to it.label },
@@ -640,10 +758,24 @@ private fun SupplementSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
                     if (name.isNotBlank() && dose.isNotBlank()) {
                         vm.saveSupplement(
                             Supplement(
-                                id = "", name = name.trim(), brand = brand.ifBlank { null },
-                                category = category.name, dose = dose.trim(),
+                                id = current?.id ?: "",
+                                name = name.trim(),
+                                brand = brand.ifBlank { null },
+                                category = category.name,
+                                dose = dose.trim(),
+                                // 编辑时保留原排班 / 用药属性，避免被默认值覆盖
+                                frequency = current?.frequency ?: "daily",
+                                times = current?.times,
+                                takeWithFood = current?.takeWithFood,
+                                prescribed = current?.prescribed ?: false,
+                                isArchived = current?.isArchived ?: false,
                                 notes = notes.ifBlank { null },
-                                createdAt = nowIso(), updatedAt = nowIso(),
+                                // 非数字 / 空串一律落地为 null（不抛异常）；单位 trim 后空串同样为 null
+                                doseAmount = doseAmount.trim().toDoubleOrNull(),
+                                doseUnit = doseUnit.trim().ifBlank { null },
+                                dailyMax = dailyMax.trim().toDoubleOrNull(),
+                                createdAt = current?.createdAt ?: nowIso(),
+                                updatedAt = nowIso(),
                             )
                         )
                         onDismiss()
