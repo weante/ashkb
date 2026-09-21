@@ -863,4 +863,63 @@
     <string name="pdf_freq_biw">每周两次</string>
     <string name="pdf_freq_q2w">每两周一次</string>
     <string name="pdf_freq_prn">按需</string>
+
+    <!-- ===== v10（v1.0.33）：C4 复诊前准备清单 ===== -->
+    <string name="checkup_prep_title">复诊准备</string>
+    <string name="checkup_prep_no_plan">尚未设置下次复诊时间。在「复诊记录」里填写「下次复诊」后，这里会自动生成准备清单。</string>
+    <string name="checkup_prep_days_left">距下次复诊还有 %1$d 天</string>
+    <string name="checkup_prep_today">下次复诊就是今天</string>
+    <string name="checkup_prep_overdue">下次复诊已过 %1$d 天，请更新复诊记录</string>
+    <string name="checkup_prep_fasting_tag">需空腹</string>
+    <string name="checkup_prep_check_items">本次需做的检查</string>
+    <string name="checkup_prep_bring">建议携带</string>
+    <string name="checkup_prep_export_hint">可在「报表 → 导出」生成复诊报告 PDF 一并带去。</string>
+    <string name="checkup_prep_disclaimer">以上为通用准备提示，具体以医院与主治医师要求为准。</string>
+
+    <!-- ===== v10（v1.0.33）：B2 知识库个人备注层 ===== -->
+    <string name="kb_note_title">我的备注</string>
+    <string name="kb_note_hint">记录你自己的情况（如「我吃了会胃痛」）。与条目内容分开保存，条目更新不会覆盖它。</string>
+    <string name="kb_note_empty">还没有备注</string>
+    <string name="kb_note_edit">写备注</string>
+    <string name="kb_note_edit_action">修改备注</string>
+    <string name="kb_note_saved">备注已保存</string>
+    <string name="kb_note_clear">清除备注</string>
+    <string name="kb_note_has_tag">有备注</string>
+    <string name="kb_note_count">%1$d 条有我的备注</string>
+
+    <!-- ===== v10（v1.0.33）：C7 漏服 / 延迟处理指引 ===== -->
+    <string name="missed_dose_title">漏服处理指引</string>
+    <string name="missed_dose_late">已超过计划时间约 %1$s</string>
+    <string name="missed_dose_disclaimer">以下为通用安全提示，具体是否补服 / 补注及剂量，以药品说明书与主治医师医嘱为准。</string>
+    <string name="missed_dose_contact_doctor">建议联系医生</string>
+
+    <!-- ===== v10（v1.0.33）：C9 体重目标区间 ===== -->
+    <string name="weight_target_title">体重目标区间</string>
+    <string name="weight_target_low">目标下限（kg）</string>
+    <string name="weight_target_high">目标上限（kg）</string>
+    <string name="weight_target_note">可留空。由医生给定或自我管理目标，用于体重卡提示是否在区间内。</string>
+    <string name="weight_target_in_range">在目标区间内</string>
+    <string name="weight_target_below">低于目标 %1$s kg</string>
+    <string name="weight_target_above">高于目标 %1$s kg</string>
+    <string name="weight_target_incomplete">请补全目标区间（上下限都需填写）</string>
+    <string name="weight_target_not_set">未设目标区间</string>
+    <string name="weight_target_range_label">目标 %1$s – %2$s kg</string>
+
+    <!-- ===== v10（v1.0.33）：B10 复诊附件归档 ===== -->
+    <string name="attach_title">附件归档</string>
+    <string name="attach_add">添加附件</string>
+    <string name="attach_take_photo">拍照</string>
+    <string name="attach_pick_image">从相册选</string>
+    <string name="attach_pick_pdf">选 PDF</string>
+    <string name="attach_empty">还没有附件</string>
+    <string name="attach_hint">化验单 / 影像报告可拍照或上传 PDF 存档。附件保存在本机，不随备份文件上传。</string>
+    <string name="attach_added">附件已保存</string>
+    <string name="attach_failed">保存失败：文件过大或无法读取（单个上限 20MB）</string>
+    <string name="attach_deleted">附件已删除</string>
+    <string name="attach_delete_confirm">删除该附件？文件将从本机移除。</string>
+    <string name="attach_open_failed">无法打开该附件</string>
+    <string name="attach_view">查看</string>
+    <string name="attach_count">%1$d 个附件</string>
+    <string name="attach_photo_name">照片</string>
+    <string name="attach_total_size">占用 %1$s</string>
 </resources>

@@ -140,6 +140,11 @@ class SymptomViewModel(private val repo: HealthRepository) : ViewModel() {
     /** 警报「查看依据」：取关联知识条目 */
     suspend fun kbEntry(id: String): KbEntry? = repo.kbEntry(id)
 
+    /** v10（B2）：症状页警报依据里也能给知识条目写个人备注（与知识库同一列） */
+    fun saveKbNote(id: String, note: String?) {
+        viewModelScope.launch { repo.saveKbNote(id, note) }
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {

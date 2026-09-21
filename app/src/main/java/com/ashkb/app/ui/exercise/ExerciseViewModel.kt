@@ -116,6 +116,11 @@ class ExerciseViewModel(private val repo: HealthRepository) : ViewModel() {
         }
     }
 
+    /** v10（B2）：运动处方里点开的运动知识条目也能写个人备注（与知识库同一列） */
+    fun saveKbNote(id: String, note: String?) {
+        viewModelScope.launch { repo.saveKbNote(id, note) }
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {

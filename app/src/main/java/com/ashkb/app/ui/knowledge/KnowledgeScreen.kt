@@ -56,6 +56,7 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
     var detail by remember { mutableStateOf<KbEntry?>(null) }
     val todayDate by vm.date.collectAsStateWithLifecycle()
     val today = remember(todayDate) { todayDate.toString() }
+    val noteCount by vm.noteCount.collectAsStateWithLifecycle()
 
     // 搜索框本地态 + 防抖：避免每敲一键就重算 uiState 导致整屏重组（VM 内防抖只护住了 DAO 查询）
     var queryText by rememberSaveable { mutableStateOf(ui.query) }
@@ -93,6 +94,15 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
                     )
                 }
             }
+            // B2：把「有备注」的条数放在筛选之后、到期告警之前——先看到自己积累的内容，再看到需要处理的异常
+            if (noteCount > 0) {
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    stringResource(R.string.kb_note_count, noteCount),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (ui.overdueCount > 0) {
                 Spacer(Modifier.height(Spacing.sm))
                 AlertBanner(
@@ -121,13 +131,27 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
             }
             ui.entries.forEach { entry ->
                 item(key = entry.id) {
-                    KbListCard(entry = entry, overdue = entry.reviewDue < today, onClick = { detail = entry })
+                    KbListCard(
+                        entry = entry,
+                        overdue = entry.reviewDue < today,
+                        hasNote = !entry.userNote.isNullOrBlank(),
+                        onClick = { detail = entry },
+                    )
                 }
             }
         }
     }
 
-    detail?.let { KbDetailDialog(entry = it, onDismiss = { detail = null }) }
+    // 用列表里的最新 entry 渲染弹窗：备注保存后 Room 会推新实例，若沿用点开那一刻的旧对象，
+    // 弹窗内的 userNote 永远停在旧值，保存看起来「没生效」。
+    detail?.let { opened ->
+        val live = ui.entries.firstOrNull { it.id == opened.id } ?: opened
+        KbDetailDialog(
+            entry = live,
+            onSaveNote = { vm.saveNote(live.id, it) },
+            onDismiss = { detail = null },
+        )
+    }
 }
 
 @Composable
@@ -147,7 +171,12 @@ private fun categoryTone(category: String): StatusTone = when (category) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun KbListCard(entry: KbEntry, overdue: Boolean, onClick: () -> Unit) {
+private fun KbListCard(
+    entry: KbEntry,
+    overdue: Boolean,
+    hasNote: Boolean,
+    onClick: () -> Unit,
+) {
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -169,6 +198,10 @@ private fun KbListCard(entry: KbEntry, overdue: Boolean, onClick: () -> Unit) {
                 Spacer(Modifier.weight(1f))
                 if (entry.severityLevel == "high") {
                     StatusChip(text = stringResource(R.string.knowledge_high_risk), tone = StatusTone.Danger, icon = Icons.Rounded.WarningAmber)
+                }
+                // B2：有备注的条目给个中性标签，方便在长列表里找回自己做过批注的那几条
+                if (hasNote) {
+                    StatusChip(text = stringResource(R.string.kb_note_has_tag), tone = StatusTone.Info)
                 }
                 if (overdue) {
                     StatusChip(text = stringResource(R.string.checkup_overdue_short), tone = StatusTone.Warning, icon = Icons.Rounded.Schedule)

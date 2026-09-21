@@ -2,4 +2,6 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <files-path name="exports" path="exports/" />
     <files-path name="backups" path="backups/" />
+    <!-- v10：复诊附件归档（B10）——相机拍照的目标文件需可写 content URI -->
+    <files-path name="attachments" path="checkup_attachments/" />
 </paths>

@@ -28,7 +28,10 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class CheckupViewModel(private val repo: HealthRepository) : ViewModel() {
+class CheckupViewModel(
+    private val repo: HealthRepository,
+    private val attachmentRepo: com.ashkb.app.data.repo.AttachmentRepository,
+) : ViewModel() {
     private val _date = MutableStateFlow(LocalDate.now())
     val date: LocalDate get() = _date.value
 
@@ -110,11 +113,49 @@ class CheckupViewModel(private val repo: HealthRepository) : ViewModel() {
         viewModelScope.launch { repo.saveVaccineRecord(record) }
     }
 
+    // ---- v10（B10）复诊附件归档：拍照 / 相册 / PDF ----
+    val attachments: StateFlow<List<com.ashkb.app.data.entity.CheckupAttachment>> =
+        attachmentRepo.observeAll()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** 某条复诊记录下的附件（冷 Flow，调用点 remember(id) 记住） */
+    fun attachmentsFor(checkupId: String): Flow<List<com.ashkb.app.data.entity.CheckupAttachment>> =
+        attachmentRepo.observeByCheckup(checkupId)
+
+    /** 相机目标文件 + 其 content URI（交给 TakePicture 契约写入） */
+    fun newCameraTarget(): Pair<java.io.File, android.net.Uri> = attachmentRepo.newCameraTarget()
+
+    fun discardCameraFile(file: java.io.File) = attachmentRepo.discardCameraFile(file)
+
+    /** 拍照成功后入库；返回 null = 失败（空文件 / 超限） */
+    suspend fun registerCameraPhoto(
+        file: java.io.File,
+        checkupId: String?,
+    ): com.ashkb.app.data.entity.CheckupAttachment? =
+        attachmentRepo.registerCameraFile(file, checkupId)
+
+    /** 相册图片 / PDF 导入；返回 null = 失败 */
+    suspend fun importAttachment(
+        uri: android.net.Uri,
+        kind: String,
+        checkupId: String?,
+        displayName: String?,
+    ): com.ashkb.app.data.entity.CheckupAttachment? =
+        attachmentRepo.importFromUri(uri, kind, checkupId, displayName)
+
+    fun deleteAttachment(attachment: com.ashkb.app.data.entity.CheckupAttachment) {
+        viewModelScope.launch { attachmentRepo.delete(attachment) }
+    }
+
+    /** 供分享 / 外部查看的 content URI */
+    fun attachmentUri(attachment: com.ashkb.app.data.entity.CheckupAttachment): android.net.Uri =
+        attachmentRepo.uriOf(attachment)
+
     companion object {
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                CheckupViewModel(app.healthRepository)
+                CheckupViewModel(app.healthRepository, app.attachmentRepository)
             }
         }
     }

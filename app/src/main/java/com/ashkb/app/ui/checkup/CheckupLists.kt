@@ -87,16 +87,27 @@ internal fun CheckupItemsList(items: List<CheckupItem>, onAdd: () -> Unit, onDea
 }
 
 // ===== 复诊记录列表 =====
+/**
+ * @param onAttach   打开某条记录的附件归档 sheet（附件入口在卡片正文里，与右上角动作槽区分开）
+ * @param prepHeader 列表顶部插槽（复诊准备清单）。做成插槽而非固定内容：
+ *                   卡片需要 items/records/today 三路数据，由调用方组装，本列表不必知道 C4。
+ */
 @Composable
 internal fun CheckupRecordsList(
     records: List<CheckupRecord>,
     onAdd: () -> Unit,
     onViewLab: (CheckupRecord) -> Unit,
+    onAttach: (CheckupRecord) -> Unit,
+    prepHeader: (@Composable () -> Unit)? = null,
 ) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
+        // 准备清单必须排在空态/列表之前：它是"下次复诊该做什么"的唯一答案，不能滚出首屏
+        prepHeader?.let { header ->
+            item { header() }
+        }
         if (records.isEmpty()) {
             item {
                 SectionCard(title = stringResource(R.string.checkup_records_empty)) {
@@ -143,6 +154,12 @@ internal fun CheckupRecordsList(
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
+                    // 附件入口放正文末尾：化验记录右上角已被"化验详情"占用，
+                    // 两条操作挤在动作槽里在窄屏会互相截断
+                    TextButton(
+                        onClick = { onAttach(rec) },
+                        modifier = Modifier.heightIn(min = Size.touchMin),
+                    ) { Text(stringResource(R.string.attach_title)) }
                 }
             }
             item {

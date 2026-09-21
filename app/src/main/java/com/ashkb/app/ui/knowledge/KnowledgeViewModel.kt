@@ -107,6 +107,15 @@ class KnowledgeViewModel(private val repo: HealthRepository) : ViewModel() {
     fun setQuery(q: String) { query.value = q }
     fun setCategory(c: String?) { category.value = c }
 
+    /** v10（B2）：个人备注层——有备注的条目数（列表页提示） */
+    val noteCount: StateFlow<Int> = repo.observeKbNoteCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    /** v10（B2）：写入个人备注（空白即清除）。只动 user_note，种子内容不受影响。 */
+    fun saveNote(id: String, note: String?) {
+        viewModelScope.launch { repo.saveKbNote(id, note) }
+    }
+
     fun refreshReviewCheck() {
         val today = _date.value.toString()
         viewModelScope.launch { repo.checkReviewDue(today) }

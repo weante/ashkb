@@ -33,6 +33,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -59,6 +60,7 @@ import com.ashkb.app.R
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.SkipReason
 import com.ashkb.app.data.repo.TodayItem
+import com.ashkb.app.domain.MissedDose
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.SectionCard
@@ -90,6 +92,7 @@ fun TodayScreen(
     var skipTarget by remember { mutableStateOf<TodayItem?>(null) }
     var injTarget by remember { mutableStateOf<TodayItem?>(null) }
     var postponeTarget by remember { mutableStateOf<TodayItem?>(null) }
+    var missedGuideTarget by remember { mutableStateOf<TodayItem?>(null) }
 
     val todayDate = vm.date
     val scheduled = items.count { !it.isPrn }
@@ -179,6 +182,7 @@ fun TodayScreen(
                         vm.checkIn(item)
                         vm.reschedule(context)
                     },
+                    onMissedGuide = { missedGuideTarget = item },
                 )
             }
         }
@@ -221,6 +225,10 @@ fun TodayScreen(
             },
             onDismiss = { postponeTarget = null },
         )
+    }
+
+    missedGuideTarget?.let { target ->
+        MissedDoseDialog(item = target, onDismiss = { missedGuideTarget = null })
     }
 }
 
@@ -389,6 +397,7 @@ private fun MedCheckCard(
     onSkip: () -> Unit,
     onPostpone: () -> Unit,
     onPrnTaken: () -> Unit,
+    onMissedGuide: () -> Unit,
 ) {
     val med: Medication = item.med
     val missed = isMissed(item, today)
@@ -454,6 +463,14 @@ private fun MedCheckCard(
 
             // 文字一环（三重编码：色 + 图标 + 文字）
             Text(st.detail, style = MaterialTheme.typography.bodySmall, color = onContainer)
+
+            // v10（C7）：漏服时给出通用处理指引入口（口服补服规则 / 注射窗口分级）
+            if (missed) {
+                TextButton(
+                    onClick = onMissedGuide,
+                    modifier = Modifier.heightIn(min = Size.touchMin),
+                ) { Text(stringResource(R.string.missed_dose_title)) }
+            }
 
             if (st.actionable && !item.isPrn) {
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -637,5 +654,71 @@ private fun PostponeDialog(
             ) { Text(stringResource(R.string.med_postpone_to_date)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
+    )
+}
+
+/**
+ * v10（C7）：漏服 / 延迟处理指引。
+ *
+ * 规划要求「口服按通用补服规则、注射按窗口期内补注 / 超窗联系医师分级」。
+ * 文案由纯函数 `domain/MissedDose` 生成（可单测），这里只负责呈现——
+ * 医疗边界：不给出个体化剂量决策，始终提示以说明书与主治医师医嘱为准。
+ */
+@Composable
+private fun MissedDoseDialog(item: TodayItem, onDismiss: () -> Unit) {
+    val nowMinutes = LocalTime.now().let { it.hour * 60 + it.minute }
+    val late = MissedDose.minutesLate(item.slotTime, nowMinutes)
+    val guide = remember(item, late) { MissedDose.guidanceFor(item.med, late, item.isPrn) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.missed_dose_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                if (guide == null) {
+                    // 理论上入口只在漏服态出现；兜底给通用提示而不是空白弹窗
+                    Text(
+                        stringResource(R.string.missed_dose_disclaimer),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(
+                        stringResource(
+                            R.string.missed_dose_late,
+                            if (late < 60) "$late 分钟" else "%.1f 小时".format(late / 60.0),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        guide.headline,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (guide.contactDoctor) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.primary,
+                    )
+                    if (guide.contactDoctor) {
+                        StatusChip(
+                            stringResource(R.string.missed_dose_contact_doctor),
+                            StatusTone.Danger,
+                            Icons.Rounded.ErrorOutline,
+                        )
+                    }
+                    guide.steps.forEach { s ->
+                        Text(
+                            "· ${s.replace("**", "")}",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = Spacing.xs))
+                    Text(
+                        stringResource(R.string.missed_dose_disclaimer),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) } },
     )
 }

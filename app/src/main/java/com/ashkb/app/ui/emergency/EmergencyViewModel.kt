@@ -69,6 +69,11 @@ class EmergencyViewModel(
         viewModelScope.launch { repo.saveContact(contact) }
     }
 
+    /** v10（B2）：紧急卡场景下也能给知识条目写个人备注（与知识库同一列） */
+    fun saveKbNote(id: String, note: String?) {
+        viewModelScope.launch { repo.saveKbNote(id, note) }
+    }
+
     fun deleteContact(id: String) {
         viewModelScope.launch { repo.deleteContact(id) }
     }

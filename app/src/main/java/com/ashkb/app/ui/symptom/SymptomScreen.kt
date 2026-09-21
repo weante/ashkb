@@ -210,5 +210,11 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
             onDismiss = { showBasdai = false },
         )
     }
-    kbDetail?.let { KbDetailDialog(entry = it, onDismiss = { kbDetail = null }) }
+    kbDetail?.let { card ->
+        KbDetailDialog(
+            entry = card,
+            onSaveNote = { vm.saveKbNote(card.id, it) },
+            onDismiss = { kbDetail = null },
+        )
+    }
 }

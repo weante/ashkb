@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.entity.KbEntry
+import com.ashkb.app.data.repo.AttachmentRepository
 import com.ashkb.app.data.repo.BackupRepository
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.ReportRepository
@@ -28,6 +29,8 @@ class AshkbApplication : Application() {
     val healthRepository: HealthRepository by lazy { HealthRepository(this) }
     val backupRepository: BackupRepository by lazy { BackupRepository(this) }
     val reportRepository: ReportRepository by lazy { ReportRepository(this) }
+    /** v10（B10）：复诊附件归档（拍照 / 相册 / PDF） */
+    val attachmentRepository: AttachmentRepository by lazy { AttachmentRepository(this) }
 
     override fun onCreate() {
         super.onCreate()

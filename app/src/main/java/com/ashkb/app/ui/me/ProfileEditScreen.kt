@@ -60,6 +60,9 @@ fun ProfileEditScreen(
     // R27 矩阵两输入：分期维 + 颈椎受累维（驱动 M4 运动过滤 / M5 预警灵敏度）
     var stage by remember { mutableStateOf(initial?.diseaseStage ?: "unknown") }
     var spine by remember { mutableStateOf(initial?.spineMobility ?: "none") }
+    // v10（C9）体重目标区间（kg）——可留空
+    var wLow by remember { mutableStateOf(initial?.weightTargetLow?.toString() ?: "") }
+    var wHigh by remember { mutableStateOf(initial?.weightTargetHigh?.toString() ?: "") }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -94,6 +97,14 @@ fun ProfileEditScreen(
                                     comorbidities = csvToJson(comorbid),
                                     allergies = csvToJson(allergies),
                                     emergencyBloodType = bloodType.trim().ifBlank { null },
+                                    // v10：未在本表单呈现的字段必须从 initial 透传——
+                                    // 否则保存会把它们重置为实体默认值（潜在数据丢失）
+                                    lifestyle = initial?.lifestyle,
+                                    emergencyMedSummary = initial?.emergencyMedSummary,
+                                    emergencyNote = initial?.emergencyNote,
+                                    uiMode = initial?.uiMode ?: "normal",
+                                    weightTargetLow = wLow.toDoubleOrNull(),
+                                    weightTargetHigh = wHigh.toDoubleOrNull(),
                                     createdAt = initial?.createdAt ?: now,
                                     updatedAt = now,
                                 )
@@ -173,6 +184,27 @@ fun ProfileEditScreen(
                 comorbid, { comorbid = it },
                 label = { Text(stringResource(R.string.profile_comorbidity_field)) },
                 modifier = Modifier.fillMaxWidth(),
+            )
+            // v10（C9）体重目标区间：两列并排，可留空
+            Text(stringResource(R.string.weight_target_title), style = MaterialTheme.typography.labelMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                OutlinedTextField(
+                    wLow, { wLow = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text(stringResource(R.string.weight_target_low)) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    wHigh, { wHigh = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text(stringResource(R.string.weight_target_high)) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                )
+            }
+            Text(
+                stringResource(R.string.weight_target_note),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 stringResource(R.string.profile_local_data_note) +

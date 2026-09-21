@@ -69,6 +69,8 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
     var showLabImport by remember { mutableStateOf(false) }
     var showImagingImport by remember { mutableStateOf(false) }
     var imagingDetail by remember { mutableStateOf<ImagingRecord?>(null) }
+    // 附件归档的目标记录：null = 未打开。用整条记录而非 id，是为了把日期直接当 sheet 表头
+    var attachTarget by remember { mutableStateOf<CheckupRecord?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         ScreenTopBar(title = stringResource(R.string.checkup_manage_title), onBack = onBack)
@@ -101,6 +103,9 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
                     records = records,
                     onAdd = { showRecordForm = true },
                     onViewLab = { showLabDetail = it },
+                    onAttach = { attachTarget = it },
+                    // 准备清单排在最前：复诊管理的首要问题是"下次该做什么"，其次才是翻历史
+                    prepHeader = { CheckupPrepCard(items, records, vm.date) },
                 )
                 CheckupTab.LABS -> LabsList(
                     labs = labRecent,
@@ -155,6 +160,15 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
         ImagingDetailDialog(
             record = rec,
             onDismiss = { imagingDetail = null },
+        )
+    }
+    // B10 附件归档：从记录卡进入时绑定该记录 id，表头用记录日期便于确认归属
+    attachTarget?.let { rec ->
+        AttachmentSheet(
+            vm = vm,
+            checkupId = rec.id,
+            title = rec.date,
+            onDismiss = { attachTarget = null },
         )
     }
 }

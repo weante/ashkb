@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.NoMeals
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Straighten
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -57,6 +58,7 @@ import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.Labels
+import com.ashkb.app.domain.WeightTarget
 import com.ashkb.app.R
 import com.ashkb.app.ui.components.DestructiveAction
 import com.ashkb.app.ui.components.DividerList
@@ -78,6 +80,7 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
     val vitals by vm.vitalsToday.collectAsStateWithLifecycle()
     val weight by vm.weightToday.collectAsStateWithLifecycle()
     val weightList by vm.weightRecent.collectAsStateWithLifecycle()
+    val profile by vm.profile.collectAsStateWithLifecycle()
     val bm by vm.bodyMeasureLatest.collectAsStateWithLifecycle()
     val supplements by vm.supplements.collectAsStateWithLifecycle()
     val supLogs by vm.supplementLogsToday.collectAsStateWithLifecycle()
@@ -142,6 +145,8 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
                         value = weight?.weightKg?.let { "%.1f".format(it) } ?: stringResource(R.string.common_not_recorded),
                         unit = weight?.let { "kg" },
                     )
+                    // v10（C9）：体重目标区间提示（区间由档案设定）
+                    WeightTargetHint(weightKg = weight?.weightKg, profile = profile)
                 }
             }
             item {
@@ -300,6 +305,68 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
     if (showAvoidManage) AvoidManageSheet(vm = vm, onDismiss = { showAvoidManage = false })
     historySup?.let { sup -> SupplementHistorySheet(vm = vm, sup = sup, onDismiss = { historySup = null }) }
 }
+
+/**
+ * v10（C9）：体重目标区间提示。
+ *
+ * 判定逻辑在纯函数 `domain/WeightTarget`（可单测）；这里只呈现结论。
+ * 未设目标时不打扰用户（只在填了区间后出现）；只填一侧提示补全。
+ */
+@Composable
+private fun WeightTargetHint(weightKg: Double?, profile: com.ashkb.app.data.entity.Profile?) {
+    val low = profile?.weightTargetLow
+    val high = profile?.weightTargetHigh
+    val status = WeightTarget.status(weightKg, low, high)
+    if (status == WeightTarget.Status.NO_TARGET) return
+
+    Spacer(Modifier.height(Spacing.sm))
+    val range = WeightTarget.normalize(low, high)
+    when (status) {
+        WeightTarget.Status.INCOMPLETE -> Text(
+            stringResource(R.string.weight_target_incomplete),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        WeightTarget.Status.IN_RANGE -> Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            StatusChip(stringResource(R.string.weight_target_in_range), StatusTone.Success, Icons.Rounded.CheckCircle)
+            range?.let {
+                Text(
+                    stringResource(R.string.weight_target_range_label, fmtKg(it.first), fmtKg(it.second)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        WeightTarget.Status.BELOW, WeightTarget.Status.ABOVE -> {
+            val dev = WeightTarget.deviation(weightKg, low, high) ?: 0.0
+            val text = if (status == WeightTarget.Status.BELOW) {
+                stringResource(R.string.weight_target_below, fmtKg(-dev))
+            } else {
+                stringResource(R.string.weight_target_above, fmtKg(dev))
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                StatusChip(text, StatusTone.Warning, Icons.Rounded.WarningAmber)
+                range?.let {
+                    Text(
+                        stringResource(R.string.weight_target_range_label, fmtKg(it.first), fmtKg(it.second)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        else -> Unit
+    }
+}
+
+/** 体重数值显示：整数不带小数点，其余一位小数。 */
+private fun fmtKg(v: Double): String = if (v == v.toLong().toDouble()) v.toLong().toString() else "%.1f".format(v)
 
 /** 分组头：sticky。吸附时用页面底色融入背景，底边 1dp 分隔。 */
 @Composable

@@ -366,7 +366,13 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
         }
     }
 
-    selectedCard?.let { KbDetailDialog(entry = it, onDismiss = { selectedCard = null }) }
+    selectedCard?.let { card ->
+        KbDetailDialog(
+            entry = card,
+            onSaveNote = { vm.saveKbNote(card.id, it) },
+            onDismiss = { selectedCard = null },
+        )
+    }
 
     if (showContactForm) ContactFormDialog(
         onSave = { vm.saveContact(it); showContactForm = false },

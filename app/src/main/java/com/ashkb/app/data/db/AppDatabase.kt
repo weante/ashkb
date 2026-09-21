@@ -10,6 +10,7 @@ import com.ashkb.app.data.entity.Alert
 import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.entity.BasdaiRecord
 import com.ashkb.app.data.entity.BodyMeasure
+import com.ashkb.app.data.entity.CheckupAttachment
 import com.ashkb.app.data.entity.CheckupItem
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.data.entity.DietProfile
@@ -39,8 +40,9 @@ import com.ashkb.app.data.entity.WeightLog
         Supplement::class, SupplementLog::class, Vitals::class, WeightLog::class, BodyMeasure::class,
         DietProfile::class, FoodAvoidItem::class, CheckupItem::class, CheckupRecord::class, LabResult::class,
         ImagingRecord::class, VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class, BackupLedger::class,
+        CheckupAttachment::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -69,6 +71,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun emergencyEventDao(): EmergencyEventDao
     abstract fun contactDao(): ContactDao
     abstract fun backupLedgerDao(): BackupLedgerDao
+    abstract fun checkupAttachmentDao(): CheckupAttachmentDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
@@ -313,13 +316,38 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v10：三项规划缺口落地——
+         * ① kb_entries.user_note（B2 知识库个人备注层，v3「双层结构」第二层）
+         * ② profile.weight_target_low/high（C9 体重目标区间）
+         * ③ checkup_attachments 新表（B10 复诊附件归档）
+         *
+         * 新列一律可空：旧备份无这些列，insertTable 按备份自身列集 INSERT，缺列留 NULL；
+         * 三个新列 NULL 都是合法业务态（未写备注 / 未设目标），无需恢复后回填。
+         */
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `kb_entries` ADD COLUMN `user_note` TEXT")
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `weight_target_low` REAL")
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `weight_target_high` REAL")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `checkup_attachments` (" +
+                        "`id` TEXT NOT NULL, `checkup_id` TEXT, `kind` TEXT NOT NULL, " +
+                        "`file_name` TEXT NOT NULL, `mime` TEXT, `size_bytes` INTEGER NOT NULL, " +
+                        "`display_name` TEXT, `note` TEXT, `created_at` TEXT NOT NULL, PRIMARY KEY(`id`))"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_checkup_attachments_checkup_id` ON `checkup_attachments` (`checkup_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_checkup_attachments_created_at` ON `checkup_attachments` (`created_at`)")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext, AppDatabase::class.java, "ashkb.db"
                 ).addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-                    MIGRATION_7_8, MIGRATION_8_9
+                    MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10
                 ).build().also { instance = it }
             }
     }

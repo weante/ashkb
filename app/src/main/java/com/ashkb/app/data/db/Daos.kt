@@ -9,6 +9,7 @@ import com.ashkb.app.data.entity.Alert
 import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.entity.BasdaiRecord
 import com.ashkb.app.data.entity.BodyMeasure
+import com.ashkb.app.data.entity.CheckupAttachment
 import com.ashkb.app.data.entity.CheckupItem
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.data.entity.DietProfile
@@ -144,6 +145,18 @@ interface KbEntryDao {
 
     @Query("SELECT * FROM kb_entries WHERE category = 'emergency' ORDER BY id")
     suspend fun emergencies(): List<KbEntry>
+
+    /**
+     * v10：写入个人备注层（B2）。传 null / 空白即清除备注。
+     * 只更新 user_note 一列——不触碰种子层内容（title/summary/payload 等），
+     * 保证「种子可随版本更新、个人备注自持」的双层语义。
+     */
+    @Query("UPDATE kb_entries SET user_note = :note WHERE id = :id")
+    suspend fun updateUserNote(id: String, note: String?)
+
+    /** v10：有个人备注的条目数（知识库页提示用） */
+    @Query("SELECT COUNT(*) FROM kb_entries WHERE user_note IS NOT NULL AND user_note != ''")
+    fun observeNoteCount(): Flow<Int>
 }
 
 @Dao
@@ -491,4 +504,31 @@ interface BackupLedgerDao {
 
     @Insert
     suspend fun insert(ledger: BackupLedger)
+}
+
+// ===========================================================================
+// v10 DAO：复诊附件归档（B10）
+// ===========================================================================
+
+@Dao
+interface CheckupAttachmentDao {
+    /** 全量（按时间倒序）——附件中心列表 */
+    @Query("SELECT * FROM checkup_attachments ORDER BY created_at DESC")
+    fun observeAll(): Flow<List<CheckupAttachment>>
+
+    /** 某条复诊记录下的附件 */
+    @Query("SELECT * FROM checkup_attachments WHERE checkup_id = :checkupId ORDER BY created_at DESC")
+    fun observeByCheckup(checkupId: String): Flow<List<CheckupAttachment>>
+
+    @Query("SELECT * FROM checkup_attachments ORDER BY created_at DESC")
+    suspend fun listAll(): List<CheckupAttachment>
+
+    @Query("SELECT * FROM checkup_attachments WHERE id = :id")
+    suspend fun byId(id: String): CheckupAttachment?
+
+    @Upsert
+    suspend fun upsert(attachment: CheckupAttachment)
+
+    @Query("DELETE FROM checkup_attachments WHERE id = :id")
+    suspend fun delete(id: String)
 }

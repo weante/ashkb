@@ -203,7 +203,13 @@ fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
         )
     }
 
-    kbDetail?.let { KbDetailDialog(entry = it, onDismiss = { kbDetail = null }) }
+    kbDetail?.let { card ->
+        KbDetailDialog(
+            entry = card,
+            onSaveNote = { vm.saveKbNote(card.id, it) },
+            onDismiss = { kbDetail = null },
+        )
+    }
 }
 
 /** 处方 hero：大号结论文字 + 分期状态色带 + 昨日判读依据（疼痛 / 晨僵 / 体温）。 */

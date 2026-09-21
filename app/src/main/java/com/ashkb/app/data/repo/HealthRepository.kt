@@ -223,6 +223,12 @@ class HealthRepository(private val context: Context) {
     fun searchKb(q: String): Flow<List<KbEntry>> = kbDao.search(q, KbSearch.MAX_RESULTS)
     suspend fun kbEntry(id: String): KbEntry? = kbDao.byId(id)
 
+    /** v10（B2）：写入知识库个人备注层——只动 user_note，种子内容不受影响。空白即清除。 */
+    suspend fun saveKbNote(id: String, note: String?) = kbDao.updateUserNote(id, note?.trim()?.ifBlank { null })
+
+    /** v10（B2）：有个人备注的条目数 */
+    fun observeKbNoteCount(): Flow<Int> = kbDao.observeNoteCount()
+
     /** 复核到期警报：按条目去重（refDate 存条目 id），启动与知识库入口各查一次 */
     suspend fun checkReviewDue(today: String) {
         val overdue = kbDao.overdueReview(today)

@@ -45,6 +45,10 @@ class WellnessViewModel(private val repo: HealthRepository) : ViewModel() {
     }
 
     // ---- 观察 ----
+    /** v10（C9）：体重目标区间取自档案，体重卡据此提示是否在区间内 */
+    val profile: StateFlow<com.ashkb.app.data.entity.Profile?> = repo.observeProfile()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val vitalsToday: StateFlow<Vitals?> = _date.flatMapLatest { repo.observeVitals(it.toString()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 

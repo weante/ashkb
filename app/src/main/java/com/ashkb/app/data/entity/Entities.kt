@@ -66,6 +66,10 @@ data class Profile(
     @ColumnInfo(name = "emergency_blood_type") val emergencyBloodType: String? = null,
     @ColumnInfo(name = "emergency_med_summary") val emergencyMedSummary: String? = null,
     @ColumnInfo(name = "emergency_note") val emergencyNote: String? = null,
+    // v10：体重目标区间（kg）——由医生给定或自我管理目标，用于体重卡「在区间内 / 偏高 / 偏低」提示。
+    // 可空以兼容旧备份（旧备份无此列，恢复后为 NULL = 未设目标）。
+    @ColumnInfo(name = "weight_target_low") val weightTargetLow: Double? = null,
+    @ColumnInfo(name = "weight_target_high") val weightTargetHigh: Double? = null,
     /** 极简模式（红线三状态机 e2：发作期输入减负） */
     @ColumnInfo(name = "ui_mode") val uiMode: String = "normal", // normal / minimal
     @ColumnInfo(name = "created_at") val createdAt: String,
@@ -154,6 +158,34 @@ data class KbEntry(
     // v9：检索专用拼接列（title + summary + payload，口径见 domain/KbSearch）。
     // 可空——旧版本备份不含此列，恢复时按名列表 INSERT 会留空，由恢复后回填补齐。
     @ColumnInfo(name = "search_text") val searchText: String? = null,
+    // v10：个人备注层（v3 规划「只读种子层 + 个人备注层」双层结构的第二层）。
+    // 用户对该条目的私人记录（如「我吃了会胃痛」），与种子内容分离、不随种子更新被覆盖。
+    // 可空——NULL = 未写备注。
+    @ColumnInfo(name = "user_note") val userNote: String? = null,
+)
+
+/**
+ * v10：M6 复诊附件归档（checkup_attachments）——化验单 / 影像报告的拍照或 PDF 存档。
+ *
+ * ⚠️ **附件文件不随数据库备份**：文件落在 `filesDir/checkup_attachments/`，本表只记元数据。
+ * 备份导出的是数据库各表 JSON（见 BackupEngine），不含二进制文件；换机恢复后附件需重新导入。
+ * 这是为保持备份轻量（WebDAV 上传 120s 超时）而做的取舍。
+ */
+@Entity(tableName = "checkup_attachments", indices = [Index("checkup_id"), Index("created_at")])
+data class CheckupAttachment(
+    @PrimaryKey val id: String, // catt-xxxx
+    /** 归属复诊记录（弱引用，可空自持——记录删除后附件仍可追溯） */
+    @ColumnInfo(name = "checkup_id") val checkupId: String? = null,
+    /** PHOTO（拍照 / 相册图片）/ PDF */
+    @ColumnInfo(name = "kind") val kind: String,
+    /** 应用内部存储的相对文件名（不含目录），绝对路径由 AttachmentRepository 拼接 */
+    @ColumnInfo(name = "file_name") val fileName: String,
+    @ColumnInfo(name = "mime") val mime: String? = null,
+    @ColumnInfo(name = "size_bytes") val sizeBytes: Long = 0,
+    /** 原始文件名（PDF 来自选择器时保留，便于用户辨认） */
+    @ColumnInfo(name = "display_name") val displayName: String? = null,
+    @ColumnInfo(name = "note") val note: String? = null,
+    @ColumnInfo(name = "created_at") val createdAt: String,
 )
 
 /** R17 停药原因分类分级（D-2 §7：自行停药触发警示） */
