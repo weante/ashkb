@@ -42,7 +42,7 @@ import com.ashkb.app.data.entity.WeightLog
         ImagingRecord::class, VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class, BackupLedger::class,
         CheckupAttachment::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -341,13 +341,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v11：化验 / 影像记录归属复诊记录（B10 后续增强）——
+         * `imaging_records` 补 `checkup_id`（与 `lab_results.checkup_id` 对称）。
+         *
+         * 背景：此前 lab_results 虽有 checkup_id 列但 AI 导入恒写 null、imaging_records 连列都没有，
+         * 导致「复诊记录 → 查看化验」永远查不到数据，且附件无法归档到对应复诊。
+         * 归属由用户在化验 / 影像列表**手动选择**（不按日期自动猜，避免配错）。
+         *
+         * 可空：旧备份无此列 → 恢复后为 NULL = 尚未归属，属合法业务态，无需回填。
+         */
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `imaging_records` ADD COLUMN `checkup_id` TEXT")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_imaging_records_checkup_id` ON `imaging_records` (`checkup_id`)")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext, AppDatabase::class.java, "ashkb.db"
                 ).addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-                    MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10
+                    MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11
                 ).build().also { instance = it }
             }
     }

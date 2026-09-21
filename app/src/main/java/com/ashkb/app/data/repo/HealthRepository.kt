@@ -444,6 +444,19 @@ class HealthRepository(private val context: Context) {
         )
     }
 
+    // ---- v11：化验 / 影像归属复诊记录（B10 后续增强，手动选择） ----
+
+    /** 把某一天的全部化验归属到指定复诊记录（null = 解除归属）。 */
+    suspend fun linkLabsByDate(date: String, checkupId: String?) = labResultDao.linkByDate(date, checkupId)
+
+    /** 把某条影像记录归属到指定复诊记录（null = 解除归属）。 */
+    suspend fun linkImagingToCheckup(imagingId: String, checkupId: String?) =
+        imagingDao.linkToCheckup(imagingId, checkupId)
+
+    /** 某条复诊记录下的影像 */
+    fun observeImagingByCheckup(checkupId: String): Flow<List<ImagingRecord>> =
+        imagingDao.observeByCheckup(checkupId)
+
     // ---- 疫苗记录 ----
     fun observeVaccinesAll(): Flow<List<VaccineRecord>> = vaccineDao.observeAll()
     fun observeVaccinesByType(type: String): Flow<List<VaccineRecord>> = vaccineDao.observeByType(type)

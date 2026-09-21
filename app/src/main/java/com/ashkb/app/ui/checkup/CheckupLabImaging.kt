@@ -175,12 +175,18 @@ internal fun LabDetailDialog(record: CheckupRecord, vm: CheckupViewModel, onDism
 }
 
 // ===== 化验结果列表（按日期分组，支持 AI 导入；底部翻页加载更早记录） =====
+/**
+ * @param onAttachDate 归档该日期的附件（附件本身也属于这次抽血）
+ * @param onLinkDate   把该日期的整组化验归属到某条复诊记录
+ */
 @Composable
 internal fun LabsList(
     labs: List<LabResult>,
     canLoadMore: Boolean,
     onLoadMore: () -> Unit,
     onImport: () -> Unit,
+    onAttachDate: (String) -> Unit,
+    onLinkDate: (String) -> Unit,
 ) {
     // 派生计算上提到 LazyColumn 之外并 remember：LazyListScope 不是 @Composable 作用域，
     // 写在 item/forEach 内会随每次重组重跑 groupBy / maxOfOrNull（数十条化验 × 每次重组）
@@ -217,6 +223,8 @@ internal fun LabsList(
             grouped.forEach { (date, rows) ->
                 item(key = "lab-$date") {
                     val abnormalCount = rows.count { it.isAbnormal() }
+                    // 整组化验共用一条归属：同一天的一次抽血属于同一次复诊，逐项设置只会变成负担
+                    val linkedId = rows.firstOrNull { it.checkupId != null }?.checkupId
                     // item key 稳定 + rememberSaveable：翻页加载更早记录、滚动回收、旋转屏均保持折叠状态
                     var expanded by rememberSaveable {
                         mutableStateOf(abnormalCount > 0 || date == latestDate)
@@ -238,6 +246,25 @@ internal fun LabsList(
                             }
                         },
                     ) {
+                        // 归属/附件动作放在折叠开关之外：折叠状态下也要能直接归档，
+                        // 否则"这天有没有归属"得先展开才能查、才能改
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            if (linkedId != null) {
+                                // 只有"已归属"才给胶囊：未归属是常态，不额外占用视觉噪音
+                                StatusChip(text = stringResource(R.string.attach_link_title), tone = StatusTone.Success)
+                            }
+                            TextButton(
+                                onClick = { onLinkDate(date) },
+                                modifier = Modifier.heightIn(min = Size.touchMin),
+                            ) { Text(stringResource(R.string.lab_link_action)) }
+                            TextButton(
+                                onClick = { onAttachDate(date) },
+                                modifier = Modifier.heightIn(min = Size.touchMin),
+                            ) { Text(stringResource(R.string.attach_title)) }
+                        }
                         if (expanded) LabGroup(rows)
                     }
                 }
@@ -256,11 +283,17 @@ internal fun LabsList(
 }
 
 // ===== 影像列表（MRI/CT/X线，支持 AI 导入） =====
+/**
+ * @param onAttach 归档该条影像的附件（报告 PDF / 片子照片）
+ * @param onLink   把该条影像归属到某条复诊记录
+ */
 @Composable
 internal fun ImagingList(
     records: List<ImagingRecord>,
     onImport: () -> Unit,
     onView: (ImagingRecord) -> Unit,
+    onAttach: (ImagingRecord) -> Unit,
+    onLink: (ImagingRecord) -> Unit,
 ) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
@@ -328,6 +361,25 @@ internal fun ImagingList(
                                 style = MaterialTheme.typography.bodySmall,
                                 maxLines = 2,
                             )
+                        }
+                        // 归属/附件排在结论之后：先读结论（这才是这张片子的价值），再决定它算哪次复诊。
+                        // 外层 Surface 有点击（打开详情），Compose 里子节点优先消费点击，按钮不会被吞
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            if (rec.checkupId != null) {
+                                // 只有"已归属"才给胶囊：未归属是常态，不额外占用视觉噪音
+                                StatusChip(text = stringResource(R.string.attach_link_title), tone = StatusTone.Success)
+                            }
+                            TextButton(
+                                onClick = { onLink(rec) },
+                                modifier = Modifier.heightIn(min = Size.touchMin),
+                            ) { Text(stringResource(R.string.imaging_link_action)) }
+                            TextButton(
+                                onClick = { onAttach(rec) },
+                                modifier = Modifier.heightIn(min = Size.touchMin),
+                            ) { Text(stringResource(R.string.attach_title)) }
                         }
                     }
                 }

@@ -89,6 +89,7 @@ internal fun CheckupItemsList(items: List<CheckupItem>, onAdd: () -> Unit, onDea
 // ===== 复诊记录列表 =====
 /**
  * @param onAttach   打开某条记录的附件归档 sheet（附件入口在卡片正文里，与右上角动作槽区分开）
+ * @param onOpenAllAttachments 打开全部附件总览：未归属复诊的附件（从化验/影像侧导入）只在这里可见
  * @param prepHeader 列表顶部插槽（复诊准备清单）。做成插槽而非固定内容：
  *                   卡片需要 items/records/today 三路数据，由调用方组装，本列表不必知道 C4。
  */
@@ -98,6 +99,7 @@ internal fun CheckupRecordsList(
     onAdd: () -> Unit,
     onViewLab: (CheckupRecord) -> Unit,
     onAttach: (CheckupRecord) -> Unit,
+    onOpenAllAttachments: () -> Unit,
     prepHeader: (@Composable () -> Unit)? = null,
 ) {
     LazyColumn(
@@ -107,6 +109,14 @@ internal fun CheckupRecordsList(
         // 准备清单必须排在空态/列表之前：它是"下次复诊该做什么"的唯一答案，不能滚出首屏
         prepHeader?.let { header ->
             item { header() }
+        }
+        // 总览入口紧跟在准备清单之后、记录列表之前：未归属的附件不属于任何一条记录，
+        // 只能挂在这一层，否则用户在记录页永远找不到它们
+        item {
+            TextButton(
+                onClick = onOpenAllAttachments,
+                modifier = Modifier.heightIn(min = Size.touchMin),
+            ) { Text(stringResource(R.string.attach_title)) }
         }
         if (records.isEmpty()) {
             item {

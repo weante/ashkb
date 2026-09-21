@@ -922,4 +922,18 @@
     <string name="attach_count">%1$d 个附件</string>
     <string name="attach_photo_name">照片</string>
     <string name="attach_total_size">占用 %1$s</string>
+
+    <!-- ===== v11（v1.0.34）：化验 / 影像 / 附件归属复诊记录 ===== -->
+    <string name="attach_link_title">归属复诊记录</string>
+    <string name="attach_link_none">不关联</string>
+    <string name="attach_link_pick">选择复诊记录</string>
+    <string name="attach_link_linked">已归属：%1$s</string>
+    <string name="attach_link_unlinked">尚未归属复诊记录</string>
+    <string name="attach_link_done">已归属到 %1$s</string>
+    <string name="attach_link_cleared">已解除归属</string>
+    <string name="attach_link_hint">归属后，该记录在「记录」页对应复诊下也能看到；附件同样归入该复诊。</string>
+    <string name="attach_link_empty_records">还没有复诊记录。先在「记录」页建一条复诊记录，再回来归属。</string>
+    <string name="lab_link_action">归属复诊记录</string>
+    <string name="imaging_link_action">归属复诊记录</string>
+    <string name="attach_of_record">该复诊的附件</string>
 </resources>

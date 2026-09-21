@@ -71,6 +71,13 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
     var imagingDetail by remember { mutableStateOf<ImagingRecord?>(null) }
     // 附件归档的目标记录：null = 未打开。用整条记录而非 id，是为了把日期直接当 sheet 表头
     var attachTarget by remember { mutableStateOf<CheckupRecord?>(null) }
+    // v11：化验按"日期分组"整组处理、影像按单条处理，故各留一个待归档/待归属的目标
+    var attachLabDate by remember { mutableStateOf<String?>(null) }
+    var attachImaging by remember { mutableStateOf<ImagingRecord?>(null) }
+    // 全部附件总览：未归属复诊的附件只能从这里找到并补归
+    var showAllAttachments by remember { mutableStateOf(false) }
+    var pickLabsDate by remember { mutableStateOf<String?>(null) }
+    var pickImaging by remember { mutableStateOf<ImagingRecord?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         ScreenTopBar(title = stringResource(R.string.checkup_manage_title), onBack = onBack)
@@ -104,6 +111,7 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
                     onAdd = { showRecordForm = true },
                     onViewLab = { showLabDetail = it },
                     onAttach = { attachTarget = it },
+                    onOpenAllAttachments = { showAllAttachments = true },
                     // 准备清单排在最前：复诊管理的首要问题是"下次该做什么"，其次才是翻历史
                     prepHeader = { CheckupPrepCard(items, records, vm.date) },
                 )
@@ -112,11 +120,15 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
                     canLoadMore = labRecent.size >= labLimit,
                     onLoadMore = { vm.loadMoreLabs() },
                     onImport = { showLabImport = true },
+                    onAttachDate = { attachLabDate = it },
+                    onLinkDate = { pickLabsDate = it },
                 )
                 CheckupTab.IMAGING -> ImagingList(
                     records = imagingRecords,
                     onImport = { showImagingImport = true },
                     onView = { imagingDetail = it },
+                    onAttach = { attachImaging = it },
+                    onLink = { pickImaging = it },
                 )
                 CheckupTab.VACCINES -> VaccineList(
                     vaccines = vaccines,
@@ -169,6 +181,55 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
             checkupId = rec.id,
             title = rec.date,
             onDismiss = { attachTarget = null },
+        )
+    }
+    // v11 化验附件归档：初始归属取该日期分组的现有归属，
+    // allowLink 让用户在归档的同时把"这天的化验"整组归到某条复诊，省一次往返
+    attachLabDate?.let { d ->
+        AttachmentSheet(
+            vm = vm,
+            checkupId = labRecent.firstOrNull { it.date == d }?.checkupId,
+            title = d,
+            allowLink = true,
+            onLinkSource = { vm.linkLabsByDate(d, it) },
+            onDismiss = { attachLabDate = null },
+        )
+    }
+    attachImaging?.let { r ->
+        AttachmentSheet(
+            vm = vm,
+            checkupId = r.checkupId,
+            title = "${r.examDate} · ${r.bodyPart}",
+            allowLink = true,
+            onLinkSource = { vm.linkImaging(r.id, it) },
+            onDismiss = { attachImaging = null },
+        )
+    }
+    // 总览不绑定具体记录（checkupId = null）：未归属的附件才有机会被看见并补归
+    if (showAllAttachments) {
+        AttachmentSheet(
+            vm = vm,
+            checkupId = null,
+            title = stringResource(R.string.attach_title),
+            allowLink = true,
+            onDismiss = { showAllAttachments = false },
+        )
+    }
+    // 从化验/影像列表直接发起归属：与 sheet 内改归属走同一套 vm 接口，两边状态自然同步
+    pickLabsDate?.let { d ->
+        CheckupRecordPickerDialog(
+            records = records,
+            currentId = labRecent.firstOrNull { it.date == d }?.checkupId,
+            onPick = { vm.linkLabsByDate(d, it); pickLabsDate = null },
+            onDismiss = { pickLabsDate = null },
+        )
+    }
+    pickImaging?.let { r ->
+        CheckupRecordPickerDialog(
+            records = records,
+            currentId = r.checkupId,
+            onPick = { vm.linkImaging(r.id, it); pickImaging = null },
+            onDismiss = { pickImaging = null },
         )
     }
 }

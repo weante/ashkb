@@ -435,6 +435,13 @@ interface LabResultDao {
     @Query("SELECT * FROM lab_results ORDER BY date DESC LIMIT :limit")
     fun observeRecent(limit: Int = 100): Flow<List<LabResult>>
 
+    /**
+     * v11：把某一天的全部化验归属到指定复诊记录（或解除归属传 null）。
+     * 覆盖式而非只补 NULL——用户改主意时要能重新归属；同一天的多行化验视作同一次就诊。
+     */
+    @Query("UPDATE lab_results SET checkup_id = :checkupId WHERE date = :date")
+    suspend fun linkByDate(date: String, checkupId: String?)
+
     @Upsert
     suspend fun upsert(result: LabResult)
 }
@@ -443,6 +450,14 @@ interface LabResultDao {
 interface ImagingDao {
     @Query("SELECT * FROM imaging_records ORDER BY exam_date DESC LIMIT :limit")
     fun observeAll(limit: Int = 50): Flow<List<ImagingRecord>>
+
+    /** v11：某条复诊记录下的影像（「记录」Tab 详情用） */
+    @Query("SELECT * FROM imaging_records WHERE checkup_id = :checkupId ORDER BY exam_date DESC")
+    fun observeByCheckup(checkupId: String): Flow<List<ImagingRecord>>
+
+    /** v11：归属到指定复诊记录（或解除归属传 null） */
+    @Query("UPDATE imaging_records SET checkup_id = :checkupId WHERE id = :id")
+    suspend fun linkToCheckup(id: String, checkupId: String?)
 
     @Upsert
     suspend fun upsert(record: ImagingRecord)
@@ -528,6 +543,10 @@ interface CheckupAttachmentDao {
 
     @Upsert
     suspend fun upsert(attachment: CheckupAttachment)
+
+    /** v11：改归属（或解除归属传 null）——用户在弹层里重新选择复诊记录时用 */
+    @Query("UPDATE checkup_attachments SET checkup_id = :checkupId WHERE id = :id")
+    suspend fun linkToCheckup(id: String, checkupId: String?)
 
     @Query("DELETE FROM checkup_attachments WHERE id = :id")
     suspend fun delete(id: String)

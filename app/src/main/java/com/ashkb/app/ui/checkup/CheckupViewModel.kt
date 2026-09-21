@@ -151,6 +151,26 @@ class CheckupViewModel(
     fun attachmentUri(attachment: com.ashkb.app.data.entity.CheckupAttachment): android.net.Uri =
         attachmentRepo.uriOf(attachment)
 
+    // ---- v11：化验 / 影像归属复诊记录（手动选择，不按日期自动猜） ----
+
+    /** 把某一天的全部化验归属到复诊记录（null = 解除归属） */
+    fun linkLabsByDate(date: String, checkupId: String?) {
+        viewModelScope.launch { repo.linkLabsByDate(date, checkupId) }
+    }
+
+    /** 把某条影像归属到复诊记录（null = 解除归属） */
+    fun linkImaging(imagingId: String, checkupId: String?) {
+        viewModelScope.launch { repo.linkImagingToCheckup(imagingId, checkupId) }
+    }
+
+    /** 改附件归属（null = 解除归属） */
+    fun linkAttachment(attachmentId: String, checkupId: String?) {
+        viewModelScope.launch { attachmentRepo.linkToCheckup(attachmentId, checkupId) }
+    }
+
+    /** 某条复诊记录下的影像（冷 Flow，调用点 remember(id) 记住） */
+    fun imagingFor(checkupId: String): Flow<List<ImagingRecord>> = repo.observeImagingByCheckup(checkupId)
+
     companion object {
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {

@@ -514,7 +514,7 @@ data class LabResult(
 )
 
 /** M6 影像记录（imaging_records）——MRI/CT/X线检查报告，支持 AI 导入（v1.0.4）。 */
-@Entity(tableName = "imaging_records", indices = [Index("exam_date")])
+@Entity(tableName = "imaging_records", indices = [Index("exam_date"), Index("checkup_id")])
 data class ImagingRecord(
     @PrimaryKey val id: String, // img-xxxx
     @ColumnInfo(name = "exam_date") val examDate: String,
@@ -526,6 +526,9 @@ data class ImagingRecord(
     @ColumnInfo(name = "findings") val findings: String? = null,
     @ColumnInfo(name = "conclusion") val conclusion: String? = null,
     @ColumnInfo(name = "notes") val notes: String? = null,
+    // v11：归属复诊记录（与 lab_results.checkup_id 对称）。可空 = 尚未归属。
+    // 由用户在影像列表里手动选择归属（不自动按日期猜），选定后「记录」Tab 的对应复诊可看到该影像。
+    @ColumnInfo(name = "checkup_id") val checkupId: String? = null,
 ) {
     companion object {
         fun modalityLabel(m: String) = when (m) { "MRI" -> "MRI"; "CT" -> "CT"; "XRAY" -> "X 线"; else -> m }

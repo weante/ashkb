@@ -136,6 +136,11 @@ class AttachmentRepository(private val context: Context) {
         true
     }
 
+    /** v11：改归属复诊记录（null = 解除归属）。 */
+    suspend fun linkToCheckup(attachmentId: String, checkupId: String?) = withContext(Dispatchers.IO) {
+        dao.linkToCheckup(attachmentId, checkupId)
+    }
+
     /** 磁盘占用总量（字节）——设置页 / 列表提示用。 */
     suspend fun totalBytes(): Long = withContext(Dispatchers.IO) {
         dao.listAll().sumOf { it.sizeBytes }
