@@ -1,9 +1,11 @@
 package com.ashkb.app.data.repo
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import androidx.core.content.FileProvider
 import com.ashkb.app.data.db.AppDatabase
+import com.ashkb.app.data.db.AttachmentSyncCounts
 import com.ashkb.app.data.db.Ids
 import com.ashkb.app.data.entity.CheckupAttachment
 import java.io.File
@@ -25,11 +27,15 @@ class AttachmentRepository(private val context: Context) {
     private val db = AppDatabase.get(context)
     private val dao = db.checkupAttachmentDao()
 
+    private val syncPrefs: SharedPreferences =
+        context.getSharedPreferences("sync_config", Context.MODE_PRIVATE)
+
     companion object {
         /** 单文件上限 20 MB——防止用户误选超大视频/文件把内部存储塞满。 */
         const val MAX_BYTES = 20L * 1024 * 1024
 
         private const val DIR = "checkup_attachments"
+        private const val PREF_SYNC_ENABLED = "attachment_sync_enabled"
     }
 
     fun observeAll(): Flow<List<CheckupAttachment>> = dao.observeAll()
@@ -129,17 +135,58 @@ class AttachmentRepository(private val context: Context) {
         }.getOrNull()
     }
 
-    /** 删除附件：先删文件再删行（文件删失败不阻塞行删除，避免留下看不见的脏行）。 */
+    /** 删除附件：先删本地文件，再决定远端怎么处理（见下）。 */
     suspend fun delete(attachment: CheckupAttachment): Boolean = withContext(Dispatchers.IO) {
         runCatching { fileOf(attachment).delete() }
-        dao.delete(attachment.id)
+        // 有远端副本且开关开启 → 留墓碑等同步流程清远端；否则直接物理删行
+        if (attachment.remotePath != null && isSyncEnabled()) {
+            dao.markDeleted(attachment.id, nowIso())
+        } else {
+            dao.delete(attachment.id)
+        }
         true
     }
+
+    /** 远端已清理（或无需清理）→ 物理删行，由同步流程调用。 */
+    suspend fun hardDelete(id: String) = withContext(Dispatchers.IO) { dao.delete(id) }
 
     /** v11：改归属复诊记录（null = 解除归属）。 */
     suspend fun linkToCheckup(attachmentId: String, checkupId: String?) = withContext(Dispatchers.IO) {
         dao.linkToCheckup(attachmentId, checkupId)
     }
+
+    // ---- v12（v1.0.35）WebDAV 同步 ----
+
+    /** 附件同步开关。关闭时：新附件不上传、删除不动远端。存普通 prefs（非密钥）。 */
+    fun isSyncEnabled(): Boolean = syncPrefs.getBoolean(PREF_SYNC_ENABLED, false)
+
+    fun setSyncEnabled(enabled: Boolean) {
+        syncPrefs.edit().putBoolean(PREF_SYNC_ENABLED, enabled).apply()
+    }
+
+    fun observeSyncCounts(): Flow<AttachmentSyncCounts> = dao.observeSyncCounts()
+
+    suspend fun pendingUpload(): List<CheckupAttachment> = withContext(Dispatchers.IO) { dao.pendingUpload() }
+
+    suspend fun pendingRemoteDelete(): List<CheckupAttachment> =
+        withContext(Dispatchers.IO) { dao.pendingRemoteDelete() }
+
+    suspend fun markUploaded(id: String, remotePath: String, sha256: String) =
+        withContext(Dispatchers.IO) { dao.markUploaded(id, remotePath, sha256, nowIso()) }
+
+    /** 本地文件是否在（懒下载据此判断要不要去远端拉）。 */
+    fun hasLocalFile(attachment: CheckupAttachment): Boolean = fileOf(attachment).exists()
+
+    /** 读本地明文（上传前加密用）。 */
+    suspend fun readLocal(attachment: CheckupAttachment): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { fileOf(attachment).readBytes() }.getOrNull()
+    }
+
+    /** 懒下载后把解密内容写回本地缓存目录。 */
+    suspend fun writeLocal(attachment: CheckupAttachment, bytes: ByteArray): Boolean =
+        withContext(Dispatchers.IO) {
+            runCatching { fileOf(attachment).writeBytes(bytes) }.isSuccess
+        }
 
     /** 磁盘占用总量（字节）——设置页 / 列表提示用。 */
     suspend fun totalBytes(): Long = withContext(Dispatchers.IO) {

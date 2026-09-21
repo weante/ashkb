@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 class CheckupViewModel(
     private val repo: HealthRepository,
     private val attachmentRepo: com.ashkb.app.data.repo.AttachmentRepository,
+    private val backupRepo: com.ashkb.app.data.repo.BackupRepository,
 ) : ViewModel() {
     private val _date = MutableStateFlow(LocalDate.now())
     val date: LocalDate get() = _date.value
@@ -171,11 +172,27 @@ class CheckupViewModel(
     /** 某条复诊记录下的影像（冷 Flow，调用点 remember(id) 记住） */
     fun imagingFor(checkupId: String): Flow<List<ImagingRecord>> = repo.observeImagingByCheckup(checkupId)
 
+    // ---- v12（v1.0.35）附件同步：本地缺失时按需从云端取回 ----
+
+    /** 本地是否已有该附件文件（否则「查看」需先懒下载）。 */
+    fun attachmentHasLocal(a: com.ashkb.app.data.entity.CheckupAttachment): Boolean =
+        attachmentRepo.hasLocalFile(a)
+
+    /** 附件同步开关（只读，用于列表状态标记）。 */
+    fun attachmentSyncOn(): Boolean = backupRepo.attachmentSyncEnabled()
+
+    /**
+     * 懒下载：本地文件缺失且已有远端副本时按需取回并解密。
+     * @return true = 本地已可用（原本就在 / 刚取回）；false = 云端没有或解密失败
+     */
+    suspend fun ensureAttachmentLocal(a: com.ashkb.app.data.entity.CheckupAttachment): Boolean =
+        backupRepo.downloadAttachmentIfMissing(a)
+
     companion object {
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                CheckupViewModel(app.healthRepository, app.attachmentRepository)
+                CheckupViewModel(app.healthRepository, app.attachmentRepository, app.backupRepository)
             }
         }
     }

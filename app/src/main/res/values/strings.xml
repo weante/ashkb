@@ -936,4 +936,23 @@
     <string name="lab_link_action">归属复诊记录</string>
     <string name="imaging_link_action">归属复诊记录</string>
     <string name="attach_of_record">该复诊的附件</string>
+
+    <!-- ===== v12（v1.0.35）：附件 WebDAV 同步 ===== -->
+    <string name="attach_sync_section">附件同步</string>
+    <string name="attach_sync_switch">同步附件到 WebDAV</string>
+    <string name="attach_sync_switch_note">开启后，附件（化验单 / 影像报告）会加密后逐个上传到服务器，换机时可随用随取。附件内容加密后上传，服务器上不可读；附件不并入备份文件。</string>
+    <string name="attach_sync_button">同步附件</string>
+    <string name="attach_sync_running">正在同步附件…</string>
+    <string name="attach_sync_summary">本地 %1$d 个 · 已同步 %2$d · 待传 %3$d · 待清理 %4$d</string>
+    <string name="attach_sync_size">本地占用 %1$s</string>
+    <string name="attach_sync_need_webdav">请先配置 WebDAV 服务器</string>
+    <string name="attach_sync_need_enable">请先开启「同步附件到 WebDAV」</string>
+    <string name="attach_sync_done">附件同步完成：%1$s</string>
+    <string name="attach_sync_failed">附件同步失败：%1$s</string>
+    <string name="attach_state_synced">已同步</string>
+    <string name="attach_state_pending">未同步</string>
+    <string name="attach_state_remote_only">仅云端</string>
+    <string name="attach_downloading">正在从云端取回…</string>
+    <string name="attach_download_failed">云端未找到该附件，或网络异常</string>
+    <string name="attach_download_ok">已从云端取回</string>
 </resources>

@@ -11,7 +11,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -41,8 +43,10 @@ import com.ashkb.app.data.entity.CheckupAttachment
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.ui.components.DestructiveAction
 import com.ashkb.app.ui.components.SectionCard
+import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
+import com.ashkb.app.ui.theme.StatusTone
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -134,6 +138,9 @@ internal fun AttachmentSheet(
         if (id == null) vm.attachments else vm.attachmentsFor(id)
     }
     val rows by flow.collectAsStateWithLifecycle(initialValue = emptyList())
+    // 同步开关存在 prefs 里、不是可观察流：sheet 打开期间用户不可能在备份页改它，
+    // 故读一次快照即可，不必为它引入额外的 Flow 订阅
+    val syncOn = vm.attachmentSyncOn()
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
@@ -202,7 +209,11 @@ internal fun AttachmentSheet(
                     stringResource(res),
                     style = MaterialTheme.typography.bodySmall,
                     // 失败与成功用不同前景色：一次性提示会在下一次操作时被覆盖，颜色是唯一残留的语义
-                    color = if (res == R.string.attach_failed || res == R.string.attach_open_failed) {
+                    color = if (
+                        res == R.string.attach_failed ||
+                        res == R.string.attach_open_failed ||
+                        res == R.string.attach_download_failed
+                    ) {
                         MaterialTheme.colorScheme.error
                     } else {
                         MaterialTheme.colorScheme.primary
@@ -225,19 +236,25 @@ internal fun AttachmentSheet(
                 }
                 AttachmentRow(
                     attachment = a,
+                    syncOn = syncOn,
                     onView = {
-                        val opened = runCatching {
-                            val uri = vm.attachmentUri(a)
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW).apply {
-                                    // 没有 MIME 时用 */* 兜底，否则部分查看器会拒绝打开
-                                    setDataAndType(uri, a.mime ?: "*/*")
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        // 本地文件可能已被清理：先判断在不在，不在而云端有就懒下载回来再开
+                        if (vm.attachmentHasLocal(a)) {
+                            openAttachment(context, vm, a) { msg = R.string.attach_open_failed }
+                        } else if (a.remotePath != null) {
+                            scope.launch {
+                                msg = R.string.attach_downloading
+                                val ok = vm.ensureAttachmentLocal(a)
+                                if (ok) {
+                                    msg = R.string.attach_download_ok
+                                    openAttachment(context, vm, a) { msg = R.string.attach_open_failed }
+                                } else {
+                                    msg = R.string.attach_download_failed
                                 }
-                            )
-                        }.isSuccess
-                        // 没有可处理该类型的 App（或 FileProvider 未配好）时明确告知，而不是静默无反应
-                        if (!opened) msg = R.string.attach_open_failed
+                            }
+                        } else {
+                            msg = R.string.attach_open_failed
+                        }
                     },
                     onDelete = {
                         vm.deleteAttachment(a)
@@ -358,10 +375,11 @@ private fun PickerRow(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** 单条附件：归属 / 查看 / 删除。 */
+/** 单条附件：同步态 / 归属 / 查看 / 删除。 */
 @Composable
 private fun AttachmentRow(
     attachment: CheckupAttachment,
+    syncOn: Boolean,
     onView: () -> Unit,
     onDelete: () -> Unit,
     onLink: (() -> Unit)? = null,
@@ -375,6 +393,21 @@ private fun AttachmentRow(
         },
         subtitle = stringResource(R.string.attach_total_size, formatBytes(attachment.sizeBytes)),
     ) {
+        // 未启用同步时"未同步"是纯噪音，故整块随开关隐藏；启用后独立一行，
+        // 不挤进下面那排按钮：按钮已有 3 个，再并一个胶囊窄屏必然折行
+        if (syncOn) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                if (attachment.remotePath != null) {
+                    StatusChip(stringResource(R.string.attach_state_synced), StatusTone.Success)
+                } else {
+                    StatusChip(stringResource(R.string.attach_state_pending), StatusTone.Neutral)
+                }
+            }
+            Spacer(Modifier.height(Spacing.xs))
+        }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -397,6 +430,32 @@ private fun AttachmentRow(
             )
         }
     }
+}
+
+/**
+ * 用系统查看器打开本地附件。
+ *
+ * 抽成函数是因为「查看」现在有直开、懒下载后再开两条路径，而失败兜底必须共用一套：
+ * 各自 runCatching 一遍，很容易只改了其中一个分支。
+ */
+private fun openAttachment(
+    context: Context,
+    vm: CheckupViewModel,
+    a: CheckupAttachment,
+    onFail: () -> Unit,
+) {
+    val opened = runCatching {
+        val uri = vm.attachmentUri(a)
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW).apply {
+                // 没有 MIME 时用 */* 兜底，否则部分查看器会拒绝打开
+                setDataAndType(uri, a.mime ?: "*/*")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        )
+    }.isSuccess
+    // 没有可处理该类型的 App（或 FileProvider 未配好）时明确告知，而不是静默无反应
+    if (!opened) onFail()
 }
 
 /** SAF 文档的原始文件名；查询失败退回 URI 末段，避免列表只剩"照片"二字。 */

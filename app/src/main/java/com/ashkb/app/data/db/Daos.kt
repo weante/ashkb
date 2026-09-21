@@ -527,15 +527,15 @@ interface BackupLedgerDao {
 
 @Dao
 interface CheckupAttachmentDao {
-    /** 全量（按时间倒序）——附件中心列表 */
-    @Query("SELECT * FROM checkup_attachments ORDER BY created_at DESC")
+    /** 全量可见（按时间倒序）——附件中心列表。墓碑行（待远端清理）对用户不可见。 */
+    @Query("SELECT * FROM checkup_attachments WHERE deleted_at IS NULL ORDER BY created_at DESC")
     fun observeAll(): Flow<List<CheckupAttachment>>
 
     /** 某条复诊记录下的附件 */
-    @Query("SELECT * FROM checkup_attachments WHERE checkup_id = :checkupId ORDER BY created_at DESC")
+    @Query("SELECT * FROM checkup_attachments WHERE checkup_id = :checkupId AND deleted_at IS NULL ORDER BY created_at DESC")
     fun observeByCheckup(checkupId: String): Flow<List<CheckupAttachment>>
 
-    @Query("SELECT * FROM checkup_attachments ORDER BY created_at DESC")
+    @Query("SELECT * FROM checkup_attachments WHERE deleted_at IS NULL ORDER BY created_at DESC")
     suspend fun listAll(): List<CheckupAttachment>
 
     @Query("SELECT * FROM checkup_attachments WHERE id = :id")
@@ -550,4 +550,38 @@ interface CheckupAttachmentDao {
 
     @Query("DELETE FROM checkup_attachments WHERE id = :id")
     suspend fun delete(id: String)
+
+    // ---- v12（v1.0.35）WebDAV 同步 ----
+
+    /** 待上传：可见且尚无远端副本 */
+    @Query("SELECT * FROM checkup_attachments WHERE remote_path IS NULL AND deleted_at IS NULL ORDER BY created_at")
+    suspend fun pendingUpload(): List<CheckupAttachment>
+
+    /** 待清理远端：软删除墓碑行 */
+    @Query("SELECT * FROM checkup_attachments WHERE deleted_at IS NOT NULL ORDER BY deleted_at")
+    suspend fun pendingRemoteDelete(): List<CheckupAttachment>
+
+    @Query("UPDATE checkup_attachments SET remote_path = :remotePath, remote_sha256 = :sha256, synced_at = :syncedAt WHERE id = :id")
+    suspend fun markUploaded(id: String, remotePath: String, sha256: String, syncedAt: String)
+
+    /** 软删除：置墓碑，等远端 DELETE 成功后再物理删行 */
+    @Query("UPDATE checkup_attachments SET deleted_at = :deletedAt WHERE id = :id")
+    suspend fun markDeleted(id: String, deletedAt: String)
+
+    /** 同步状态计数（用于备份页摘要）：[全部可见, 已同步, 待上传, 待远端清理] */
+    @Query(
+        "SELECT (SELECT COUNT(*) FROM checkup_attachments WHERE deleted_at IS NULL) AS visible, " +
+            "(SELECT COUNT(*) FROM checkup_attachments WHERE remote_path IS NOT NULL AND deleted_at IS NULL) AS synced, " +
+            "(SELECT COUNT(*) FROM checkup_attachments WHERE remote_path IS NULL AND deleted_at IS NULL) AS pending, " +
+            "(SELECT COUNT(*) FROM checkup_attachments WHERE deleted_at IS NOT NULL) AS toDelete"
+    )
+    fun observeSyncCounts(): Flow<AttachmentSyncCounts>
 }
+
+/** 附件同步摘要（Room 直接映射上面那条多子查询） */
+data class AttachmentSyncCounts(
+    val visible: Int = 0,
+    val synced: Int = 0,
+    val pending: Int = 0,
+    val toDelete: Int = 0,
+)

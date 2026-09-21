@@ -33,6 +33,10 @@ import javax.crypto.spec.SecretKeySpec
 object VaultCipher {
     const val MAGIC_V1 = "ASHKBAK1"
     const val MAGIC_V2 = "ASHKBAK2"
+    /** v3（v1.0.35）：密钥槽包装的是**稳定 vault key** 本身（而非每次随机 DEK）——见 encryptV3。 */
+    const val MAGIC_V3 = "ASHKBAK3"
+    /** 附件密文标识（与备份文件区分，防止误喂）。 */
+    const val BLOB_MAGIC = "ASHKBATT"
     private const val KDF = "pbkdf2-sha256"
     private const val ITER = 120_000
     private const val KEY_BITS = 256
@@ -40,7 +44,10 @@ object VaultCipher {
     private const val SALT_LEN = 16
     private const val IV_LEN = 12
     private const val DEK_LEN = 32
+    /** 稳定数据密钥长度（v3 / 附件共用） */
+    const val VAULT_KEY_LEN = 32
     private const val SLOT_AAD_PREFIX = "ASHKBAK2:slot:"
+    private const val SLOT_AAD_PREFIX_V3 = "ASHKBAK3:slot:"
 
     class VaultException(msg: String, cause: Throwable? = null) : Exception(msg, cause)
 
@@ -61,19 +68,42 @@ object VaultCipher {
     /**
      * v2 加密。recoveryCode 非空 → 双槽（口令 / 恢复码任一可解）；空 → 仅口令槽。
      * 秘密错配的槽在解密时逐槽尝试失败即跳过，互不干扰。
+     * ⚠️ 每次生成**随机 DEK**——附件不能用它（改口令即失效），附件走 [encryptV3] 的稳定密钥。
      */
     fun encrypt(pass: CharArray, recoveryCode: CharArray?, payload: String,
                 schemaVersion: Int, nowIso: String): ByteArray {
+        val dek = ByteArray(DEK_LEN).also { SecureRandom().nextBytes(it) }
+        return envelope(MAGIC_V2, dek, pass, recoveryCode, payload, schemaVersion, nowIso)
+    }
+
+    /**
+     * v3 加密（v1.0.35）：用**稳定的 vault key** 加密 payload，密钥槽包装的也是 vault key 本身。
+     *
+     * 为什么不让 DEK 每次随机：附件要上传到 WebDAV 长期保存，若用「某次备份的随机 DEK」加密，
+     * 用户改口令 / 重新生成恢复码后旧附件全部解不开。改为稳定密钥后：
+     *  - 改口令 = 只重包装密钥槽，所有密文（含云端附件）不用重传
+     *  - 换机恢复 = 从槽里解出 vault key，DB 与附件一起可读
+     * 安全性不降：槽仍由 PBKDF2(口令/恢复码) 保护，与 v2 同构。
+     */
+    fun encryptV3(vaultKey: ByteArray, pass: CharArray, recoveryCode: CharArray?, payload: String,
+                  schemaVersion: Int, nowIso: String): ByteArray {
+        require(vaultKey.size == VAULT_KEY_LEN) { "vault key 长度必须为 $VAULT_KEY_LEN 字节" }
+        return envelope(MAGIC_V3, vaultKey, pass, recoveryCode, payload, schemaVersion, nowIso)
+    }
+
+    /** v2 / v3 共用的信封装配：key 被逐槽包装，payload 用 key 加密。 */
+    private fun envelope(magic: String, key: ByteArray, pass: CharArray, recoveryCode: CharArray?,
+                         payload: String, schemaVersion: Int, nowIso: String): ByteArray {
         val rnd = SecureRandom()
-        val dek = ByteArray(DEK_LEN).also { rnd.nextBytes(it) }
         val payloadIv = ByteArray(IV_LEN).also { rnd.nextBytes(it) }
+        val prefix = slotAadPrefix(magic)
 
         val slots = JSONArray()
-        wrapSlot(slots, rnd, dek, "pass", pass)
-        recoveryCode?.let { wrapSlot(slots, rnd, dek, "recovery", it) }
+        wrapSlot(slots, rnd, key, "pass", pass, prefix)
+        recoveryCode?.let { wrapSlot(slots, rnd, key, "recovery", it, prefix) }
 
         val header = JSONObject().apply {
-            put("fmt", 2)
+            put("fmt", if (magic == MAGIC_V3) 3 else 2)
             put("cipher", "aes-256-gcm")
             put("schema_version", schemaVersion)
             put("created_at", nowIso)
@@ -82,20 +112,25 @@ object VaultCipher {
         }
         val headerBytes = header.toString().toByteArray(Charsets.UTF_8)
         val ct = Cipher.getInstance("AES/GCM/NoPadding").apply {
-            init(Cipher.ENCRYPT_MODE, SecretKeySpec(dek, "AES"), GCMParameterSpec(GCM_TAG_BITS, payloadIv))
+            init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(GCM_TAG_BITS, payloadIv))
             updateAAD(headerBytes) // AAD 绑定明文头防跨协议改头（协议 §2，与 v1 一致）
         }.doFinal(payload.toByteArray(Charsets.UTF_8))
-        return pack(MAGIC_V2, headerBytes, ct)
+        return pack(magic, headerBytes, ct)
     }
 
-    /** 用槽秘密（口令或恢复码）包 DEK，追加进 slots 数组。 */
-    private fun wrapSlot(slots: JSONArray, rnd: SecureRandom, dek: ByteArray, id: String, secret: CharArray) {
+    /** 槽 AAD 前缀随 magic 变：v2 文件必须仍用 "ASHKBAK2:slot:" 才能解开（历史文件不可回改）。 */
+    private fun slotAadPrefix(magic: String): String =
+        if (magic == MAGIC_V3) SLOT_AAD_PREFIX_V3 else SLOT_AAD_PREFIX
+
+    /** 用槽秘密（口令或恢复码）包 key，追加进 slots 数组。 */
+    private fun wrapSlot(slots: JSONArray, rnd: SecureRandom, key: ByteArray, id: String,
+                         secret: CharArray, aadPrefix: String) {
         val salt = ByteArray(SALT_LEN).also { rnd.nextBytes(it) }
         val iv = ByteArray(IV_LEN).also { rnd.nextBytes(it) }
         val wrapped = Cipher.getInstance("AES/GCM/NoPadding").apply {
             init(Cipher.ENCRYPT_MODE, deriveKey(secret, salt, ITER), GCMParameterSpec(GCM_TAG_BITS, iv))
-            updateAAD((SLOT_AAD_PREFIX + id).toByteArray(Charsets.UTF_8)) // 槽 id 进 AAD 防交换
-        }.doFinal(dek)
+            updateAAD((aadPrefix + id).toByteArray(Charsets.UTF_8)) // 槽 id 进 AAD 防交换
+        }.doFinal(key)
         slots.put(JSONObject().apply {
             put("id", id)
             put("kdf", KDF)
@@ -112,8 +147,8 @@ object VaultCipher {
     fun decrypt(secret: CharArray, file: ByteArray): Decrypted {
         if (file.size < 12) throw VaultException("文件过短，不是有效的 ASHKB 备份")
         val magic = String(file, 0, 8, Charsets.US_ASCII)
-        if (magic != MAGIC_V1 && magic != MAGIC_V2)
-            throw VaultException("文件头标识不符（期望 $MAGIC_V1/$MAGIC_V2）")
+        if (magic != MAGIC_V1 && magic != MAGIC_V2 && magic != MAGIC_V3)
+            throw VaultException("文件头标识不符（期望 $MAGIC_V1/$MAGIC_V2/$MAGIC_V3）")
         val headerLen = readIntBE(file, 8)
         if (headerLen <= 0 || 12 + headerLen >= file.size) throw VaultException("文件头长度非法")
         val headerBytes = file.copyOfRange(12, 12 + headerLen)
@@ -126,7 +161,7 @@ object VaultCipher {
         if (header.optString("cipher") != "aes-256-gcm")
             throw VaultException("不支持的加密算法 ${header.optString("cipher")}")
         return if (magic == MAGIC_V1) decryptV1(secret, header, headerBytes, ct)
-        else decryptV2(secret, header, headerBytes, ct)
+        else decryptSlotted(magic, secret, header, headerBytes, ct)
     }
 
     /** v1：口令直接派生 payload 密钥（历史文件，只读兼容）。 */
@@ -166,9 +201,15 @@ object VaultCipher {
             listOf(secret, RecoveryCode.normalize(String(secret)).toCharArray())
         else listOf(secret)
 
-    /** v2：逐槽尝试解包 DEK（任一槽秘密匹配即通过），再用 DEK 解 payload。 */
-    private fun decryptV2(secret: CharArray, header: JSONObject, headerBytes: ByteArray, ct: ByteArray): Decrypted {
+    /**
+     * v2 / v3 解密：逐槽尝试解包密钥（任一槽秘密匹配即通过），再用该密钥解 payload。
+     * v2 解出的是该文件的随机 DEK；v3 解出的是稳定 vault key（随 Decrypted.key 一并返回，
+     * 供恢复后写入 Keystore——附件与后续备份都用它）。
+     */
+    private fun decryptSlotted(magic: String, secret: CharArray, header: JSONObject,
+                               headerBytes: ByteArray, ct: ByteArray): Decrypted {
         val slots = header.optJSONArray("slots") ?: throw VaultException("文件头缺少密钥槽")
+        val prefix = slotAadPrefix(magic)
         var dek: ByteArray? = null
         outer@ for (cand in candidates(secret)) {
             for (i in 0 until slots.length()) {
@@ -183,7 +224,7 @@ object VaultCipher {
                 val unwrapped = try {
                     Cipher.getInstance("AES/GCM/NoPadding").apply {
                         init(Cipher.DECRYPT_MODE, deriveKey(cand, salt, iter), GCMParameterSpec(GCM_TAG_BITS, iv))
-                        updateAAD((SLOT_AAD_PREFIX + slot.optString("id")).toByteArray(Charsets.UTF_8))
+                        updateAAD((prefix + slot.optString("id")).toByteArray(Charsets.UTF_8))
                     }.doFinal(wrapped)
                 } catch (_: Exception) {
                     null // 本槽秘密不匹配——继续试下一槽
@@ -206,10 +247,55 @@ object VaultCipher {
             payload = String(plain, Charsets.UTF_8),
             schemaVersion = header.optInt("schema_version", 0),
             createdAt = header.optString("created_at"),
+            // v3 的密钥就是 vault key；v2 的是该文件私有 DEK（不应当作 vault key 采纳）
+            vaultKey = if (magic == MAGIC_V3) key else null,
         )
     }
 
-    data class Decrypted(val payload: String, val schemaVersion: Int, val createdAt: String)
+    // ======================= 附件密文（v1.0.35） =======================
+
+    /**
+     * 附件密文：[8B "ASHKBATT"][12B iv][ct+tag]，AES-256-GCM(key=vault key, AAD=附件 id)。
+     * AAD 绑定附件 id —— 即便有人能写服务器，也无法把 A 的密文冒充成 B。
+     */
+    fun encryptBlob(vaultKey: ByteArray, plain: ByteArray, attachmentId: String): ByteArray {
+        require(vaultKey.size == VAULT_KEY_LEN) { "vault key 长度必须为 $VAULT_KEY_LEN 字节" }
+        val iv = ByteArray(IV_LEN).also { SecureRandom().nextBytes(it) }
+        val ct = Cipher.getInstance("AES/GCM/NoPadding").apply {
+            init(Cipher.ENCRYPT_MODE, SecretKeySpec(vaultKey, "AES"), GCMParameterSpec(GCM_TAG_BITS, iv))
+            updateAAD(attachmentId.toByteArray(Charsets.UTF_8))
+        }.doFinal(plain)
+        val out = ByteArray(8 + IV_LEN + ct.size)
+        System.arraycopy(BLOB_MAGIC.toByteArray(Charsets.US_ASCII), 0, out, 0, 8)
+        System.arraycopy(iv, 0, out, 8, IV_LEN)
+        System.arraycopy(ct, 0, out, 8 + IV_LEN, ct.size)
+        return out
+    }
+
+    /** 解密附件密文；标识不符 / 密钥错 / 篡改 / id 不匹配均抛 VaultException。 */
+    fun decryptBlob(vaultKey: ByteArray, blob: ByteArray, attachmentId: String): ByteArray {
+        if (blob.size <= 8 + IV_LEN) throw VaultException("附件密文过短")
+        val magic = String(blob, 0, 8, Charsets.US_ASCII)
+        if (magic != BLOB_MAGIC) throw VaultException("附件密文标识不符（期望 $BLOB_MAGIC）")
+        val iv = blob.copyOfRange(8, 8 + IV_LEN)
+        val ct = blob.copyOfRange(8 + IV_LEN, blob.size)
+        return try {
+            Cipher.getInstance("AES/GCM/NoPadding").apply {
+                init(Cipher.DECRYPT_MODE, SecretKeySpec(vaultKey, "AES"), GCMParameterSpec(GCM_TAG_BITS, iv))
+                updateAAD(attachmentId.toByteArray(Charsets.UTF_8))
+            }.doFinal(ct)
+        } catch (e: Exception) {
+            throw VaultException("附件解密失败：密钥不匹配或文件已损坏", e)
+        }
+    }
+
+    data class Decrypted(
+        val payload: String,
+        val schemaVersion: Int,
+        val createdAt: String,
+        /** 仅 v3 非空：解出的稳定 vault key（恢复时应采纳到 Keystore）。 */
+        val vaultKey: ByteArray? = null,
+    )
 
     // ======================= v1 加密（仅回归测试生成历史样本） =======================
 

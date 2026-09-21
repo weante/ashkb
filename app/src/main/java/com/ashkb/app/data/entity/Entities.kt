@@ -171,7 +171,7 @@ data class KbEntry(
  * 备份导出的是数据库各表 JSON（见 BackupEngine），不含二进制文件；换机恢复后附件需重新导入。
  * 这是为保持备份轻量（WebDAV 上传 120s 超时）而做的取舍。
  */
-@Entity(tableName = "checkup_attachments", indices = [Index("checkup_id"), Index("created_at")])
+@Entity(tableName = "checkup_attachments", indices = [Index("checkup_id"), Index("created_at"), Index("remote_path")])
 data class CheckupAttachment(
     @PrimaryKey val id: String, // catt-xxxx
     /** 归属复诊记录（弱引用，可空自持——记录删除后附件仍可追溯） */
@@ -186,6 +186,18 @@ data class CheckupAttachment(
     @ColumnInfo(name = "display_name") val displayName: String? = null,
     @ColumnInfo(name = "note") val note: String? = null,
     @ColumnInfo(name = "created_at") val createdAt: String,
+    // ---- v12（v1.0.35）：WebDAV 附件同步 ----
+    /** 远端相对路径（`YYYY-MM-DD/<附件id>.enc`，口径见 domain/AttachmentPath）；null = 未上传。 */
+    @ColumnInfo(name = "remote_path") val remotePath: String? = null,
+    /** 上传密文的 SHA-256，用于完整性校验与重传判断 */
+    @ColumnInfo(name = "remote_sha256") val remoteSha256: String? = null,
+    @ColumnInfo(name = "synced_at") val syncedAt: String? = null,
+    /**
+     * 软删除墓碑：非空 = 本地已删、待远端同步清理。
+     * 直接物理删会留下「远端有、本地无」的孤儿且无从追溯——网络失败时靠它重试。
+     * 远端 DELETE 成功后由同步流程物理删行。
+     */
+    @ColumnInfo(name = "deleted_at") val deletedAt: String? = null,
 )
 
 /** R17 停药原因分类分级（D-2 §7：自行停药触发警示） */
@@ -611,7 +623,7 @@ data class EmergencyContact(
 // ===========================================================================
 
 enum class LedgerType(val label: String) {
-    BACKUP("备份"), RESTORE("恢复"), EXPORT("导出"), DRILL("演练");
+    BACKUP("备份"), RESTORE("恢复"), EXPORT("导出"), DRILL("演练"), ATTACH("附件同步");
 
     companion object { fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: BACKUP }
 }

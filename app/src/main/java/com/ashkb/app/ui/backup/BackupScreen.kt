@@ -36,6 +36,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -89,6 +90,14 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
     val ledger by vm.ledger.collectAsStateWithLifecycle()
     val davUrl by vm.davUrl.collectAsStateWithLifecycle()
     val davUser by vm.davUser.collectAsStateWithLifecycle()
+
+    // ---- v1.0.35 附件同步 ----
+    val attachSyncEnabled by vm.attachSyncEnabled.collectAsStateWithLifecycle()
+    val attachCounts by vm.attachCounts.collectAsStateWithLifecycle()
+    val attachSyncStage by vm.attachSyncStage.collectAsStateWithLifecycle()
+    val attachSyncMsg by vm.attachSyncMsg.collectAsStateWithLifecycle()
+    val attachBytes by vm.attachBytes.collectAsStateWithLifecycle()
+
     val context = LocalContext.current
 
     var backupPass by remember { mutableStateOf("") }
@@ -156,6 +165,9 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
             vm.consumeRecoveryReveal()
         }
     }
+
+    // 附件同步摘要是只读快照（不是 Flow）：进页面拉一次，同步结束后由 VM 自己再刷新
+    LaunchedEffect(Unit) { vm.refreshAttachStats() }
 
     Column(Modifier.fillMaxSize()) {
         ScreenTopBar(title = stringResource(R.string.me_backup_section), onBack = onBack)
@@ -315,6 +327,92 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
                 ) { Text(if (davUrl.isNotBlank()) stringResource(R.string.backup_modify_dav) else stringResource(R.string.backup_configure_dav)) }
+            }
+
+            // ---- 附件同步（v1.0.35）：逐附件加密上传，与 DB 备份各自独立 ----
+            SectionCard(title = stringResource(R.string.attach_sync_section)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.attach_sync_switch),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(
+                        checked = attachSyncEnabled,
+                        onCheckedChange = { vm.setAttachSyncEnabled(it) },
+                    )
+                }
+                Text(
+                    stringResource(R.string.attach_sync_switch_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                Text(
+                    stringResource(
+                        R.string.attach_sync_summary,
+                        attachCounts.visible, attachCounts.synced,
+                        attachCounts.pending, attachCounts.toDelete,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    stringResource(R.string.attach_sync_size, formatBytes(attachBytes)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Button(
+                        onClick = { vm.syncAttachments() },
+                        // 附件同步是一趟独立长任务（几百 MB），所以只看自身状态，不占用全局 busy
+                        enabled = attachSyncEnabled && davUrl.isNotBlank() && attachSyncStage == null,
+                        modifier = Modifier.heightIn(min = Size.touchMin),
+                    ) { Text(stringResource(R.string.attach_sync_button)) }
+                    attachSyncStage?.let { progress ->
+                        Text(
+                            buildString {
+                                append(stringResource(R.string.attach_sync_running))
+                                append(" ")
+                                append(progress)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                // 禁用态按钮自己不会解释原因，缺哪一步就直说是缺哪一步
+                if (davUrl.isBlank()) {
+                    Text(
+                        stringResource(R.string.attach_sync_need_webdav),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else if (!attachSyncEnabled) {
+                    Text(
+                        stringResource(R.string.attach_sync_need_enable),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                attachSyncMsg?.let { (ok, detail) ->
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        stringResource(
+                            if (ok) R.string.attach_sync_done else R.string.attach_sync_failed,
+                            detail,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (ok) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error,
+                    )
+                }
             }
 
             // ---- 恢复（协议 §6 五步） ----
@@ -636,6 +734,11 @@ private fun formatFileSize(bytes: Long): String = when {
     bytes >= 1_024L -> String.format(java.util.Locale.US, "%.0f KB", bytes / 1_024.0)
     else -> "$bytes B"
 }
+
+/** 附件本地占用：只分 MB / KB 两档（附件量级到不了 GB），同样锁 Locale 免小数点变逗号。 */
+private fun formatBytes(bytes: Long): String =
+    if (bytes >= 1_048_576L) String.format(java.util.Locale.US, "%.1f MB", bytes / 1_048_576.0)
+    else String.format(java.util.Locale.US, "%.0f KB", bytes / 1_024.0)
 
 // ===== WebDAV 配置 sheet（密码不回显，重新输入） =====
 @OptIn(ExperimentalMaterial3Api::class)

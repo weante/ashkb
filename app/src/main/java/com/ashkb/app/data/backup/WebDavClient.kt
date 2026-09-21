@@ -7,6 +7,8 @@ import java.net.URL
 import java.util.Base64
 import javax.net.ssl.HttpsURLConnection
 
+import com.ashkb.app.domain.AttachmentPath
+
 /**
  * WebDAV 客户端（零依赖实现：HttpURLConnection）。
  * 协议 §4 探针：PROPFIND(0) 地址检查 → MKCOL 确保目录 → PUT 写探针 → GET 回读 → DELETE 清探针；
@@ -158,6 +160,45 @@ class WebDavClient(
     }
 
     fun download(name: String): ByteArray = get("ashkb/backup/$name")
+
+    // ======================= v12（v1.0.35）附件同步 =======================
+    //
+    // 附件**逐个**上传（不打包）：单文件远小于服务商单文件上限，且天然是增量——只传新增，
+    // 流量最省。目录 ashkb/attachments/<YYYY-MM-DD>/，命名口径见 domain/AttachmentPath。
+
+    /** 确保附件日期目录存在。mkcol 对 405（已存在）不报错，天然幂等。 */
+    fun ensureAttachmentDir(dateFolder: String) {
+        mkcol("ashkb")
+        mkcol(AttachmentPath.DIR)
+        mkcol("${AttachmentPath.DIR}/$dateFolder")
+    }
+
+    /**
+     * 上传附件密文。**刻意不做上传后回读**——DB 备份会回读比对（协议 §4），
+     * 但附件逐个回读会让流量翻倍（几十个附件就是双倍），改为记录本地密文 SHA-256，
+     * 恢复/懒下载时再校验。
+     */
+    fun uploadAttachment(remotePath: String, data: ByteArray) {
+        requirePath(remotePath)
+        put(AttachmentPath.fullPathOf(remotePath), data)
+    }
+
+    fun downloadAttachment(remotePath: String): ByteArray {
+        requirePath(remotePath)
+        return get(AttachmentPath.fullPathOf(remotePath))
+    }
+
+    /** 删除远端附件；404 视为已不存在（幂等，重试安全）。 */
+    fun deleteAttachment(remotePath: String) {
+        requirePath(remotePath)
+        delete(AttachmentPath.fullPathOf(remotePath))
+    }
+
+    /** 拼 URL 前的最后一道防线：只放行本应用生成的路径形状，防备份脏值拼出越权路径。 */
+    private fun requirePath(remotePath: String) {
+        if (!AttachmentPath.isValidRemotePath(remotePath))
+            throw DavException("非法附件路径：$remotePath")
+    }
 
     private fun put(path: String, data: ByteArray) {
         val conn = open(path, "PUT")

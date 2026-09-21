@@ -5,12 +5,16 @@ import android.content.SharedPreferences
 import com.ashkb.app.data.backup.BackupEngine
 import com.ashkb.app.data.backup.KeystoreCipher
 import com.ashkb.app.data.backup.VaultCipher
+import com.ashkb.app.data.backup.VaultKeyStore
 import com.ashkb.app.data.backup.WebDavClient
 import com.ashkb.app.data.db.AppDatabase
+import com.ashkb.app.data.db.AttachmentSyncCounts
 import com.ashkb.app.data.db.Ids
 import com.ashkb.app.data.entity.BackupLedger
+import com.ashkb.app.data.entity.CheckupAttachment
 import com.ashkb.app.data.entity.LedgerStatus
 import com.ashkb.app.data.entity.LedgerType
+import com.ashkb.app.domain.AttachmentPath
 import com.ashkb.app.domain.RecoveryCode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -29,6 +33,10 @@ import java.time.format.DateTimeFormatter
 class BackupRepository(private val context: Context) {
     private val db = AppDatabase.get(context)
     private val ledgerDao = db.backupLedgerDao()
+
+    /** v1.0.35：稳定 vault key（备份 payload 与附件共用）与附件同步所需的本地读写。 */
+    private val vaultKeys = VaultKeyStore(context)
+    private val attachments = AttachmentRepository(context)
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("webdav_config", Context.MODE_PRIVATE)
@@ -125,7 +133,8 @@ class BackupRepository(private val context: Context) {
     /** 全量加密备份到本机（协议 §3 全量导出：ashkb-YYYYMMDD.ashkb）。 */
     suspend fun backupLocal(password: CharArray): BackupOutcome = withContext(Dispatchers.IO) {
         val exported = BackupEngine.export(supportDb(), nowIso())
-        val bytes = VaultCipher.encrypt(password, recoverySlot(), exported.payload,
+        // v3：用稳定 vault key 加密（附件与备份同密钥域，换机后附件才解得开）
+        val bytes = VaultCipher.encryptV3(vaultKeys.getOrCreate(), password, recoverySlot(), exported.payload,
             BackupEngine.schemaVersion(supportDb()), nowIso())
         val dir = File(context.filesDir, "backups").apply { mkdirs() }
         // 同日多次备份保留时分秒后缀
@@ -155,7 +164,7 @@ class BackupRepository(private val context: Context) {
         onStage("正在导出数据库快照…")
         val exported = BackupEngine.export(supportDb(), nowIso())
         onStage("正在加密（AES-256-GCM）…")
-        val bytes = VaultCipher.encrypt(password, recoverySlot(), exported.payload,
+        val bytes = VaultCipher.encryptV3(vaultKeys.getOrCreate(), password, recoverySlot(), exported.payload,
             BackupEngine.schemaVersion(supportDb()), nowIso())
         // X2：文件名带时间戳——同一天多次备份不再互相覆盖（旧按日命名 PUT 同名即覆盖）
         val name = "ashkb-backup-" +
@@ -215,6 +224,9 @@ class BackupRepository(private val context: Context) {
     suspend fun decryptAndSelfCheck(bytes: ByteArray, password: CharArray): DecryptedFile =
         withContext(Dispatchers.IO) {
             val d = VaultCipher.decrypt(password, bytes)
+            // v1.0.35：v3 备份携带稳定 vault key——本机没有才采纳（不覆盖本机已有密钥，
+            // 否则一次旧备份恢复会把本机附件密钥冲掉，已上传的附件立刻解不开）
+            d.vaultKey?.let { vaultKeys.adoptIfAbsent(it) }
             val root = JSONObject(d.payload)
             if (root.optString("format") != "ashkb-full") throw BackupEngine.BackupException("备份格式不正确")
             if (root.optInt("schema_version", 0) > BackupEngine.schemaVersion(supportDb()))
@@ -251,8 +263,8 @@ class BackupRepository(private val context: Context) {
             // 1. pre-restore 快照（退路）
             val snapshot = BackupEngine.export(supportDb(), nowIso())
             // 快照同样带恢复码槽——用户用恢复码完成恢复时，快照仍可用同一恢复码解开
-            val snapBytes = VaultCipher.encrypt(
-                snapshotPassword, recoverySlot(), snapshot.payload,
+            val snapBytes = VaultCipher.encryptV3(
+                vaultKeys.getOrCreate(), snapshotPassword, recoverySlot(), snapshot.payload,
                 BackupEngine.schemaVersion(supportDb()), nowIso())
             val dir = File(context.filesDir, "backups").apply { mkdirs() }
             val snapFile = dir.resolve("pre-restore-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))}.ashkb")
@@ -301,8 +313,8 @@ class BackupRepository(private val context: Context) {
             val before = BackupEngine.export(copy, now)
             // 2. 加密 → 解密（证明加密链路）
             val drillPass = "drill-${java.util.UUID.randomUUID()}"
-            // 演练口令随机即弃，无恢复码槽（单口令槽，v2 格式）
-            val bytes = VaultCipher.encrypt(drillPass.toCharArray(), null, before.payload,
+            // 演练口令随机即弃，无恢复码槽（单口令槽）；v3 格式——演练走的就是生产加密路径
+            val bytes = VaultCipher.encryptV3(vaultKeys.getOrCreate(), drillPass.toCharArray(), null, before.payload,
                 BackupEngine.schemaVersion(copy), now)
             val decrypted = VaultCipher.decrypt(drillPass.toCharArray(), bytes)
             // 3. 副本上恢复写入 + 双校验
@@ -428,5 +440,109 @@ class BackupRepository(private val context: Context) {
 
     suspend fun logFailed(type: LedgerType, target: String, msg: String) {
         log(type, false, target, null, null, null, msg)
+    }
+
+    // ======================= 附件同步（v1.0.35） =======================
+    //
+    // 逐个附件加密上传到 ashkb/attachments/<日期>/<附件id>.enc（不打包）。
+    // 与 DB 备份**分开操作**：DB 备份有 120s 超时，附件几百 MB 远超，混在一起必然失败。
+
+    /** UI 透传：同步开关（存 prefs，非密钥） */
+    fun attachmentSyncEnabled(): Boolean = attachments.isSyncEnabled()
+
+    fun setAttachmentSyncEnabled(on: Boolean) = attachments.setSyncEnabled(on)
+
+    fun observeAttachmentSyncCounts(): Flow<AttachmentSyncCounts> = attachments.observeSyncCounts()
+
+    suspend fun attachmentLocalBytes(): Long = attachments.totalBytes()
+
+    data class AttachmentSyncProgress(val phase: String, val done: Int, val total: Int, val failed: Int)
+
+    data class AttachmentSyncResult(
+        val uploaded: Int,
+        val deletedRemote: Int,
+        /** 本地文件已丢失且无远端副本——无从上传（如从旧备份恢复后的空壳行） */
+        val noLocal: Int,
+        val failed: Int,
+        val detail: String,
+    )
+
+    /**
+     * 批量补传 + 清理待删远端。
+     *
+     * 幂等：已上传的天然不在队列里；中途失败保留已完成部分，重跑继续。
+     * 刻意不做上传后回读（逐个回读流量翻倍），改为记录本地密文 SHA-256 供后续校验。
+     */
+    suspend fun syncAttachments(
+        onProgress: (AttachmentSyncProgress) -> Unit = {},
+    ): AttachmentSyncResult = withContext(Dispatchers.IO) {
+        if (!attachments.isSyncEnabled()) throw WebDavClient.DavException("附件同步已关闭")
+        val (url, user, pass) = webdavConfig()
+        if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
+        requireHttps(url)
+        val client = WebDavClient(url, user, pass)
+        val vaultKey = vaultKeys.getOrCreate()
+
+        var failed = 0
+
+        // 1. 先清墓碑：释放服务器空间，也让「删除」尽快闭环
+        val tombstones = attachments.pendingRemoteDelete()
+        var deleted = 0
+        tombstones.forEach { a ->
+            val p = a.remotePath
+            if (p == null) {
+                attachments.hardDelete(a.id) // 从未上传过，无需远端清理
+                return@forEach
+            }
+            runCatching { client.deleteAttachment(p) }
+                .onSuccess { attachments.hardDelete(a.id); deleted++ }
+                .onFailure { failed++ }
+        }
+
+        // 2. 补传
+        val pending = attachments.pendingUpload()
+        var uploaded = 0
+        var noLocal = 0
+        val ensured = mutableSetOf<String>()
+        onProgress(AttachmentSyncProgress("准备上传附件", 0, pending.size, failed))
+        pending.forEachIndexed { idx, a ->
+            onProgress(AttachmentSyncProgress("正在上传附件", idx, pending.size, failed))
+            val plain = attachments.readLocal(a)
+            if (plain == null) { noLocal++; return@forEachIndexed }
+            val folder = AttachmentPath.folderOf(a.createdAt)
+            // 每个日期目录只确保一次（MKCOL 幂等，但没必要重复往返）
+            if (ensured.add(folder)) runCatching { client.ensureAttachmentDir(folder) }
+            val blob = VaultCipher.encryptBlob(vaultKey, plain, a.id)
+            val remote = AttachmentPath.remotePathOf(a.createdAt, a.id)
+            runCatching { client.uploadAttachment(remote, blob) }
+                .onSuccess { attachments.markUploaded(a.id, remote, BackupEngine.sha256Hex(blob)); uploaded++ }
+                .onFailure { failed++ }
+        }
+        onProgress(AttachmentSyncProgress("附件同步完成", pending.size, pending.size, failed))
+
+        val detail = "上传 $uploaded / 待传 ${pending.size}；远端清理 $deleted / 待删 ${tombstones.size}" +
+            if (noLocal > 0) "；$noLocal 个本地文件缺失（无法上传）" else "" +
+            if (failed > 0) "；失败 $failed" else ""
+        log(LedgerType.ATTACH, failed == 0, "webdav", null, uploaded, failed == 0, detail)
+        AttachmentSyncResult(uploaded, deleted, noLocal, failed, detail)
+    }
+
+    /**
+     * 懒下载：本地文件缺失但已有远端副本时，按需拉回并解密。
+     *
+     * @return true = 已恢复本地文件；false = 远端没有 / 解密失败 / 未配置
+     */
+    suspend fun downloadAttachmentIfMissing(a: CheckupAttachment): Boolean = withContext(Dispatchers.IO) {
+        if (attachments.hasLocalFile(a)) return@withContext true
+        val remote = a.remotePath ?: return@withContext false
+        val (url, user, pass) = webdavConfig()
+        if (url.isBlank()) return@withContext false
+        requireHttps(url)
+        val vaultKey = vaultKeys.current() ?: return@withContext false
+        runCatching {
+            val blob = WebDavClient(url, user, pass).downloadAttachment(remote)
+            val plain = VaultCipher.decryptBlob(vaultKey, blob, a.id)
+            attachments.writeLocal(a, plain)
+        }.getOrDefault(false)
     }
 }

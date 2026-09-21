@@ -11,11 +11,14 @@ import com.ashkb.app.AshkbApplication
 import com.ashkb.app.R
 import com.ashkb.app.data.backup.BackupEngine
 import com.ashkb.app.data.backup.WebDavClient
+import com.ashkb.app.data.db.AttachmentSyncCounts
 import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.repo.BackupRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
@@ -69,6 +72,8 @@ class BackupViewModel(
         val (u, usr) = repo.webdavConfig()
         _davUrl.value = u
         _davUser.value = usr
+        // 附件统计不在这里拉：页面用 LaunchedEffect 拉，既满足"进页面就有数"，
+        // 又能在每次回到该页时刷新，避免 init 只跑一次的陈旧快照
     }
 
     // ---- 恢复流程状态（协议 §6 五步） ----
@@ -321,6 +326,62 @@ class BackupViewModel(
             type = mime
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+
+    // ======================= 附件同步（v1.0.35） =======================
+
+    private val _attachSyncEnabled = MutableStateFlow(repo.attachmentSyncEnabled())
+    val attachSyncEnabled: StateFlow<Boolean> = _attachSyncEnabled.asStateFlow()
+
+    private val _attachCounts = MutableStateFlow(AttachmentSyncCounts())
+    val attachCounts: StateFlow<AttachmentSyncCounts> = _attachCounts.asStateFlow()
+
+    /** 进度文案；null = 未在跑（按钮据此显示"正在同步"并禁用）。 */
+    private val _attachSyncStage = MutableStateFlow<String?>(null)
+    val attachSyncStage: StateFlow<String?> = _attachSyncStage.asStateFlow()
+
+    /**
+     * 结果文案：(是否成功, 明细)；null = 尚无结果。
+     *
+     * 与 message 不同，这里刻意不 getString 成型：成功/失败是两条不同模板，
+     * 把成败位和原始 detail 一起传出，模板与配色都由 Screen 一次决定，避免 VM 里塞 UI 语义。
+     */
+    private val _attachSyncMsg = MutableStateFlow<Pair<Boolean, String>?>(null)
+    val attachSyncMsg: StateFlow<Pair<Boolean, String>?> = _attachSyncMsg.asStateFlow()
+
+    private val _attachBytes = MutableStateFlow(0L)
+    val attachBytes: StateFlow<Long> = _attachBytes.asStateFlow()
+
+    fun setAttachSyncEnabled(on: Boolean) {
+        repo.setAttachmentSyncEnabled(on)
+        _attachSyncEnabled.value = on
+    }
+
+    /** 批量补传 + 清理待删远端。UI 侧应在开启开关且已配置 WebDAV 时才可点。 */
+    fun syncAttachments() {
+        viewModelScope.launch {
+            _attachSyncMsg.value = null
+            _attachSyncStage.value = null
+            try {
+                val r = repo.syncAttachments { p ->
+                    // onProgress 在 IO 线程回调：只写 MutableStateFlow（线程安全），不要碰 UI
+                    _attachSyncStage.value = if (p.total > 0) "${p.phase} ${p.done}/${p.total}" else p.phase
+                }
+                _attachSyncMsg.value = true to r.detail
+            } catch (e: Exception) {
+                _attachSyncMsg.value = false to (e.message ?: "")
+            } finally {
+                _attachSyncStage.value = null
+                refreshAttachStats()
+            }
+        }
+    }
+
+    fun refreshAttachStats() {
+        viewModelScope.launch {
+            _attachCounts.value = repo.observeAttachmentSyncCounts().first()
+            _attachBytes.value = repo.attachmentLocalBytes()
         }
     }
 

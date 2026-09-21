@@ -42,7 +42,7 @@ import com.ashkb.app.data.entity.WeightLog
         ImagingRecord::class, VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class, BackupLedger::class,
         CheckupAttachment::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -358,13 +358,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v12（v1.0.35）：附件接入 WebDAV 同步——`checkup_attachments` 补 4 列：
+         * `remote_path`（远端相对路径，null = 未上传）、`remote_sha256`、`synced_at`、
+         * `deleted_at`（软删除墓碑，待远端清理）。
+         *
+         * 全部可空：旧备份无这些列 → 恢复后 = 未上传 / 未删除，合法业务态，**无需回填**。
+         */
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `checkup_attachments` ADD COLUMN `remote_path` TEXT")
+                db.execSQL("ALTER TABLE `checkup_attachments` ADD COLUMN `remote_sha256` TEXT")
+                db.execSQL("ALTER TABLE `checkup_attachments` ADD COLUMN `synced_at` TEXT")
+                db.execSQL("ALTER TABLE `checkup_attachments` ADD COLUMN `deleted_at` TEXT")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_checkup_attachments_remote_path` ON `checkup_attachments` (`remote_path`)")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext, AppDatabase::class.java, "ashkb.db"
                 ).addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-                    MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11
+                    MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12
                 ).build().also { instance = it }
             }
     }
