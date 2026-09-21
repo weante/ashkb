@@ -64,7 +64,12 @@ class AshkbApplication : Application() {
                 val today = LocalDate.now()
                 healthRepository.checkFlareDayAlert(today)
                 healthRepository.checkReviewDue(today.toString())
-            }.onFailure { Log.w("ASHKB", "startup task failed", it) }
+            }.onFailure {
+                // v1.0.41：不能只写 Logcat——v1.0.39/40 的根因正是「首次失败被这里吞掉」，
+                // 后续二次触碰才抛 NoClassDefFoundError，导致崩溃留档只看到二次现象。同步留档。
+                Log.w("ASHKB", "startup task failed", it)
+                CrashLogger.recordNonFatal(this@AshkbApplication, "启动期例行工作", it)
+            }
         }
     }
 

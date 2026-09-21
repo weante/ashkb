@@ -4,6 +4,51 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.41] — 2026-09-21
+
+**修复「康复计划 → 添加模板」闪退**（真机留档：`java.lang.NoClassDefFoundError: K1.n`）。
+
+⚠️ **无数据库结构变更**（仍为 Room v15），可覆盖安装。
+
+### 根因（v1.0.40 只是掩盖，并未修复）
+
+用本次 release 的 `mapping.txt` 反查混淆名：`K1.n` = `com.ashkb.app.domain.ExercisePlanTemplates`
+（B7 周期康复计划模板对象）。逐层排除：
+
+- 该类**及其嵌套类 `$Template` / `$WeekSpec` 都在 dex 里**（`dexdump` 列出全部 4022 个类定义，
+  `LK1/n;` / `LK1/l;` / `LK1/m;` 均存在）⇒ 不是「被裁剪」；
+- 类内 `<clinit>` 只有 `listOf(...)` 与 `Regex(...)`，且 **JVM 单测 `ExercisePlanTemplatesTest` 全绿**
+  ⇒ 不是逻辑错误。
+
+R8 产物 `usage.txt` 显示该类的 `INSTANCE` 字段被删除、`pending` / `toJson` / `esc` / `unesc` /
+`targetDays` 被**静态化**，`<clinit>` 亦进入处理清单；同时唯一以 `ExercisePlanTemplates.WeekSpec`
+作签名类型的 `ExercisePlanProgress` 被 R8 **整类删除并内联**。
+⇒ **R8 对 Kotlin `object` 单例（含嵌套 data class）的激进优化**，产出的类在 ART 上无法完成初始化。
+
+失败链条（与真机现象完全吻合）：
+
+1. **启动时** `AshkbApplication` 调用 `seedExercisePlans()` 首次触碰该类 → 初始化失败；
+2. 该异常被 v1.0.40 新增的启动兜底 `runCatching{}.onFailure{Log.w}` **静默吞掉** → 进程存活，
+   但 ART 已把该类标记为「错误状态」；
+3. 点「添加模板」二次触碰 → 抛 `NoClassDefFoundError` → 未捕获 → 闪退。
+
+⇒ **v1.0.40 的启动兜底把 v1.0.39 的冷启动闪退"藏"了起来**（崩溃从冷启动挪到了点击），
+并非真正修复；此前将 v1.0.39 闪退归因于「数据库迁移竞态」的判断是**错误的**。
+
+### 修复
+
+1. **`proguard-rules.pro` 完整保留该组领域类（治本）**：`ExercisePlanTemplates` 与
+   `ExercisePlanProgress` 及其嵌套类 `-keep { *; }`，禁止裁剪 / 优化 / 改名。
+2. **启动期被吞掉的异常也留档**：新增 `CrashLogger.recordNonFatal()`（写 `last_nonfatal.txt`），
+   `AshkbApplication.onFailure` 除 Logcat 外同步留档——不再丢掉「首次失败」。
+3. **崩溃摘要带 `Caused by` 与栈帧**：release 包类名经混淆，原先按 `at com.ashkb` 过滤在混淆后
+   恒为空、摘要退化成一行；现取「异常首行 + Caused by 首行 + 前 4 帧」，可用 `mapping.txt` 反查。
+
+### 验证
+
+- 单测 264 全绿；release 构建后复核 `usage.txt`：该组类不再出现在 R8 处理清单中。
+- 装机：康复计划 → 添加模板，应正常种入 4 / 8 / 12 周模板且不闪退。
+
 ## [v1.0.40] — 2026-09-21
 
 **热修：v1.0.39 冷启动闪退**，并加入崩溃日志留档，便于定位此类问题。

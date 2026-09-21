@@ -8,53 +8,87 @@ import java.time.LocalDateTime
 /**
  * v1.0.40：崩溃日志留档（**只写本地 + Logcat，不上报**）。
  *
- * 背景：本应用是纯离线自用工具，没有崩溃上报通道；一旦冷启动闪退，开发者拿不到任何线索，
- * 只能靠猜——这正是 v1.0.39 闪退排查的困境。
- *
- * 做法：把未捕获异常的堆栈写入 `filesDir/last_crash.txt`（`adb pull` 可拉取），
- * 并在**下次启动**时由界面读取一次、以 Snackbar 摘要提示（便于截图反馈），读后即清。
+ * v1.0.41 两处改进（起因：v1.0.39/40 的 `NoClassDefFoundError: K1.n` 极难定位）：
+ * 1. **被业务兜底吞掉的异常也留档**（`last_nonfatal.txt`）——那次崩溃的真实链条是
+ *    「启动期首次触碰 → 初始化失败 → 被 `runCatching` 吞掉 → 稍后二次触碰才抛
+ *    `NoClassDefFoundError`」。只记未捕获异常会丢掉根因。
+ * 2. **摘要带上 `Caused by` 与栈帧**——release 包类名经 R8 混淆（如 `K1.n`），
+ *    原先「只取 `at com.ashkb` 帧」在混淆后恒为空，摘要退化成一行，无法定位；
+ *    现取「异常首行 + Caused by 首行 + 前 4 帧」，可用 `mapping.txt` 反查。
  *
  * 与「零网络权限 / 不上报」的红线一致：本文件不含任何上传逻辑。
  */
 object CrashLogger {
 
     private const val TAG = "ASHKB-CRASH"
-    private const val FILE_NAME = "last_crash.txt"
+    private const val FILE_FATAL = "last_crash.txt"
+    private const val FILE_NONFATAL = "last_nonfatal.txt"
 
     /** 安装全局未捕获异常处理器；记录后仍交还原处理器（保持原有崩溃行为）。 */
     fun install(context: Context) {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             runCatching { Log.e(TAG, "uncaught exception", error) }
-            runCatching { record(context, thread, error) }
+            runCatching { write(context, FILE_FATAL, thread, error) }
             previous?.uncaughtException(thread, error)
         }
     }
 
-    private fun record(context: Context, thread: Thread, error: Throwable) {
+    /**
+     * 记录**被业务代码兜底吞掉**的异常（非致命，追加写入，一次可见多次失败）。
+     * 与致命崩溃分开存：`takeLast` 会同时取出并标注，避免前者被后者覆盖。
+     */
+    fun recordNonFatal(context: Context, label: String, error: Throwable) {
+        runCatching {
+            val text = buildString {
+                append("time=").append(LocalDateTime.now())
+                    .append(" label=").append(label).append('\n')
+                append(Log.getStackTraceString(error))
+                append("\n\n")
+            }
+            File(context.filesDir, FILE_NONFATAL).appendText(text)
+        }
+    }
+
+    private fun write(context: Context, name: String, thread: Thread, error: Throwable) {
         val text = buildString {
             append("time=").append(LocalDateTime.now()).append('\n')
             append("thread=").append(thread.name).append('\n')
             append(Log.getStackTraceString(error))
         }
-        File(context.filesDir, FILE_NAME).writeText(text)
+        File(context.filesDir, name).writeText(text)
     }
 
-    /** 读取并清空上次崩溃全文（下次启动调用；无记录返回 null）。 */
+    /** 读取并清空上次记录（优先致命崩溃，非致命一并带出并标注）；无记录返回 null。 */
     fun takeLast(context: Context): String? {
-        val f = File(context.filesDir, FILE_NAME)
+        val fatal = readAndClear(context, FILE_FATAL)
+        val nonFatal = readAndClear(context, FILE_NONFATAL)
+        return when {
+            fatal != null && nonFatal != null ->
+                nonFatal + "\n===== 致命崩溃 =====\n" + fatal
+            fatal != null -> fatal
+            else -> nonFatal
+        }
+    }
+
+    private fun readAndClear(context: Context, name: String): String? {
+        val f = File(context.filesDir, name)
         if (!f.exists()) return null
         val text = runCatching { f.readText() }.getOrNull()
         runCatching { f.delete() }
         return text?.takeIf { it.isNotBlank() }
     }
 
-    /** 摘要：异常首行 + 第一条应用内栈帧（够定位，也能塞进 Snackbar）。 */
+    /**
+     * 摘要：异常首行 + `Caused by` 首行 + 前 4 条栈帧。
+     * 刻意**不**按包名过滤——release 包类名被混淆，过滤会得到空摘要。
+     */
     fun summary(text: String): String {
         val lines = text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
         val head = lines.firstOrNull { it.contains("Exception") || it.contains("Error") }
             ?: lines.firstOrNull().orEmpty()
-        val where = lines.firstOrNull { it.startsWith("at com.ashkb") }
-        return listOfNotNull(head.ifBlank { null }, where).joinToString(" @ ")
+        val caused = lines.firstOrNull { it.startsWith("Caused by:") }
+        val frames = lines.filter { it.startsWith("at ") }.take(4)
+        return (listOfNotNull(head.ifBlank { null }, caused) + frames).joinToString("\n")
     }
 }

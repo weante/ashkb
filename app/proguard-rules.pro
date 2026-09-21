@@ -14,3 +14,14 @@
 -keepclasseswithmembers class com.ashkb.app.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# v1.0.41（B7 闪退修复）：R8 对 Kotlin object 单例（含嵌套 data class）的激进优化在 ART 上
+# 会产出无法完成初始化的类 —— 真机表现为 NoClassDefFoundError: K1.n
+# （mapping 反查 = com.ashkb.app.domain.ExercisePlanTemplates）。
+# usage.txt 显示该类 INSTANCE 字段被删、成员被静态化，且 ExercisePlanProgress（唯一以
+# ExercisePlanTemplates.WeekSpec 作签名类型的类）被整类删除并内联。
+# 故对这两个纯领域类及其嵌套类做完整保留（禁裁剪 / 优化 / 改名）。
+-keep class com.ashkb.app.domain.ExercisePlanTemplates { *; }
+-keep class com.ashkb.app.domain.ExercisePlanTemplates$* { *; }
+-keep class com.ashkb.app.domain.ExercisePlanProgress { *; }
+-keep class com.ashkb.app.domain.ExercisePlanProgress$* { *; }

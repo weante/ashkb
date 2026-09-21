@@ -128,7 +128,7 @@ fun AppShell() {
     val appContext = LocalContext.current.applicationContext
     LaunchedEffect(Unit) {
         CrashLogger.takeLast(appContext)?.let { log ->
-            snackbar.showSnackbar("上次启动异常：" + CrashLogger.summary(log).take(300))
+            snackbar.showSnackbar("上次异常：\n" + CrashLogger.summary(log).take(600))
         }
     }
 
