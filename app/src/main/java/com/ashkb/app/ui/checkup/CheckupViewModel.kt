@@ -76,6 +76,24 @@ class CheckupViewModel(
         viewModelScope.launch { repo.deactivateCheckupItem(id) }
     }
 
+    // ---- C10 生物制剂筛查 / 续方节点一键种入 ----
+    // 结果暴露 Int? 而非文案：本 VM 不持有 Context，文案由 UI 侧 stringResource 组装，
+    // 语言区域切换时无需重建 VM 也能正确取词。
+    private val _seedResult = MutableStateFlow<Int?>(null)
+    val seedResult: StateFlow<Int?> = _seedResult.asStateFlow()
+
+    /** 幂等种入结核 / 乙肝 / 丙肝筛查 + 生物制剂续方随访节点，结果为本次新增条数。 */
+    fun seedBiologicScreening() {
+        // 先清旧结果：连点按钮时不会残留上一次的"已添加 N 个节点"
+        _seedResult.value = null
+        viewModelScope.launch { _seedResult.value = repo.seedBiologicScreeningItems() }
+    }
+
+    /** UI 展示过结果后清空（本页退出时调用），避免下次进入看到过期文案。 */
+    fun consumeSeedResult() {
+        _seedResult.value = null
+    }
+
     // ---- 复诊记录 ----
     fun saveCheckupRecord(record: CheckupRecord) {
         viewModelScope.launch { repo.saveCheckupRecord(record) }

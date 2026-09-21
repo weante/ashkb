@@ -41,9 +41,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
+import com.ashkb.app.data.entity.DoseState
 import com.ashkb.app.data.entity.MedFrequency
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.StopReason
+import com.ashkb.app.domain.StopWarning
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.components.SectionCard
@@ -135,8 +137,7 @@ fun MedsScreen(
 
     stopTarget?.let { med ->
         StopMedDialog(
-            medName = "${med.name} ${med.dose}",
-            isBiologic = med.medClass.equals("BIOLOGIC", true),
+            med = med,
             onConfirm = { reason, note ->
                 vm.stopMedication(context, med, reason, note)
                 stopTarget = null
@@ -171,6 +172,10 @@ private fun MedRow(med: Medication, onEdit: () -> Unit, onStop: () -> Unit) {
                 if (needsCheck) {
                     StatusChip(stringResource(R.string.med_verify_todo_tag), StatusTone.Warning, Icons.Rounded.WarningAmber)
                 }
+                // C6：医嘱减量方案进行中（此态下停药不提示「自行停药」风险）
+                if (DoseState.of(med) == DoseState.TAPERING) {
+                    StatusChip(DoseState.TAPERING.label, StatusTone.Info)
+                }
             }
         }
         // v1.0.31：编辑在用药品参数（剂量 / 频次 / 时刻 / 周期等）
@@ -181,14 +186,15 @@ private fun MedRow(med: Medication, onEdit: () -> Unit, onStop: () -> Unit) {
     }
 }
 
-/** R17 停药原因分类：self_stopped / side_effect 弹警示（D-2 §7） */
+/** R17 停药原因分类：self_stopped / side_effect 弹警示（D-2 §7）；C6 起减量中豁免「自行停药」警示 */
 @Composable
 private fun StopMedDialog(
-    medName: String,
-    isBiologic: Boolean,
+    med: Medication,
     onConfirm: (reason: String, note: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    // 标题保留剂量，与停用前的展示一致（只显示药名会让人不确定停的是哪一条）
+    val medName = "${med.name} ${med.dose}"
     var reason by remember { mutableStateOf(StopReason.DOCTOR_SCHEDULED) }
     var note by remember { mutableStateOf("") }
 
@@ -215,7 +221,7 @@ private fun StopMedDialog(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                reason.warning?.let { w ->
+                StopWarning.forStop(reason, med)?.let { w ->
                     Spacer(Modifier.height(Spacing.sm))
                     Text(
                         w,
@@ -223,7 +229,7 @@ private fun StopMedDialog(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
-                if (isBiologic && reason == StopReason.SELF_STOPPED) {
+                if (StopWarning.showBiologicStopWarning(reason, med)) {
                     Spacer(Modifier.height(Spacing.xs))
                     Text(
                         stringResource(R.string.med_bio_stop_warning),

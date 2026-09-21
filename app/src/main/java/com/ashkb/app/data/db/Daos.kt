@@ -297,6 +297,10 @@ interface SupplementLogDao {
 
     @Upsert
     suspend fun upsert(log: SupplementLog)
+
+    /** C2（v1.0.37）：补剂依从统计——按状态计数（与 medication_logs 同口径）。 */
+    @Query("SELECT COUNT(*) FROM supplement_logs WHERE date BETWEEN :from AND :to AND status = :status")
+    suspend fun countBetweenStatus(from: String, to: String, status: String): Int
 }
 
 @Dao

@@ -31,6 +31,11 @@ class ReportRepository(private val context: Context) {
         val medTotal: Int, val medRatePct: Int,
     )
 
+    /** C2（v1.0.37）：补剂（营养）依从统计——与用药同口径（部分完成计 0.5）。 */
+    data class SupplementAdherence(
+        val done: Int, val partial: Int, val skipped: Int, val total: Int, val ratePct: Int,
+    )
+
     data class ExerciseStat(val doneCount: Int, val skippedCount: Int, val totalMinutes: Int)
 
     data class SymptomStat(
@@ -41,6 +46,7 @@ class ReportRepository(private val context: Context) {
 
     data class Overview(
         val adherence: Adherence,
+        val supplement: SupplementAdherence,
         val exercise: ExerciseStat,
         val symptom: SymptomStat,
         val flareCount: Int, val flareActive: Boolean,
@@ -85,6 +91,14 @@ class ReportRepository(private val context: Context) {
         val total = done + partial + skipped
         val rate = if (total == 0) 0 else ((done + partial * 0.5) / total * 100).toInt()
 
+        // C2（v1.0.37）：补剂（营养）依从——与用药同口径（部分完成计 0.5）
+        val supDao = db.supplementLogDao()
+        val supDone = supDao.countBetweenStatus(f, t, "done")
+        val supPartial = supDao.countBetweenStatus(f, t, "partial")
+        val supSkipped = supDao.countBetweenStatus(f, t, "skipped")
+        val supTotal = supDone + supPartial + supSkipped
+        val supRate = if (supTotal == 0) 0 else ((supDone + supPartial * 0.5) / supTotal * 100).toInt()
+
         val exLogs = db.exerciseLogDao().between(f, t)
         val exDone = exLogs.count { it.status == "done" }
         val exSkipped = exLogs.count { it.status != "done" }
@@ -111,6 +125,7 @@ class ReportRepository(private val context: Context) {
 
         Overview(
             adherence = Adherence(days, done, partial, skipped, total, rate),
+            supplement = SupplementAdherence(supDone, supPartial, supSkipped, supTotal, supRate),
             exercise = ExerciseStat(exDone, exSkipped, exMin),
             symptom = SymptomStat(
                 daysRecorded = symptoms.size,

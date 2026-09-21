@@ -39,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 
 import com.ashkb.app.R
 import com.ashkb.app.data.db.Ids
+import com.ashkb.app.data.entity.DoseState
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.entity.MedClass
 import com.ashkb.app.data.entity.MedFrequency
@@ -91,6 +92,9 @@ fun MedEditScreen(
     var prnReason by rememberSaveable { mutableStateOf("") }
     var storage by rememberSaveable { mutableStateOf("") }
     var startDate by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
+    // ---- C6 服药三态：固定 / 按需 / 减量中（默认固定，编辑时按原值预填） ----
+    var doseState by rememberSaveable { mutableStateOf(DoseState.FIXED) }
+    var taperNote by rememberSaveable { mutableStateOf("") }
 
     // ---- 第二步 R03 ----
     var hits by remember { mutableStateOf<List<KbEntry>?>(null) }
@@ -122,6 +126,9 @@ fun MedEditScreen(
         prnReason = med.prnReason ?: ""
         storage = med.storage ?: ""
         startDate = med.startDate
+        // C6：未显式设置（旧数据）时按 frequency 推断
+        doseState = DoseState.of(med)
+        taperNote = med.taperNote ?: ""
         doctorTold = med.checkDoctorTold
         leafletRead = med.checkLeafletRead
     }
@@ -148,6 +155,9 @@ fun MedEditScreen(
         injCycleDays = if (route == "injection") cycleDays.toIntOrNull() ?: 14 else null,
         storage = storage.trim().ifBlank { null },
         takeWithFood = if (route == "oral") food else null,
+        // C6：服药状态；减量备注仅在「减量中」时落库（切回固定 / 按需即清空，避免残留脏备注）
+        doseState = doseState.name,
+        taperNote = if (doseState == DoseState.TAPERING) taperNote.trim().ifBlank { null } else null,
         checkDoctorTold = doctorTold,
         checkLeafletRead = leafletRead,
         interactionCheckDate = original?.interactionCheckDate
@@ -384,6 +394,27 @@ fun MedEditScreen(
                     label = { Text(stringResource(R.string.med_storage_hint)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // C6：服药三态（固定 / 按需 / 减量中），与分类、给药途径同为单选 chip
+                Text(stringResource(R.string.med_dose_state_label), style = MaterialTheme.typography.labelMedium)
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                    DoseState.entries.forEach { s ->
+                        FilterChip(selected = doseState == s, onClick = { doseState = s }, label = { Text(s.label) })
+                    }
+                }
+                if (doseState == DoseState.TAPERING) {
+                    OutlinedTextField(
+                        taperNote, { taperNote = it },
+                        label = { Text(stringResource(R.string.med_taper_note_label)) },
+                        placeholder = { Text(stringResource(R.string.med_taper_note_hint)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    // 说明「减量中」在停药流程里豁免自行停药警示
+                    Text(
+                        stringResource(R.string.med_taper_exempt_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             } else {
                 // ---- 第二步：R03 核对清单 ----
                 val h = hits

@@ -20,6 +20,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +62,13 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
     val labRecent by vm.labRecent.collectAsStateWithLifecycle()
     val labLimit by vm.labLimit.collectAsStateWithLifecycle()
     val imagingRecords by vm.imagingRecords.collectAsStateWithLifecycle()
+    val seedResult by vm.seedResult.collectAsStateWithLifecycle()
+
+    // C10 种入结果是本页的一次性反馈：VM 常驻在 AppShell，退出本页时清空，
+    // 否则下次进来还会看到上次的"已添加 N 个节点"
+    DisposableEffect(Unit) {
+        onDispose { vm.consumeSeedResult() }
+    }
 
     var showItemForm by remember { mutableStateOf(false) }
     var showRecordForm by remember { mutableStateOf(false) }
@@ -105,6 +113,8 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
                     items = items,
                     onAdd = { showItemForm = true },
                     onDeactivate = { vm.deactivateCheckupItem(it) },
+                    seedResult = seedResult,
+                    onSeed = { vm.seedBiologicScreening() },
                 )
                 CheckupTab.RECORDS -> CheckupRecordsList(
                     records = records,

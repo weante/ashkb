@@ -43,7 +43,11 @@ enum class CheckStatus(val label: String) { DONE("完成"), PARTIAL("部分完�
 
 enum class SkipReason(val label: String) {
     TOO_BUSY("太忙"), UNWELL("身体不适"), HOSPITALIZED("住院"),
-    SIDE_EFFECT("疑似副作用"), OTHER("其他")
+    SIDE_EFFECT("疑似副作用"),
+    // C5（v1.0.37）：对齐规划口径的漏服原因（遗忘 / 外出 / 药物用完）。
+    // 新增项追加在 OTHER 之前——枚举 key 以 name 存库，追加不影响历史数据。
+    FORGOT("遗忘"), OUTING("外出"), RUN_OUT("药物用完"),
+    OTHER("其他")
 }
 
 enum class Reaction(val label: String) {
@@ -90,6 +94,13 @@ data class Medication(
     @ColumnInfo(name = "route") val route: String, // oral / injection
     @ColumnInfo(name = "dose") val dose: String,
     @ColumnInfo(name = "frequency") val frequency: String, // MedFrequency.name
+    /**
+     * C6（v1.0.37）：服药三态显式标记（DoseState.name）。null = 未设置，按 frequency 推断。
+     * 可空以兼容旧备份（旧备份无此列，恢复后为 NULL）。
+     */
+    @ColumnInfo(name = "dose_state") val doseState: String? = null,
+    /** C6：减量方案备注（如「泼尼松 10mg→5mg，每周减 1mg，医生 9/15 医嘱」） */
+    @ColumnInfo(name = "taper_note") val taperNote: String? = null,
     @ColumnInfo(name = "prn_reason") val prnReason: String? = null,
     /** 实现层增补 D-1：口服各槽位时刻 JSON ["08:00","20:00"]；frequency=prn 时为空 */
     @ColumnInfo(name = "take_times") val takeTimes: String? = null,
@@ -207,10 +218,32 @@ enum class StopReason(val label: String, val warning: String?) {
     SELF_STOPPED("自行停药", "自行停药有病情反弹风险——生物制剂尤其不建议自行停用或减量，任何调整请与风湿科医生确认。"),
     SIDE_EFFECT("副作用", "建议联系医生说明副作用表现，由医生判断停药 / 换药或对症处理。"),
     EXAM_RESULT("检查结果调整", null),
+    // C5（v1.0.37）：对齐规划口径的停药原因（感染发热 / 准备手术 / 经济原因）
+    INFECTION("感染发热", "感染发热期间免疫抑制类药物可能需暂缓，请先联系医生确认是否停药及何时恢复。"),
+    SURGERY("准备手术", "部分药物（尤其生物制剂 / 免疫抑制剂）需术前停用并错开手术窗口，请与医生确认停药时间。"),
+    FINANCIAL("经济原因", "因经济原因停药请与医生沟通替代方案，不建议自行中断治疗。"),
     OTHER("其他", null);
 
     companion object {
         fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: OTHER
+    }
+}
+
+/**
+ * C6（v1.0.37）：服药三态——固定 / 按需 / 减量中。
+ *
+ * 「减量中」= 医生批准的减量方案进行中：此态下**不触发停药警示**（见 domain/StopWarning），
+ * 避免把医嘱减量误报成自行停药风险。
+ */
+enum class DoseState(val label: String) {
+    FIXED("固定"), PRN("按需"), TAPERING("减量中");
+
+    companion object {
+        fun fromKey(k: String?): DoseState? = entries.firstOrNull { it.name.equals(k, true) }
+
+        /** 未显式设置时按 frequency 推断：PRN → 按需，其余 → 固定。 */
+        fun of(med: Medication): DoseState =
+            fromKey(med.doseState) ?: if (MedFrequency.fromKey(med.frequency) == MedFrequency.PRN) PRN else FIXED
     }
 }
 

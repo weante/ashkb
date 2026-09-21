@@ -23,6 +23,7 @@ import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.TrendingDown
 import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,6 +59,7 @@ import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.ImportTemplates
 import com.ashkb.app.domain.LabImport
 import com.ashkb.app.domain.LabImportRow
+import com.ashkb.app.domain.LabUnits
 import com.ashkb.app.domain.ReportImportParser
 import com.ashkb.app.R
 import com.ashkb.app.ui.components.DividerList
@@ -118,13 +120,46 @@ private fun RowScope.LabRow(lab: LabResult) {
     }
 }
 
-/** 化验分组：异常项置顶，正常项默认折叠——复诊沟通先看要紧的。 */
+/**
+ * C3：把一段化验按「项目名 + 单位」成组渲染——同一项目跨院 / 换设备用了不同单位时，
+ * 不会被误当成同一列数值直接比较。组头用 R.string.lab_unit_label 标注单位（unit 为空则不占行）。
+ */
+@Composable
+private fun LabUnitGroups(rows: List<LabResult>) {
+    val groups = remember(rows) { LabUnits.groupByUnit(rows) }
+    // 只有「同一项目存在多个单位」时才需要标出单位——否则行内已带单位，再挂一行会白白把列表拉长一倍
+    val mixed = remember(rows) { LabUnits.mixedUnitTests(rows).toSet() }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        groups.forEachIndexed { index, group ->
+            if (index > 0) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                if (group.testName in mixed) {
+                    group.unit?.let { unit ->
+                        Text(
+                            stringResource(R.string.lab_unit_label, unit),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                DividerList(items = group.results, key = { lab -> lab.id }) { lab -> LabRow(lab) }
+            }
+        }
+    }
+}
+
+/**
+ * 化验分组：异常项置顶，正常项默认折叠——复诊沟通先看要紧的。
+ * C3：段内再按「项目名 + 单位」分组，异常 / 正常两段的划分与折叠开关保持不变（折叠状态不退化）。
+ */
 @Composable
 private fun LabGroup(rows: List<LabResult>) {
     val (abnormal, normal) = remember(rows) { rows.partition { it.isAbnormal() } }
     var showNormal by remember { mutableStateOf(false) }
     if (abnormal.isNotEmpty()) {
-        DividerList(items = abnormal, key = { it.id }) { lab -> LabRow(lab) }
+        LabUnitGroups(abnormal)
     }
     if (normal.isNotEmpty()) {
         if (abnormal.isNotEmpty()) {
@@ -134,7 +169,7 @@ private fun LabGroup(rows: List<LabResult>) {
             )
         }
         if (showNormal) {
-            DividerList(items = normal, key = { it.id }) { lab -> LabRow(lab) }
+            LabUnitGroups(normal)
         }
         TextButton(
             onClick = { showNormal = !showNormal },
@@ -192,6 +227,8 @@ internal fun LabsList(
     // 写在 item/forEach 内会随每次重组重跑 groupBy / maxOfOrNull（数十条化验 × 每次重组）
     val grouped = remember(labs) { labs.groupBy { it.date } }
     val latestDate = remember(labs) { labs.maxOfOrNull { it.date } }
+    // C3：同一项目存在多个单位（跨院 / 换设备）时，列表顶部给一条「数值不可直接比较」的提示
+    val mixedUnits = remember(labs) { LabUnits.mixedUnitTests(labs) }
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -212,6 +249,16 @@ internal fun LabsList(
                 }
             }
         } else {
+            // C3：跨院多单位提示放列表顶部——先声明"不可比"，再看下面的分组数值
+            if (mixedUnits.isNotEmpty()) {
+                item(key = "lab-unit-hint") {
+                    StatusChip(
+                        text = stringResource(R.string.lab_unit_group_hint),
+                        tone = StatusTone.Warning,
+                        icon = Icons.Rounded.WarningAmber,
+                    )
+                }
+            }
             item {
                 Button(
                     onClick = onImport,

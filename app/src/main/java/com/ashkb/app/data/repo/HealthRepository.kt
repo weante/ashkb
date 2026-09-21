@@ -363,6 +363,34 @@ class HealthRepository(private val context: Context) {
 
     suspend fun deactivateCheckupItem(id: String) = checkupItemDao.deactivate(id, nowIso())
 
+    /**
+     * C10（v1.0.37）：一键种入生物制剂筛查 / 续方节点（结核 / 乙肝 / 丙肝筛查 + 续方随访）。
+     * 幂等：按 name 去重，已存在的不重复建。
+     * @return 本次新增条数
+     */
+    suspend fun seedBiologicScreeningItems(): Int = db.withTransaction {
+        val existing = checkupItemDao.listActive().map { it.name }.toSet()
+        val pending = com.ashkb.app.domain.ScreeningSeeds.pending(existing)
+        val now = nowIso()
+        pending.forEach { s ->
+            checkupItemDao.upsert(
+                CheckupItem(
+                    id = Ids.new("cki"),
+                    name = s.name,
+                    checkType = s.checkType,
+                    cycleDays = s.cycleDays,
+                    linkedMedId = null,
+                    kbRef = null,
+                    isActive = true,
+                    notes = s.notes,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            )
+        }
+        pending.size
+    }
+
     // ---- 复诊记录 ----
     fun observeCheckupRecent(limit: Int = 20): Flow<List<CheckupRecord>> = checkupRecordDao.observeRecent(limit)
     fun observeCheckupByItem(itemId: String, limit: Int = 10): Flow<List<CheckupRecord>> =

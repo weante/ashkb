@@ -163,6 +163,52 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
             }
         }
 
+        // C2：补剂依从——取数/阈值/配色与上方「用药依从」完全同口径（部分完成按 0.5 计）
+        item {
+            SectionCard(title = stringResource(R.string.report_supp_adherence, o.adherence.days)) {
+                val sup = o.supplement
+                if (sup.total == 0) {
+                    // 无打卡记录时不摆 0% 的假进度条，直接说明"暂无数据"
+                    Text(
+                        stringResource(R.string.report_supp_empty),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    val rate = sup.ratePct
+                    val tone = when {
+                        rate >= ClinicalThresholds.ADHERENCE_GOOD -> StatusTone.Success
+                        rate >= ClinicalThresholds.ADHERENCE_FAIR -> StatusTone.Warning
+                        else -> StatusTone.Danger
+                    }
+                    val accent = tone.accent()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("$rate%", style = DataLarge, color = accent)
+                        Spacer(Modifier.padding(start = Spacing.lg))
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                            Text(
+                                stringResource(R.string.report_supp_adherence_detail, sup.done, sup.partial, sup.skipped),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                stringResource(R.string.report_adherence_total, sup.total),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.weight(1f))
+                        StatusChip(ClinicalThresholds.adherenceLabel(rate), tone)
+                    }
+                    Spacer(Modifier.height(Spacing.sm))
+                    LinearProgressIndicator(
+                        progress = { rate / 100f },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = accent,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    )
+                }
+            }
+        }
+
         item {
             SectionCard(title = stringResource(R.string.report_exercise_section)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

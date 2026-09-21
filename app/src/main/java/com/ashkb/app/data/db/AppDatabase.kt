@@ -42,7 +42,7 @@ import com.ashkb.app.data.entity.WeightLog
         ImagingRecord::class, VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class, BackupLedger::class,
         CheckupAttachment::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -375,13 +375,26 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v13（v1.0.37）：C6 服药三态——`medications` 补 `dose_state`（DoseState.name）与 `taper_note`。
+         *
+         * 全部可空：旧备份无这些列 → 恢复后 = 未设置（按 frequency 推断为固定 / 按需），
+         * 属合法业务态，**无需回填**（两列均不参与 WHERE 过滤，只在读取时展示）。
+         */
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `medications` ADD COLUMN `dose_state` TEXT")
+                db.execSQL("ALTER TABLE `medications` ADD COLUMN `taper_note` TEXT")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext, AppDatabase::class.java, "ashkb.db"
                 ).addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-                    MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12
+                    MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13
                 ).build().also { instance = it }
             }
     }

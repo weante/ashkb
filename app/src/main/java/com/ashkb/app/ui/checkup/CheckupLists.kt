@@ -35,8 +35,20 @@ import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
 
 // ===== 复诊项目列表 =====
+/**
+ * @param seedResult C10 一键种入的结果：null = 尚未操作、0 = 节点已齐全、>0 = 本次新增条数。
+ *                   由调用方从 VM 采集后传入，文案在本列表内用 stringResource 组装
+ *                   （VM 无 Context，不负责取词）。
+ * @param onSeed     触发种入结核 / 乙肝 / 丙肝筛查 + 生物制剂续方节点。
+ */
 @Composable
-internal fun CheckupItemsList(items: List<CheckupItem>, onAdd: () -> Unit, onDeactivate: (String) -> Unit) {
+internal fun CheckupItemsList(
+    items: List<CheckupItem>,
+    onAdd: () -> Unit,
+    onDeactivate: (String) -> Unit,
+    seedResult: Int?,
+    onSeed: () -> Unit,
+) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -80,8 +92,34 @@ internal fun CheckupItemsList(items: List<CheckupItem>, onAdd: () -> Unit, onDea
                     onClick = onAdd,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
                 ) { Text(stringResource(R.string.checkup_add_item)) }
-                Spacer(Modifier.height(Spacing.xxl))
             }
+        }
+        // C10 生物制剂筛查 / 续方节点：属"补全项目"的批量入口，排在列表末尾（空态时同样出现），
+        // 不抢「添加复诊项目」主按钮的位置
+        item {
+            SectionCard(title = stringResource(R.string.checkup_seed_title)) {
+                Text(
+                    stringResource(R.string.checkup_seed_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                Button(
+                    onClick = onSeed,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
+                ) { Text(stringResource(R.string.checkup_seed_button)) }
+                // 结果只在点过之后出现：0 条与新增若干条是两种不同反馈，不能都沉默
+                seedResult?.let { added ->
+                    Spacer(Modifier.height(Spacing.sm))
+                    Text(
+                        if (added > 0) stringResource(R.string.checkup_seed_done, added)
+                        else stringResource(R.string.checkup_seed_all),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            Spacer(Modifier.height(Spacing.xxl))
         }
     }
 }
