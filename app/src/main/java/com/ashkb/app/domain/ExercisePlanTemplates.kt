@@ -6,8 +6,12 @@ package com.ashkb.app.domain
  * 模板只给「每周强度级别 + 每周目标天数 + 一句提示」，**不写死具体动作**——动作仍由
  * `ExerciseEngine` 按当日分期从运动库过滤生成，避免与 R27 矩阵产生第二份真相。
  *
- * 编解码为自实现（不依赖 org.json，保持 domain 纯 JVM 可单测）；只处理本对象自己
- * 产出的 JSON 形状，脏数据不会抛异常（解析不到的周直接忽略）。
+ * 编解码为自实现（不依赖 org.json，保持 domain 纯 JVM 可单测）。
+ *
+ * v1.0.42：**解析改为逐字符扫描，彻底移除正则**。原因见 `parse` 的注释——旧版 `Regex` 里有一个
+ * 未转义的 `}`，Java 的 `Pattern` 视其为普通字符而 **Android（ICU）会抛 `PatternSyntaxException`**，
+ * 导致类初始化失败（真机 `ExceptionInInitializerError → PatternSyntaxException: near index 83`，
+ * 继而表现为 `NoClassDefFoundError: K1.n`）。
  */
 object ExercisePlanTemplates {
 
@@ -74,27 +78,114 @@ object ExercisePlanTemplates {
             "{\"week\":${w.week},\"grade\":\"${esc(w.grade)}\",\"days\":${w.days},\"note\":\"${esc(w.note)}\"}"
         }
 
-    private val WEEK_RE = Regex(
-        "\\{\"week\":(\\d+),\"grade\":\"((?:[^\"\\\\]|\\\\.)*)\",\"days\":(\\d+),\"note\":\"((?:[^\"\\\\]|\\\\.)*)\"}"
-    )
-
-    /** JSON → 每周结构；解析不到的周忽略（脏数据不致崩）。 */
+    /**
+     * JSON → 每周结构；解析不到的周忽略（脏数据不致崩）。
+     *
+     * 该 JSON 只由本对象的 `toJson` 产出，格式固定，故**逐字符解析**即可：
+     * 先按深度配平找出每个对象的边界（字符串内的转义与花括号不参与配平），再按字段名取值。
+     * 这样既不依赖 org.json，也**不依赖正则引擎的方言差异**（见类注释）。
+     */
     fun parse(json: String?): List<WeekSpec> {
         if (json.isNullOrBlank()) return emptyList()
-        return WEEK_RE.findAll(json).map { m ->
-            WeekSpec(
-                week = m.groupValues[1].toIntOrNull() ?: return@map null,
-                grade = unesc(m.groupValues[2]),
-                days = m.groupValues[3].toIntOrNull() ?: 0,
-                note = unesc(m.groupValues[4]),
-            )
-        }.filterNotNull().sortedBy { it.week }.toList()
+        val body = json
+        val out = ArrayList<WeekSpec>()
+        var i = body.indexOf('{')
+        while (i >= 0) {
+            val end = indexOfObjectEnd(body, i)
+            if (end < 0) break
+            parseOne(body.substring(i + 1, end))?.let { out.add(it) }
+            i = body.indexOf('{', end + 1)
+        }
+        return out.sortedBy { it.week }
+    }
+
+    /** 与 `open` 处的 `{` 配对的 `}` 下标；字符串内（含转义）不参与配平。找不到返回 -1。 */
+    private fun indexOfObjectEnd(s: String, open: Int): Int {
+        var depth = 0
+        var inStr = false
+        var i = open
+        while (i < s.length) {
+            val c = s[i]
+            if (inStr) {
+                when {
+                    c == '\\' -> i++          // 跳过被转义的下一个字符
+                    c == '"' -> inStr = false
+                }
+            } else {
+                when (c) {
+                    '"' -> inStr = true
+                    '{' -> depth++
+                    '}' -> {
+                        depth--
+                        if (depth == 0) return i
+                    }
+                }
+            }
+            i++
+        }
+        return -1
+    }
+
+    /** 解析单个对象体（不含首尾花括号）。缺 `week` 视为脏数据，返回 null。 */
+    private fun parseOne(obj: String): WeekSpec? {
+        val week = intField(obj, "week") ?: return null
+        return WeekSpec(
+            week = week,
+            grade = strField(obj, "grade"),
+            days = intField(obj, "days") ?: 0,
+            note = strField(obj, "note"),
+        )
+    }
+
+    private fun intField(obj: String, key: String): Int? {
+        val at = obj.indexOf("\"$key\":")
+        if (at < 0) return null
+        var j = at + key.length + 3
+        val sb = StringBuilder()
+        while (j < obj.length && obj[j].isDigit()) {
+            sb.append(obj[j])
+            j++
+        }
+        return sb.toString().toIntOrNull()
+    }
+
+    private fun strField(obj: String, key: String): String {
+        val at = obj.indexOf("\"$key\":\"")
+        if (at < 0) return ""
+        var j = at + key.length + 4
+        val sb = StringBuilder()
+        while (j < obj.length) {
+            val c = obj[j]
+            if (c == '\\' && j + 1 < obj.length) {
+                sb.append(unescChar(obj[j + 1]))
+                j += 2
+                continue
+            }
+            if (c == '"') break
+            sb.append(c)
+            j++
+        }
+        return sb.toString()
     }
 
     /** 指定周的目标天数（超出范围返回 0）。 */
     fun targetDays(spec: List<WeekSpec>, week: Int): Int = spec.firstOrNull { it.week == week }?.days ?: 0
 
-    private fun esc(s: String): String = s.replace("\\", "\\\\").replace("\"", "\\\"")
+    private fun esc(s: String): String = buildString {
+        for (c in s) when (c) {
+            '\\' -> append("\\\\")
+            '"' -> append("\\\"")
+            '\n' -> append("\\n")
+            '\r' -> append("\\r")
+            '\t' -> append("\\t")
+            else -> append(c)
+        }
+    }
 
-    private fun unesc(s: String): String = s.replace("\\\"", "\"").replace("\\\\", "\\")
+    private fun unescChar(c: Char): Char = when (c) {
+        'n' -> '\n'
+        'r' -> '\r'
+        't' -> '\t'
+        else -> c
+    }
 }

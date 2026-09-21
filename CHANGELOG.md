@@ -4,6 +4,58 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.42] — 2026-09-21
+
+**真正修复「康复计划 → 添加模板」闪退**（v1.0.41 的 R8 结论是错的）。
+
+⚠️ **无数据库结构变更**（仍为 Room v15），可覆盖安装。
+
+### 真因：正则方言差异（Java 通过 / Android 报错）
+
+v1.0.41 改进后的崩溃留档一次就给出了完整链条（这正是 v1.0.41 那两处留档改动的价值）：
+
+```
+java.lang.ExceptionInInitializerError
+Caused by: java.util.regex.PatternSyntaxException: Syntax error in regexp pattern near index 83
+```
+
+`ExercisePlanTemplates` 的 `WEEK_RE` 模式长度为 84，**index 83 正是末尾那个未转义的 `}`**：
+
+```
+\{"week":(\d+),"grade":"((?:[^"\\]|\\.)*)","days":(\d+),"note":"((?:[^"\\]|\\.)*)"}
+                                                                                  ^ index 83
+```
+
+- **Java 的 `java.util.regex.Pattern`** 把孤立的 `}` 当普通字符 ⇒ 编译通过
+  （所以我先前在 JVM 上「验证通过」是**误导性**的，并据此得出了错误的 R8 结论）；
+- **Android 的 ICU 正则引擎**视其为**语法错误** ⇒ `Pattern.compile` 抛 `PatternSyntaxException`。
+
+于是：类初始化失败（`ExceptionInInitializerError`）→ 启动期被兜底吞掉 → 点「添加模板」二次触碰
+抛 `NoClassDefFoundError: K1.n` → 闪退。**与 v1.0.39 的冷启动闪退是同一个根因。**
+
+### 修复
+
+1. **`ExercisePlanTemplates.parse` 移除正则，改为逐字符扫描**（先按深度配平找对象边界——字符串内的
+   转义与花括号不参与配平——再按字段名取值）。该 JSON 由本对象自己产出、格式固定，无需正则。
+   ⇒ **不再依赖任何正则引擎的方言差异。**
+2. `esc` 一并转义 `\n` / `\r` / `\t`，保持单行且可逆（旧数据仍可解析）。
+3. v1.0.41 的两条 `proguard -keep` **保留**（属防御性，与本根因无关），注释已更正为如实描述。
+4. 复核全项目其余 16 处 `Regex(...)`：**仅此一处含孤立 `}`**，其余为成对量词（`{4}` / `{2}`）或
+   不含花括号，无需改动。
+
+### 验证
+
+- 单测新增「说明含花括号 / 换行 / 制表」往返用例（旧正则版会漏配或崩）。
+- 装机：康复计划 → 添加模板，应提示「已添加 3 个模板」且不闪退。
+
+### 教训
+
+- **JVM 单测无法覆盖正则方言差异**：解析「自己产出的固定格式」时优先手写解析；
+  必须用正则时，避免孤立 `{` / `}` 这类 Java 与 ICU 语义不一致的写法。
+- 真机崩 + JVM 测试全绿 + 异常为 `NoClassDefFoundError` 时，**不要急着归因 R8**：
+  先用 `mapping.txt` 反查类名，再拿**首因异常**（`Caused by`）说话——这正是 v1.0.41 补上
+  `recordNonFatal` 与「摘要带 Caused by/栈帧」后，一轮就定位的原因。
+
 ## [v1.0.41] — 2026-09-21
 
 **修复「康复计划 → 添加模板」闪退**（真机留档：`java.lang.NoClassDefFoundError: K1.n`）。

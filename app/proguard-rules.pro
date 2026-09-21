@@ -15,12 +15,11 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
-# v1.0.41（B7 闪退修复）：R8 对 Kotlin object 单例（含嵌套 data class）的激进优化在 ART 上
-# 会产出无法完成初始化的类 —— 真机表现为 NoClassDefFoundError: K1.n
-# （mapping 反查 = com.ashkb.app.domain.ExercisePlanTemplates）。
-# usage.txt 显示该类 INSTANCE 字段被删、成员被静态化，且 ExercisePlanProgress（唯一以
-# ExercisePlanTemplates.WeekSpec 作签名类型的类）被整类删除并内联。
-# 故对这两个纯领域类及其嵌套类做完整保留（禁裁剪 / 优化 / 改名）。
+# v1.0.41 加入 / v1.0.42 更正注释：这两条 keep 属**防御性**保留（禁止裁剪 / 优化 / 改名），
+# 与「康复计划 → 添加模板」闪退的**真实根因无关**——真因是 ExercisePlanTemplates 里正则末尾
+# 一个未转义的 `}`：Java 的 Pattern 视为普通字符，而 Android（ICU）会抛 PatternSyntaxException，
+# 导致类初始化失败。v1.0.42 已把该处解析改为逐字符扫描（不再用正则）。
+# 保留 keep 的理由：纯领域单例被 R8 激进优化（删 INSTANCE / 静态化成员）存在潜在风险，代价极小。
 -keep class com.ashkb.app.domain.ExercisePlanTemplates { *; }
 -keep class com.ashkb.app.domain.ExercisePlanTemplates$* { *; }
 -keep class com.ashkb.app.domain.ExercisePlanProgress { *; }

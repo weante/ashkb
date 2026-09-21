@@ -17,6 +17,20 @@ class ExercisePlanTemplatesTest {
         assertEquals(spec, back)
     }
 
+    /**
+     * v1.0.42：说明里含**花括号 / 换行 / 制表**也必须能往返。
+     * 旧正则版正是被末尾未转义的 `}` 拖垮（Android ICU 报 PatternSyntaxException）。
+     */
+    @Test
+    fun `parse handles braces newlines and tabs inside note`() {
+        val spec = listOf(
+            ExercisePlanTemplates.WeekSpec(1, "L1", 3, "含{花括号}与单独}的说明"),
+            ExercisePlanTemplates.WeekSpec(2, "L2", 5, "含换行\n与制表\t的说明"),
+        )
+        val back = ExercisePlanTemplates.parse(ExercisePlanTemplates.toJson(spec))
+        assertEquals(spec, back)
+    }
+
     /** 脏数据不抛异常：整体无法解析 → 空；部分可解析 → 只保留能解析的周。 */
     @Test
     fun `parse tolerates dirty input`() {
