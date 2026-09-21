@@ -119,7 +119,7 @@
     "title": "肋间呼吸训练：维持胸廓活动度",
     "summary": "仰卧双手触肋，吸气顶手呼气彻底——每天数次的胸廓扩张训练（2023 指南推荐呼吸练习，证据支持改善胸廓扩张）。",
     "severity_level": "low",
-    "applicable_scene": "每日计划常规项（低成本高价值）；晨僵序列；胸廓扩张度低于同年龄正常值用户置顶提示",
+    "applicable_scene": "每日计划常规项（低成本高价值）；晨僵序列；医生测量提示胸廓活动度受限者",
     "source_name": "Versus Arthritis《Keeping active with ankylosing spondylitis》练习册；2023 康复实践指南",
     "source_url": "https://www.versusarthritis.org/media/12818/ankylosing-spondylitis-exercise-section.pdf",
     "source_tier": "S2",
@@ -146,10 +146,10 @@
         "动作 a（侧肋）：仰卧屈膝，双手置胸侧——吸气顶手，呼气彻底，重复 5 次",
         "动作 b（上胸）：双手置前胸上部——深吸气后尽量呼气，肋骨推手，重复 5 次（可坐位）",
         "与晨僵管理合并做（起床序列）",
-        "body_measures.chest_expansion_cm 定期测关联追踪效果"
+        "复诊时由医生测量胸廓扩张度，对比历次病历数值跟踪效果（App 不提供自测）"
       ],
       "alternative_hint": "卧位困难 → 坐位完成（原文支持）",
-      "app_link": "每日计划默认项；与 body_measures 胸廓扩张度趋势联动"
+      "app_link": "每日计划默认项；效果变化可结合复诊时医生测量的胸廓扩张度数值"
     }
   },
   {
