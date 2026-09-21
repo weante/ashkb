@@ -8,6 +8,7 @@ import com.ashkb.app.data.repo.AttachmentRepository
 import com.ashkb.app.data.repo.BackupRepository
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.ReportRepository
+import com.ashkb.app.data.repo.RecipeRepository
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.reminder.NotificationHelper
@@ -31,6 +32,8 @@ class AshkbApplication : Application() {
     val reportRepository: ReportRepository by lazy { ReportRepository(this) }
     /** v10（B10）：复诊附件归档（拍照 / 相册 / PDF） */
     val attachmentRepository: AttachmentRepository by lazy { AttachmentRepository(this) }
+    /** v1.0.39（B3）：推荐食谱库 */
+    val recipeRepository: RecipeRepository by lazy { RecipeRepository(this) }
 
     override fun onCreate() {
         super.onCreate()
@@ -43,6 +46,10 @@ class AshkbApplication : Application() {
                 if (exports.isDirectory) exports.listFiles()?.forEach { it.delete() }
             }
             importKbSeedIfNeeded(this@AshkbApplication)
+            // v1.0.39：B3 食谱种子（10 条）+ B7 康复计划模板（4/8/12 周）——均按固定 id 幂等，
+            // 重复启动不会重复种入；用户自建内容不受影响
+            recipeRepository.seedIfMissing()
+            healthRepository.seedExercisePlans()
             // 启动即重排未来 7 天闹钟（覆盖跨日 / 杀后台遗漏）
             val meds = AppDatabase.get(this@AshkbApplication).medicationDao().observeActive().first()
             ReminderScheduler.rescheduleAll(this@AshkbApplication, meds)

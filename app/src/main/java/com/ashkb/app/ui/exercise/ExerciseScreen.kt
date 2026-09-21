@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.EventNote
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -52,6 +53,7 @@ import com.ashkb.app.domain.ExerciseEngine
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.DividerList
 import com.ashkb.app.ui.components.EmptyState
+import com.ashkb.app.ui.components.NavRow
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.StatTile
@@ -66,7 +68,7 @@ import com.ashkb.app.ui.theme.container
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
+fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -> Unit, onBack: () -> Unit) {
     val ui by vm.uiState.collectAsStateWithLifecycle()
     val todayLogs by vm.todayLogs.collectAsStateWithLifecycle()
     val pending by vm.feedbackPending.collectAsStateWithLifecycle()
@@ -101,6 +103,16 @@ fun ExerciseScreen(vm: ExerciseViewModel, onBack: () -> Unit) {
             // ---- 当日处方 hero：大号结论 + 分期色带 + 判读依据 ----
             item {
                 PrescriptionHero(ui = ui, yesterday = yesterday)
+            }
+
+            // ---- B7 入口：周期康复计划（4–12 周按周递进的模板与完成度） ----
+            item {
+                NavRow(
+                    icon = Icons.Rounded.EventNote,
+                    title = stringResource(R.string.plans_title),
+                    subtitle = stringResource(R.string.plans_entry_sub),
+                    onClick = onOpenPlans,
+                )
             }
 
             // ---- R21 次日反馈待填 ----

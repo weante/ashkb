@@ -16,6 +16,7 @@ import com.ashkb.app.data.entity.DietProfile
 import com.ashkb.app.data.entity.EmergencyContact
 import com.ashkb.app.data.entity.EmergencyEvent
 import com.ashkb.app.data.entity.ExerciseLog
+import com.ashkb.app.data.entity.ExercisePlan
 import com.ashkb.app.data.entity.FlareEvent
 import com.ashkb.app.data.entity.FoodAvoidItem
 import com.ashkb.app.data.entity.ImagingRecord
@@ -25,6 +26,7 @@ import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.MedicationChange
 import com.ashkb.app.data.entity.MedicationLog
 import com.ashkb.app.data.entity.Profile
+import com.ashkb.app.data.entity.Recipe
 import com.ashkb.app.data.entity.Supplement
 import com.ashkb.app.data.entity.SupplementLog
 import com.ashkb.app.data.entity.SymptomDaily
@@ -593,3 +595,62 @@ data class AttachmentSyncCounts(
     val pending: Int = 0,
     val toDelete: Int = 0,
 )
+
+// ===========================================================================
+// v1.0.39：B3 食谱库 + B7 周期康复计划
+// ===========================================================================
+
+@Dao
+interface RecipeDao {
+    /** 收藏置顶，其余按创建时间——列表默认顺序。 */
+    @Query("SELECT * FROM recipes ORDER BY is_favorite DESC, created_at")
+    fun observeAll(): Flow<List<Recipe>>
+
+    @Query("SELECT * FROM recipes ORDER BY is_favorite DESC, created_at")
+    suspend fun listAll(): List<Recipe>
+
+    @Query("SELECT * FROM recipes WHERE id = :id")
+    suspend fun byId(id: String): Recipe?
+
+    /** 已种入的种子 id（幂等种子的判重依据） */
+    @Query("SELECT id FROM recipes WHERE is_seed = 1")
+    suspend fun seedIds(): List<String>
+
+    @Upsert
+    suspend fun upsert(recipe: Recipe)
+
+    @Query("UPDATE recipes SET is_favorite = :favorite, updated_at = :now WHERE id = :id")
+    suspend fun setFavorite(id: String, favorite: Boolean, now: String)
+
+    @Query("DELETE FROM recipes WHERE id = :id")
+    suspend fun delete(id: String)
+}
+
+@Dao
+interface ExercisePlanDao {
+    /** 按周数升序（4 周 → 12 周），列表顺序稳定 */
+    @Query("SELECT * FROM exercise_plans ORDER BY weeks, created_at")
+    fun observeAll(): Flow<List<ExercisePlan>>
+
+    @Query("SELECT * FROM exercise_plans ORDER BY weeks, created_at")
+    suspend fun listAll(): List<ExercisePlan>
+
+    @Query("SELECT * FROM exercise_plans WHERE is_active = 1 LIMIT 1")
+    fun observeActive(): Flow<ExercisePlan?>
+
+    @Query("SELECT * FROM exercise_plans WHERE is_active = 1 LIMIT 1")
+    suspend fun active(): ExercisePlan?
+
+    @Query("SELECT id FROM exercise_plans WHERE is_seed = 1")
+    suspend fun seedIds(): List<String>
+
+    @Upsert
+    suspend fun upsert(plan: ExercisePlan)
+
+    /** 同一时刻只允许一个在用计划（切换前先全部停用） */
+    @Query("UPDATE exercise_plans SET is_active = 0, updated_at = :now")
+    suspend fun deactivateAll(now: String)
+
+    @Query("DELETE FROM exercise_plans WHERE id = :id")
+    suspend fun delete(id: String)
+}

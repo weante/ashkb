@@ -691,3 +691,58 @@ data class BackupLedger(
     @ColumnInfo(name = "detail") val detail: String? = null,
     @ColumnInfo(name = "created_at") val createdAt: String,
 )
+
+// ===========================================================================
+// v1.0.39：B3 推荐食谱库 + B7 周期康复计划模板
+// ===========================================================================
+
+/**
+ * B3（v1.0.39）：推荐食谱（recipes）。
+ *
+ * 双层结构同知识库：**种子层**（`is_seed=true`，随版本更新）+ **自建层**（用户自己添加）。
+ * 标签用于筛选（抗炎 / 胃肠友好 / 控热量）；`sources` 只存编号（`S1`…），完整题录见
+ * `domain/RecipeSources`——列表页不占版面，**点开某条食谱才在详情里展开出处**。
+ */
+@Entity(tableName = "recipes", indices = [Index("is_favorite"), Index("is_seed")])
+data class Recipe(
+    @PrimaryKey val id: String, // rec-xxxx
+    @ColumnInfo(name = "title") val title: String,
+    /** 标签 JSON 数组：anti_inflammatory / gut_friendly / calorie_control */
+    @ColumnInfo(name = "tags") val tags: String,
+    /** 配料（每行一条） */
+    @ColumnInfo(name = "ingredients") val ingredients: String,
+    /** 做法（每行一步） */
+    @ColumnInfo(name = "steps") val steps: String,
+    /** 出处编号 JSON 数组：["S1","S4"]（完整题录见 domain/RecipeSources） */
+    @ColumnInfo(name = "sources") val sources: String? = null,
+    @ColumnInfo(name = "is_favorite") val isFavorite: Boolean = false,
+    @ColumnInfo(name = "is_seed") val isSeed: Boolean = false,
+    @ColumnInfo(name = "notes") val notes: String? = null,
+    @ColumnInfo(name = "created_at") val createdAt: String,
+    @ColumnInfo(name = "updated_at") val updatedAt: String,
+)
+
+/**
+ * B7（v1.0.39）：4–12 周周期康复计划（exercise_plans）。
+ *
+ * `week_structure` 存每周结构 JSON（口径见 `domain/ExercisePlanTemplates`）：
+ * `[{"week":1,"grade":"L1","days":3,"note":"…"}]`——知识库种子 `kb_seed_exc.json` 里引用的
+ * `exercise_plans.week_structure` / `exercise_plans(stage_mode=flare)` 挂点由此补齐。
+ * **完成度由 `exercise_logs` 反算**（不另存进度，避免双份真相）。
+ */
+@Entity(tableName = "exercise_plans", indices = [Index("is_active")])
+data class ExercisePlan(
+    @PrimaryKey val id: String, // eplan-xxxx
+    @ColumnInfo(name = "title") val title: String,
+    @ColumnInfo(name = "weeks") val weeks: Int,
+    /** 适用分期：any / stable / flare */
+    @ColumnInfo(name = "stage_mode") val stageMode: String = "any",
+    @ColumnInfo(name = "week_structure") val weekStructure: String,
+    @ColumnInfo(name = "is_active") val isActive: Boolean = false,
+    @ColumnInfo(name = "is_seed") val isSeed: Boolean = false,
+    /** 启用日期（周次从该日起算）；null = 未启用 */
+    @ColumnInfo(name = "start_date") val startDate: String? = null,
+    @ColumnInfo(name = "notes") val notes: String? = null,
+    @ColumnInfo(name = "created_at") val createdAt: String,
+    @ColumnInfo(name = "updated_at") val updatedAt: String,
+)

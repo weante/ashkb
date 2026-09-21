@@ -25,7 +25,9 @@ import com.ashkb.app.data.entity.LabResult
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.MedicationChange
 import com.ashkb.app.data.entity.MedicationLog
+import com.ashkb.app.data.entity.ExercisePlan
 import com.ashkb.app.data.entity.Profile
+import com.ashkb.app.data.entity.Recipe
 import com.ashkb.app.data.entity.Supplement
 import com.ashkb.app.data.entity.SupplementLog
 import com.ashkb.app.data.entity.SymptomDaily
@@ -40,9 +42,9 @@ import com.ashkb.app.data.entity.WeightLog
         Supplement::class, SupplementLog::class, Vitals::class, WeightLog::class, BodyMeasure::class,
         DietProfile::class, FoodAvoidItem::class, CheckupItem::class, CheckupRecord::class, LabResult::class,
         ImagingRecord::class, VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class, BackupLedger::class,
-        CheckupAttachment::class,
+        CheckupAttachment::class, Recipe::class, ExercisePlan::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -72,6 +74,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun contactDao(): ContactDao
     abstract fun backupLedgerDao(): BackupLedgerDao
     abstract fun checkupAttachmentDao(): CheckupAttachmentDao
+    abstract fun recipeDao(): RecipeDao
+    abstract fun exercisePlanDao(): ExercisePlanDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
@@ -402,6 +406,35 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v15（v1.0.39）：B3 推荐食谱库 + B7 周期康复计划模板——新增两张表。
+         *
+         * 新表无需特殊处理：`BackupEngine.tableNames` 走 `sqlite_master` 动态发现，
+         * 新表自动进入备份 / 恢复范围；旧备份不含新表 → 恢复后为空，属预期。
+         * 种子数据在应用启动时按需幂等种入（不放在迁移里，避免与后续种子更新冲突）。
+         */
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `recipes` (" +
+                        "`id` TEXT NOT NULL, `title` TEXT NOT NULL, `tags` TEXT NOT NULL, " +
+                        "`ingredients` TEXT NOT NULL, `steps` TEXT NOT NULL, `sources` TEXT, " +
+                        "`is_favorite` INTEGER NOT NULL, `is_seed` INTEGER NOT NULL, `notes` TEXT, " +
+                        "`created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, PRIMARY KEY(`id`))"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_recipes_is_favorite` ON `recipes` (`is_favorite`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_recipes_is_seed` ON `recipes` (`is_seed`)")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `exercise_plans` (" +
+                        "`id` TEXT NOT NULL, `title` TEXT NOT NULL, `weeks` INTEGER NOT NULL, " +
+                        "`stage_mode` TEXT NOT NULL, `week_structure` TEXT NOT NULL, " +
+                        "`is_active` INTEGER NOT NULL, `is_seed` INTEGER NOT NULL, `start_date` TEXT, " +
+                        "`notes` TEXT, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, PRIMARY KEY(`id`))"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_exercise_plans_is_active` ON `exercise_plans` (`is_active`)")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -409,7 +442,7 @@ abstract class AppDatabase : RoomDatabase() {
                 ).addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
                     MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-                    MIGRATION_12_13, MIGRATION_13_14
+                    MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15
                 ).build().also { instance = it }
             }
     }

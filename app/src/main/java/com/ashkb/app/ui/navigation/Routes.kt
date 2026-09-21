@@ -33,6 +33,9 @@ import com.ashkb.app.R
 @Serializable data object Emergency
 @Serializable data object Backup
 @Serializable data object Meds
+// v1.0.39：B3 推荐食谱库 / B7 周期康复计划
+@Serializable data object Recipes
+@Serializable data object ExercisePlans
 
 // ---- L3（表单全屏）----
 @Serializable data class MedEdit(val id: String? = null)   // null = 新增

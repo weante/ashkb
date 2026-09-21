@@ -51,6 +51,8 @@ import com.ashkb.app.ui.checkup.CheckupViewModel
 import com.ashkb.app.ui.components.NavRow
 import com.ashkb.app.ui.emergency.EmergencyScreen
 import com.ashkb.app.ui.emergency.EmergencyViewModel
+import com.ashkb.app.ui.exercise.ExercisePlansScreen
+import com.ashkb.app.ui.exercise.ExercisePlansViewModel
 import com.ashkb.app.ui.exercise.ExerciseScreen
 import com.ashkb.app.ui.exercise.ExerciseViewModel
 import com.ashkb.app.ui.knowledge.KnowledgeScreen
@@ -64,12 +66,14 @@ import com.ashkb.app.ui.navigation.Backup
 import com.ashkb.app.ui.navigation.Checkup
 import com.ashkb.app.ui.navigation.Emergency
 import com.ashkb.app.ui.navigation.Exercise
+import com.ashkb.app.ui.navigation.ExercisePlans
 import com.ashkb.app.ui.navigation.Health
 import com.ashkb.app.ui.navigation.Knowledge
 import com.ashkb.app.ui.navigation.Me
 import com.ashkb.app.ui.navigation.MedEdit
 import com.ashkb.app.ui.navigation.Meds
 import com.ashkb.app.ui.navigation.ProfileEdit
+import com.ashkb.app.ui.navigation.Recipes
 import com.ashkb.app.ui.navigation.Report
 import com.ashkb.app.ui.navigation.Symptom
 import com.ashkb.app.ui.navigation.TABS
@@ -84,6 +88,8 @@ import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.today.TodayScreen
 import com.ashkb.app.ui.today.TodayViewModel
+import com.ashkb.app.ui.wellness.RecipesScreen
+import com.ashkb.app.ui.wellness.RecipesViewModel
 import com.ashkb.app.ui.wellness.WellnessScreen
 import com.ashkb.app.ui.wellness.WellnessViewModel
 
@@ -125,6 +131,8 @@ fun AppShell() {
     val emergencyVm: EmergencyViewModel = viewModel(factory = EmergencyViewModel.Factory)
     val reportVm: ReportViewModel = viewModel(factory = ReportViewModel.Factory)
     val backupVm: BackupViewModel = viewModel(factory = BackupViewModel.Factory)
+    val recipesVm: RecipesViewModel = viewModel(factory = RecipesViewModel.Factory)
+    val plansVm: ExercisePlansViewModel = viewModel(factory = ExercisePlansViewModel.Factory)
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -206,8 +214,20 @@ fun AppShell() {
 
             // ---- L2 ----
             composable<Symptom> { SymptomScreen(vm = symptomVm, onBack = { nav.popBackStack() }) }
-            composable<Exercise> { ExerciseScreen(vm = exerciseVm, onBack = { nav.popBackStack() }) }
-            composable<Wellness> { WellnessScreen(vm = wellnessVm, onBack = { nav.popBackStack() }) }
+            composable<Exercise> {
+                ExerciseScreen(
+                    vm = exerciseVm,
+                    onOpenPlans = { nav.navigate(ExercisePlans) },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable<Wellness> {
+                WellnessScreen(
+                    vm = wellnessVm,
+                    onOpenRecipes = { nav.navigate(Recipes) },
+                    onBack = { nav.popBackStack() },
+                )
+            }
             composable<Checkup> { CheckupScreen(vm = checkupVm, onBack = { nav.popBackStack() }) }
             composable<Emergency> { EmergencyScreen(vm = emergencyVm, onBack = { nav.popBackStack() }) }
             composable<Backup> { BackupScreen(vm = backupVm, onBack = { nav.popBackStack() }) }
@@ -219,6 +239,9 @@ fun AppShell() {
                     onBack = { nav.popBackStack() },
                 )
             }
+
+            composable<Recipes> { RecipesScreen(vm = recipesVm, onBack = { nav.popBackStack() }) }
+            composable<ExercisePlans> { ExercisePlansScreen(vm = plansVm, onBack = { nav.popBackStack() }) }
 
             // ---- L3 ----
             composable<MedEdit> { entry ->

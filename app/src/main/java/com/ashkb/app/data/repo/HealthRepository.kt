@@ -44,6 +44,7 @@ class HealthRepository(private val context: Context) {
     private val basdaiDao = db.basdaiDao()
     private val flareDao = db.flareDao()
     private val exerciseDao = db.exerciseLogDao()
+    private val exercisePlanDao = db.exercisePlanDao()
     private val alertDao = db.alertDao()
     private val kbDao = db.kbEntryDao()
     private val profileDao = db.profileDao()
@@ -214,6 +215,54 @@ class HealthRepository(private val context: Context) {
 
     /** R27 矩阵输入：当日运动库（红榜 + 黑榜由引擎分层） */
     suspend fun exerciseLibrary(): List<KbEntry> = kbDao.exercises()
+
+    // ---- B7（v1.0.39）周期康复计划 ----
+
+    fun observeExercisePlans(): Flow<List<com.ashkb.app.data.entity.ExercisePlan>> = exercisePlanDao.observeAll()
+
+    fun observeActiveExercisePlan(): Flow<com.ashkb.app.data.entity.ExercisePlan?> = exercisePlanDao.observeActive()
+
+    /** 幂等种入 4 / 8 / 12 周模板。@return 本次新增条数 */
+    suspend fun seedExercisePlans(): Int = db.withTransaction {
+        val existing = exercisePlanDao.seedIds().toSet()
+        val pending = com.ashkb.app.domain.ExercisePlanTemplates.pending(existing)
+        val now = nowIso()
+        pending.forEach { t ->
+            exercisePlanDao.upsert(
+                com.ashkb.app.data.entity.ExercisePlan(
+                    id = t.id,
+                    title = t.title,
+                    weeks = t.weeks,
+                    stageMode = t.stageMode,
+                    weekStructure = com.ashkb.app.domain.ExercisePlanTemplates.toJson(t.spec),
+                    isActive = false,
+                    isSeed = true,
+                    startDate = null,
+                    notes = null,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            )
+        }
+        pending.size
+    }
+
+    /** 启用某计划（同一时刻只允许一个；重新启用即重新起算周次） */
+    suspend fun activateExercisePlan(id: String, startDate: String) = db.withTransaction {
+        val now = nowIso()
+        exercisePlanDao.deactivateAll(now)
+        val p = exercisePlanDao.listAll().firstOrNull { it.id == id } ?: return@withTransaction
+        exercisePlanDao.upsert(p.copy(isActive = true, startDate = startDate, updatedAt = now))
+    }
+
+    suspend fun deactivateExercisePlan(id: String) = db.withTransaction {
+        val now = nowIso()
+        val p = exercisePlanDao.listAll().firstOrNull { it.id == id } ?: return@withTransaction
+        exercisePlanDao.upsert(p.copy(isActive = false, updatedAt = now))
+    }
+
+    /** 计划窗口内的运动日志（完成度反算用） */
+    suspend fun exerciseLogsBetween(from: String, to: String): List<ExerciseLog> = exerciseDao.between(from, to)
 
     // ---- K 知识库 ----
     fun observeKbAll(): Flow<List<KbEntry>> = kbDao.observeAll()

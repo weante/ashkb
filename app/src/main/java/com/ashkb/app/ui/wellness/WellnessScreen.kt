@@ -67,6 +67,7 @@ import com.ashkb.app.ui.components.DestructiveAction
 import com.ashkb.app.ui.components.DividerList
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.KeyValueRow
+import com.ashkb.app.ui.components.NavRow
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.StatTile
@@ -79,7 +80,7 @@ import com.ashkb.app.ui.theme.StatusTone
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
+fun WellnessScreen(vm: WellnessViewModel, onOpenRecipes: () -> Unit, onBack: () -> Unit) {
     val vitals by vm.vitalsToday.collectAsStateWithLifecycle()
     val weight by vm.weightToday.collectAsStateWithLifecycle()
     val weightList by vm.weightRecent.collectAsStateWithLifecycle()
@@ -182,6 +183,15 @@ fun WellnessScreen(vm: WellnessViewModel, onBack: () -> Unit) {
 
             // ---- 分组三：营养与饮食 ----
             stickyHeader { GroupHeader(stringResource(R.string.wellness_nutrition_section)) }
+            // B3：推荐食谱库入口——放在饮食分组首位，与下方饮食画像 / 忌口清单同属「吃什么」的决策链
+            item {
+                NavRow(
+                    icon = Icons.Rounded.Restaurant,
+                    title = stringResource(R.string.recipes_title),
+                    subtitle = stringResource(R.string.recipes_entry_sub),
+                    onClick = onOpenRecipes,
+                )
+            }
             item {
                 // 补剂打卡态集合一次性算好：避免每行对全部 supLogs 做 O(N·M) 线性扫描
                 val doneIds: Set<String?> = remember(supLogs) {
