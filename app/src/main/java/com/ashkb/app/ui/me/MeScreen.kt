@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -125,7 +126,32 @@ fun MeScreen(
             )
         }
 
+        // ---- 关于：版本号 + MIT 开源协议 + 全局免责声明 ----
+        item { AboutCard() }
+
         item { Spacer(Modifier.height(Spacing.xxl)) }
+    }
+}
+
+/** 关于卡：用 PackageManager 取版本（不动 buildFeatures.buildConfig，AGP 8 默认关闭）。 */
+@Composable
+private fun AboutCard() {
+    val context = LocalContext.current
+    val version = remember {
+        runCatching {
+            val pi = context.packageManager.getPackageInfo(context.packageName, 0)
+            val code = if (Build.VERSION.SDK_INT >= 28) pi.longVersionCode else pi.versionCode.toLong()
+            "v${pi.versionName} ($code)"
+        }.getOrDefault("")
+    }
+    SectionCard(title = stringResource(R.string.me_about_title)) {
+        KeyValueRow(stringResource(R.string.me_version_field), version)
+        Text(
+            stringResource(R.string.me_license_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = Spacing.xs),
+        )
     }
 }
 

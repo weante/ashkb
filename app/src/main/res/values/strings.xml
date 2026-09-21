@@ -270,6 +270,9 @@
     <string name="lab_ref_upper">参考上限</string>
     <string name="lab_value">数值</string>
     <string name="me_backup_section">备份与数据</string>
+    <string name="me_about_title">关于</string>
+    <string name="me_version_field">版本</string>
+    <string name="me_license_note">开源协议：MIT（源码见 github.com/weante/ashkb）。本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗；用药与治疗方案请始终遵医嘱。</string>
     <string name="me_health_manage">健康管理</string>
     <string name="me_health_section">健康</string>
     <string name="me_health_subtitle">骨健康、营养、复诊与应急——全方位守护你的健康</string>
