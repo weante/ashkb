@@ -68,8 +68,20 @@ class VaultKeyStore(context: Context) {
         KeyState.UNREADABLE -> null
     }
 
-    /** 生成新密钥并覆盖落盘（仅测试 / 极端重置场景使用，正常路径不要调用）。 */
+    /**
+     * 生成新密钥并覆盖落盘。**仅在本机从未有过密钥时可用**（正常路径只经 [getOrCreate] 的
+     * `ABSENT` 分支到达）。
+     *
+     * v1.0.44（S3）：把「不要覆盖已有密钥」从注释升级为**机器约束**。本方法是「覆盖落盘」语义，
+     * 与 B5 修掉的是同一类威胁——静默覆盖会让云端已上传的附件永久不可解；同一文件里留一个
+     * 无防护的覆盖入口，逻辑上自相矛盾。密钥已存在或读不出时一律拒绝（读不出时也拒绝：
+     * 覆盖会毁掉唯一可恢复的密文）。
+     */
     fun generate(): ByteArray {
+        require(state() == KeyState.ABSENT) {
+            "本机已存在 vault key（或存在但读不出），拒绝覆盖：覆盖后云端已上传的附件将永久不可解。" +
+                "如需取回密钥，请恢复一份本机或云端的 v3 备份（见 adoptIfAbsent）。"
+        }
         val key = ByteArray(KEY_LEN).also { SecureRandom().nextBytes(it) }
         prefs.edit()
             .putString(PREF_KEY, KeystoreCipher.encryptToB64(Base64.getEncoder().encodeToString(key)))

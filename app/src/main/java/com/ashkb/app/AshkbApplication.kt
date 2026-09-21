@@ -12,6 +12,7 @@ import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.data.repo.RecipeRepository
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.domain.KbSearch
+import com.ashkb.app.domain.KbSeedRefresh
 import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
 import java.io.File
@@ -62,11 +63,9 @@ class AshkbApplication : Application() {
                 // 升级重查，避免每次冷启动都清掉当天的 +30 / +60 提醒
                 val today = LocalDate.now()
                 val meds = AppDatabase.get(this@AshkbApplication).medicationDao().observeActive().first()
-                val doneRefs = medicationRepository.logsForDate(today)
-                    .filter { it.status == "done" }
-                    .map { ReminderScheduler.slotRef(it.medId, it.slotKey) }
-                    .toSet()
-                ReminderScheduler.rescheduleAll(this@AshkbApplication, meds, doneRefs)
+                ReminderScheduler.rescheduleAll(
+                    this@AshkbApplication, meds, medicationRepository.doneSlotRefs(today),
+                )
                 // P2 例行检查：发作第 7 天警报 + 知识条目复核到期（insertAlertOnce 幂等）
                 healthRepository.checkFlareDayAlert(today)
                 healthRepository.checkReviewDue(today.toString())
@@ -79,18 +78,35 @@ class AshkbApplication : Application() {
         }
     }
 
-    /** 首启导入种子：47 条 = itx 15 / exc 15（红10+黑5）/ fdg 6 / emr 5 / edu 6（含阈值 2） */
+    /**
+     * 知识库种子导入 / **增量刷新**（v1.0.44 重写）。
+     *
+     * 旧实现是 `if (dao.count() > 0) return`——库里只要有任意一条就整体跳过。后果是
+     * **任何早于首次导入的设备，此后所有种子增补都永远进不来**（v1.0.20 以来知识条目多次扩充），
+     * 而且完全静默、无任何报错。属结构性数据缺口：用户基数越大越难补。
+     *
+     * 新实现：
+     * 1. `KB_SEED_VERSION` 闸门——只在种子包版本提升时做一次核对，不必每次冷启动解析 5 个 JSON；
+     * 2. 按 id 比对：缺失的**补入**（固定 id + `INSERT IGNORE`，幂等）；
+     * 3. 内容被修订的**更新种子列**，并把 `user_note` 从旧行拷回——
+     *    个人备注层永不因种子更新被覆盖（v10「只读种子层 + 个人备注层」双层结构的承诺）。
+     */
     private suspend fun importKbSeedIfNeeded(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.getInt(KEY_SEED_VERSION, 0) >= KB_SEED_VERSION) return
+
         val dao = AppDatabase.get(context).kbEntryDao()
-        if (dao.count() > 0) return
-        val files = listOf(
-            "kb_seed_itx.json", "kb_seed_exc.json", "kb_seed_fdg.json",
-            "kb_seed_emr.json", "kb_seed_edu.json",
-        )
-        val entries = files.flatMap { file ->
-            parseSeed(context, file)
-        }
-        if (entries.isNotEmpty()) dao.insertAll(entries)
+        val existing = dao.listAll().associateBy { it.id }
+        val seeds = SEED_FILES.flatMap { parseSeed(context, it) }
+        // 解析整体失败（assets 缺失 / JSON 损坏）时**不写闸门**，留给下次启动重试——
+        // 否则一次瞬时失败会让种子永久停在旧版本，且无从察觉。
+        if (seeds.isEmpty()) return
+
+        // 判定逻辑在 domain/KbSeedRefresh（纯函数，可单测）；这里只负责执行
+        val plan = KbSeedRefresh.plan(existing, seeds)
+        if (plan.fresh.isNotEmpty()) dao.insertAll(plan.fresh)
+        if (plan.revised.isNotEmpty()) dao.updateAll(plan.revised)
+        prefs.edit().putInt(KEY_SEED_VERSION, KB_SEED_VERSION).apply()
     }
 
     private fun parseSeed(context: Context, file: String): List<KbEntry> {
@@ -124,5 +140,22 @@ class AshkbApplication : Application() {
                 )
             }
         }.getOrDefault(emptyList())
+    }
+
+    private companion object {
+        /**
+         * **知识库种子包版本**。每次增补 / 修订种子内容都必须 +1——否则老设备不会重新核对。
+         * 1 = 旧实现（首启导入后永不再看）；2 = v1.0.44 起启用增量刷新。
+         */
+        const val KB_SEED_VERSION = 2
+
+        const val PREFS = "app_prefs"
+        const val KEY_SEED_VERSION = "kb_seed_version"
+
+        /** 种子文件清单（47 条 = itx 15 / exc 15（红10+黑5）/ fdg 6 / emr 5 / edu 6（含阈值 2）） */
+        val SEED_FILES = listOf(
+            "kb_seed_itx.json", "kb_seed_exc.json", "kb_seed_fdg.json",
+            "kb_seed_emr.json", "kb_seed_edu.json",
+        )
     }
 }

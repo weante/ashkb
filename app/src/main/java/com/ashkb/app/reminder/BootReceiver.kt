@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.ashkb.app.data.db.AppDatabase
+import com.ashkb.app.data.repo.MedicationRepository
+import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,8 +34,13 @@ class BootReceiver : BroadcastReceiver() {
         val result = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                val meds = AppDatabase.get(context).medicationDao().listActive()
-                ReminderScheduler.rescheduleAll(context, meds)
+                val db = AppDatabase.get(context)
+                val meds = db.medicationDao().listActive()
+                // v1.0.44（N1）：开机 / 改时钟 / 换时区 / 权限回授也要带上「今日已打卡槽位」。
+                // 此前漏传 → 重启发生在「已打卡槽位的 +30/+60 未到点」窗口内时，会给已服药的
+                // 槽位重建升级重查，用户明明吃过药却收到「未服药」提醒。
+                val doneRefs = MedicationRepository(context).doneSlotRefs(LocalDate.now())
+                ReminderScheduler.rescheduleAll(context, meds, doneRefs)
                 // 权限回授场景顺手把 sys 通道告知一声（通道存在才发，免打扰用户）
                 if (action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED &&
                     Build.VERSION.SDK_INT >= 31

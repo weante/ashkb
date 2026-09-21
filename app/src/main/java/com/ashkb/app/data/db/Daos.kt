@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import androidx.room.Upsert
 import com.ashkb.app.data.entity.Alert
 import com.ashkb.app.data.entity.BackupLedger
@@ -106,6 +107,17 @@ interface KbEntryDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(entries: List<KbEntry>)
+
+    /** v1.0.44（N3）：种子增量刷新用——一次取回全表（固定 47+ 条，量级可忽略） */
+    @Query("SELECT * FROM kb_entries")
+    suspend fun listAll(): List<KbEntry>
+
+    /**
+     * v1.0.44（N3）：按主键整行更新（种子内容修订时用）。
+     * 调用方必须先把 `userNote` 从旧行拷回，否则会抹掉用户的个人备注。
+     */
+    @Update
+    suspend fun updateAll(entries: List<KbEntry>)
 
     @Query(
         "SELECT * FROM kb_entries WHERE category = 'interaction' AND " +

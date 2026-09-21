@@ -4,6 +4,99 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.44] — 2026-09-21
+
+**第三轮审查报告的 N1–N3 修复 + S3/S4/S5 加固 + 正则花括号静态守卫。**
+
+⚠️ **无数据库结构变更**（仍为 Room v15），可覆盖安装。
+
+### N1 开机广播重排漏传「已打卡槽位」→ 重启后误提醒
+
+v1.0.43 给 `rescheduleAll` 加了 `doneSlotRefs`，但**给了 `emptySet()` 默认值**，于是 4 个调用点里
+开机广播那条（`BootReceiver`）漏传：手机重启若落在「已打卡槽位的 +30 / +60 尚未到点」窗口内，
+会给**已经吃过药**的槽位重建升级重查 → 用户收到「未服药」误提醒。
+
+修复分两层：
+1. 把「今日已打卡槽位」的构造抽成 `MedicationRepository.doneSlotRefs(date)` 一处实现
+   （此前在 Application / TodayViewModel / MeViewModel 各写一遍，漏改是必然）；
+2. **删掉 `doneSlotRefs` 的默认值**——任何新增调用点都必须显式想一次「今天哪些槽位已完成」。
+   这正是「把纪律升级为代码」：默认值让「忘记」变成了合法编译。
+
+### N3 种子 `count>0` 短路 → 老设备永远拿不到种子增补与修订
+
+原实现 `if (dao.count() > 0) return`：库里只要有任意一条就整体跳过。后果是**任何早于首次导入的
+设备，此后所有种子增补都进不来**（v1.0.20 以来知识条目多次扩充），而且完全静默。属结构性数据缺口。
+
+改为**版本化增量刷新**（`KB_SEED_VERSION` 闸门 + 按 id 比对）：
+- 本机缺失的种子 → 补入（固定 id + `INSERT IGNORE`，幂等）；
+- 内容被修订的 → 只更新**种子列**，并把 `user_note` 从旧行拷回——个人备注层永不因种子更新被覆盖；
+- 修订判定既看条目 `version`，也做**字段级比对**（安全网：改了文案却忘记 bump version 时仍能刷新）；
+- 顺带修复「`search_text` 未回填」的历史行（旧备份恢复后可能为 NULL）。
+
+判定逻辑放在 `domain/KbSeedRefresh`（纯函数）以便单测；导入动作依赖 Context，测不到，故只留执行。
+
+**这条一并了结了 v1.0.43 遗留的 exc-004 文案残留**：老设备这次会拿到改写后的文案。
+
+### N2 README 过期信息（比报告指出的多两处）
+
+- `./gradlew ...` **在本仓库根本不存在**（无 wrapper 脚本），三条命令全是跑不了的 → 改为 `gradle`
+  并说明版本要求与 wrapper 缺失；
+- 测试数两处互相矛盾（`114 条` / `205 条`）→ 统一为实测值；
+- 版本号 `v1.0.35 (40)` → 更新。
+
+### S3 / S4 / S5 加固
+
+1. **S3** `VaultKeyStore.generate()` 加 `require(state() == ABSENT)`：把「不要覆盖已有密钥」
+   从注释升级为机器约束。该方法本就是「覆盖落盘」语义，与 B5 修掉的是同一类威胁——
+   同一文件里留一个无防护的覆盖入口逻辑上自相矛盾。
+2. **S4** `BackupEngine` 的 `(v as Number)` 改走 `asNumber(table, col, v)`：INT/REAL 列收到非数值
+   时抛 `BackupException("备份数据类型不符：表.列 …")`，而不是让裸 `ClassCastException` 被外层
+   包成「恢复写入失败」（安全性不变，仍在事务内整体回滚；只是可定位性大幅提升）。
+3. **S5** `CrashLogger` 落盘前做**凭据脱敏**：`scheme://user:pass@host` → `scheme://***@host`。
+   留档只写 app 私有目录（`allowBackup=false`）且永不上报，但医疗类应用应主动划清边界——
+   凭据一律不入盘。Logcat 那一路仍是原始堆栈（瞬时、非特权读不到）。
+
+### S1 / S2 可行性验证：**Robolectric 方案被实测证伪**
+
+第三轮审查建议「用 Robolectric 触发含正则的 object 初始化即可暴露 v1.0.39–42 的崩溃」。
+该建议依赖一个未经验证的前提：Robolectric 里的 `java.util.regex.Pattern` 走 Android ICU 语义。
+
+**实测结论：不是。** 装上 Robolectric 4.13（依赖可正常解析，Maven Central 可达），
+用**当年的真实缺陷模式**做探针，在 sdk=34 下得到：
+
+```
+PROBE sdkInt=34 java=21.0.12.1
+PROBE_RESULT=JVM_LIKE          ← 含孤立 `}` 的模式正常编译通过
+PROBE_SANITY_QUANTIFIER_OK=true
+```
+
+即该方案对本类 bug 的**检出率为 0**——「JVM 语义全绿」正是当年真机崩溃的根因。
+探针已删除（未留在交付代码里）。
+
+**改用静态守卫**（S2 的实际落地）：新增 `RegexLiteralGuardTest`，扫描主源码里的正则字面量，
+只允许 ICU 也接受的合法量词 `{\d+}` / `{\d+,\d*}`，其余花括号一律判失败；
+字符类 `[...]` 内与 `\X` 转义对内的花括号视为字面量（不误报）。
+它随 `testDebugUnitTest` 一起跑，**CI 无需改动**即获得这道防线，且用历史缺陷模式做了回归用例。
+
+### 验证
+
+- 单测 **290 条全过**（新增 22 条：种子增量刷新判定 8 / 崩溃留档脱敏 6 / 正则花括号守卫 8）。
+- release APK 验签：证书 SHA-256 `38CA80A6…012D7D`，与历史版本一致，可覆盖升级；
+  `aapt dump badging` 确认 `versionCode=49 / versionName=1.0.44`；debug dex 中可见
+  `KbSeedRefresh` / `scrubCredentials` / `kb_seed_version` 等新符号。
+
+### 教训
+
+- **给「安全相关」的参数配默认值，等于允许调用方忘记它**。`doneSlotRefs = emptySet()` 让漏传
+  成了合法编译，于是 4 条路径漏了 1 条。凡参数缺失会导致**静默错误行为**（而非编译失败）的，
+  一律不给默认值。
+- **「装上工具」不等于「工具能解决这个问题」**：Robolectric 能装、能跑、能模拟 `AlarmManager`，
+  但它**不模拟 ICU 正则**。可行性验证必须用「目标 bug 的真实样本」去测检出能力，
+  而不是测「依赖能否安装」——后者是必要不充分条件。
+- 同理，`java.util.regex` 的方言差异（v1.0.42）**只能靠静态检查或真机**发现；
+  任何「在 JVM 上跑一遍」的方案（含 Robolectric）对它天然免疫。这道结论已固化为
+  `RegexLiteralGuardTest` 里的守卫。
+
 ## [v1.0.43] — 2026-09-21
 
 **代码审查后的 A / B 类问题集中修复，外加口令框「长按显明文」。**

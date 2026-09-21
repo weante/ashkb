@@ -229,6 +229,17 @@ object BackupEngine {
     private fun m_rows(manifest: JSONObject, t: String): Int = manifest.getJSONObject(t).getInt("rows")
     private fun m_sha(manifest: JSONObject, t: String): String = manifest.getJSONObject(t).getString("sha256")
 
+    /**
+     * v1.0.44（S4）：把备份里的值当数值取。
+     *
+     * INT / REAL 列收到非数值（损坏或被构造过的备份）时，原先的 `(v as Number)` 会抛裸
+     * `ClassCastException`，被外层包成「恢复写入失败」——用户无从知道是哪张表哪一列。
+     * 安全性不受影响（仍在事务内，会整体回滚），但可定位性差很多。
+     */
+    private fun asNumber(table: String, col: String, v: Any): Number =
+        v as? Number
+            ?: throw BackupException("备份数据类型不符：$table.$col 期望数值，实际为 ${v::class.simpleName}")
+
     private fun insertTable(db: SupportSQLiteDatabase, table: String, rows: JSONArray) {
         db.execSQL("DELETE FROM `$table`")
         if (rows.length() == 0) return
@@ -257,9 +268,9 @@ object BackupEngine {
                     val v = row.opt(col)
                     when {
                         v == null || v == JSONObject.NULL -> stmt.bindNull(idx + 1)
-                        type.contains("INT") -> stmt.bindLong(idx + 1, (v as Number).toLong())
+                        type.contains("INT") -> stmt.bindLong(idx + 1, asNumber(table, col, v).toLong())
                         type.contains("REAL") || type.contains("FLOA") || type.contains("DOUB") || type.contains("NUM") ->
-                            stmt.bindDouble(idx + 1, (v as Number).toDouble())
+                            stmt.bindDouble(idx + 1, asNumber(table, col, v).toDouble())
                         v is Number -> stmt.bindString(idx + 1, v.toString())
                         v is Boolean -> stmt.bindLong(idx + 1, if (v) 1L else 0L)
                         else -> stmt.bindString(idx + 1, v.toString())

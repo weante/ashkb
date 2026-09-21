@@ -46,12 +46,7 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
      */
     private suspend fun rescheduleReminders(context: android.content.Context) {
         val list = com.ashkb.app.data.db.AppDatabase.get(context).medicationDao().listActive()
-        val today = LocalDate.now()
-        val doneRefs = repo.logsForDate(today)
-            .filter { it.status == "done" }
-            .map { ReminderScheduler.slotRef(it.medId, it.slotKey) }
-            .toSet()
-        ReminderScheduler.rescheduleAll(context, list, doneRefs)
+        ReminderScheduler.rescheduleAll(context, list, repo.doneSlotRefs(LocalDate.now()))
     }
 
     /** A3（v1.0.43）：按 id 直接查（不限于「在用」）——编辑页预填用，避免在 meds 流上无限等待 */

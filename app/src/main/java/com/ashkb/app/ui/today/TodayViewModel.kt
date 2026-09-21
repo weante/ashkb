@@ -89,12 +89,7 @@ class TodayViewModel(
     fun reschedule(context: android.content.Context) {
         viewModelScope.launch {
             val meds = com.ashkb.app.data.db.AppDatabase.get(context).medicationDao().listActive()
-            val today = LocalDate.now()
-            val doneRefs = repo.logsForDate(today)
-                .filter { it.status == "done" }
-                .map { ReminderScheduler.slotRef(it.medId, it.slotKey) }
-                .toSet()
-            ReminderScheduler.rescheduleAll(context, meds, doneRefs)
+            ReminderScheduler.rescheduleAll(context, meds, repo.doneSlotRefs(LocalDate.now()))
         }
     }
 

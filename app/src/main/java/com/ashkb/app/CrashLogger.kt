@@ -43,7 +43,7 @@ object CrashLogger {
             val text = buildString {
                 append("time=").append(LocalDateTime.now())
                     .append(" label=").append(label).append('\n')
-                append(Log.getStackTraceString(error))
+                append(scrubCredentials(Log.getStackTraceString(error)))
                 append("\n\n")
             }
             File(context.filesDir, FILE_NONFATAL).appendText(text)
@@ -54,7 +54,7 @@ object CrashLogger {
         val text = buildString {
             append("time=").append(LocalDateTime.now()).append('\n')
             append("thread=").append(thread.name).append('\n')
-            append(Log.getStackTraceString(error))
+            append(scrubCredentials(Log.getStackTraceString(error)))
         }
         File(context.filesDir, name).writeText(text)
     }
@@ -92,3 +92,28 @@ object CrashLogger {
         return (listOfNotNull(head.ifBlank { null }, caused) + frames).joinToString("\n")
     }
 }
+
+/**
+ * v1.0.44（S5）：崩溃留档落盘前的**凭据脱敏**。
+ *
+ * 堆栈 / 异常消息可能带上 WebDAV 地址里内嵌的凭据（`https://user:pass@host/dav`）。留档本身
+ * 只写 app 私有目录（`allowBackup=false`）且永不上报，但医疗类应用应当主动划清边界：
+ * **凭据一律不入盘**。只滤「URL 内嵌凭据」这一种形态，保留主机名以便定位（主机名不敏感）。
+ *
+ * Logcat 那一路仍是原始堆栈——Logcat 是瞬时的、且自 Android 4.1 起非特权应用读不到，
+ * 真正的持久化边界是这里。
+ *
+ * 正则以字符类表达、**不含任何孤立花括号**（v1.0.39–42 的崩溃链正是孤立 `}` 在 Android ICU 下
+ * 抛 `PatternSyntaxException`；本文件属于崩溃留档自身，更不能在这里埋雷）。
+ */
+internal val CREDENTIALS_IN_URL = Regex("(://)[^/@\\s]+@")
+
+/**
+ * 把 URL 内嵌的凭据段（`user:pass@`）收敛为 `***@`，主机名保留。
+ *
+ * 注：本行刻意不写出替换后的完整 URL 字面量——Kotlin 的块注释是**可嵌套**的，
+ * 而「scheme 冒号 + 双斜杠 + 三个星号」恰好含 `斜杠+星号` 序列，会意外开启嵌套注释。
+ */
+internal fun scrubCredentials(text: String): String =
+    CREDENTIALS_IN_URL.replace(text) { m -> m.groupValues[1] + "***@" }
+

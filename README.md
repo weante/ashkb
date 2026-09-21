@@ -56,12 +56,16 @@ Ankylosing Spondylitis Health Knowledge Base —— 一款面向强直性脊柱�
 ```bash
 git clone https://github.com/weante/ashkb.git
 cd ashkb
-./gradlew assembleDebug        # Debug APK
-./gradlew assembleRelease      # Release APK（注意：签名配置请自行修改）
-./gradlew testDebugUnitTest    # 114 条单元测试
+gradle assembleDebug        # Debug APK
+gradle assembleRelease      # Release APK（注意：签名配置请自行修改）
+gradle testDebugUnitTest    # 单元测试
 ```
 
-要求：JDK 17+，Android SDK 34。或直接用 Android Studio 打开。
+> ⚠️ 本仓库**不含 Gradle wrapper 脚本**（`gradlew` / `gradlew.bat` / `gradle-wrapper.jar` 均未入库，
+> 仅保留 `gradle/wrapper/gradle-wrapper.properties` 作为版本声明），所以上面用 `gradle` 而非 `./gradlew`。
+> 请使用 **Gradle 8.7**；或直接用 Android Studio 打开（会自行接管构建）。
+
+要求：JDK 17+、Gradle 8.7、Android SDK 34。
 
 ## 数据与隐私
 
@@ -72,11 +76,11 @@ cd ashkb
 
 ## 测试
 
-205 条 JVM 单元测试覆盖核心 domain 逻辑：排程计算（含 BIW 每周两针边界）、运动分级矩阵 R27（三态分期 + 发作期 L1 兜底）、检查报告 AI 导入解析（化验 / 影像 / 参考范围 / 未识别行提示）、备份加密（v1/v2/v3 三格式互读 + 恢复码 + 稳定密钥 + 附件密文）/ 恢复表名白名单与 SHA / WebDAV 远程列表解析与轮换保留 / 附件远端路径口径、知识库检索口径（单列检索文本 + 中文子串语义）、紧急卡用药汇总（免疫抑制类判定）、漏服处理指引（口服补服窗口 / 注射超窗分级）、体重目标区间判定、复诊准备清单、通用名键目录。
+282 条 JVM 单元测试覆盖核心 domain 逻辑：排程计算（含 BIW 每周两针边界）、运动分级矩阵 R27（三态分期 + 发作期 L1 兜底）、检查报告 AI 导入解析（化验 / 影像 / 参考范围 / 未识别行提示）、备份加密（v1/v2/v3 三格式互读 + 恢复码 + 稳定密钥 + 附件密文）/ 恢复表名与列名白名单及 SHA / WebDAV 远程列表解析与轮换保留 / 附件远端路径口径（含百分号编码绕过）、知识库检索口径（单列检索文本 + 中文子串语义）与种子增量刷新判定、紧急卡用药汇总（免疫抑制类判定）、漏服处理指引（口服补服窗口 / 注射超窗分级）、体重目标区间判定、复诊准备清单、通用名键目录、崩溃留档凭据脱敏。
 
 ## 版本
 
-当前 `v1.0.35`（versionCode 40）。P0~P5 阶段开发完成，处于自用验证（dogfooding）阶段。
+当前 `v1.0.44`（versionCode 49）。P0~P5 阶段开发完成，处于自用验证（dogfooding）阶段。
 
 ## License
 

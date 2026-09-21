@@ -37,12 +37,15 @@ object ReminderScheduler {
      * 今日「已过点但未打卡」槽位尚未到时的升级重查。此前只重建 `escalation = 0` 且跳过已过时刻，
      * 于是每次冷启动 / 打卡 / 改药单都会把当天后续的 +30 / +60 提醒静默清掉（M10 升级链失效）。
      *
-     * @param doneSlotRefs 今日已打卡的槽位（[slotRef] 形态）——这些不再重建升级重查
+     * @param doneSlotRefs 今日已打卡的槽位（[slotRef] 形态）——这些不再重建升级重查。
+     *   **刻意不设默认值**（v1.0.44）：v1.0.43 引入本参数时给了 `emptySet()` 默认值，
+     *   结果开机广播那条调用路径漏传，重启后已服药的槽位仍会被排上 +30 / +60 误提醒。
+     *   去掉默认值后，任何新增调用点都必须显式想一次「哪些槽位今天已完成」。
      */
     fun rescheduleAll(
         context: Context,
         meds: List<Medication>,
-        doneSlotRefs: Set<String> = emptySet(),
+        doneSlotRefs: Set<String>,
     ) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         cancelAllFuture(context, meds)

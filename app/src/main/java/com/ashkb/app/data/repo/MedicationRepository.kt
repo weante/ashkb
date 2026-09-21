@@ -10,6 +10,7 @@ import com.ashkb.app.data.entity.MedicationLog
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.entity.Reaction
 import com.ashkb.app.domain.ScheduleCalc
+import com.ashkb.app.reminder.ReminderScheduler
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -181,6 +182,20 @@ class MedicationRepository(private val context: Context) {
     }
 
     suspend fun logsForDate(date: LocalDate): List<MedicationLog> = logDao.byDate(date.toString())
+
+    /**
+     * v1.0.44（N1）：今日**已打卡**槽位集合（[ReminderScheduler.slotRef] 形态），
+     * 供 [ReminderScheduler.rescheduleAll] 判断「该槽位无需重建升级重查」。
+     *
+     * 抽到一处的原因：这个集合此前在 Application / TodayViewModel / MeViewModel 各写一遍，
+     * 于是开机广播（BootReceiver）那条路径漏传就成了必然。现在只有一个实现，
+     * 且 `rescheduleAll` 的该参数**无默认值**——任何新增调用点都必须显式取一次。
+     */
+    suspend fun doneSlotRefs(date: LocalDate): Set<String> =
+        logsForDate(date)
+            .filter { it.status == "done" }
+            .map { ReminderScheduler.slotRef(it.medId, it.slotKey) }
+            .toSet()
 
     /** R17 注射顺延：锚点移至新日期，周期从新日期起算重排；实际注射发生时才写日志（未记录=无行） */
     suspend fun postponeInjection(med: Medication, toDate: LocalDate) {
