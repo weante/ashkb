@@ -27,11 +27,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -67,13 +67,16 @@ fun ScoreInput(
     val cs = MaterialTheme.colorScheme
     val accent = if (unrecorded) cs.onSurfaceVariant else tone(value).accent()
     // M3 Slider 对落在当前值上的点按不产生任何回调（dispatchRawDelta 值相等即丢弃，
-    // onValueChangeFinished 也只在拖动收尾必发）——未作答态滑杆停在 0 时「直接点 0」永远无响应，
-    // 只能先动一下再归零。双层修复：
+    // onValueChangeFinished 也只在拖动收尾必发）——未作答态滑杆停在 0 时「直接点 0」永远无响应。
+    // 两层配合：
     // ① 记录手势期最近原始值，onValueChangeFinished 按它兜底提交（点轨道跳转收尾）。
-    // ② 叠一层不消费事件的旁听手势：真点按（位移 < 触摸阈值）按落点换算刻度并显式提交，
-    //    与滑杆自身的拖动 / 点轨道跳转互不干扰（从不 consume）。
+    // ② **父 Box（祖先）上的非消费点按旁听**：真点按且落点换算值恰等于当前值时，显式补一次提交，
+    //    把该题标记为已作答。
+    // ⚠️ v1.0.17–v1.0.46 的 ② 是把旁听层叠在滑杆**同级**（matchParentSize 覆盖层），
+    // 这会让滑杆**完全收不到指针事件**、拖动彻底失效（详见下方 Box 处注释）。
     var gestureValue by remember { mutableFloatStateOf(value.toFloat()) }
     LaunchedEffect(value) { gestureValue = value.toFloat() }
+    val currentValue by rememberUpdatedState(value)
     val sliderDesc = stringResource(R.string.forms_slider_a11y, label, value, range.last)
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -107,7 +110,48 @@ fun ScoreInput(
             ) {
                 Icon(Icons.Rounded.Remove, contentDescription = stringResource(R.string.symptom_decrease_one))
             }
-            Box(Modifier.weight(1f)) {
+            // 点按旁听挂在滑杆的**父 Box（祖先）**上，而不是像 v1.0.17–v1.0.46 那样在滑杆**同级**
+            // 再叠一层 matchParentSize 透明覆盖层。原因（Compose 官方「事件调度和点击测试」）：
+            // 同一层级上若有多个可参与手势的可组合项，**只有 z 序最高的那个算命中**；
+            // 覆盖层挂了 pointerInput 就独占命中，滑杆自身收不到任何指针事件，拖动因此彻底失效。
+            // 「从不 consume」救不回来——消费与否发生在命中测试**之后**。祖先与子节点同处一条命中链，
+            // 子节点先拿到事件，父节点旁听不干扰子节点，这才是旁听手势的正确写法。
+            Box(
+                Modifier
+                    .weight(1f)
+                    .pointerInput(range) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val downX = down.position.x
+                            var moved = false
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                // 按「相对按下点的累计位移」判定拖动，而不是逐事件位移：
+                                // 慢拖时单个事件的位移可能始终小于触摸阈值，逐事件判会把拖动误判成点按。
+                                if (event.changes.any {
+                                        (it.position - down.position).getDistance() >
+                                            viewConfiguration.touchSlop
+                                    }
+                                ) moved = true
+                                if (event.changes.all { !it.pressed }) break
+                            }
+                            if (!moved && size.width > 0) {
+                                val fraction = (downX / size.width).coerceIn(0f, 1f)
+                                val tapped = (range.first + (range.last - range.first) * fraction)
+                                    .roundToInt().coerceIn(range.first, range.last)
+                                // 只补 M3 滑杆「不产生任何回调」的那一种情形：点按落在当前值上
+                                // （dispatchRawDelta 值相等即丢弃）。落点值不同时 M3 自带的点轨道跳转
+                                // 已经提交过，这里再写一次会与它的坐标换算打架（可能差一格），故不写。
+                                // 此处读的是**本次手势前**的值：子节点（滑杆）在同一事件分发中先执行，
+                                // 此刻重组尚未发生，因此 currentValue 正是旧值——恰好用作判据。
+                                if (tapped == currentValue) {
+                                    gestureValue = tapped.toFloat()
+                                    onValueChange(tapped)
+                                }
+                            }
+                        }
+                    },
+            ) {
                 Slider(
                     value = value.toFloat(),
                     onValueChange = {
@@ -123,31 +167,6 @@ fun ScoreInput(
                         .fillMaxWidth()
                         .height(Size.touchMin)
                         .semantics { contentDescription = sliderDesc },
-                )
-                Box(
-                    Modifier
-                        .matchParentSize()
-                        .pointerInput(range) {
-                            awaitEachGesture {
-                                val down = awaitFirstDown(requireUnconsumed = false)
-                                val downX = down.position.x
-                                var moved = false
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    if (event.changes.any {
-                                            it.positionChangeIgnoreConsumed().getDistance() > viewConfiguration.touchSlop
-                                        }
-                                    ) moved = true
-                                    if (event.changes.all { !it.pressed }) break
-                                }
-                                if (!moved && size.width > 0) {
-                                    val fraction = (downX / size.width).coerceIn(0f, 1f)
-                                    val tapped = (range.first + (range.last - range.first) * fraction).roundToInt()
-                                    gestureValue = tapped.toFloat()
-                                    onValueChange(tapped.coerceIn(range.first, range.last))
-                                }
-                            }
-                        },
                 )
             }
             FilledTonalIconButton(
