@@ -138,4 +138,32 @@ class TrendChartAxisTest {
         assertEquals(0, summarizeValues(listOf(pt("d", 4.0f)), 4.0f).overCount)
         assertEquals(1, summarizeValues(listOf(pt("d", 4.01f)), 4.0f).overCount)
     }
+
+    // ---- nearestIndex：拖动命中必须与日期定位一致（v1.0.46 修复的缺陷）----
+
+    /**
+     * v1.0.45 的缺陷回归：X 轴按日期间隔分布后，按「序号比例」映射会选错点。
+     * 偏移 [0,1,2,20]：手指在 60% 宽度处，按日期距离最近的是画在 100% 的末点（距离 0.4）；
+     * 旧实现按序号比例选中 index 2——那个点画在 10% 处，气泡会跳到离手指很远的地方。
+     */
+    @Test
+    fun `nearest index follows date positions not index ratio`() {
+        val offsets = listOf(0L, 1L, 2L, 20L)
+        assertEquals(3, nearestIndex(0.6f, 4, 0f, 1f, offsets, 20L))
+    }
+
+    @Test
+    fun `nearest index falls back to ratio without offsets`() {
+        assertEquals(2, nearestIndex(0.6f, 4, 0f, 1f))
+        assertEquals(0, nearestIndex(0f, 4, 0f, 1f))
+        assertEquals(3, nearestIndex(1f, 4, 0f, 1f))
+        assertEquals(0, nearestIndex(0.5f, 1, 0f, 1f))
+    }
+
+    @Test
+    fun `nearest index clamps touches outside the plot`() {
+        val offsets = listOf(0L, 5L, 10L)
+        assertEquals(0, nearestIndex(-5f, 3, 0f, 1f, offsets, 10L))
+        assertEquals(2, nearestIndex(99f, 3, 0f, 1f, offsets, 10L))
+    }
 }

@@ -663,7 +663,6 @@
     <string name="med_plus_days">+%1$s 天</string>
     <string name="med_postpone_title">顺延 %1$s 注射</string>
     <string name="med_skip_title">跳过 %1$s</string>
-    <string name="report_activity_level">活动度 %1$s</string>
     <string name="report_adherence_breakdown">完成 %1$s · 部分 %2$s · 跳过 %3$s</string>
     <string name="report_adherence_days">服药依从（%1$s 天）</string>
     <string name="report_adherence_total">共 %1$s 次打卡（部分完成按 0.5 计）</string>

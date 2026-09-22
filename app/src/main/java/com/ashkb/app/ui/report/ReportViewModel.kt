@@ -96,7 +96,10 @@ class ReportViewModel(
         viewModelScope.launch {
             _busy.value = true
             try {
-                _trends.value = repo.trends(days)
+                val fresh = repo.trends(days)
+                // v1.0.46：慢查询结果后到时不回写——快速连点 7→30 时，若 7 天的响应
+                // 比 30 天的更晚返回，会把图换成旧窗口的数据而 chip 仍显示 30 天。
+                if (_trendDays.value == days) _trends.value = fresh
             } catch (e: Exception) {
                 _message.value = app.getString(R.string.vm_report_stats_failed, e.message)
             } finally {

@@ -97,8 +97,12 @@ class RegexLiteralGuardTest {
 
         var literalCount = 0
         val offenders = mutableListOf<String>()
+        val uncoveredForms = mutableListOf<String>()
         for (f in ktFiles) {
             val text = runCatching { f.readText() }.getOrNull() ?: continue
+            // 守卫目前只认 Regex("字面量") 形态。别的正则入口一旦出现就**大声失败**，
+            // 提示先扩展提取器——比静默漏检好（v1.0.46 加固）。
+            if (text.contains(".toRegex()") || text.contains("Pattern.compile")) uncoveredForms += f.path
             for (lit in extractRegexLiterals(text)) {
                 literalCount++
                 val hit = firstStrayBrace(lit)
@@ -106,6 +110,11 @@ class RegexLiteralGuardTest {
             }
         }
         assertTrue("提取到的正则字面量过少（$literalCount），守卫可能失效", literalCount >= 1)
+        assertTrue(
+            "主源码出现 .toRegex() / Pattern.compile：正则守卫尚未覆盖该形态，" +
+                "请先扩展 extractRegexLiterals 再继续（文件：${uncoveredForms.joinToString()}）",
+            uncoveredForms.isEmpty(),
+        )
         assertTrue(
             "以下正则字面量含 ICU 不接受的孤立花括号（真机抛 PatternSyntaxException，JVM 单测无法发现）：\n" +
                 offenders.joinToString("\n"),
@@ -124,6 +133,9 @@ internal fun extractRegexLiterals(src: String): List<String> {
     while (true) {
         val at = src.indexOf("Regex(", i)
         if (at < 0) break
+        // `.toRegex()` 也含子串 "Regex("，但其字面量在调用**之前**——继续向前抓会错拿
+        // 下一个无关字符串。当前主源码零使用（由上方断言保证），出现时先扩展再放行。
+        if (at > 0 && src[at - 1] == 'o') { i = at + 1; continue }
         var j = at + "Regex(".length
         while (j < src.length && src[j].isWhitespace()) j++
         if (j >= src.length || src[j] != '"') { i = at + 1; continue }

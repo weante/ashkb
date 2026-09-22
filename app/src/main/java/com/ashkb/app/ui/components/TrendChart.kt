@@ -226,16 +226,16 @@ fun TrendChart(
                 .fillMaxWidth()
                 .height(chartHeight)
                 .semantics { contentDescription = a11y }
-                .pointerInput(points, axisWidthPx) {
+                .pointerInput(points, axisWidthPx, dayOffsets, spanDays) {
                     detectHorizontalDragGestures(
                         onDragStart = { off ->
-                            selected = nearestIndex(off.x, points.size, axisWidthPx, size.width.toFloat())
+                            selected = nearestIndex(off.x, points.size, axisWidthPx, size.width.toFloat(), dayOffsets, spanDays)
                         },
                         onDragEnd = { selected = null },
                         onDragCancel = { selected = null },
                     ) { change, _ ->
                         change.consume()
-                        selected = nearestIndex(change.position.x, points.size, axisWidthPx, size.width.toFloat())
+                        selected = nearestIndex(change.position.x, points.size, axisWidthPx, size.width.toFloat(), dayOffsets, spanDays)
                     }
                 },
         ) {
@@ -248,8 +248,12 @@ fun TrendChart(
 
             fun xAt(i: Int): Float = when {
                 points.size == 1 -> (left + right) / 2f
-                dayOffsets != null && spanDays > 0L ->
-                    left + (right - left) * dayOffsets[i] / spanDays.toFloat()
+                dayOffsets != null && spanDays > 0L -> {
+                    // v1.0.46：clamp 防御未按日期排序的输入——中段出现比末点更晚的日期时，
+                    // 不加 clamp 会画到绘图区右边界之外（数据层目前均升序，纯防御）。
+                    val r = (dayOffsets[i] / spanDays.toFloat()).coerceIn(0f, 1f)
+                    left + (right - left) * r
+                }
                 else -> left + (right - left) * i / (points.size - 1).toFloat()
             }
             fun yAt(v: Float): Float =
@@ -297,12 +301,13 @@ fun TrendChart(
                     pathEffect = thresholdDash,
                 )
                 thresholdLayout?.let { l ->
+                    // v1.0.46：量程边缘（阈值恰为最大/最小值）时标签会垂直溢出画布——
+                    // 旧 chip 实现有 coerceAtLeast(top)，v1.0.45 重写时丢了，这里补回。
+                    val ty = (thrY - l.size.height / 2f)
+                        .coerceIn(top, (bottom - l.size.height).coerceAtLeast(top))
                     drawText(
                         textLayoutResult = l,
-                        topLeft = Offset(
-                            left - padH - l.size.width,
-                            thrY - l.size.height / 2f,
-                        ),
+                        topLeft = Offset(left - padH - l.size.width, ty),
                     )
                 }
             }
@@ -341,29 +346,33 @@ fun TrendChart(
             }
 
             // ---- 末点高亮 + 数值（不拖动也能读数）----
-            val lastIdx = points.lastIndex
-            val lx = xAt(lastIdx)
-            val ly = yAt(points[lastIdx].value)
-            drawCircle(accent, dotPx * 0.9f, Offset(lx, ly))
-            drawCircle(cs.surfaceContainerLowest, dotPx * 0.45f, Offset(lx, ly))
+            // v1.0.46：仅入场动画播完后绘制——动画期间折线尚未扫到末点，末点圆与数值气泡
+            // 若无条件绘制，会提前悬在折线终点位置（v1.0.45 的缺陷）。
+            if (visible >= points.size) {
+                val lastIdx = points.lastIndex
+                val lx = xAt(lastIdx)
+                val ly = yAt(points[lastIdx].value)
+                drawCircle(accent, dotPx * 0.9f, Offset(lx, ly))
+                drawCircle(cs.surfaceContainerLowest, dotPx * 0.45f, Offset(lx, ly))
 
-            // 拖动选中时不画末点数值，避免与气泡叠字
-            if (selected == null || selected != lastIdx) {
-                val padBoxH = Spacing.xs.toPx()
-                val padBoxV = Spacing.xxs.toPx()
-                val bw = lastValueLayout.size.width + padBoxH * 2
-                val bh = lastValueLayout.size.height + padBoxV * 2
-                val bx = (right - bw).coerceAtLeast(left)
-                var by = ly - bh - padBoxV * 2
-                if (by < top) by = ly + padBoxV * 2
-                if (by + bh > bottom) by = (bottom - bh).coerceAtLeast(top)
-                drawRoundRect(
-                    color = cs.surfaceContainerLowest,
-                    topLeft = Offset(bx, by),
-                    size = GeometrySize(bw, bh),
-                    cornerRadius = CornerRadius(Spacing.xs.toPx()),
-                )
-                drawText(lastValueLayout, topLeft = Offset(bx + padBoxH, by + padBoxV))
+                // 拖动选中时不画末点数值，避免与气泡叠字
+                if (selected == null || selected != lastIdx) {
+                    val padBoxH = Spacing.xs.toPx()
+                    val padBoxV = Spacing.xxs.toPx()
+                    val bw = lastValueLayout.size.width + padBoxH * 2
+                    val bh = lastValueLayout.size.height + padBoxV * 2
+                    val bx = (right - bw).coerceAtLeast(left)
+                    var by = ly - bh - padBoxV * 2
+                    if (by < top) by = ly + padBoxV * 2
+                    if (by + bh > bottom) by = (bottom - bh).coerceAtLeast(top)
+                    drawRoundRect(
+                        color = cs.surfaceContainerLowest,
+                        topLeft = Offset(bx, by),
+                        size = GeometrySize(bw, bh),
+                        cornerRadius = CornerRadius(Spacing.xs.toPx()),
+                    )
+                    drawText(lastValueLayout, topLeft = Offset(bx + padBoxH, by + padBoxV))
+                }
             }
 
             // ---- 选中点读数 ----
@@ -552,10 +561,38 @@ private fun fmtValue(v: Float): String =
 private fun dateTick(first: String, last: String, date: String): String =
     if (first.take(4) != last.take(4)) date else date.takeLast(5)
 
-private fun nearestIndex(x: Float, count: Int, left: Float, width: Float): Int {
+/**
+ * 拖动位置 → 最近数据点。
+ *
+ * v1.0.46 修复：X 轴改为按日期间隔定位后，本函数若仍按「序号比例」映射就会**选错点**——
+ * 日期间隔不均时（如偏移 [0,1,2,20]），手指按在 60% 宽度处，旧实现选中 index 2，
+ * 而那个点画在 10% 的位置，读数气泡会跳到离手指很远的地方。
+ * 现在与 [xAt] 同一套定位：有日期偏移时按「天数比例」找最近点，否则回退序号比例。
+ */
+internal fun nearestIndex(
+    x: Float,
+    count: Int,
+    left: Float,
+    width: Float,
+    dayOffsets: List<Long>? = null,
+    spanDays: Long = 0L,
+): Int {
     if (count <= 1) return 0
     val usable = (width - left).coerceAtLeast(1f)
     val ratio = ((x - left) / usable).coerceIn(0f, 1f)
+    if (dayOffsets != null && spanDays > 0L) {
+        var best = 0
+        var bestDist = Float.MAX_VALUE
+        for (i in dayOffsets.indices) {
+            if (i >= count) break
+            val d = abs(dayOffsets[i] / spanDays.toFloat() - ratio)
+            if (d < bestDist) {
+                bestDist = d
+                best = i
+            }
+        }
+        return best
+    }
     return (ratio * (count - 1)).roundToInt().coerceIn(0, count - 1)
 }
 
