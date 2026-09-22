@@ -351,6 +351,13 @@ interface WeightLogDao {
     @Query("SELECT * FROM weight_logs ORDER BY date DESC LIMIT :limit")
     suspend fun recent(limit: Int = 90): List<WeightLog>
 
+    /**
+     * v1.0.45：按日期区间取体重（升序），供趋势页 7 / 30 / 90 天切换。
+     * 原先趋势页用 `recent(60)` 取「最近 60 条」，与所选窗口无关——切到 7 天视图仍会带回更早的数据。
+     */
+    @Query("SELECT * FROM weight_logs WHERE date >= :from AND date <= :to ORDER BY date")
+    suspend fun between(from: String, to: String): List<WeightLog>
+
     /** U4 误录删除 */
     @Query("DELETE FROM weight_logs WHERE id = :id")
     suspend fun delete(id: String)

@@ -2,6 +2,7 @@ package com.ashkb.app.ui.report
 
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -66,6 +67,7 @@ import kotlinx.coroutines.launch
 fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
     val overview by vm.overview.collectAsStateWithLifecycle()
     val trends by vm.trends.collectAsStateWithLifecycle()
+    val trendDays by vm.trendDays.collectAsStateWithLifecycle()
     val periodic by vm.periodic.collectAsStateWithLifecycle()
     val periodDays by vm.periodDays.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
@@ -113,7 +115,7 @@ fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
         HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
             when (page) {
                 0 -> OverviewPage(overview)
-                1 -> TrendsPage(trends)
+                1 -> TrendsPage(trends, trendDays, vm::setTrendDays)
                 2 -> PeriodicPage(vm, periodic, periodDays)
                 else -> ExportPage(vm, busy, context, onOpenBackup)
             }
@@ -303,16 +305,50 @@ private fun StatCell(label: String, value: String, modifier: Modifier = Modifier
 // ======================= 趋势 =======================
 
 @Composable
-private fun TrendsPage(t: ReportRepository.Trends?) {
-    if (t == null) {
-        LoadingBlock(minHeight = 240.dp, label = stringResource(R.string.report_stats_loading_dots))
-        return
+private fun TrendsPage(
+    t: ReportRepository.Trends?,
+    days: Int,
+    onDays: (Int) -> Unit,
+) {
+    Column(Modifier.fillMaxSize()) {
+        // v1.0.45：时间范围切换**钉在顶部**，不随 6 张图滚走
+        //（FilterChip 形态与 48dp 触摸下限沿用项目既有约定）
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = Spacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TrendRangeChip(stringResource(R.string.report_range_7d), days == 7) { onDays(7) }
+            TrendRangeChip(stringResource(R.string.report_range_30d), days == 30) { onDays(30) }
+            TrendRangeChip(stringResource(R.string.report_range_90d), days == 90) { onDays(90) }
+        }
+        Box(Modifier.weight(1f)) {
+            if (t == null) {
+                LoadingBlock(minHeight = 240.dp, label = stringResource(R.string.report_stats_loading_dots))
+            } else {
+                TrendCharts(t)
+            }
+        }
     }
+}
+
+@Composable
+private fun TrendRangeChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) },
+        modifier = Modifier.heightIn(min = Size.touchMin),
+    )
+}
+
+@Composable
+private fun TrendCharts(t: ReportRepository.Trends) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item { Spacer(Modifier.height(12.dp)) }
+        item { Spacer(Modifier.height(Spacing.md)) }
         item {
             SectionCard(title = stringResource(R.string.report_basdai_trend), subtitle = stringResource(R.string.report_threshold_note2)) {
                 val basdaiPoints = remember(t.basdai) { t.basdai.map { TrendPoint(it.date, it.total.toFloat()) } }
@@ -321,7 +357,6 @@ private fun TrendsPage(t: ReportRepository.Trends?) {
                     unit = "",
                     label = stringResource(R.string.basdai_total_score),
                     threshold = ClinicalThresholds.BASDAI_HIGH,
-                    thresholdLabel = stringResource(R.string.report_activity_level, ClinicalThresholds.BASDAI_HIGH),
                 )
             }
         }
@@ -385,11 +420,12 @@ private fun TrendsPage(t: ReportRepository.Trends?) {
                 )
             }
         }
-        item { Spacer(Modifier.height(20.dp)) }
+        item { Spacer(Modifier.height(Spacing.xl)) }
     }
 }
 
-// 趋势图已抽到 ui/components/TrendChart.kt（坐标轴 / 整数刻度 / 拖动读数 / 无障碍摘要）
+// 趋势图已抽到 ui/components/TrendChart.kt
+// （按日期时间轴 / 自适应刻度 / 数据点与末点数值 / 读数摘要 / 阈值入轴槽 / 拖动读数 / 无障碍摘要）
 
 // ======================= 周月报 =======================
 

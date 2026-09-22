@@ -214,14 +214,24 @@ class ReportRepository(private val context: Context) {
         )
     }
 
-    suspend fun trends(): Trends = withContext(Dispatchers.IO) {
+    /**
+     * 趋势序列。
+     *
+     * v1.0.45：`rangeDays` 由趋势页的时间范围控件决定（7 / 30 / 90）。
+     * 此前窗口写死 90 天，且体重用 `recent(60)` 取「最近 60 条」而与窗口无关——
+     * 切到 7 天视图仍会带回更早的体重数据，与其它指标口径不一致。
+     * 现在四个序列统一以 `[to - (rangeDays-1), to]` 为窗口，闭区间。
+     */
+    suspend fun trends(rangeDays: Int = 30): Trends = withContext(Dispatchers.IO) {
         val to = LocalDate.now()
-        val from90 = to.minusDays(90).toString()
+        val from = to.minusDays((rangeDays.coerceIn(1, 365) - 1).toLong()).toString()
+        val toStr = to.toString()
         Trends(
-            basdai = db.basdaiDao().between(from90, to.toString()).sortedBy { it.date }.takeLast(12),
-            symptom = db.symptomDailyDao().between(from90, to.toString()).sortedBy { it.date },
-            weight = db.weightLogDao().recent(60).reversed(),
-            vitals = vitalsBetween(from90, to.toString()),
+            // BASDAI 为手工填写，窗口内最多一天一条；不再另设 takeLast 上限（否则 90 天视图会被静默截断）
+            basdai = db.basdaiDao().between(from, toStr).sortedBy { it.date },
+            symptom = db.symptomDailyDao().between(from, toStr).sortedBy { it.date },
+            weight = db.weightLogDao().between(from, toStr),
+            vitals = vitalsBetween(from, toStr),
         )
     }
 

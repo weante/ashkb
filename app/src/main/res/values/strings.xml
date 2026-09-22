@@ -469,7 +469,7 @@
     <string name="report_share_action">分享复诊报告</string>
     <string name="report_stats_loading">统计加载中…</string>
     <string name="report_stats_loading_dots">正在统计…</string>
-    <string name="report_subtitle">近 30 天统计 · 趋势 · 复诊报告</string>
+    <string name="report_subtitle">统计 · 趋势 · 复诊报告</string>
     <string name="report_supplement_tag">（补）</string>
     <string name="report_tab">报表</string>
     <string name="report_threshold">阈值</string>
@@ -563,6 +563,9 @@
     <string name="trend_flat_short">不变</string>
     <string name="trend_up_to">升至</string>
     <string name="trend_vs_last">较上次</string>
+    <string name="trend_readout_vs_first">较首次 %1$s</string>
+    <string name="trend_readout_avg">均值 %1$s</string>
+    <string name="trend_readout_over">超阈值 %1$d/%2$d 次</string>
     <string name="vaccine_bio_warning">AS 患者使用生物制剂期间接种疫苗需谨慎——活疫苗务必先与医生确认</string>
     <string name="vaccine_booster_date">下次加强日期（可选）</string>
     <string name="vaccine_date">接种日期</string>
@@ -980,6 +983,9 @@
     <string name="supp_merged_med_tag">药</string>
     <string name="supp_merged_supp_tag">补</string>
     <string name="report_tab_periodic">周月报</string>
+    <string name="report_range_7d">近 7 天</string>
+    <string name="report_range_30d">近 30 天</string>
+    <string name="report_range_90d">近 90 天</string>
     <string name="report_periodic_week">近 7 天</string>
     <string name="report_periodic_month">近 30 天</string>
     <string name="report_periodic_med_adherence">用药依从</string>

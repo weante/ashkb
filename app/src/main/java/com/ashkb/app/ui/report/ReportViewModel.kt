@@ -29,6 +29,9 @@ class ReportViewModel(
     val overview: StateFlow<ReportRepository.Overview?> = _overview
     private val _trends = MutableStateFlow<ReportRepository.Trends?>(null)
     val trends: StateFlow<ReportRepository.Trends?> = _trends
+    // v1.0.45：趋势页的时间范围（7 / 30 / 90 天），默认 30 天
+    private val _trendDays = MutableStateFlow(30)
+    val trendDays: StateFlow<Int> = _trendDays
     // B4：周报 / 月报的统计窗口（默认 7 天）与小结数据
     private val _periodDays = MutableStateFlow(7)
     val periodDays: StateFlow<Int> = _periodDays
@@ -46,7 +49,7 @@ class ReportViewModel(
             _busy.value = true
             try {
                 _overview.value = repo.overview()
-                _trends.value = repo.trends()
+                _trends.value = repo.trends(_trendDays.value)
             } catch (e: Exception) {
                 _message.value = app.getString(R.string.vm_report_stats_failed, e.message)
             } finally {
@@ -75,6 +78,25 @@ class ReportViewModel(
             _busy.value = true
             try {
                 _periodic.value = repo.periodicReport(days)
+            } catch (e: Exception) {
+                _message.value = app.getString(R.string.vm_report_stats_failed, e.message)
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    /**
+     * v1.0.45：切换趋势页的时间范围（7 / 30 / 90 天）并重载。
+     * 与 [setPeriodDays] 同口径：点同一窗口且已有数据时不重复查询；失败保留上次结果、只走全局提示。
+     */
+    fun setTrendDays(days: Int) {
+        if (days == _trendDays.value && _trends.value != null) return
+        _trendDays.value = days
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                _trends.value = repo.trends(days)
             } catch (e: Exception) {
                 _message.value = app.getString(R.string.vm_report_stats_failed, e.message)
             } finally {
