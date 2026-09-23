@@ -193,8 +193,48 @@ class ScheduleCalcTest {
     fun `注射无时刻配置时标签与回退时刻一致`() {
         val m = med(route = "injection", frequency = "Q2W", injCycleDays = 14, takeTimes = null)
         val slots = ScheduleCalc.slotsFor(m, LocalDate.parse("2026-08-03"))
-        assertEquals("09:00", slots[0].time)
-        assertEquals("09:00", slots[0].label)
+        assertEquals(ScheduleCalc.DEFAULT_PLAN_TIME, slots[0].time)
+        assertEquals(ScheduleCalc.DEFAULT_PLAN_TIME, slots[0].label)
+    }
+
+    // ======================= 时间选择器初始值（v1.0.52） =======================
+
+    /**
+     * 回归锁：编辑已有药品时，选择器必须显示**用户当初设过的时刻**。
+     * 旧实现用固定候选 chip 的「选中态」表达当前值，存的时刻只要不在那 5 个候选里
+     * （如 07:30），编辑页上没有任何 chip 被选中 → 用户看不到自己设过什么。
+     */
+    @Test
+    fun `timeParts 如实解析任意已设时刻（含不在常用候选内的值）`() {
+        assertEquals(7 to 30, ScheduleCalc.timeParts("07:30"))
+        assertEquals(8 to 0, ScheduleCalc.timeParts("08:00"))
+        assertEquals(0 to 0, ScheduleCalc.timeParts("00:00"))
+        assertEquals(23 to 59, ScheduleCalc.timeParts("23:59"))
+        assertEquals(22 to 31, ScheduleCalc.timeParts("22:31"))
+    }
+
+    @Test
+    fun `timeParts 解析不了或越界时回退默认值`() {
+        val d = ScheduleCalc.timeParts(ScheduleCalc.DEFAULT_PLAN_TIME)
+        assertFallsBackTo(ScheduleCalc.timeParts(null), d)
+        assertFallsBackTo(ScheduleCalc.timeParts(""), d)
+        assertFallsBackTo(ScheduleCalc.timeParts("garbage"), d)
+        // 纯日期不是时刻（split(":") 只有一个元素）
+        assertFallsBackTo(ScheduleCalc.timeParts("2026-09-23"), d)
+        // 越界值必须夹回默认，不能让 TimePicker 收到 25 点 / 99 分
+        assertFallsBackTo(ScheduleCalc.timeParts("25:99"), d)
+        assertFallsBackTo(ScheduleCalc.timeParts("24:00"), d)
+        assertFallsBackTo(ScheduleCalc.timeParts("08:60"), d)
+    }
+
+    @Test
+    fun `默认时刻本身合法`() {
+        assertTrue(ScheduleCalc.TIME_PATTERN.matches(ScheduleCalc.DEFAULT_PLAN_TIME))
+    }
+
+    /** 断言 [actual] 已回退到 [expected]（避免每条重复三行断言） */
+    private fun assertFallsBackTo(actual: Pair<Int, Int>, expected: Pair<Int, Int>) {
+        assertEquals(expected, actual)
     }
 
     @Test

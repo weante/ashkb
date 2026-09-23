@@ -10,13 +10,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -24,6 +32,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -82,8 +92,7 @@ fun MedEditScreen(
     var route by rememberSaveable { mutableStateOf("oral") }
     var dose by rememberSaveable { mutableStateOf("") }
     var frequency by rememberSaveable { mutableStateOf(MedFrequency.DAILY) }
-    var times by rememberSaveable { mutableStateOf(listOf("08:00")) }
-    var customTime by rememberSaveable { mutableStateOf("") }
+    var times by rememberSaveable { mutableStateOf(listOf(ScheduleCalc.DEFAULT_PLAN_TIME)) }
     var weekday by rememberSaveable { mutableStateOf(1) }
     var weekday2 by rememberSaveable { mutableStateOf(4) }
     var biwError by rememberSaveable { mutableStateOf(false) }
@@ -125,7 +134,7 @@ fun MedEditScreen(
         route = med.route
         dose = med.dose
         frequency = MedFrequency.fromKey(med.frequency)
-        times = ScheduleCalc.takeTimesOf(med).ifEmpty { listOf("08:00") }
+        times = ScheduleCalc.takeTimesOf(med).ifEmpty { listOf(ScheduleCalc.DEFAULT_PLAN_TIME) }
         weekday = med.weeklyWeekday ?: 1
         weekday2 = med.weeklyWeekday2 ?: 4
         cycleDays = med.injCycleDays?.toString() ?: "14"
@@ -324,8 +333,6 @@ fun MedEditScreen(
                         PlanTimePicker(
                             times = times,
                             onTimesChange = { times = it },
-                            custom = customTime,
-                            onCustomChange = { customTime = it },
                             single = false,
                         )
                     } else {
@@ -348,8 +355,6 @@ fun MedEditScreen(
                         PlanTimePicker(
                             times = times,
                             onTimesChange = { times = it },
-                            custom = customTime,
-                            onCustomChange = { customTime = it },
                             single = true,
                         )
                         // 固定星期类（WEEKLY / BIW）才按星期出卡，故说明只在这类频次下显示
@@ -483,64 +488,128 @@ fun MedEditScreen(
     }
 }
 
-/** 常用计划时刻（口服与注射共用同一套候选） */
-private val COMMON_PLAN_TIMES = listOf("06:30", "08:00", "12:00", "18:00", "21:00")
+/** 表示「正在新增一个时刻」的下标哨兵（非负下标表示在编辑已有时刻） */
+private const val NEW_TIME_INDEX = -1
 
 /**
- * 计划用药时间选择器（v1.0.51 从口服分支抽出，供口服与注射共用）。
+ * 计划用药时间选择器。
  *
- * - **口服可多选**：一天多次（如每日两次 = 08:00 + 20:00），再点一次即取消；
- * - **注射只能单选**：一针只有一个时刻，且单选态下点「已选中」的时刻**不做取消**——
- *   否则会退化成「零个时刻」，`take_times` 变 null 后计划时刻静默回退到 09:00。
+ * v1.0.52：**不再给「06:30 / 08:00 / …」这类固定候选**，改为一个真正的时间选择器
+ * （[TimePickerDialog]），并且**始终把当前已设的时刻显示出来**。
  *
- * 自定义时刻用 [ScheduleCalc.TIME_PATTERN] 校验（合法 00:00–23:59）。此前用
- * `\d{2}:\d{2}` 会放行 `25:99`：它被加进「已选时刻」看起来生效了，存库后又被
- * `takeTimesOf` 过滤掉——**用户以为设了时刻，其实那个槽位根本不存在**，且毫无提示。
+ * 旧实现用固定 chip 的「选中态」表达当前值，只要存的时刻不在那 5 个候选里
+ * （如 07:30），编辑页上**没有任何 chip 被选中**——用户看不到自己设过什么，
+ * 也无从判断该不该改。
+ *
+ * - **口服可多选**（一天多次）：已选时刻逐个列出，点它改、点 ✕ 删，另有「添加时刻」；
+ * - **注射单选**：只有一行，点开即改——一针只有一个时刻，且不会退化成「零个时刻」
+ *   （否则 `take_times` 变 null，计划时刻会被静默回退到 [ScheduleCalc.DEFAULT_PLAN_TIME]）。
  */
 @Composable
 private fun PlanTimePicker(
     times: List<String>,
     onTimesChange: (List<String>) -> Unit,
-    custom: String,
-    onCustomChange: (String) -> Unit,
     single: Boolean,
 ) {
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-        COMMON_PLAN_TIMES.forEach { t ->
-            FilterChip(
-                selected = t in times,
-                onClick = {
-                    onTimesChange(
-                        when {
-                            single -> listOf(t)
-                            t in times -> times - t
-                            else -> times + t
-                        }
-                    )
-                },
-                label = { Text(t) },
+    val shown = times.distinct().sorted()
+    var editingIndex by remember { mutableStateOf<Int?>(null) }
+
+    if (single) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Size.touchMin)
+                .clickable(onClickLabel = stringResource(R.string.med_edit_time)) { editingIndex = 0 },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(
+                shown.firstOrNull() ?: ScheduleCalc.DEFAULT_PLAN_TIME,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Icon(
+                Icons.Rounded.Schedule,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(Size.iconSm),
             )
         }
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        OutlinedTextField(
-            custom, onCustomChange,
-            label = { Text(stringResource(R.string.med_custom_time)) },
-            modifier = Modifier.weight(1f),
-        )
-        TextButton(onClick = {
-            if (ScheduleCalc.TIME_PATTERN.matches(custom) && custom !in times) {
-                onTimesChange(if (single) listOf(custom) else times + custom)
-                onCustomChange("")
+    } else {
+        shown.forEachIndexed { idx, t ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier
+                        .weight(1f)
+                        .heightIn(min = Size.touchMin)
+                        .clickable(onClickLabel = stringResource(R.string.med_edit_time)) { editingIndex = idx },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Text(t, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                    Icon(
+                        Icons.Rounded.Edit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(Size.iconSm),
+                    )
+                }
+                IconButton(
+                    onClick = { onTimesChange(shown.filterNot { it == t }) },
+                    modifier = Modifier.size(Size.touchMin),
+                ) {
+                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.med_remove_time))
+                }
             }
-        }) { Text(stringResource(R.string.common_add)) }
+        }
+        TextButton(onClick = { editingIndex = NEW_TIME_INDEX }) {
+            Text(stringResource(R.string.med_add_time))
+        }
     }
-    // 单选（注射）时已选值就是唯一那个 chip 本身，无需再列一遍
-    if (!single && times.isNotEmpty()) {
-        Text(
-            "已选时刻：${times.sorted().joinToString("、")}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary,
+
+    editingIndex?.let { idx ->
+        TimePickerDialog(
+            // 初始值 = 该行当前已设的时刻（新增时用默认值）——编辑已有药品时看到的就是存过的值
+            initial = shown.getOrNull(idx) ?: ScheduleCalc.DEFAULT_PLAN_TIME,
+            onConfirm = { picked ->
+                onTimesChange(
+                    when {
+                        single -> listOf(picked)
+                        idx == NEW_TIME_INDEX -> (shown + picked).distinct().sorted()
+                        else -> shown.toMutableList().also { it[idx] = picked }.distinct().sorted()
+                    }
+                )
+                editingIndex = null
+            },
+            onDismiss = { editingIndex = null },
         )
     }
+}
+
+/**
+ * 计划用药时间选择对话框（M3 `TimePicker`，24 小时制）。
+ *
+ * 初始值取**当前已设时刻**并容错（见 [ScheduleCalc.timeParts]），
+ * 因此「编辑已有药品」时显示的是已保存的值，而不是某个写死的默认值。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimePickerDialog(
+    initial: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val hm = remember(initial) { ScheduleCalc.timeParts(initial) }
+    val state = rememberTimePickerState(initialHour = hm.first, initialMinute = hm.second, is24Hour = true)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.med_time_picker_title)) },
+        text = { TimePicker(state = state) },
+        confirmButton = {
+            TextButton(onClick = { onConfirm("%02d:%02d".format(state.hour, state.minute)) }) {
+                Text(stringResource(R.string.common_save))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
+    )
 }

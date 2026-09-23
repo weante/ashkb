@@ -290,7 +290,6 @@
     <string name="med_brand_field">商品名（选填，如：修美乐）</string>
     <string name="med_category">药物类别</string>
     <string name="med_complete_injection">完成注射</string>
-    <string name="med_custom_time">自定义 HH:mm</string>
     <string name="med_cycle_anchor_date">周期锚点日期（YYYY-MM-DD，本期注射日）</string>
     <string name="med_cycle_days_field">周期（天，留空=按需）</string>
     <string name="med_deactivate">停用</string>
@@ -300,6 +299,10 @@
     <string name="med_dose_anchor">剂量锚点</string>
     <string name="med_dose_field">剂量（必填，含单位，如 40 mg）</string>
     <string name="med_dose_time_field">计划用药时间（到点提醒）</string>
+    <string name="med_time_picker_title">选择计划用药时间</string>
+    <string name="med_add_time">＋ 添加时刻</string>
+    <string name="med_edit_time">修改时刻</string>
+    <string name="med_remove_time">删除该时刻</string>
     <string name="med_empty_hint">还没有添加药品</string>
     <string name="med_fasting">空腹</string>
     <string name="med_freq_fixed_weekday">每周固定星期（如甲氨蝶呤）</string>

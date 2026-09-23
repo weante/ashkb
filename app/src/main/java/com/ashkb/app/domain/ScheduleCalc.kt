@@ -24,6 +24,33 @@ object ScheduleCalc {
     val TIME_PATTERN = Regex("([01]\\d|2[0-3]):[0-5]\\d")
 
     /**
+     * 未设置计划时刻时的兜底时刻。
+     *
+     * **唯一来源**：`slotsFor` 的注射分支与「添加/编辑药品」表单的初始值都取它——
+     * 此前表单默认写 08:00、而 `slotsFor` 兜底 09:00，两者不一致，
+     * 编辑一支没有存过时刻的老药时，表单显示的并不是它实际生效的时刻。
+     */
+    const val DEFAULT_PLAN_TIME = "09:00"
+
+    /**
+     * "HH:mm" → (时, 分)，供时间选择器的初始值使用。
+     *
+     * 必须**容得下任何历史值**（如 07:30、或脏数据 25:99）：解析不了或越界就回退
+     * [DEFAULT_PLAN_TIME]。编辑页要能如实显示用户当初设过的时刻，
+     * 而不是因为「不在常用候选里」就显示不出来。
+     */
+    fun timeParts(hhmm: String?): Pair<Int, Int> {
+        val parts = hhmm?.split(":")
+        val h = parts?.getOrNull(0)?.toIntOrNull()
+        val m = parts?.getOrNull(1)?.toIntOrNull()
+        if (h == null || m == null || h !in 0..23 || m !in 0..59) {
+            val d = DEFAULT_PLAN_TIME.split(":")
+            return d[0].toInt() to d[1].toInt()
+        }
+        return h to m
+    }
+
+    /**
      * 判定药品在某日是否有注射任务：
      * 锚点 = start_date；周期 = inj_cycle_days（q2w=14）。
      * 当日与锚点差值 mod 周期 == 0 → 注射日。锚点当日也算。
@@ -54,7 +81,7 @@ object ScheduleCalc {
             else listOfNotNull(med.weeklyWeekday)
             if (wds.isEmpty() || date.dayOfWeek.value !in wds) return emptyList()
             if (med.route == "injection") {
-                val t = takeTimesOf(med).firstOrNull() ?: "09:00"
+                val t = takeTimesOf(med).firstOrNull() ?: DEFAULT_PLAN_TIME
                 return listOf(PlanSlot("inj", t, t))
             }
             val times = takeTimesOf(med)
@@ -63,7 +90,7 @@ object ScheduleCalc {
 
         if (med.route == "injection") {
             return if (isInjectionDay(med, date) && (freq == MedFrequency.Q2W || freq == MedFrequency.CUSTOM)) {
-                val t = takeTimesOf(med).firstOrNull() ?: "09:00"
+                val t = takeTimesOf(med).firstOrNull() ?: DEFAULT_PLAN_TIME
                 listOf(PlanSlot("inj", t, t))
             } else emptyList()
         }
