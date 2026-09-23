@@ -57,6 +57,10 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
     /** v1.0.48：某条药的用药记录流（近 90 天），药单点开查看流水 */
     fun observeLogsForMed(medId: String): Flow<List<MedicationLog>> = repo.observeLogsForMed(medId)
 
+    /** v1.0.49：手动修正某条用药记录（药单「用药记录」弹层里改） */
+    fun updateLog(log: MedicationLog, status: String, reason: String?, injSite: String?, notes: String?) =
+        viewModelScope.launch { repo.updateLog(log, status, reason, injSite, notes) }
+
     /** v1.0.48：已停用药品（含停药原因 / 生效日 / 备注），药单底部「已停用药品」折叠区 */
     val archivedMeds: StateFlow<List<MedicationRepository.ArchivedMedication>> =
         repo.observeArchivedMedications()

@@ -64,6 +64,33 @@ enum class Reaction(val label: String) {
     NONE("无"), MILD("轻微"), MODERATE("中等"), SEVERE("严重")
 }
 
+/**
+ * v1.0.49：注射部位。
+ *
+ * `key` 即 `medication_logs.inj_site` 的**存库值**（勿改——改了历史记录就与中文标签对不上），
+ * `label` 为展示用中文。
+ *
+ * 此前只有「今日打卡」的选择器（`TodayScreen` 里的私有 `injSites()`）知道这层映射，
+ * 药单的「用药记录」直接打印存库值，于是记录里显示的是 `thigh_l` 这种英文键。
+ * 收拢到这里，选择侧与展示侧共用一份映射。
+ */
+enum class InjSite(val key: String, val label: String) {
+    LEFT_THIGH("thigh_l", "左大腿"),
+    RIGHT_THIGH("thigh_r", "右大腿"),
+    LEFT_ABDOMEN("abdomen_l", "左腹部"),
+    RIGHT_ABDOMEN("abdomen_r", "右腹部"),
+    LEFT_ARM("arm_l", "左上臂"),
+    RIGHT_ARM("arm_r", "右上臂");
+
+    companion object {
+        /**
+         * 按存库值取枚举，**未知值返回 null**——不兜底成某个部位：
+         * 猜错等于替用户改了注射部位，宁可显示原始字符串。
+         */
+        fun fromKey(k: String?): InjSite? = entries.firstOrNull { it.key == k }
+    }
+}
+
 @Entity(tableName = "profile")
 data class Profile(
     @PrimaryKey val id: Int = 1,

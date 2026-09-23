@@ -3,6 +3,8 @@ package com.ashkb.app.ui.me
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.DoseState
+import com.ashkb.app.data.entity.InjSite
 import com.ashkb.app.data.entity.MedFrequency
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.MedicationLog
@@ -57,6 +61,7 @@ import com.ashkb.app.data.entity.StopReason
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.ClinicalThresholds
+import com.ashkb.app.domain.MedLogEdit
 import com.ashkb.app.domain.StopWarning
 import com.ashkb.app.ui.checkup.SheetColumn
 import com.ashkb.app.ui.components.DividerList
@@ -411,6 +416,8 @@ private fun RowScope.ArchivedRow(a: MedicationRepository.ArchivedMedication, onO
  * 补剂早就有「服用历史」（WellnessScreen 的 SupplementHistorySheet），药品却只能看报表汇总——
  * 看不到「哪天哪一针打了没有、跳过的原因是什么」。本弹层与补剂那套同款，顶部给出该药
  * 90 天依从率，口径与报表**完全同源**（见 [AdherenceCalc]）。
+ *
+ * v1.0.49：每条记录可**手动修正**（记错了改），修正弹层见 [MedicationLogEditDialog]。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -418,6 +425,8 @@ private fun MedicationHistorySheet(vm: MeViewModel, med: Medication, onDismiss: 
     val logs by remember(med.id) { vm.observeLogsForMed(med.id) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val summary = remember(logs) { AdherenceCalc.summarize(logs.map { it.status }) }
+    // v1.0.49：正在修正的记录（null = 未打开修正弹层）
+    var editTarget by remember(med.id) { mutableStateOf<MedicationLog?>(null) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
@@ -456,10 +465,31 @@ private fun MedicationHistorySheet(vm: MeViewModel, med: Medication, onDismiss: 
                     Spacer(Modifier.weight(1f))
                     StatusChip(ClinicalThresholds.adherenceLabel(summary.ratePct), tone)
                 }
+                // 修正入口的可发现性：只放一个铅笔图标不够，用一行小字说明
+                Text(
+                    stringResource(R.string.med_history_edit_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Spacer(Modifier.height(Spacing.sm))
-                DividerList(logs, key = { it.id }) { log -> MedicationLogRow(log) }
+                DividerList(logs, key = { it.id }) { log ->
+                    MedicationLogRow(log, medRoute = med.route, onEdit = { editTarget = log })
+                }
             }
         }
+    }
+
+    // 修正弹层放在 sheet 之外：AlertDialog 是独立窗口，叠在 ModalBottomSheet 之上
+    editTarget?.let { log ->
+        MedicationLogEditDialog(
+            log = log,
+            medRoute = med.route,
+            onSave = { status, reason, injSite, notes ->
+                vm.updateLog(log, status, reason, injSite, notes)
+                editTarget = null
+            },
+            onDismiss = { editTarget = null },
+        )
     }
 }
 
@@ -467,14 +497,15 @@ private fun MedicationHistorySheet(vm: MeViewModel, med: Medication, onDismiss: 
 private const val MED_HISTORY_DAYS = 90
 
 @Composable
-private fun RowScope.MedicationLogRow(log: MedicationLog) {
+private fun RowScope.MedicationLogRow(log: MedicationLog, medRoute: String, onEdit: () -> Unit) {
     val slotText = when {
         log.scheduledTime != null -> stringResource(R.string.med_history_slot_line, log.scheduledTime)
         log.prnFlag -> stringResource(R.string.med_history_prn)
         else -> null
     }
+    // v1.0.49：部位显示中文。未知键（老数据 / 手工导入）回退原始字符串，不猜成某个部位
     val siteText = log.injSite?.takeIf { it.isNotBlank() }
-        ?.let { stringResource(R.string.med_history_inj_site_line, it) }
+        ?.let { stringResource(R.string.med_history_inj_site_line, InjSite.fromKey(it)?.label ?: it) }
     // 原因优先取枚举中文名；取不到（未知值）就显示原始字符串，不伪装成「其他」
     val reasonText = log.reason?.takeIf { it.isNotBlank() }
         ?.let { stringResource(R.string.med_history_reason_line, SkipReason.fromKey(it)?.label ?: it) }
@@ -497,6 +528,109 @@ private fun RowScope.MedicationLogRow(log: MedicationLog) {
             )
         }
     }
+    // v1.0.49：修正该条记录（记错了改）
+    IconButton(onClick = onEdit, modifier = Modifier.size(Size.touchMin)) {
+        Icon(
+            Icons.Rounded.Edit,
+            contentDescription = stringResource(R.string.med_log_edit_action),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * v1.0.49：修正一条用药记录。
+ *
+ * 只开放「内容」字段（状态 / 原因 / 注射部位 / 备注）：归属日与计划时刻是这条记录的**身份**
+ * （`(date, med_id, slot_key)` 唯一索引的成分），改它们等于换一条记录，会与相邻记录撞键。
+ *
+ * 字段之间的约束（已服不留原因、部分/跳过必填原因、部位仅已服有意义）交给
+ * [MedLogEdit] 与仓储层统一处理——弹层只负责收集，不自己发明规则。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MedicationLogEditDialog(
+    log: MedicationLog,
+    medRoute: String,
+    onSave: (status: String, reason: String?, injSite: String?, notes: String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var status by remember(log.id) { mutableStateOf(log.status) }
+    var reason by remember(log.id) { mutableStateOf(SkipReason.fromKey(log.reason) ?: SkipReason.OTHER) }
+    var injSite by remember(log.id) { mutableStateOf(log.injSite) }
+    var note by remember(log.id) { mutableStateOf(log.notes.orEmpty()) }
+    val isInjection = medRoute == "injection"
+    val needsReason = MedLogEdit.needsReason(status)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.med_log_edit_title, log.date)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Text(stringResource(R.string.med_log_edit_status), style = MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    listOf(AdherenceCalc.DONE, AdherenceCalc.PARTIAL, AdherenceCalc.SKIPPED).forEach { s ->
+                        FilterChip(
+                            selected = status == s,
+                            onClick = { status = s },
+                            label = { Text(statusLabel(s)) },
+                        )
+                    }
+                }
+                if (needsReason) {
+                    Text(stringResource(R.string.med_skip_reason_note), style = MaterialTheme.typography.bodySmall)
+                    SkipReason.entries.forEach { r ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = reason == r, onClick = { reason = r })
+                            Text(r.label)
+                        }
+                    }
+                }
+                // 部位只在「已服」的注射记录上有意义——跳过的针次没有部位
+                if (isInjection && status == AdherenceCalc.DONE) {
+                    Text(stringResource(R.string.med_inj_site_prompt), style = MaterialTheme.typography.bodySmall)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        InjSite.entries.forEach { s ->
+                            FilterChip(
+                                selected = injSite == s.key,
+                                onClick = { injSite = s.key },
+                                label = { Text(s.label) },
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text(stringResource(R.string.med_log_edit_notes)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    stringResource(R.string.med_log_edit_immutable),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSave(
+                        status,
+                        if (needsReason) reason.name else null,
+                        if (isInjection) injSite else null,
+                        note.ifBlank { null },
+                    )
+                },
+                // 需要原因的状态必须选原因，否则会写出「无原因的跳过」污染依从率
+                enabled = MedLogEdit.canSave(status, reason.name),
+            ) { Text(stringResource(R.string.common_save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
+    )
 }
 
 /** 记录状态文案（写入侧只产生三态，未知值按「已服」兜底） */

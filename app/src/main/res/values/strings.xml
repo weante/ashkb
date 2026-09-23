@@ -333,12 +333,6 @@
     <string name="med_route">给药途径</string>
     <string name="med_route_injection">注射</string>
     <string name="med_route_oral">口服</string>
-    <string name="med_site_left_abdomen">左腹部</string>
-    <string name="med_site_left_arm">左上臂</string>
-    <string name="med_site_left_thigh">左大腿</string>
-    <string name="med_site_right_abdomen">右腹部</string>
-    <string name="med_site_right_arm">右上臂</string>
-    <string name="med_site_right_thigh">右大腿</string>
     <string name="med_skip">跳过</string>
     <string name="med_skip_reason_note">请选择原因（跳过会如实记录，不计入漏服）</string>
     <string name="med_status_missed">漏服</string>
@@ -673,6 +667,12 @@
     <string name="med_history_status_done">已服</string>
     <string name="med_history_status_partial">部分</string>
     <string name="med_history_status_skipped">跳过</string>
+    <string name="med_history_edit_hint">记错了？点右侧铅笔可修正该条记录</string>
+    <string name="med_log_edit_action">修正这条记录</string>
+    <string name="med_log_edit_title">修正 %1$s 的记录</string>
+    <string name="med_log_edit_status">服药状态</string>
+    <string name="med_log_edit_notes">备注</string>
+    <string name="med_log_edit_immutable">归属日与计划时刻不可改——它们是这条记录的身份，改了会与相邻记录冲突</string>
     <string name="med_cycle_note">（每 %1$s 天起算）</string>
     <string name="med_injection_title">注射 %1$s</string>
     <string name="med_kb_hits_prefix">知识库命中 %1$s 条相关提示：</string>

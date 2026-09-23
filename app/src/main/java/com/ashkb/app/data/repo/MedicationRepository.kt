@@ -10,6 +10,8 @@ import com.ashkb.app.data.entity.MedicationLog
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.entity.Reaction
 import com.ashkb.app.data.entity.StopReason
+import com.ashkb.app.domain.AdherenceCalc
+import com.ashkb.app.domain.MedLogEdit
 import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.reminder.ReminderScheduler
 import java.time.LocalDate
@@ -180,6 +182,27 @@ class MedicationRepository(private val context: Context) {
             scheduledTime = slotTime, slotKey = slotKey, status = "skipped", reason = reason,
         )).copy(status = "skipped", reason = reason, notes = note, recordedAt = now, takenAt = null)
         logDao.upsert(log)
+    }
+
+    /**
+     * v1.0.49：手动修正某条用药记录（记错了改）。
+     *
+     * **只改「内容」，不改归属日与槽位键**——`(date, med_id, slot_key)` 是唯一索引，
+     * 改日期/槽位等于换一条记录，会与相邻记录撞键（[logDao.upsert] 是 REPLACE 语义，
+     * 撞键会**静默删掉**被撞的那条）。日期与计划时刻因此在 UI 上只读。
+     *
+     * 字段规范化交给 [MedLogEdit]（与写入侧同一套不变量），并保证「已服」有服用时刻。
+     */
+    suspend fun updateLog(log: MedicationLog, status: String, reason: String?, injSite: String?, notes: String?) {
+        logDao.upsert(
+            log.copy(
+                status = status,
+                reason = MedLogEdit.reasonFor(status, reason),
+                injSite = MedLogEdit.injSiteFor(status, injSite),
+                takenAt = if (status == AdherenceCalc.DONE) (log.takenAt ?: nowIso()) else null,
+                notes = notes?.takeIf { it.isNotBlank() },
+            )
+        )
     }
 
     suspend fun logsForDate(date: LocalDate): List<MedicationLog> = logDao.byDate(date.toString())

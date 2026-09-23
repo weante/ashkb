@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
+import com.ashkb.app.data.entity.InjSite
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.SkipReason
 import com.ashkb.app.data.repo.TodayItem
@@ -537,14 +538,6 @@ private fun SkipDialog(
     )
 }
 
-/** 依那西普等皮下注射可选部位（大腿前外侧 / 腹部 / 上臂外侧，左右各一）。 */
-@Composable
-private fun injSites(): List<Pair<String, String>> = listOf(
-    "thigh_l" to stringResource(R.string.med_site_left_thigh), "thigh_r" to stringResource(R.string.med_site_right_thigh),
-    "abdomen_l" to stringResource(R.string.med_site_left_abdomen), "abdomen_r" to stringResource(R.string.med_site_right_abdomen),
-    "arm_l" to stringResource(R.string.med_site_left_arm), "arm_r" to stringResource(R.string.med_site_right_arm),
-)
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun InjSiteDialog(
@@ -553,7 +546,7 @@ private fun InjSiteDialog(
     onConfirm: (site: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sites = injSites()
+    val sites = InjSite.entries.map { it.key to it.label }
     var site by remember { mutableStateOf(sites.firstOrNull { it.first != lastSite }?.first ?: "thigh_l") }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -561,7 +554,8 @@ private fun InjSiteDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 if (lastSite != null) {
-                    val lastLabel = sites.firstOrNull { it.first == lastSite }?.second ?: lastSite
+                    // v1.0.49：部位映射收拢到 InjSite（此前本页私有），展示中文而非存库键
+                    val lastLabel = InjSite.fromKey(lastSite)?.label ?: lastSite
                     Text(stringResource(R.string.med_last_site_note, lastLabel), style = MaterialTheme.typography.bodySmall)
                 }
                 Text(stringResource(R.string.med_inj_site_prompt), style = MaterialTheme.typography.bodyMedium)
