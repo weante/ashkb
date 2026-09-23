@@ -62,6 +62,7 @@ import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.SkipReason
 import com.ashkb.app.data.repo.TodayItem
 import com.ashkb.app.domain.MissedDose
+import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.SectionCard
@@ -351,8 +352,14 @@ private fun medStatusOf(item: TodayItem, missed: Boolean): MedStatus = when {
         chip = stringResource(R.string.med_status_taken_short),
         tone = StatusTone.Success,
         icon = Icons.Rounded.CheckCircle,
-        detail = stringResource(R.string.med_taken_prefix) + (item.log?.takenAt?.takeLast(5) ?: "") +
-            if (item.isLate) stringResource(R.string.med_late_note) else "",
+        // v1.0.50：时刻必须解析后再格式化。原实现取 `takenAt.takeLast(5)`，
+        // 而 takenAt 带小数秒时串长会浮动（见 ScheduleCalc.hhmm），
+        // 于是「已服 22:31」被显示成「已服 19981」这类小数秒数字。
+        // 解析不出时刻时不留下悬空的「已服 」前缀。
+        detail = listOfNotNull(
+            ScheduleCalc.hhmm(item.log?.takenAt)?.let { stringResource(R.string.med_taken_prefix) + it },
+            if (item.isLate) stringResource(R.string.med_late_note) else null,
+        ).joinToString(""),
         actionable = false,
     )
     item.skipped -> MedStatus(

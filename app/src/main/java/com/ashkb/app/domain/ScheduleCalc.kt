@@ -3,6 +3,8 @@ package com.ashkb.app.domain
 import com.ashkb.app.data.entity.MedFrequency
 import com.ashkb.app.data.entity.Medication
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import org.json.JSONArray
 
 /** 槽位键：口服 = "HH:mm"；注射日 = "inj"；PRN 无 */
@@ -72,9 +74,27 @@ object ScheduleCalc {
     /** late 判定：实际执行晚于计划时刻 + 容差（分钟） */
     const val LATE_TOLERANCE_MIN = 30L
 
+    private val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+    /**
+     * ISO 时刻串 → "HH:mm"（展示用）；解析不了返回 null。
+     *
+     * **不要用 `takeLast(5)` 从串尾截取**：写入侧 `nowIso()` 用的是
+     * `DateTimeFormatter.ISO_LOCAL_DATE_TIME`，它在**纳秒非零时会追加小数秒**，
+     * 于是串长在 19 / 23 / 26 之间浮动（如 `2026-09-23T22:31:15.019981`），
+     * 从尾部截 5 个字符截到的是小数秒的数字——今日页曾因此把「已服 22:31」
+     * 显示成「已服 19981」。
+     *
+     * 凡是要从 ISO 时刻里取「时刻」，都必须**解析**（本方法）或**从头截**
+     * （`take(16)` 取到分钟），不能从尾截。
+     */
+    fun hhmm(iso: String?): String? = iso?.let {
+        runCatching { LocalDateTime.parse(it).format(HHMM) }.getOrNull()
+    }
+
     fun isLate(scheduledTime: String?, takenAtIso: String?, date: LocalDate): Boolean {
         if (scheduledTime == null || takenAtIso == null) return false
-        val taken = runCatching { java.time.LocalDateTime.parse(takenAtIso) }.getOrNull() ?: return false
+        val taken = runCatching { LocalDateTime.parse(takenAtIso) }.getOrNull() ?: return false
         // P5 修订：计划时刻必须锚定在归属日 date 上（原实现用打卡日重建，
         // 次日补打卡差值恒为 0，late 判定失效污染依从统计）
         val scheduled = runCatching {

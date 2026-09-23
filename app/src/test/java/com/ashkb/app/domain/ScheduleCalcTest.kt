@@ -225,4 +225,46 @@ class ScheduleCalcTest {
         assertFalse(ScheduleCalc.isLate("08:00", null, date))
         assertFalse(ScheduleCalc.isLate("08:00", "garbage", date))
     }
+
+    // ======================= ISO 时刻 → HH:mm 展示 =======================
+
+    @Test
+    fun `hhmm 秒精度串取到时刻`() {
+        assertEquals("22:31", ScheduleCalc.hhmm("2026-09-23T22:31:15"))
+    }
+
+    /**
+     * 回归锁：今日页曾把「已服 22:31」显示成「已服 19981」。
+     *
+     * 原因：写入侧 `nowIso()` 用 `DateTimeFormatter.ISO_LOCAL_DATE_TIME`，
+     * **纳秒非零时会追加小数秒**，串长在 19 / 23 / 26 之间浮动；
+     * 展示侧却用 `takeLast(5)` 从尾部截——截到的是小数秒的数字。
+     * 下面三个串分别对应小数秒为 6 位 / 3 位 / 9 位，都必须取到真正的时刻。
+     */
+    @Test
+    fun `hhmm 带小数秒的串仍取到时刻（不能从尾部截）`() {
+        // 6 位小数秒：旧实现 takeLast(5) = "19981"（就是用户截图里的那个数）
+        assertEquals("22:31", ScheduleCalc.hhmm("2026-09-23T22:31:15.019981"))
+        // 3 位小数秒：旧实现 takeLast(5) = "5.199"
+        assertEquals("22:31", ScheduleCalc.hhmm("2026-09-23T22:31:15.199"))
+        // 9 位小数秒：旧实现 takeLast(5) = "810000"
+        assertEquals("22:31", ScheduleCalc.hhmm("2026-09-23T22:31:15.199810000"))
+        // 该串恰好也是 isLate 的合法输入（解析口径一致）
+        assertFalse(ScheduleCalc.isLate("22:31", "2026-09-23T22:31:15.019981", LocalDate.parse("2026-09-23")))
+    }
+
+    @Test
+    fun `hhmm 零点与边界时刻不丢前导零`() {
+        assertEquals("00:00", ScheduleCalc.hhmm("2026-09-23T00:00:00"))
+        assertEquals("09:05", ScheduleCalc.hhmm("2026-09-23T09:05:00"))
+    }
+
+    @Test
+    fun `hhmm 解析不了返回 null（由调用方决定不显示）`() {
+        assertNull(ScheduleCalc.hhmm(null))
+        assertNull(ScheduleCalc.hhmm(""))
+        assertNull(ScheduleCalc.hhmm("garbage"))
+        // 纯日期不是时刻
+        assertNull(ScheduleCalc.hhmm("2026-09-23"))
+    }
 }
