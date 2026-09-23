@@ -7,10 +7,12 @@ import androidx.lifecycle.viewmodel.initializer
 import com.ashkb.app.AshkbApplication
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.entity.Medication
+import com.ashkb.app.data.entity.MedicationLog
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.reminder.ReminderScheduler
 import java.time.LocalDate
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -51,6 +53,14 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
 
     /** A3（v1.0.43）：按 id 直接查（不限于「在用」）——编辑页预填用，避免在 meds 流上无限等待 */
     suspend fun medicationById(id: String): Medication? = repo.medicationById(id)
+
+    /** v1.0.48：某条药的用药记录流（近 90 天），药单点开查看流水 */
+    fun observeLogsForMed(medId: String): Flow<List<MedicationLog>> = repo.observeLogsForMed(medId)
+
+    /** v1.0.48：已停用药品（含停药原因 / 生效日 / 备注），药单底部「已停用药品」折叠区 */
+    val archivedMeds: StateFlow<List<MedicationRepository.ArchivedMedication>> =
+        repo.observeArchivedMedications()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** R03：新增药核对清单查询（suspend 由 UI 协程调用） */
     suspend fun interactionsFor(med: Medication): List<KbEntry> = repo.interactionsFor(med)

@@ -9,6 +9,7 @@ import com.ashkb.app.data.entity.MedicationChange
 import com.ashkb.app.data.entity.MedicationLog
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.entity.Reaction
+import com.ashkb.app.data.entity.StopReason
 import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.reminder.ReminderScheduler
 import java.time.LocalDate
@@ -182,6 +183,46 @@ class MedicationRepository(private val context: Context) {
     }
 
     suspend fun logsForDate(date: LocalDate): List<MedicationLog> = logDao.byDate(date.toString())
+
+    // ---- v1.0.48：用药记录与已停用药品（药单点开查看流水 / 折叠区） ----
+
+    /**
+     * 某条药的用药记录（近 [days] 天，倒序）。
+     *
+     * 闭区间与报表口径一致：`[今天-(days-1), 今天]`。停药的药也能查到——归档不改写历史日志。
+     */
+    fun observeLogsForMed(medId: String, days: Int = 90): Flow<List<MedicationLog>> =
+        logDao.observeByMedSince(medId, LocalDate.now().minusDays((days - 1).toLong()).toString())
+
+    /**
+     * 已停用药品 + 停药信息（原因 / 生效日 / 备注）。
+     *
+     * 停药原因不在 `medications` 表上（那里只有 `is_archived` 一个布尔），而在
+     * `medication_changes` 的 `change_type='stop'` 记录里——本方法按 `med_id` 关联最近一条。
+     *
+     * `stopReason` 为 null = 查不到对应的停药变更（老数据 / 恢复的旧备份），
+     * 此时 UI 不应臆测原因，只显示「无记录」。
+     */
+    fun observeArchivedMedications(): Flow<List<ArchivedMedication>> =
+        combine(medDao.observeArchived(), changeDao.observeStops()) { meds, changes ->
+            meds.map { med ->
+                val c = changes.firstOrNull { it.medId == med.id }
+                ArchivedMedication(
+                    med = med,
+                    stopDate = c?.effectiveDate,
+                    stopReason = c?.reason?.let { StopReason.fromKey(it) },
+                    stopNote = c?.reasonNote,
+                )
+            }
+        }
+
+    /** 已停用药品视图项（[stopReason] null = 无停药变更记录，见 [observeArchivedMedications]） */
+    data class ArchivedMedication(
+        val med: Medication,
+        val stopDate: String?,
+        val stopReason: StopReason?,
+        val stopNote: String?,
+    )
 
     /**
      * v1.0.44（N1）：今日**已打卡**槽位集合（[ReminderScheduler.slotRef] 形态），

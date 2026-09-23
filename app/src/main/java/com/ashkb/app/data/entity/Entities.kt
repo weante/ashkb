@@ -47,7 +47,17 @@ enum class SkipReason(val label: String) {
     // C5（v1.0.37）：对齐规划口径的漏服原因（遗忘 / 外出 / 药物用完）。
     // 新增项追加在 OTHER 之前——枚举 key 以 name 存库，追加不影响历史数据。
     FORGOT("遗忘"), OUTING("外出"), RUN_OUT("药物用完"),
-    OTHER("其他")
+    OTHER("其他");
+
+    companion object {
+        /**
+         * v1.0.48：按存库值（枚举 name，大小写不敏感）取枚举。
+         *
+         * **未知值返回 null**——不像 [StopReason.fromKey] 兜底成 OTHER：用药记录里
+         * 宁可直接显示原始字符串，也不要静默把它伪装成「其他」。
+         */
+        fun fromKey(k: String?): SkipReason? = entries.firstOrNull { it.name.equals(k, true) }
+    }
 }
 
 enum class Reaction(val label: String) {

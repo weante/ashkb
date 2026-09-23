@@ -64,6 +64,10 @@ interface MedicationDao {
 
     @Query("UPDATE medications SET is_archived = 1, updated_at = :now WHERE id = :id")
     suspend fun archive(id: String, now: String)
+
+    /** v1.0.48：已停用（归档）药品——药单「已停用药品」区用，按停用时间倒序 */
+    @Query("SELECT * FROM medications WHERE is_archived = 1 ORDER BY updated_at DESC")
+    fun observeArchived(): Flow<List<Medication>>
 }
 
 @Dao
@@ -86,6 +90,20 @@ interface MedicationLogDao {
     /** P4 M9 依从统计：区间内指定状态的打卡数（done / partial / skipped） */
     @Query("SELECT COUNT(*) FROM medication_logs WHERE date BETWEEN :from AND :to AND status = :status")
     suspend fun countBetweenStatus(from: String, to: String, status: String): Int
+
+    /**
+     * v1.0.48：某条药的用药记录（区间内倒序），供药单点开查看流水。
+     *
+     * 排序：`date DESC, scheduled_time DESC`——(date, med_id, slot_key) 有唯一索引，
+     * 故同日内按计划时刻倒序即是稳定的时间线；PRN（scheduled_time 为 NULL）排在当日末尾。
+     *
+     * **按 med_id 查是有意的**：归档（停药）不改写历史日志，归档药的流水仍能查全。
+     */
+    @Query(
+        "SELECT * FROM medication_logs WHERE med_id = :medId AND date >= :from " +
+            "ORDER BY date DESC, scheduled_time DESC",
+    )
+    fun observeByMedSince(medId: String, from: String): Flow<List<MedicationLog>>
 }
 
 @Dao
@@ -98,6 +116,15 @@ interface MedicationChangeDao {
 
     @Query("SELECT * FROM medication_changes ORDER BY effective_date DESC, recorded_at DESC LIMIT :limit")
     fun observeRecent(limit: Int = 50): Flow<List<MedicationChange>>
+
+    /**
+     * v1.0.48：全部停药变更——「已停用药品」区按 med_id 取最近一条以显示停药原因 / 日期 / 备注。
+     *
+     * 停药原因不落在 `medications` 上（那里只有 `is_archived` 一个布尔），而在本表
+     * `change_type='stop'` 的记录里（见 MedicationRepository.stopMedication）。
+     */
+    @Query("SELECT * FROM medication_changes WHERE change_type = 'stop' ORDER BY recorded_at DESC")
+    fun observeStops(): Flow<List<MedicationChange>>
 }
 
 @Dao

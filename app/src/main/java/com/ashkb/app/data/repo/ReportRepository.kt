@@ -12,6 +12,7 @@ import com.ashkb.app.data.entity.SymptomDaily
 import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.entity.WeightLog
+import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.EmergencyMeds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -89,7 +90,8 @@ class ReportRepository(private val context: Context) {
         val partial = logDao.countBetweenStatus(f, t, "partial")
         val skipped = logDao.countBetweenStatus(f, t, "skipped")
         val total = done + partial + skipped
-        val rate = if (total == 0) 0 else ((done + partial * 0.5) / total * 100).toInt()
+        // v1.0.48：公式收拢到 AdherenceCalc（此前本文件内联 4 遍，必然漂移）
+        val rate = AdherenceCalc.ratePct(done, partial, total)
 
         // C2（v1.0.37）：补剂（营养）依从——与用药同口径（部分完成计 0.5）
         val supDao = db.supplementLogDao()
@@ -97,7 +99,7 @@ class ReportRepository(private val context: Context) {
         val supPartial = supDao.countBetweenStatus(f, t, "partial")
         val supSkipped = supDao.countBetweenStatus(f, t, "skipped")
         val supTotal = supDone + supPartial + supSkipped
-        val supRate = if (supTotal == 0) 0 else ((supDone + supPartial * 0.5) / supTotal * 100).toInt()
+        val supRate = AdherenceCalc.ratePct(supDone, supPartial, supTotal)
 
         val exLogs = db.exerciseLogDao().between(f, t)
         val exDone = exLogs.count { it.status == "done" }
@@ -169,14 +171,14 @@ class ReportRepository(private val context: Context) {
         val mp = logDao.countBetweenStatus(f, t, "partial")
         val ms = logDao.countBetweenStatus(f, t, "skipped")
         val mt = md + mp + ms
-        val mr = if (mt == 0) 0 else ((md + mp * 0.5) / mt * 100).toInt()
+        val mr = AdherenceCalc.ratePct(md, mp, mt)
 
         val supDao = db.supplementLogDao()
         val sd = supDao.countBetweenStatus(f, t, "done")
         val sp = supDao.countBetweenStatus(f, t, "partial")
         val ss = supDao.countBetweenStatus(f, t, "skipped")
         val st = sd + sp + ss
-        val sr = if (st == 0) 0 else ((sd + sp * 0.5) / st * 100).toInt()
+        val sr = AdherenceCalc.ratePct(sd, sp, st)
 
         val exLogs = db.exerciseLogDao().between(f, t)
         val exDone = exLogs.filter { it.status == "done" }
