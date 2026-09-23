@@ -174,6 +174,43 @@ class ScheduleCalcTest {
         assertTrue(ScheduleCalc.slotsFor(m, LocalDate.parse("2026-08-04")).isEmpty())
     }
 
+    // ======================= 槽位标签 = 计划时刻（v1.0.51） =======================
+
+    /**
+     * 回归锁：今日卡的 chip 显示的是 `PlanSlot.label`。注射曾把 label 写死成「注射」，
+     * 于是「计划用药时间」在全应用都看不到（药单不显示、卡片也不显示），
+     * 用户只能看到一个「注射」标签，无从得知计划时刻。label 必须等于计划时刻。
+     */
+    @Test
+    fun `注射槽位标签即计划时刻（今日卡要能看见时刻）`() {
+        val m = med(route = "injection", frequency = "Q2W", injCycleDays = 14, takeTimes = """["20:00"]""")
+        val slots = ScheduleCalc.slotsFor(m, LocalDate.parse("2026-08-03"))
+        assertEquals("20:00", slots[0].time)
+        assertEquals("20:00", slots[0].label)
+    }
+
+    @Test
+    fun `注射无时刻配置时标签与回退时刻一致`() {
+        val m = med(route = "injection", frequency = "Q2W", injCycleDays = 14, takeTimes = null)
+        val slots = ScheduleCalc.slotsFor(m, LocalDate.parse("2026-08-03"))
+        assertEquals("09:00", slots[0].time)
+        assertEquals("09:00", slots[0].label)
+    }
+
+    @Test
+    fun `BIW 注射槽位标签即计划时刻`() {
+        val m = med(route = "injection", frequency = "BIW", weeklyWeekday = 1, weeklyWeekday2 = 4, takeTimes = """["20:00"]""")
+        val slots = ScheduleCalc.slotsFor(m, LocalDate.parse("2026-08-31")) // 周一
+        assertEquals("20:00", slots[0].time)
+        assertEquals("20:00", slots[0].label)
+    }
+
+    @Test
+    fun `口服槽位标签同样是计划时刻`() {
+        val slots = ScheduleCalc.slotsFor(med(), LocalDate.parse("2026-08-30"))
+        assertEquals(listOf("08:00", "20:00"), slots.map { it.label })
+    }
+
     @Test
     fun `空腹药槽位标签带晨起空腹提示`() {
         val m = med(takeWithFood = "empty_stomach")

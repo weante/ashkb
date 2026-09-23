@@ -36,7 +36,14 @@ object ScheduleCalc {
         return days >= 0 && days % cycle == 0L
     }
 
-    /** 某药品某日的计划槽位列表（PRN 返回空——使用记录不受计划约束） */
+    /**
+     * 某药品某日的计划槽位列表（PRN 返回空——使用记录不受计划约束）。
+     *
+     * **`label` 一律是计划时刻**（口服与注射都一样）：今日卡的 chip 直接显示它，
+     * 用户才能看到「计划用药时间」。注射曾把 label 写死为「注射」，
+     * 于是计划时刻在全应用无处可见（`key="inj"` 已经表达了「这是注射槽位」，
+     * 「注射」二字由卡片上的给药途径 chip 承担，不必重复）。
+     */
     fun slotsFor(med: Medication, date: LocalDate): List<PlanSlot> {
         val freq = MedFrequency.fromKey(med.frequency)
         if (freq == MedFrequency.PRN) return emptyList()
@@ -48,7 +55,7 @@ object ScheduleCalc {
             if (wds.isEmpty() || date.dayOfWeek.value !in wds) return emptyList()
             if (med.route == "injection") {
                 val t = takeTimesOf(med).firstOrNull() ?: "09:00"
-                return listOf(PlanSlot("inj", t, "注射"))
+                return listOf(PlanSlot("inj", t, t))
             }
             val times = takeTimesOf(med)
             return times.map { PlanSlot(it, it, slotLabel(it, med)) }
@@ -57,7 +64,7 @@ object ScheduleCalc {
         if (med.route == "injection") {
             return if (isInjectionDay(med, date) && (freq == MedFrequency.Q2W || freq == MedFrequency.CUSTOM)) {
                 val t = takeTimesOf(med).firstOrNull() ?: "09:00"
-                listOf(PlanSlot("inj", t, "注射"))
+                listOf(PlanSlot("inj", t, t))
             } else emptyList()
         }
 

@@ -299,7 +299,7 @@
     <string name="med_deactivate_reason_note">请选择停用原因（将写入药单变更记录）</string>
     <string name="med_dose_anchor">剂量锚点</string>
     <string name="med_dose_field">剂量（必填，含单位，如 40 mg）</string>
-    <string name="med_dose_time_field">服药时刻（本地提醒时刻）</string>
+    <string name="med_dose_time_field">计划用药时间（到点提醒）</string>
     <string name="med_empty_hint">还没有添加药品</string>
     <string name="med_fasting">空腹</string>
     <string name="med_freq_fixed_weekday">每周固定星期（如甲氨蝶呤）</string>
@@ -308,7 +308,7 @@
     <string name="med_generic_key_field">通用名键（必填，小写英文，如 adalimumab）</string>
     <string name="med_generic_key_note">用于知识库相互作用检索；输入中英文自动匹配</string>
     <string name="med_inj_cycle_field">注射周期（天，如 14 = 每两周）</string>
-    <string name="med_inj_schedule_note">注射日按下方选择的固定星期自动出卡（默认 09:00 提醒）。</string>
+    <string name="med_inj_schedule_note">注射日按下方选择的固定星期自动出卡；提醒时刻取上方「计划用药时间」。</string>
     <string name="med_inj_site_prompt">请选择本次注射部位：</string>
     <string name="med_inj_two_days_error">两针星期需不同（如周一 / 周四），请调整</string>
     <string name="med_injection_suffix">" · 注射"</string>

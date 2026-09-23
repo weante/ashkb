@@ -321,52 +321,45 @@ fun MedEditScreen(
                 if (frequency != MedFrequency.PRN) {
                     if (route == "oral") {
                         Text(stringResource(R.string.med_dose_time_field), style = MaterialTheme.typography.labelMedium)
-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                            listOf("06:30", "08:00", "12:00", "18:00", "21:00").forEach { t ->
-                                FilterChip(
-                                    selected = t in times,
-                                    onClick = { times = if (t in times) times - t else times + t },
-                                    label = { Text(t) },
-                                )
-                            }
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                            OutlinedTextField(
-                                customTime, { customTime = it },
-                                label = { Text(stringResource(R.string.med_custom_time)) },
-                                modifier = Modifier.weight(1f),
-                            )
-                            TextButton(onClick = {
-                                if (Regex("\\d{2}:\\d{2}").matches(customTime) && customTime !in times) {
-                                    times = times + customTime
-                                    customTime = ""
-                                }
-                            }) { Text(stringResource(R.string.common_add)) }
-                        }
-                        if (times.isNotEmpty()) {
-                            Text(
-                                "已选时刻：${times.sorted().joinToString("、")}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    } else if (frequency == MedFrequency.Q2W || frequency == MedFrequency.CUSTOM) {
-                        OutlinedTextField(
-                            cycleDays, { cycleDays = it.filter { c -> c.isDigit() }.take(3) },
-                            label = { Text(stringResource(R.string.med_inj_cycle_field)) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedTextField(
-                            startDate, { startDate = it },
-                            label = { Text(stringResource(R.string.med_cycle_anchor_date)) },
-                            modifier = Modifier.fillMaxWidth(),
+                        PlanTimePicker(
+                            times = times,
+                            onTimesChange = { times = it },
+                            custom = customTime,
+                            onCustomChange = { customTime = it },
+                            single = false,
                         )
                     } else {
-                        Text(
-                            stringResource(R.string.med_inj_schedule_note),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        // v1.0.51：注射类此前**没有任何「计划用药时间」入口**——时刻选择只在口服分支里，
+                        // 注射的时刻被静默写成表单默认值 08:00，用户既看不到也改不了；
+                        // 今日卡又只显示「注射」不显示时刻，于是「计划用药时间」在全应用都无处可见。
+                        if (frequency == MedFrequency.Q2W || frequency == MedFrequency.CUSTOM) {
+                            OutlinedTextField(
+                                cycleDays, { cycleDays = it.filter { c -> c.isDigit() }.take(3) },
+                                label = { Text(stringResource(R.string.med_inj_cycle_field)) },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            OutlinedTextField(
+                                startDate, { startDate = it },
+                                label = { Text(stringResource(R.string.med_cycle_anchor_date)) },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        Text(stringResource(R.string.med_dose_time_field), style = MaterialTheme.typography.labelMedium)
+                        PlanTimePicker(
+                            times = times,
+                            onTimesChange = { times = it },
+                            custom = customTime,
+                            onCustomChange = { customTime = it },
+                            single = true,
                         )
+                        // 固定星期类（WEEKLY / BIW）才按星期出卡，故说明只在这类频次下显示
+                        if (frequency != MedFrequency.Q2W && frequency != MedFrequency.CUSTOM) {
+                            Text(
+                                stringResource(R.string.med_inj_schedule_note),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 } else {
                     OutlinedTextField(
@@ -487,5 +480,67 @@ fun MedEditScreen(
             // 底部操作条已固定，这里补足滚动余量
             Text("", Modifier.padding(bottom = Spacing.xl))
         }
+    }
+}
+
+/** 常用计划时刻（口服与注射共用同一套候选） */
+private val COMMON_PLAN_TIMES = listOf("06:30", "08:00", "12:00", "18:00", "21:00")
+
+/**
+ * 计划用药时间选择器（v1.0.51 从口服分支抽出，供口服与注射共用）。
+ *
+ * - **口服可多选**：一天多次（如每日两次 = 08:00 + 20:00），再点一次即取消；
+ * - **注射只能单选**：一针只有一个时刻，且单选态下点「已选中」的时刻**不做取消**——
+ *   否则会退化成「零个时刻」，`take_times` 变 null 后计划时刻静默回退到 09:00。
+ *
+ * 自定义时刻用 [ScheduleCalc.TIME_PATTERN] 校验（合法 00:00–23:59）。此前用
+ * `\d{2}:\d{2}` 会放行 `25:99`：它被加进「已选时刻」看起来生效了，存库后又被
+ * `takeTimesOf` 过滤掉——**用户以为设了时刻，其实那个槽位根本不存在**，且毫无提示。
+ */
+@Composable
+private fun PlanTimePicker(
+    times: List<String>,
+    onTimesChange: (List<String>) -> Unit,
+    custom: String,
+    onCustomChange: (String) -> Unit,
+    single: Boolean,
+) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+        COMMON_PLAN_TIMES.forEach { t ->
+            FilterChip(
+                selected = t in times,
+                onClick = {
+                    onTimesChange(
+                        when {
+                            single -> listOf(t)
+                            t in times -> times - t
+                            else -> times + t
+                        }
+                    )
+                },
+                label = { Text(t) },
+            )
+        }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        OutlinedTextField(
+            custom, onCustomChange,
+            label = { Text(stringResource(R.string.med_custom_time)) },
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = {
+            if (ScheduleCalc.TIME_PATTERN.matches(custom) && custom !in times) {
+                onTimesChange(if (single) listOf(custom) else times + custom)
+                onCustomChange("")
+            }
+        }) { Text(stringResource(R.string.common_add)) }
+    }
+    // 单选（注射）时已选值就是唯一那个 chip 本身，无需再列一遍
+    if (!single && times.isNotEmpty()) {
+        Text(
+            "已选时刻：${times.sorted().joinToString("、")}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
