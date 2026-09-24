@@ -41,15 +41,21 @@ object ReminderScheduler {
      *   **刻意不设默认值**（v1.0.44）：v1.0.43 引入本参数时给了 `emptySet()` 默认值，
      *   结果开机广播那条调用路径漏传，重启后已服药的槽位仍会被排上 +30 / +60 误提醒。
      *   去掉默认值后，任何新增调用点都必须显式想一次「哪些槽位今天已完成」。
+     * @param now 「现在」。刻意留成可注入参数（默认真实当下）以便**确定性地**回归本方法：
+     *   本方法的可观察效果完全由「现在」决定（哪些槽位已过点、哪些升级重查还没到），
+     *   而 Robolectric **改不动 `java.time` 的挂钟**（`ShadowSystemClock` 只影响
+     *   `SystemClock`，实测 `advanceBy` 后 `LocalDateTime.now()` 不变），
+     *   所以只能从调用侧注入，测试才能在任何时刻运行都不漂移、不静默跳过。
+     *   这与 `ScheduleCalc.slotsFor(med, date)` 显式传入日期的风格一致。
      */
     fun rescheduleAll(
         context: Context,
         meds: List<Medication>,
         doneSlotRefs: Set<String>,
+        now: LocalDateTime = LocalDateTime.now(),
     ) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        cancelAllFuture(context, meds)
-        val now = LocalDateTime.now()
+        cancelAllFuture(context, meds, now.toLocalDate())
         val today = now.toLocalDate()
 
         // 1) 未来（含今日未到点）槽位：按 esc=0 排首次提醒
@@ -100,9 +106,8 @@ object ReminderScheduler {
         }
     }
 
-    fun cancelAllFuture(context: Context, meds: List<Medication>) {
+    fun cancelAllFuture(context: Context, meds: List<Medication>, today: LocalDate = LocalDate.now()) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val today = LocalDate.now()
         for (dayOffset in 0..HORIZON_DAYS) {
             val date = today.plusDays(dayOffset)
             for (med in meds) {

@@ -26,8 +26,8 @@ android {
         applicationId = "com.ashkb.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 57
-        versionName = "1.0.52"
+        versionCode = 58
+        versionName = "1.0.53"
     }
 
     signingConfigs {
@@ -58,6 +58,8 @@ android {
         unitTests {
             // 未 mock 的 android.* 调用返回默认值而非抛异常（P5 单测可跑纯逻辑）
             isReturnDefaultValues = true
+            // S1（v1.0.53）：Robolectric 需要真实资源（androidx.test:monitor 等已随其传递依赖引入）
+            isIncludeAndroidResources = true
         }
     }
     compileOptions {
@@ -97,4 +99,17 @@ dependencies {
     // P5 单元测试：org.json 桥接（Android stub 的 org.json 在 JVM 单测中不可用）
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
+
+    // S1（v1.0.53）：提醒链回归——`ReminderScheduler` 依赖 `AlarmManager`，纯 JVM 单测
+    // （isReturnDefaultValues=true）完全覆盖不到，A1/N1 那类「只在真机暴露」的 bug 正源于此。
+    // Robolectric 能模拟 AlarmManager（其核心能力），故用它断言「取消-重建」语义。
+    // ⚠️ 不可用于检测 ICU 正则差异（已实测证伪，见 HANDOFF §7）。
+    // 4.13 + instrumented android-all(API 34) 已在本机 Gradle / Maven 缓存中，可离线跑。
+    testImplementation("org.robolectric:robolectric:4.13")
+
+    // S1b（手势回归）**已实测证伪、不予落地**（v1.0.53）：本环境能注入触摸事件
+    // （最小 pointerInput 盒子能收到 down），但**驱动不了 M3 Slider 的拖动**——
+    // 连「裸 M3 Slider」（无 ScoreInput 包装、无祖先旁听）都拖不动，故那 3 条手势断言
+    // 是**环境假红**而非应用缺陷。结论：滑杆手势仍只能真机验证，不要在此环境写手势测试。
+    // 证据与探针写法见 HANDOFF §7。
 }
