@@ -4,6 +4,49 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.58] — 2026-09-25
+
+**v1.0.57 的收尾：拖动读数不再只报一条（同日多值全部报出）；并按用户要求撤掉小图下那行「同日多条数值」说明。**
+
+⚠️ **无数据库结构变更**（仍为 Room v15），可覆盖安装。**含 v1.0.44 ~ v1.0.57 全部内容。**
+
+### 缺陷一：拖到 03-13 仍只读到 0.4
+
+v1.0.57 已把同日的两条 CRP（36.33 与 0.4）**都画了出来**（图上是一段竖线），
+但**拖动读数气泡仍只报一条**，且报的恰是较小的 0.4（用户实测：「手指拖动到 3.13 的时候还是显示 0.4」）。
+
+根因：`nearestIndex` 找最近点用**严格小于**比较，命中同日**第一个**下标；
+而同日多值在 `points` 里按数值**升序**排列 —— 于是永远报到较小的那条。
+
+**这说明「把图改对」不等于「把读数也改对」**：一个 x 对应多个 y 之后，所有「先用 x 定位、再取第 i 个点」
+的消费方都得同步改，否则会留下「线画对了、读数还是错的」这种一半对一半错的混合状态。
+
+修法：新增纯函数 `sameDateIndices(points, index)`，一次取出**该日的全部下标**，
+高亮（该日每个值各画一个圆点）与读数都不再只报一条；气泡文案由纯函数 `selectionText` 生成，
+同日多值**全部列出且从大到小**——与图上竖线自上而下一致，偏高的异常值先被看到。
+
+### 缺陷二：小图下那行说明破坏整体性
+
+v1.0.57 在化验小图下加了一行「有 N 个日期存在多条不同数值（均已画出）」。
+但那些值**本来就已经全部画出来了**——图上一段竖线已把话说清楚；
+再挂一行文字只会把该格撑高、与左侧「血沉」格不齐，破坏 2 列小多图的整齐（用户实测反馈）。
+
+故撤掉该文案，并删除只服务于它的 `LabTrend.conflictDates` 与字符串 `report_lab_same_date_conflict`。
+`hasCaveat` 只保留「有数据被排除在外」（单位认不出 / 缺失）——那才是**图上看不出来**、必须说明的情况。
+
+**判据沉淀**：文字补注只应用于「图上看不出来的事」；能被图形本身表达的，就不要再写一遍。
+
+### 验证
+
+- 单测 **394 条全过，0 skipped**（389 + 5）。新增 5 条覆盖两个新纯函数：
+  `same date indices returns every point of that day`、`same date indices handles empty list and out of range index`、
+  `selection text lists every value of the day largest first`、`selection text stays a single value when the day has one point`、
+  `selection text shows the full date across year boundary`。
+  `LabTrendTest` 相应去掉 `conflictDates` 断言，回归锁仍锁定「36.33 与 0.4 两个值都必须在图上」。
+  （气泡文案断言刻意避开小数分隔符，防止 locale 差异造成假红。）
+- `aapt dump badging` 核实 `versionCode=63 / versionName=1.0.58`；release APK 验签
+  SHA-256 `38CA80A6…012D7D`，与历史版本一致，可覆盖升级。
+
 ## [v1.0.57] — 2026-09-24
 
 **真正的修法：同日多值不再「取一条」，全部画出；并按用户要求移除 hs-CRP。**

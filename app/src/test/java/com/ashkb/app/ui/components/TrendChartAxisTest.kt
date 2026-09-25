@@ -166,4 +166,64 @@ class TrendChartAxisTest {
         assertEquals(0, nearestIndex(-5f, 3, 0f, 1f, offsets, 10L))
         assertEquals(2, nearestIndex(99f, 3, 0f, 1f, offsets, 10L))
     }
+
+    // ---- sameDateIndices / selectionText：同日多值的拖动读数（v1.0.58 修复的缺陷）----
+
+    /**
+     * v1.0.57 的缺陷回归：用户 2026-03-13 有两条 CRP（36.33 与 0.4）。
+     *
+     * 拖动命中用**严格小于**比较，命中同日**第一个**下标；而同日多值在 `points` 里是升序，
+     * 于是永远报到较小的那条（0.4）——用户拖到那天**看不到化验单上的 36.33**。
+     * 现在把该日全部下标一起取出，读数与高亮都不再只报一条。
+     */
+    @Test
+    fun `same date indices returns every point of that day`() {
+        val points = listOf(
+            pt("2026-03-13", 0.4f),
+            pt("2026-03-13", 36.33f),
+            pt("2026-06-05", 0.4f),
+            pt("2026-07-17", 0.4f),
+        )
+        assertEquals(listOf(0, 1), sameDateIndices(points, 0))
+        // 命中同日的哪一个下标，都要取全（不能只返回「那一个」）
+        assertEquals(listOf(0, 1), sameDateIndices(points, 1))
+        assertEquals(listOf(2), sameDateIndices(points, 2))
+        assertEquals(listOf(3), sameDateIndices(points, 3))
+    }
+
+    @Test
+    fun `same date indices handles empty list and out of range index`() {
+        assertEquals(emptyList<Int>(), sameDateIndices(emptyList(), 0))
+        val points = listOf(pt("2026-03-13", 1f), pt("2026-03-13", 2f))
+        assertEquals(listOf(0, 1), sameDateIndices(points, 99))
+        assertEquals(listOf(0, 1), sameDateIndices(points, -3))
+    }
+
+    /**
+     * 气泡文案：同日多值**全部列出**，且**从大到小**——与图上该日竖线自上而下一致，
+     * 也保证偏高的异常值先被看到（断言避开小数分隔符，防止 locale 差异导致假红）。
+     */
+    @Test
+    fun `selection text lists every value of the day largest first`() {
+        val txt = selectionText("2026-03-13", "2026-07-17", "2026-03-13", listOf(0.4f, 36.33f), " mg/L")
+        assertTrue("应带出该日期：$txt", txt.startsWith("03-13 · "))
+        assertTrue("应带出单位：$txt", txt.endsWith(" mg/L"))
+        val values = txt.removePrefix("03-13 · ").removeSuffix(" mg/L").split(" / ")
+        assertEquals("同日两个值都要报出来：$txt", 2, values.size)
+        assertTrue("偏高的异常值要排在前面（用户最关心的正是 36.33）：$txt", values[0].startsWith("36"))
+        assertEquals("较小的那条也要在（不静默丢）：$txt", "0.4", values[1])
+    }
+
+    @Test
+    fun `selection text stays a single value when the day has one point`() {
+        val txt = selectionText("2026-03-13", "2026-07-17", "2026-06-05", listOf(0.4f), " mg/L")
+        assertEquals("06-05 · 0.4 mg/L", txt)
+    }
+
+    /** 跨年时气泡必须带完整年份（复用了 dateTick 的口径）。 */
+    @Test
+    fun `selection text shows the full date across year boundary`() {
+        val txt = selectionText("2025-12-30", "2026-01-02", "2026-01-02", listOf(5f), " mg/L")
+        assertEquals("2026-01-02 · 5 mg/L", txt)
+    }
 }

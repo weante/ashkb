@@ -460,7 +460,6 @@
     <string name="report_latest">最新</string>
     <string name="report_lab_axis">本区时间轴：%1$s → %2$s</string>
     <string name="report_lab_import_hint">可在「复诊 / 检查」里导入化验单</string>
-    <string name="report_lab_same_date_conflict">有 %1$d 个日期存在多条不同数值（均已画出）</string>
     <string name="report_lab_unit_mismatch">另有 %1$d 条因单位不同未纳入</string>
     <string name="report_lab_unit_assumed">另有 %1$d 条无单位，按 %2$s 计</string>
     <string name="report_mom">环比</string>

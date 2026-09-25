@@ -550,17 +550,20 @@ private fun MiniSeriesCell(
  *
  * 单位缺失 / 认不出都必须**说出来**：这类数据我们没画进图里，
  * 若不说，用户会把「图上没有」理解成「没测过」，而实际是「测了但没纳入」。
+ *
+ * ⚠️ **「同日多条不同数值」不再出补注**（v1.0.58）：v1.0.57 曾在此追加一行
+ * 「有 N 个日期存在多条不同数值（均已画出）」，但那些值**本来就已经全部画出来了**——
+ * 图上的一段竖线已把话说清楚；再挂一行文字只会把格子撑高、破坏 2 列小多图的整齐
+ * （用户实测反馈）。故这里只保留「有数据被排除在外」这一类**图上看不出来**的说明。
  */
 @Composable
 private fun labCaveat(lab: LabTrend): String? {
     val mismatch = lab.unitMismatch
     val assumed = lab.unitAssumed
-    val conflict = lab.conflictDates
     val unit = lab.indicator.canonicalUnit
     val m = if (mismatch > 0) stringResource(R.string.report_lab_unit_mismatch, mismatch) else null
     val a = if (assumed > 0) stringResource(R.string.report_lab_unit_assumed, assumed, unit) else null
-    val c = if (conflict > 0) stringResource(R.string.report_lab_same_date_conflict, conflict) else null
-    return listOfNotNull(m, a, c).joinToString("；").ifBlank { null }
+    return listOfNotNull(m, a).joinToString("；").ifBlank { null }
 }
 
 // 趋势图已抽到 ui/components/TrendChart.kt

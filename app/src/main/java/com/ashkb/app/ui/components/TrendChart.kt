@@ -187,11 +187,20 @@ fun TrendChart(
 
     var selected by remember(points) { mutableStateOf<Int?>(null) }
 
-    val selectedLayout = remember(selected, points, unit, axisStyle) {
-        selected?.let { i ->
-            val idx = i.coerceIn(0, points.lastIndex)
-            val txt = "${dateTick(points.first().date, points.last().date, points[idx].date)} · " +
-                "${fmtValue(points[idx].value)}$unit"
+    // 选中的「日期」对应的**全部**下标（同日多值时不止一个）——一起高亮、一起读数
+    val selectedIndices = remember(selected, points) {
+        selected?.let { sameDateIndices(points, it) }
+    }
+
+    val selectedLayout = remember(selectedIndices, points, unit, axisStyle) {
+        selectedIndices?.let { indices ->
+            val txt = selectionText(
+                firstDate = points.first().date,
+                lastDate = points.last().date,
+                date = points[indices.first()].date,
+                values = indices.map { points[it].value },
+                unit = unit,
+            )
             textMeasurer.measure(txt, axisStyle.copy(color = cs.onSurface))
         }
     }
@@ -345,6 +354,8 @@ fun TrendChart(
                 }
             }
 
+            val selIdx = selected?.coerceIn(0, points.lastIndex)
+
             // ---- 末点高亮 + 数值（不拖动也能读数）----
             // v1.0.46：仅入场动画播完后绘制——动画期间折线尚未扫到末点，末点圆与数值气泡
             // 若无条件绘制，会提前悬在折线终点位置（v1.0.45 的缺陷）。
@@ -355,8 +366,8 @@ fun TrendChart(
                 drawCircle(accent, dotPx * 0.9f, Offset(lx, ly))
                 drawCircle(cs.surfaceContainerLowest, dotPx * 0.45f, Offset(lx, ly))
 
-                // 拖动选中时不画末点数值，避免与气泡叠字
-                if (selected == null || selected != lastIdx) {
+                // 拖动选中时（且选中的正是最后那天）不画末点数值，避免与气泡叠字
+                if (selIdx == null || points[selIdx].date != points[lastIdx].date) {
                     val padBoxH = Spacing.xs.toPx()
                     val padBoxV = Spacing.xxs.toPx()
                     val bw = lastValueLayout.size.width + padBoxH * 2
@@ -375,14 +386,15 @@ fun TrendChart(
                 }
             }
 
-            // ---- 选中点读数 ----
-            val selIdx = selected?.coerceIn(0, points.lastIndex)
+            // ---- 选中点读数（同日多值时该日**全部**值一起高亮）----
             if (selIdx != null) {
                 val x = xAt(selIdx)
-                val y = yAt(points[selIdx].value)
                 drawLine(cs.outline, Offset(x, top), Offset(x, bottom), gridPx)
-                drawCircle(accent, dotPx, Offset(x, y))
-                drawCircle(cs.surfaceContainerLowest, dotPx / 2, Offset(x, y))
+                selectedIndices?.forEach { i ->
+                    val y = yAt(points[i].value)
+                    drawCircle(accent, dotPx, Offset(x, y))
+                    drawCircle(cs.surfaceContainerLowest, dotPx / 2, Offset(x, y))
+                }
 
                 selectedLayout?.let { l ->
                     val padBoxH = Spacing.sm.toPx()
@@ -595,6 +607,37 @@ internal fun nearestIndex(
     }
     return (ratio * (count - 1)).roundToInt().coerceIn(0, count - 1)
 }
+
+/**
+ * 选中某个下标时，需要**一起**高亮与读数的全部下标。
+ *
+ * 同一天可能有多个不同数值（如 2026-03-13 的两条 CRP：36.33 与 0.4），它们 **x 相同、y 不同**。
+ * v1.0.57 只报其中一条，而 [nearestIndex] 用严格小于比较、命中同日**第一个**下标，
+ * 同日多值在 `points` 里又是升序——于是固定报到较小的那条（0.4），
+ * 用户拖到那天**看不到化验单上的 36.33**（v1.0.58 用户实测反馈）。
+ * 本函数把该日的点全找出来，一起画、一起读，从根上避免「只报一条」。
+ */
+internal fun sameDateIndices(points: List<TrendPoint>, index: Int): List<Int> {
+    if (points.isEmpty()) return emptyList()
+    val date = points[index.coerceIn(0, points.lastIndex)].date
+    return points.indices.filter { points[it].date == date }
+}
+
+/**
+ * 拖动读数气泡文案：`MM-dd · 大值 / 小值 单位`。
+ *
+ * 同日多值时**全部列出**，且**从大到小**——与图上该日竖线自上而下一致，
+ * 也保证偏高的异常值先被看到（用户最关心的正是那个一度被顶掉的 36.33）。
+ */
+internal fun selectionText(
+    firstDate: String,
+    lastDate: String,
+    date: String,
+    values: List<Float>,
+    unit: String,
+): String =
+    dateTick(firstDate, lastDate, date) + " · " +
+        values.sortedDescending().joinToString(" / ") { fmtValue(it) } + unit
 
 private fun summarize(
     label: String,

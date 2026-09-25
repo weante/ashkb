@@ -13,18 +13,19 @@ data class LabPoint(val date: String, val value: Float)
  * @param refHigh 化验单**自带**的参考上限（取范围内最新一条非空的）——为空时回退指标兜底值
  * @param unitMismatch 单位无法换算、**未纳入**的条数
  * @param unitAssumed 单位缺失、按规范单位计的条数（这类**会**入图，但需说明）
- * @param conflictDates 存在**多个不同数值**的日期数（这些数值**都已画出**，未丢弃任何一个）
  *
- * ⚠️ 这几个计数不是装饰：单位缺失/陌生、以及同日多值时，**既不静默丢弃、也不假装没有**——
+ * ⚠️ 这两个计数不是装饰：单位缺失/陌生时，**既不静默丢弃、也不假装没有**——
  * CRP 的 mg/dL 与 mg/L 差 10 倍，悄悄按错单位画会凭空多出一次「骤降」。
  *
- * ⚠️ **为什么同日多值不再「取一条」**（v1.0.57 定稿）：v1.0.54–v1.0.56 一直按
- * 「同日保留最近录入的一条」去重，结果用户 2026-03-13 有两条 CRP（36.33 与 0.4），
- * 规则选中了 0.4 → **图上显示 0.4、化验单上是 36.33**，连续两版都没修对。
+ * ⚠️ **为什么同日多值既不「取一条」、也不再挂文字说明**（v1.0.58 定稿）：
+ * v1.0.54–v1.0.56 一直按「同日保留最近录入的一条」去重，结果用户 2026-03-13 有两条 CRP
+ * （36.33 与 0.4），规则选中了 0.4 → **图上显示 0.4、化验单上是 36.33**，连续两版都没修对。
  * 根子在于：**「从多条里挑一条」这个动作本身就是错的**——无论挑哪条，都可能与
- * 用户手上的化验单不一致，而用户无从判断。改为**全部画出**：数值一个不丢，
- * 同一天有两个值就在同一横坐标上表现为一段竖线，配合 [conflictDates] 的说明，
- * 用户能自己看出「这天有两条记录」。要不要清理重复记录是**用户的数据决定**，不由我们替他做。
+ * 用户手上的化验单不一致，而用户无从判断。v1.0.57 改为**全部画出**：数值一个不丢，
+ * 同一天有两个值就表现为同一横坐标上的一段竖线。
+ * v1.0.58 进一步撤掉当时加的那行「有 N 个日期存在多条不同数值」——**图本身已经把这件事说清楚了**，
+ * 再挂一行字只会把 2 列小多图的格子撑高、破坏整齐（用户实测反馈）。
+ * 要不要清理重复记录是**用户的数据决定**，不由我们替他做。
  */
 data class LabTrend(
     val indicator: LabIndicator,
@@ -32,7 +33,6 @@ data class LabTrend(
     val refHigh: Float? = null,
     val unitMismatch: Int = 0,
     val unitAssumed: Int = 0,
-    val conflictDates: Int = 0,
 ) {
     /** 画阈值线用的参考上限：优先化验单自带值，其次指标兜底值。 */
     val threshold: Float
@@ -40,8 +40,12 @@ data class LabTrend(
 
     val isEmpty: Boolean get() = points.isEmpty()
 
-    /** 是否需要提示「有数据未纳入 / 同日多值」。 */
-    val hasCaveat: Boolean get() = unitMismatch > 0 || unitAssumed > 0 || conflictDates > 0
+    /**
+     * 是否有**未纳入**的数据需要说明。
+     *
+     * 同日多值不算：那些值**都已经画出来了**，图上一段竖线一目了然，不需要额外文字。
+     */
+    val hasCaveat: Boolean get() = unitMismatch > 0 || unitAssumed > 0
 }
 
 /**
@@ -112,7 +116,6 @@ object LabTrends {
             refHigh = orderedDates.mapNotNull { latestRowByDate[it]?.refHigh }.lastOrNull()?.toFloat(),
             unitMismatch = unitMismatch,
             unitAssumed = unitAssumed,
-            conflictDates = byDate.count { it.value.size > 1 },
         )
     }
 }

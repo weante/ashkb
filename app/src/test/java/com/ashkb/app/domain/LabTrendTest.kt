@@ -10,7 +10,7 @@ import org.junit.Test
  * 化验行 → 炎症指标序列（趋势页方案 C）。
  *
  * 重点覆盖三类**容易静默出错**的口径：单位（差 10 倍会凭空多一次「骤降」）、
- * 窗口（不该画进来的别画）、同日重复（同一天两次抽血只能留一个点）。
+ * 窗口（不该画进来的别画）、同日多值（同一天两次抽血，两个值**都要画出来**、一个不丢）。
  */
 class LabTrendTest {
 
@@ -176,7 +176,7 @@ class LabTrendTest {
     }
 
     @Test
-    fun `同日多条不同值全部保留 并计数冲突日期`() {
+    fun `同日多条不同值全部保留 一条都不丢`() {
         val t = esr(
             listOf(
                 lab("2026-06-10", value = 10.0, recordedAt = "2026-06-10T07:00:00"),
@@ -185,32 +185,33 @@ class LabTrendTest {
             )
         )
         assertEquals("三个不同值一个都不能丢", 3, t.points.size)
-        assertEquals(listOf(10f, 15f, 22f), t.points.map { it.value })
-        assertEquals("同一日期 → 计 1 个冲突日期", 1, t.conflictDates)
-        assertTrue(t.hasCaveat)
+        assertEquals("同日三点同 x 不同 y（图上是一段竖线）", listOf(10f, 15f, 22f), t.points.map { it.value })
+        // 同日多值**不算**「有数据未纳入」：值都画出来了，不再出补注（v1.0.58 撤掉了那行文字）
+        assertTrue(!t.hasCaveat)
     }
 
     @Test
-    fun `同一天重复录入同一个值合并为一个点 不算冲突`() {
+    fun `同一天重复录入同一个值合并为一个点`() {
         val t = esr(
             listOf(
                 lab("2026-06-10", value = 15.0, recordedAt = "2026-06-10T07:00:00"),
                 lab("2026-06-10", value = 15.0, recordedAt = "2026-06-10T15:00:00"),
             )
         )
-        assertEquals(1, t.points.size)
-        assertEquals("同 x 同 y，重复画看不出差别", 0, t.conflictDates)
+        assertEquals("同 x 同 y，重复画看不出差别，只留一个点", 1, t.points.size)
         assertTrue(!t.hasCaveat)
     }
 
     /**
-     * **回归锁（v1.0.57 定稿，直接来自用户真实数据）**：用户 2026-03-13 有**两条 CRP** 记录
+     * **回归锁（直接来自用户真实数据）**：用户 2026-03-13 有**两条 CRP** 记录
      * （36.33 mg/L 与 0.4 mg/L）。v1.0.54–v1.0.56 一直按「同日保留最近录入的一条」去重，
      * 连续两版都画成 0.4，而用户化验单上写的是 **36.33** —— 图与单据矛盾。
      *
      * 根子在于：**「从多条里挑一条」这个动作本身就是错的**。现在两个值都画出，
-     * 36.33 一定在图上；同一天两个值会表现为同一横坐标上的一段竖线，
-     * 配合「有 N 个日期存在多条不同数值（均已画出）」的说明，用户自己就能看出这天有两条记录。
+     * 36.33 一定在图上；同一天两个值表现为同一横坐标上的一段竖线。
+     *
+     * v1.0.58 补充：**拖动读数也不再只报一条**（此前固定报到较小的 0.4），
+     * 而是把该日全部值一起报出——见 TrendChartAxisTest 的 sameDateIndices / selectionText。
      */
     @Test
     fun `同日两条不同 CRP 全部画出 36点33 不会再被顶掉`() {
@@ -228,8 +229,7 @@ class LabTrendTest {
 
         assertTrue("36.33 必须出现在图上", crp.points.any { it.value > 36f })
         assertEquals("两个值都要画，一个不丢", listOf(0.4f, 36.33f), crp.points.map { it.value })
-        assertEquals("该日有多条数值 → 必须如实说明", 1, crp.conflictDates)
-        assertTrue(crp.hasCaveat)
+        assertTrue("同日多值不产生补注——值都画出来了，图上一目了然", !crp.hasCaveat)
         assertEquals("参考上限取化验单自带的 6", 6f, crp.threshold)
     }
 
