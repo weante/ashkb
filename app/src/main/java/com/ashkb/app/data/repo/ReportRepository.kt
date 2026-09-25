@@ -14,6 +14,8 @@ import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.entity.WeightLog
 import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.EmergencyMeds
+import com.ashkb.app.domain.LabTrend
+import com.ashkb.app.domain.LabTrends
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -60,6 +62,8 @@ class ReportRepository(private val context: Context) {
         val symptom: List<SymptomDaily>,         // 升序 90 天
         val weight: List<WeightLog>,             // 升序
         val vitals: List<Vitals>,                // 升序 90 天
+        /** 客观炎症指标（ESR / CRP）序列，数据来自 `lab_results`（v1.0.54 方案 C 新增）。 */
+        val labs: List<LabTrend> = emptyList(),
     )
 
     data class CheckupReport(
@@ -228,12 +232,15 @@ class ReportRepository(private val context: Context) {
         val to = LocalDate.now()
         val from = to.minusDays((rangeDays.coerceIn(1, 365) - 1).toLong()).toString()
         val toStr = to.toString()
+        // 炎症指标：lab_results 是按「指标名」自由文本存的，别名归一等口径全在 LabTrends 里
+        val labRows = db.labResultDao().between(from, toStr)
         Trends(
             // BASDAI 为手工填写，窗口内最多一天一条；不再另设 takeLast 上限（否则 90 天视图会被静默截断）
             basdai = db.basdaiDao().between(from, toStr).sortedBy { it.date },
             symptom = db.symptomDailyDao().between(from, toStr).sortedBy { it.date },
             weight = db.weightLogDao().between(from, toStr),
             vitals = vitalsBetween(from, toStr),
+            labs = LabTrends.build(labRows, from, toStr),
         )
     }
 

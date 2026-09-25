@@ -8,9 +8,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -23,8 +28,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -45,11 +53,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.domain.ClinicalThresholds
+import com.ashkb.app.domain.LabTrend
 import com.ashkb.app.R
 import com.ashkb.app.ui.components.KeyValueRow
 import com.ashkb.app.ui.components.LoadingBlock
 import com.ashkb.app.ui.components.NavRow
 import com.ashkb.app.ui.components.SectionCard
+import com.ashkb.app.ui.components.sharedWindow
+import com.ashkb.app.ui.components.SmallTrendChart
 import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.components.TrendChart
 import com.ashkb.app.ui.components.TrendPoint
@@ -342,86 +353,189 @@ private fun TrendRangeChip(label: String, selected: Boolean, onClick: () -> Unit
     )
 }
 
+/**
+ * 趋势页正文（v1.0.54 方案 C）：**2 列小多图**同屏 + 共享时间轴，并新增 **ESR / CRP**。
+ *
+ * **为什么要小多图**：原先 6 个指标各占一张大图，要滚很久才能对「这几周是不是一起动的」
+ * 有个大概印象——而那恰恰是趋势页最该回答的问题。压成小多图后可以同屏比。
+ *
+ * **为什么必须有共享时间轴**：小多图的全部价值在于「同一时间点上下对齐着看」。
+ * 若每格按自己的数据范围铺开横轴，各格 0%–100% 对应的日期都不一样，
+ * 叠着看就会得出错误结论。故窗口由 [sharedWindow] 在**全部序列的日期并集**上算一次、全格共用。
+ *
+ * **代价与补偿**：小图不标刻度、不能拖动读数。为不丢能力，**点任一格可展开成 v1.0.45 的大图**
+ * （[TrendChart]，含拖动读数与读数摘要）。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TrendCharts(t: ReportRepository.Trends) {
-    LazyColumn(
-        Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        item { Spacer(Modifier.height(Spacing.md)) }
-        item {
-            SectionCard(title = stringResource(R.string.report_basdai_trend), subtitle = stringResource(R.string.report_threshold_note2)) {
-                val basdaiPoints = remember(t.basdai) { t.basdai.map { TrendPoint(it.date, it.total.toFloat()) } }
-                TrendChart(
-                    points = basdaiPoints,
-                    unit = "",
-                    label = stringResource(R.string.basdai_total_score),
-                    threshold = ClinicalThresholds.BASDAI_HIGH,
-                )
-            }
-        }
-        item {
-            SectionCard(title = stringResource(R.string.symptom_pain_score), subtitle = stringResource(R.string.common_score_range)) {
-                val painPoints = remember(t.symptom) {
-                    t.symptom.mapNotNull { s -> s.painScore?.let { TrendPoint(s.date, it.toFloat()) } }
-                }
-                TrendChart(
-                    points = painPoints,
-                    unit = stringResource(R.string.exercise_minute_suffix),
-                    label = stringResource(R.string.symptom_pain_score),
-                )
-            }
-        }
-        item {
-            SectionCard(title = stringResource(R.string.symptom_morning_stiffness), subtitle = stringResource(R.string.exercise_minutes)) {
-                val stiffPoints = remember(t.symptom) {
-                    t.symptom.mapNotNull { s -> s.morningStiffnessMin?.let { TrendPoint(s.date, it.toFloat()) } }
-                }
-                TrendChart(
-                    points = stiffPoints,
-                    unit = stringResource(R.string.exercise_minute_space_suffix),
-                    label = stringResource(R.string.symptom_morning_stiffness),
-                )
-            }
-        }
-        item {
-            SectionCard(title = stringResource(R.string.vitals_weight), subtitle = "kg") {
-                val weightPoints = remember(t.weight) { t.weight.map { TrendPoint(it.date, it.weightKg.toFloat()) } }
-                TrendChart(
-                    points = weightPoints,
-                    unit = " kg",
-                    label = stringResource(R.string.vitals_weight),
-                )
-            }
-        }
-        item {
-            SectionCard(title = stringResource(R.string.vitals_bp_systolic), subtitle = "mmHg") {
-                val bpPoints = remember(t.vitals) {
-                    t.vitals.mapNotNull { v -> v.bpSys?.let { TrendPoint(v.date, it.toFloat()) } }
-                }
-                TrendChart(
-                    points = bpPoints,
-                    unit = " mmHg",
-                    label = stringResource(R.string.vitals_bp_systolic),
-                    accent = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-        item {
-            SectionCard(title = stringResource(R.string.vitals_heart_rate), subtitle = "bpm") {
-                val hrPoints = remember(t.vitals) {
-                    t.vitals.mapNotNull { v -> v.heartRate?.let { TrendPoint(v.date, it.toFloat()) } }
-                }
-                TrendChart(
-                    points = hrPoints,
-                    unit = " bpm",
-                    label = stringResource(R.string.vitals_heart_rate),
-                    accent = MaterialTheme.colorScheme.tertiary,
-                )
-            }
-        }
-        item { Spacer(Modifier.height(Spacing.xl)) }
+    val cs = MaterialTheme.colorScheme
+
+    // ---- 数据 → 点列（逐项 remember，避免每次重组重算）----
+    val basdaiPoints = remember(t.basdai) { t.basdai.map { TrendPoint(it.date, it.total.toFloat()) } }
+    val painPoints = remember(t.symptom) {
+        t.symptom.mapNotNull { s -> s.painScore?.let { TrendPoint(s.date, it.toFloat()) } }
     }
+    val stiffPoints = remember(t.symptom) {
+        t.symptom.mapNotNull { s -> s.morningStiffnessMin?.let { TrendPoint(s.date, it.toFloat()) } }
+    }
+    val weightPoints = remember(t.weight) { t.weight.map { TrendPoint(it.date, it.weightKg.toFloat()) } }
+    val bpPoints = remember(t.vitals) {
+        t.vitals.mapNotNull { v -> v.bpSys?.let { TrendPoint(v.date, it.toFloat()) } }
+    }
+    val hrPoints = remember(t.vitals) {
+        t.vitals.mapNotNull { v -> v.heartRate?.let { TrendPoint(v.date, it.toFloat()) } }
+    }
+
+    val vitalsSeries = listOf(
+        MiniSeries("basdai", stringResource(R.string.report_basdai_trend), "", basdaiPoints, ClinicalThresholds.BASDAI_HIGH, cs.primary),
+        MiniSeries("pain", stringResource(R.string.symptom_pain_score), stringResource(R.string.exercise_minute_suffix), painPoints, null, cs.secondary),
+        MiniSeries("stiff", stringResource(R.string.symptom_morning_stiffness), stringResource(R.string.exercise_minute_space_suffix), stiffPoints, null, cs.secondary),
+        MiniSeries("weight", stringResource(R.string.vitals_weight), " kg", weightPoints, null, cs.primary),
+        MiniSeries("bp", stringResource(R.string.vitals_bp_systolic), " mmHg", bpPoints, null, cs.error),
+        MiniSeries("hr", stringResource(R.string.vitals_heart_rate), " bpm", hrPoints, null, cs.tertiary),
+    )
+
+    // 炎症指标：ESR / CRP 恒占两格（没数据就明写「暂无」并给出取数入口，而不是悄悄不显示）
+    val labSeries = t.labs.map { lab ->
+        MiniSeries(
+            key = "lab-${lab.indicator.code}",
+            title = "${lab.indicator.label} ${lab.indicator.abbr}",
+            unit = " ${lab.indicator.canonicalUnit}",
+            points = lab.points.map { TrendPoint(it.date, it.value) },
+            threshold = lab.threshold,
+            accent = cs.tertiary,
+            caveat = if (lab.points.isEmpty()) {
+                stringResource(R.string.report_lab_import_hint)
+            } else {
+                labCaveat(lab)
+            },
+        )
+    }
+
+    val window = remember(basdaiPoints, painPoints, stiffPoints, weightPoints, bpPoints, hrPoints, t.labs) {
+        sharedWindow(
+            listOf(basdaiPoints, painPoints, stiffPoints, weightPoints, bpPoints, hrPoints)
+                .map { pts -> pts.map { it.date } } + t.labs.map { lab -> lab.points.map { it.date } },
+        )
+    }
+
+    var expanded by remember { mutableStateOf<MiniSeries?>(null) }
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.md),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        if (window != null) {
+            item(key = "axis", span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    stringResource(R.string.report_shared_axis, window.first, window.second),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = cs.onSurfaceVariant,
+                )
+            }
+        }
+        items(vitalsSeries, key = { it.key }) { s ->
+            MiniSeriesCell(s, window) { expanded = s }
+        }
+        item(key = "lab-header", span = { GridItemSpan(maxLineSpan) }) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                Text(stringResource(R.string.report_inflammation_section), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(R.string.report_inflammation_note),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = cs.onSurfaceVariant,
+                )
+            }
+        }
+        items(labSeries, key = { it.key }) { s ->
+            MiniSeriesCell(s, window) { expanded = s }
+        }
+        item(key = "tail", span = { GridItemSpan(maxLineSpan) }) {
+            Spacer(Modifier.height(Spacing.xl))
+        }
+    }
+
+    expanded?.let { s ->
+        ModalBottomSheet(onDismissRequest = { expanded = null }) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg)
+                    .padding(bottom = Spacing.xxxl),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                Text(s.title, style = MaterialTheme.typography.titleMedium)
+                TrendChart(
+                    points = s.points,
+                    unit = s.unit,
+                    label = s.title,
+                    threshold = s.threshold,
+                    accent = s.accent,
+                )
+                s.caveat?.let {
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+/** 小多图的一格：标题 / 单位 / 颜色在组合期解析好，避免把资源 id 塞进数据模型。 */
+private data class MiniSeries(
+    val key: String,
+    val title: String,
+    val unit: String,
+    val points: List<TrendPoint>,
+    val threshold: Float?,
+    val accent: Color,
+    val caveat: String? = null,
+)
+
+/** 单格：包一层浅容器（小多图靠边界彼此区分），点开进入大图。 */
+@Composable
+private fun MiniSeriesCell(
+    s: MiniSeries,
+    window: Pair<String, String>?,
+    onExpand: () -> Unit,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        SmallTrendChart(
+            title = s.title,
+            points = s.points,
+            unit = s.unit,
+            threshold = s.threshold,
+            fromDate = window?.first.orEmpty(),
+            toDate = window?.second.orEmpty(),
+            accent = s.accent,
+            caveat = s.caveat,
+            onClick = onExpand,
+            modifier = Modifier.padding(Spacing.sm),
+        )
+    }
+}
+
+/**
+ * 化验序列的补注。
+ *
+ * 单位缺失 / 认不出都必须**说出来**：这类数据我们没画进图里，
+ * 若不说，用户会把「图上没有」理解成「没测过」，而实际是「测了但没纳入」。
+ */
+@Composable
+private fun labCaveat(lab: LabTrend): String? {
+    val mismatch = lab.unitMismatch
+    val assumed = lab.unitAssumed
+    val unit = lab.indicator.canonicalUnit
+    val m = if (mismatch > 0) stringResource(R.string.report_lab_unit_mismatch, mismatch) else null
+    val a = if (assumed > 0) stringResource(R.string.report_lab_unit_assumed, assumed, unit) else null
+    return listOfNotNull(m, a).joinToString("；").ifBlank { null }
 }
 
 // 趋势图已抽到 ui/components/TrendChart.kt

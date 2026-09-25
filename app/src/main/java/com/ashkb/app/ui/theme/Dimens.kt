@@ -31,6 +31,7 @@ object Size {
     val navRowHeight = 68.dp    // 带副标题的导航行
     val heroMinHeight = 120.dp
     val chartHeight = 200.dp    // 图表：需容纳轴标签
+    val chartMiniHeight = 92.dp // 小多图单元的画布高（标题与共享时间轴另计）
     val chartDot = 5.dp         // 趋势图数据点半径
     val chartStroke = 1.5.dp    // 趋势图网格线宽
     val emergencyCallHeight = 64.dp  // 紧急卡页 120 快拨大按钮

@@ -23,6 +23,16 @@ object ClinicalThresholds {
     /** 化验结果距任一参考边界 ≤ 5% 量程视为"临界"。 */
     const val LAB_NEAR_BOUNDARY_RATIO = 0.05f
 
+    /**
+     * 炎症指标参考上限**兜底值**（趋势页方案 C）。
+     *
+     * 仅当化验单没带 `refHigh` 时才用（见 `LabTrend.threshold`）——因为界值随实验室、
+     * 性别、甚至检测方法而变（超敏 CRP 的界值远严于常规 CRP），
+     * 用死值去判「超标」会把正常结果标成异常。
+     */
+    const val ESR_HIGH = 20f  // mm/h（男性 0–15、女性 0–20 均以此为常见随访界）
+    const val CRP_HIGH = 8f   // mg/L（部分实验室写 <5）
+
     /** 复诊：逾期 > 7 天为危险，0–7 天为提醒。 */
     const val FOLLOWUP_OVERDUE_DAYS = 7L
 

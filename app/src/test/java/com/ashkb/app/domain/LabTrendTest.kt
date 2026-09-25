@@ -1,0 +1,203 @@
+package com.ashkb.app.domain
+
+import com.ashkb.app.data.entity.LabResult
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * 化验行 → 炎症指标序列（趋势页方案 C）。
+ *
+ * 重点覆盖三类**容易静默出错**的口径：单位（差 10 倍会凭空多一次「骤降」）、
+ * 窗口（不该画进来的别画）、同日重复（同一天两次抽血只能留一个点）。
+ */
+class LabTrendTest {
+
+    private fun lab(
+        date: String,
+        testName: String = "血沉(ESR)",
+        value: Double? = 15.0,
+        unit: String? = "mm/h",
+        refHigh: Double? = null,
+        recordedAt: String = date + "T08:00:00",
+    ) = LabResult(
+        id = "$testName-$date-$recordedAt",
+        date = date,
+        recordedAt = recordedAt,
+        testName = testName,
+        value = value,
+        unit = unit,
+        refHigh = refHigh,
+    )
+
+    private val from = "2026-06-01"
+    private val to = "2026-06-30"
+
+    private fun esr(rows: List<LabResult>) = LabTrends.buildOne(LabIndicator.ESR, rows, from, to)
+    private fun crp(rows: List<LabResult>) = LabTrends.buildOne(LabIndicator.CRP, rows, from, to)
+
+    // ======================= 别名归一到同一序列 =======================
+
+    @Test
+    fun `不同写法的指标名会归并到同一条序列`() {
+        val t = esr(
+            listOf(
+                lab("2026-06-01", testName = "血沉(ESR)", value = 10.0),
+                lab("2026-06-10", testName = "ESR", value = 20.0),
+                lab("2026-06-20", testName = "红细胞沉降率", value = 30.0),
+            )
+        )
+        assertEquals(listOf(10f, 20f, 30f), t.points.map { it.value })
+        assertEquals(listOf("2026-06-01", "2026-06-10", "2026-06-20"), t.points.map { it.date })
+    }
+
+    @Test
+    fun `其它指标不会混进来`() {
+        val t = esr(
+            listOf(
+                lab("2026-06-01", testName = "血沉(ESR)", value = 10.0),
+                lab("2026-06-01", testName = "白细胞计数(WBC)", value = 6.1, unit = "10^9/L"),
+                lab("2026-06-01", testName = "C反应蛋白(CRP)", value = 5.0, unit = "mg/L"),
+            )
+        )
+        assertEquals(1, t.points.size)
+    }
+
+    // ======================= 单位 =======================
+
+    @Test
+    fun `CRP 的 mg 每分升换算成 mg 每升后入图`() {
+        val t = crp(
+            listOf(
+                lab("2026-06-01", testName = "C反应蛋白(CRP)", value = 0.5, unit = "mg/dL"),
+                lab("2026-06-10", testName = "C反应蛋白(CRP)", value = 5.0, unit = "mg/L"),
+            )
+        )
+        // 若不换算会画成 0.5 → 5.0 的「上升」，而实际是 5.0 → 5.0 持平
+        assertEquals(listOf(5f, 5f), t.points.map { it.value })
+        assertEquals(0, t.unitMismatch)
+        assertEquals(0, t.unitAssumed)
+    }
+
+    @Test
+    fun `认不出的单位不纳入并记数`() {
+        val t = crp(
+            listOf(
+                lab("2026-06-01", testName = "C反应蛋白(CRP)", value = 5.0, unit = "mg/L"),
+                lab("2026-06-10", testName = "C反应蛋白(CRP)", value = 5.0, unit = "g/L"),
+                lab("2026-06-20", testName = "C反应蛋白(CRP)", value = 5.0, unit = "IU/mL"),
+            )
+        )
+        assertEquals(1, t.points.size)
+        assertEquals("两条认不出的单位都要计数（UI 才会如实说明）", 2, t.unitMismatch)
+        assertEquals(0, t.unitAssumed)
+        assertTrue(t.hasCaveat)
+    }
+
+    @Test
+    fun `单位缺失的按规范单位计但单独计数`() {
+        val t = crp(
+            listOf(
+                lab("2026-06-01", testName = "C反应蛋白(CRP)", value = 5.0, unit = null),
+                lab("2026-06-10", testName = "C反应蛋白(CRP)", value = 6.0, unit = "  "),
+            )
+        )
+        assertEquals(listOf(5f, 6f), t.points.map { it.value })
+        assertEquals(0, t.unitMismatch)
+        assertEquals(2, t.unitAssumed)
+    }
+
+    // ======================= 窗口 / 可绘制性 / 去重 =======================
+
+    @Test
+    fun `窗口外的行不纳入（边界为闭区间）`() {
+        val t = esr(
+            listOf(
+                lab("2026-05-31", value = 9.0),
+                lab("2026-06-01", value = 10.0),
+                lab("2026-06-30", value = 11.0),
+                lab("2026-07-01", value = 12.0),
+            )
+        )
+        assertEquals(listOf(10f, 11f), t.points.map { it.value })
+    }
+
+    @Test
+    fun `只有文字结果（无数值）的行不会变成点`() {
+        val t = esr(
+            listOf(
+                lab("2026-06-01", value = null),
+                lab("2026-06-02", value = 12.0),
+            )
+        )
+        assertEquals(1, t.points.size)
+        assertEquals("数值缺失不属于单位问题，不计入 caveat", 0, t.unitMismatch)
+        assertEquals(0, t.unitAssumed)
+    }
+
+    @Test
+    fun `同一天多条只留 recordedAt 最新的一条`() {
+        val t = esr(
+            listOf(
+                lab("2026-06-10", value = 10.0, recordedAt = "2026-06-10T07:00:00"),
+                lab("2026-06-10", value = 22.0, recordedAt = "2026-06-10T15:00:00"),
+                lab("2026-06-10", value = 15.0, recordedAt = "2026-06-10T11:00:00"),
+            )
+        )
+        assertEquals(1, t.points.size)
+        assertEquals(22f, t.points.first().value)
+    }
+
+    @Test
+    fun `输出恒为升序（即使输入乱序）`() {
+        val t = esr(
+            listOf(
+                lab("2026-06-20", value = 30.0),
+                lab("2026-06-01", value = 10.0),
+                lab("2026-06-10", value = 20.0),
+            )
+        )
+        assertEquals(listOf("2026-06-01", "2026-06-10", "2026-06-20"), t.points.map { it.date })
+    }
+
+    // ======================= 阈值 =======================
+
+    @Test
+    fun `阈值优先取化验单自带的参考上限（取最新一条非空）`() {
+        val t = esr(
+            listOf(
+                lab("2026-06-01", value = 10.0, refHigh = 15.0),
+                lab("2026-06-10", value = 10.0, refHigh = null),
+                lab("2026-06-20", value = 10.0, refHigh = 28.0),
+            )
+        )
+        assertEquals(28f, t.refHigh)
+        assertEquals(28f, t.threshold)
+    }
+
+    @Test
+    fun `化验单没带参考上限时回退到指标兜底值`() {
+        val t = esr(listOf(lab("2026-06-01", value = 10.0, refHigh = null)))
+        assertNull(t.refHigh)
+        assertEquals(ClinicalThresholds.ESR_HIGH, t.threshold)
+    }
+
+    // ======================= 整体 =======================
+
+    @Test
+    fun `build 会为每个指标各出一条序列（没数据也给空序列）`() {
+        val trends = LabTrends.build(listOf(lab("2026-06-01", value = 10.0)), from, to)
+        assertEquals(LabIndicator.entries.size, trends.size)
+        assertEquals(listOf(LabIndicator.ESR, LabIndicator.CRP), trends.map { it.indicator })
+        assertTrue("ESR 有数据", !trends[0].isEmpty)
+        assertTrue("CRP 无数据也必须返回空序列（UI 才能显示「暂无」而不是整格消失）", trends[1].isEmpty)
+    }
+
+    @Test
+    fun `没有任何化验行时全为空序列`() {
+        val trends = LabTrends.build(emptyList(), from, to)
+        assertTrue(trends.all { it.isEmpty })
+        assertTrue(trends.none { it.hasCaveat })
+    }
+}
