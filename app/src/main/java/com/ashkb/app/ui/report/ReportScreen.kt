@@ -387,24 +387,31 @@ private fun TrendCharts(t: ReportRepository.Trends) {
         t.vitals.mapNotNull { v -> v.heartRate?.let { TrendPoint(v.date, it.toFloat()) } }
     }
 
+    val noDataText = stringResource(R.string.common_no_data)
+    val noLabText = stringResource(R.string.report_no_lab_data)
+
     val vitalsSeries = listOf(
-        MiniSeries("basdai", stringResource(R.string.report_basdai_trend), "", basdaiPoints, ClinicalThresholds.BASDAI_HIGH, cs.primary),
-        MiniSeries("pain", stringResource(R.string.symptom_pain_score), stringResource(R.string.exercise_minute_suffix), painPoints, null, cs.secondary),
-        MiniSeries("stiff", stringResource(R.string.symptom_morning_stiffness), stringResource(R.string.exercise_minute_space_suffix), stiffPoints, null, cs.secondary),
-        MiniSeries("weight", stringResource(R.string.vitals_weight), " kg", weightPoints, null, cs.primary),
-        MiniSeries("bp", stringResource(R.string.vitals_bp_systolic), " mmHg", bpPoints, null, cs.error),
-        MiniSeries("hr", stringResource(R.string.vitals_heart_rate), " bpm", hrPoints, null, cs.tertiary),
+        MiniSeries("basdai", stringResource(R.string.report_basdai_trend), "", basdaiPoints, ClinicalThresholds.BASDAI_HIGH, cs.primary, noDataText),
+        MiniSeries("pain", stringResource(R.string.symptom_pain_score), stringResource(R.string.exercise_minute_suffix), painPoints, null, cs.secondary, noDataText),
+        MiniSeries("stiff", stringResource(R.string.symptom_morning_stiffness), stringResource(R.string.exercise_minute_space_suffix), stiffPoints, null, cs.secondary, noDataText),
+        MiniSeries("weight", stringResource(R.string.vitals_weight), " kg", weightPoints, null, cs.primary, noDataText),
+        MiniSeries("bp", stringResource(R.string.vitals_bp_systolic), " mmHg", bpPoints, null, cs.error, noDataText),
+        MiniSeries("hr", stringResource(R.string.vitals_heart_rate), " bpm", hrPoints, null, cs.tertiary, noDataText),
     )
 
-    // 炎症指标：ESR / CRP 恒占两格（没数据就明写「暂无」并给出取数入口，而不是悄悄不显示）
+    // 炎症指标：ESR / CRP 恒占两格（没数据就明写「暂无」并给出取数入口，而不是悄悄不显示）。
+    // 标题只用中文名：格子窄，带上英文缩写会被右侧数值挤成省略号（v1.0.55 之前的实测观感问题）；
+    // 缩写仍出现在无障碍描述与展开后的大图标题里。
     val labSeries = t.labs.map { lab ->
         MiniSeries(
             key = "lab-${lab.indicator.code}",
-            title = "${lab.indicator.label} ${lab.indicator.abbr}",
+            title = lab.indicator.label,
             unit = " ${lab.indicator.canonicalUnit}",
+            sheetTitle = "${lab.indicator.label} ${lab.indicator.abbr}",
             points = lab.points.map { TrendPoint(it.date, it.value) },
             threshold = lab.threshold,
             accent = cs.tertiary,
+            emptyText = noLabText,
             caveat = if (lab.points.isEmpty()) {
                 stringResource(R.string.report_lab_import_hint)
             } else {
@@ -413,11 +420,14 @@ private fun TrendCharts(t: ReportRepository.Trends) {
         )
     }
 
-    val window = remember(basdaiPoints, painPoints, stiffPoints, weightPoints, bpPoints, hrPoints, t.labs) {
-        sharedWindow(
-            listOf(basdaiPoints, painPoints, stiffPoints, weightPoints, bpPoints, hrPoints)
-                .map { pts -> pts.map { it.date } } + t.labs.map { lab -> lab.points.map { it.date } },
-        )
+    // ⚠️ **两套独立的时间轴**：化验是几个月一次的稀疏采样，与每日/每周记录放在同一根轴上，
+    // 要么把化验挤成右侧一个点，要么把日常指标压成左侧一条线——两边都失去意义。
+    // 故日常指标共用一个轴（跟随 7/30/90 天），化验单独一个轴（不设界、展示全部记录）。
+    val vitalsWindow = remember(basdaiPoints, painPoints, stiffPoints, weightPoints, bpPoints, hrPoints) {
+        sharedWindow(listOf(basdaiPoints, painPoints, stiffPoints, weightPoints, bpPoints, hrPoints).map { pts -> pts.map { it.date } })
+    }
+    val labWindow = remember(t.labs) {
+        sharedWindow(t.labs.map { lab -> lab.points.map { it.date } })
     }
 
     var expanded by remember { mutableStateOf<MiniSeries?>(null) }
@@ -429,17 +439,17 @@ private fun TrendCharts(t: ReportRepository.Trends) {
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        if (window != null) {
+        if (vitalsWindow != null) {
             item(key = "axis", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
-                    stringResource(R.string.report_shared_axis, window.first, window.second),
+                    stringResource(R.string.report_shared_axis, vitalsWindow.first, vitalsWindow.second),
                     style = MaterialTheme.typography.labelSmall,
                     color = cs.onSurfaceVariant,
                 )
             }
         }
         items(vitalsSeries, key = { it.key }) { s ->
-            MiniSeriesCell(s, window) { expanded = s }
+            MiniSeriesCell(s, vitalsWindow) { expanded = s }
         }
         item(key = "lab-header", span = { GridItemSpan(maxLineSpan) }) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
@@ -451,8 +461,17 @@ private fun TrendCharts(t: ReportRepository.Trends) {
                 )
             }
         }
+        if (labWindow != null) {
+            item(key = "lab-axis", span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    stringResource(R.string.report_lab_axis, labWindow.first, labWindow.second),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = cs.onSurfaceVariant,
+                )
+            }
+        }
         items(labSeries, key = { it.key }) { s ->
-            MiniSeriesCell(s, window) { expanded = s }
+            MiniSeriesCell(s, labWindow) { expanded = s }
         }
         item(key = "tail", span = { GridItemSpan(maxLineSpan) }) {
             Spacer(Modifier.height(Spacing.xl))
@@ -468,11 +487,11 @@ private fun TrendCharts(t: ReportRepository.Trends) {
                     .padding(bottom = Spacing.xxxl),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
-                Text(s.title, style = MaterialTheme.typography.titleMedium)
+                Text(s.sheetTitle, style = MaterialTheme.typography.titleMedium)
                 TrendChart(
                     points = s.points,
                     unit = s.unit,
-                    label = s.title,
+                    label = s.sheetTitle,
                     threshold = s.threshold,
                     accent = s.accent,
                 )
@@ -492,7 +511,10 @@ private data class MiniSeries(
     val points: List<TrendPoint>,
     val threshold: Float?,
     val accent: Color,
+    val emptyText: String,
     val caveat: String? = null,
+    /** 展开成大图时的标题（格子窄，这里可以带英文缩写）。默认与格子标题相同。 */
+    val sheetTitle: String = title,
 )
 
 /** 单格：包一层浅容器（小多图靠边界彼此区分），点开进入大图。 */
@@ -514,6 +536,7 @@ private fun MiniSeriesCell(
             threshold = s.threshold,
             fromDate = window?.first.orEmpty(),
             toDate = window?.second.orEmpty(),
+            emptyText = s.emptyText,
             accent = s.accent,
             caveat = s.caveat,
             onClick = onExpand,

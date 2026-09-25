@@ -232,15 +232,16 @@ class ReportRepository(private val context: Context) {
         val to = LocalDate.now()
         val from = to.minusDays((rangeDays.coerceIn(1, 365) - 1).toLong()).toString()
         val toStr = to.toString()
-        // 炎症指标：lab_results 是按「指标名」自由文本存的，别名归一等口径全在 LabTrends 里
-        val labRows = db.labResultDao().between(from, toStr)
+        // 炎症指标：lab_results 是按「指标名」自由文本存的，别名归一等口径全在 LabTrends 里。
+        // **刻意不套 rangeDays 窗口**：化验几个月才一次，套 7/30/90 天几乎永远为空（v1.0.55 用户实测）。
+        val labRows = db.labResultDao().allOrdered()
         Trends(
             // BASDAI 为手工填写，窗口内最多一天一条；不再另设 takeLast 上限（否则 90 天视图会被静默截断）
             basdai = db.basdaiDao().between(from, toStr).sortedBy { it.date },
             symptom = db.symptomDailyDao().between(from, toStr).sortedBy { it.date },
             weight = db.weightLogDao().between(from, toStr),
             vitals = vitalsBetween(from, toStr),
-            labs = LabTrends.build(labRows, from, toStr),
+            labs = LabTrends.build(labRows),
         )
     }
 

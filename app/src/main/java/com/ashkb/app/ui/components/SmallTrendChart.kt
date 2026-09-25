@@ -52,6 +52,8 @@ import kotlin.math.roundToInt
  *
  * @param caveat 卡片底部补注（如「另有 N 条因单位不同未纳入」）。**不静默**是硬要求：
  *   被排除的数据必须说出来，否则「图上看不见」会被误读成「没测过」。
+ * @param emptyText 无数据时的占位文案。**必须由调用方给对**——v1.0.55 之前这里写死成
+ *   「暂无化验数据」，于是收缩压 / 心率这些**非化验**指标的空格子也在说「暂无化验数据」（用户实测发现）。
  */
 @Composable
 fun SmallTrendChart(
@@ -61,6 +63,7 @@ fun SmallTrendChart(
     threshold: Float?,
     fromDate: String,
     toDate: String,
+    emptyText: String,
     modifier: Modifier = Modifier,
     accent: Color = MaterialTheme.colorScheme.primary,
     caveat: String? = null,
@@ -86,9 +89,8 @@ fun SmallTrendChart(
         points.lastOrNull()?.let { fmtMini(it.value) + unit }
     }
     // 文案在组合期取（stringResource 不能在 remember 的计算块里调用）
-    val noDataText = stringResource(R.string.report_no_lab_data)
     val a11y = if (points.isEmpty()) {
-        "$title $noDataText"
+        "$title $emptyText"
     } else {
         stringResource(R.string.report_small_chart_a11y, title, lastLabel ?: "", points.size)
     }
@@ -121,7 +123,7 @@ fun SmallTrendChart(
                 Modifier.fillMaxWidth().height(Size.chartMiniHeight),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(noDataText, style = axisStyle)
+                Text(emptyText, style = axisStyle)
             }
             return@Column
         }

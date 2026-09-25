@@ -123,6 +123,45 @@ class LabTrendTest {
         assertEquals(listOf(10f, 11f), t.points.map { it.value })
     }
 
+    /**
+     * 回归锁（v1.0.55）：**不传窗口 = 不设界**。
+     *
+     * 化验是几个月一次的稀疏采样，套上「近 7/30/90 天」几乎永远是空的——用户实测正是如此
+     * （默认 30 天窗口下，季度化验的项目只有一个点甚至零个点）。
+     */
+    @Test
+    fun `不传窗口时取全部记录`() {
+        val all = listOf(
+            lab("2024-03-01", value = 12.0),
+            lab("2024-09-01", value = 18.0),
+            lab("2025-06-01", value = 20.0),
+            lab("2026-06-01", value = 22.0),
+        )
+        val t = LabTrends.buildOne(LabIndicator.ESR, all)
+        assertEquals(4, t.points.size)
+        assertEquals(listOf("2024-03-01", "2024-09-01", "2025-06-01", "2026-06-01"), t.points.map { it.date })
+    }
+
+    /**
+     * 回归锁（v1.0.55）：真实数据里的名字是**「红细胞沉降率测定」**，
+     * v1.0.54 认不出来（用户实测：趋势里 ESR 一格永远是空的）。
+     */
+    @Test
+    fun `红细胞沉降率测定与其它真实写法都能成图`() {
+        // 刻意用 buildOne 的默认「不设界」调用（与趋势页一致），否则会被测试窗口挡掉
+        val t = LabTrends.buildOne(
+            LabIndicator.ESR,
+            listOf(
+                lab("2026-01-10", testName = "红细胞沉降率测定", value = 12.0, unit = "mm/h"),
+                lab("2026-04-10", testName = "红细胞沉降率(ESR)测定", value = 18.0, unit = "mm/h"),
+                lab("2026-07-10", testName = "血沉", value = 22.0, unit = "mm/h"),
+            ),
+        )
+        assertEquals("三种写法应归为同一序列", 3, t.points.size)
+        assertEquals(listOf(12f, 18f, 22f), t.points.map { it.value })
+        assertTrue("不应被当成单位问题", !t.hasCaveat)
+    }
+
     @Test
     fun `只有文字结果（无数值）的行不会变成点`() {
         val t = esr(

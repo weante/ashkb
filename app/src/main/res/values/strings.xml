@@ -456,8 +456,9 @@
     <string name="report_flare_weight_section">发作与体重</string>
     <string name="report_generate_pdf">生成复诊报告 PDF</string>
     <string name="report_inflammation_section">炎症指标（客观）</string>
-    <string name="report_inflammation_note">血沉 / C 反应蛋白取自化验单；与症状评分对照看更有意义</string>
+    <string name="report_inflammation_note">血沉 / C 反应蛋白取自化验单；化验通常几个月一次，故本区展示全部记录，不受上方 7/30/90 天限制</string>
     <string name="report_latest">最新</string>
+    <string name="report_lab_axis">本区时间轴：%1$s → %2$s</string>
     <string name="report_lab_import_hint">可在「复诊 / 检查」里导入化验单</string>
     <string name="report_lab_unit_mismatch">另有 %1$d 条因单位不同未纳入</string>
     <string name="report_lab_unit_assumed">另有 %1$d 条无单位，按 %2$s 计</string>

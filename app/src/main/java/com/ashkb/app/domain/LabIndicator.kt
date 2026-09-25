@@ -40,6 +40,8 @@ enum class LabIndicator(
         get() = when (this) {
             ESR -> setOf(
                 "血沉", "esr", "血沉(esr)", "红细胞沉降率", "红细胞沉降率(esr)",
+                // v1.0.55：真实数据里最常见的写法就是「红细胞沉降率测定」（用户实测漏配）
+                "红细胞沉降率测定", "红细胞沉降率(esr)测定",
                 "血沉测定", "血沉定量", "esr测定",
             )
             CRP -> setOf(
@@ -54,8 +56,12 @@ enum class LabIndicator(
             )
         }
 
-    /** 该化验单上的指标名是否属于本指标。 */
-    fun matches(testName: String?): Boolean = normalizeName(testName) in aliases
+    /**
+     * 该化验单上的指标名是否属于本指标。
+     *
+     * 判据是「归一 + 有限变形后**命中别名表**」，见 [nameVariants]。
+     */
+    fun matches(testName: String?): Boolean = nameVariants(testName).any { it in aliases }
 
     /**
      * 原单位 → 规范单位的乘数。
@@ -79,6 +85,17 @@ enum class LabIndicator(
     companion object {
         private val ESR_ACCEPTED_UNITS = setOf("mm/h", "mm/hr", "mm/1h", "mmh", "mm/小时")
 
+        /**
+         * 检验项目名常见的**尾限定词**。化验单上「红细胞沉降率」常写成「红细胞沉降率测定」、
+         * 「C反应蛋白」常写成「C反应蛋白定量」。
+         *
+         * v1.0.55 教训：v1.0.54 只枚举了「血沉测定」这类写法，用户真实数据是
+         * **「红细胞沉降率测定」**（复诊管理→化验里显示的正是这个名字），于是**一个点都认不出来**。
+         * 靠枚举永远会漏，故改为「剥掉已知尾限定词后再比对别名表」——
+         * 仍然是**有界规则 + 命中显式别名表**，不是自由 `contains` 匹配。
+         */
+        private val QUALIFIERS = listOf("测定", "定量", "检测", "检验", "检查", "试验", "法")
+
         fun byCode(code: String?): LabIndicator? = entries.firstOrNull { it.code.equals(code, ignoreCase = true) }
 
         /**
@@ -95,5 +112,28 @@ enum class LabIndicator(
 
         /** 单位归一：同 [normalizeName]，并容忍结尾的点与大小写（`mg/L.` / `MG/L`）。 */
         fun normalizeUnit(raw: String?): String = normalizeName(raw).trimEnd('.')
+
+        /**
+         * 归一后的**有限变形集合**，逐个拿去比别名表即可，不做模糊匹配。
+         *
+         * 变形只有两种，都是有界的：① 逐层剥掉尾限定词（`…测定` → `…` → 再剥）；
+         * ② 去掉括号及其内容（`c反应蛋白(crp)` → `c反应蛋白`）。两种可叠加。
+         */
+        internal fun nameVariants(raw: String?): List<String> {
+            val normalized = normalizeName(raw)
+            if (normalized.isEmpty()) return emptyList()
+            val out = LinkedHashSet<String>()
+            // 原形 + 去括号形，各自再逐层剥尾限定词
+            for (base in listOf(normalized, normalized.substringBefore('('))) {
+                out += base
+                var v = base
+                while (true) {
+                    val q = QUALIFIERS.firstOrNull { v.endsWith(it) && v.length > it.length } ?: break
+                    v = v.removeSuffix(q)
+                    out += v
+                }
+            }
+            return out.toList()
+        }
     }
 }

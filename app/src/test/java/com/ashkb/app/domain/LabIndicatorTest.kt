@@ -62,6 +62,50 @@ class LabIndicatorTest {
         assertFalse(LabIndicator.CRP.matches("非C反应蛋白"))
     }
 
+    // ======================= 尾限定词 / 括号内容的有限变形（v1.0.55） =======================
+
+    /**
+     * 回归锁：用户真实数据里存的名字是**「红细胞沉降率测定」**
+     * （复诊管理 → 化验里显示的就是它），v1.0.54 的别名表只有「红细胞沉降率」，
+     * 于是趋势页**一个点都认不出来**——用户实测发现。
+     * 靠枚举写法永远会漏，故改为有界变形（剥尾限定词 / 去括号）后再比对别名表。
+     */
+    @Test
+    fun `尾限定词与括号的有限变形都能匹配`() {
+        val shouldMatch = listOf(
+            "红细胞沉降率测定", "红细胞沉降率(ESR)测定", "红细胞沉降率检测", "红细胞沉降率定量",
+            "血沉检测", "血沉检验", "血沉(ESR)测定",
+            "C反应蛋白定量", "C反应蛋白检测", "C-反应蛋白(crp)测定", "超敏C反应蛋白(hs-CRP)测定",
+        )
+        shouldMatch.forEach {
+            val hit = LabIndicator.ESR.matches(it) || LabIndicator.CRP.matches(it)
+            assertTrue("应匹配：$it", hit)
+        }
+    }
+
+    @Test
+    fun `变形是有界的：不相关指标带限定词也不会被误配`() {
+        val unrelated = listOf("白细胞计数(WBC)测定", "丙氨酸氨基转移酶测定", "肌酐定量", "血红蛋白检测")
+        for (name in unrelated) {
+            assertFalse("不应匹配 ESR：$name", LabIndicator.ESR.matches(name))
+            assertFalse("不应匹配 CRP：$name", LabIndicator.CRP.matches(name))
+        }
+    }
+
+    @Test
+    fun `变形集合的边界行为`() {
+        assertTrue("空值不产生任何变形候选", LabIndicator.nameVariants(null).isEmpty())
+        assertTrue(LabIndicator.nameVariants("   ").isEmpty())
+        // 变形只有两种：剥尾限定词、去括号及其内容（含其后的限定词）
+        val v = LabIndicator.nameVariants("红细胞沉降率(ESR)测定")
+        assertTrue("原形", v.contains("红细胞沉降率(esr)测定"))
+        assertTrue("剥尾限定词", v.contains("红细胞沉降率(esr)"))
+        assertTrue("去括号", v.contains("红细胞沉降率"))
+        // 去括号形与剥限定词可叠加：带限定词的那个写法必须仍能命中别名表
+        assertTrue(LabIndicator.ESR.matches("红细胞沉降率(ESR)测定"))
+        assertTrue(LabIndicator.ESR.matches("红细胞沉降率测定"))
+    }
+
     @Test
     fun `空值与空格不匹配任何指标`() {
         for (name in listOf(null, "", "   ")) {

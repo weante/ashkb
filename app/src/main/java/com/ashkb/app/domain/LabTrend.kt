@@ -43,16 +43,21 @@ object LabTrends {
 
     fun build(
         rows: List<LabResult>,
-        from: String,
-        to: String,
+        from: String? = null,
+        to: String? = null,
         indicators: List<LabIndicator> = LabIndicator.entries,
     ): List<LabTrend> = indicators.map { buildOne(it, rows, from, to) }
 
+    /**
+     * @param from / @param to 日期窗口（闭区间）；**传 `null` 表示不设界**。
+     *   趋势页对化验**不设界**（v1.0.55）：化验是几个月一次的稀疏采样，
+     *   套上「近 7/30/90 天」只会几乎永远是空的——用户实测正是如此。
+     */
     fun buildOne(
         indicator: LabIndicator,
         rows: List<LabResult>,
-        from: String,
-        to: String,
+        from: String? = null,
+        to: String? = null,
     ): LabTrend {
         var unitMismatch = 0
         var unitAssumed = 0
@@ -62,7 +67,8 @@ object LabTrends {
         for (row in rows) {
             if (!indicator.matches(row.testName)) continue
             val raw = row.value ?: continue                       // 只有文字结果（如「阴性」）画不了折线
-            if (row.date < from || row.date > to) continue         // 窗口外
+            if (from != null && row.date < from) continue          // 窗口外
+            if (to != null && row.date > to) continue
 
             val factor = indicator.unitFactor(row.unit)
             val converted: Double
