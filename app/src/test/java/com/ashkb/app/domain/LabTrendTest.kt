@@ -176,7 +176,7 @@ class LabTrendTest {
     }
 
     @Test
-    fun `同一天多条只留 recordedAt 最新的一条`() {
+    fun `同一天多条只留 recordedAt 最新的一条 并如实计数冲突`() {
         val t = esr(
             listOf(
                 lab("2026-06-10", value = 10.0, recordedAt = "2026-06-10T07:00:00"),
@@ -186,6 +186,47 @@ class LabTrendTest {
         )
         assertEquals(1, t.points.size)
         assertEquals(22f, t.points.first().value)
+        // 被丢掉的两条与保留值都不同 → 计 2 条冲突（UI 会说「同日有 2 条不同数值」）
+        assertEquals(2, t.sameDateConflict)
+        assertTrue(t.hasCaveat)
+    }
+
+    @Test
+    fun `同一天重复录入同一个值不算冲突`() {
+        val t = esr(
+            listOf(
+                lab("2026-06-10", value = 15.0, recordedAt = "2026-06-10T07:00:00"),
+                lab("2026-06-10", value = 15.0, recordedAt = "2026-06-10T15:00:00"),
+            )
+        )
+        assertEquals(1, t.points.size)
+        assertEquals("值相同 = 重复录入，无信息损失", 0, t.sameDateConflict)
+        assertTrue(!t.hasCaveat)
+    }
+
+    /**
+     * **回归锁（v1.0.55 实测事故）**：用户 2026-03-13 的化验单上 C反应蛋白(CRP) = **36.33 mg/L**，
+     * 但趋势图把该日画成了 **0.4**——因为同日还有一条 hs-CRP 0.4，而 v1.0.54 把 hs-CRP 并进了 CRP，
+     * 去重时选中了小数值。修法：hs-CRP 独立成项。此测锁住「CRP 就是 CRP」。
+     */
+    @Test
+    fun `同日 CRP 与超敏 CRP 各归各的 不会互相顶掉`() {
+        val rows = listOf(
+            lab("2026-03-13", testName = "C反应蛋白(CRP)", value = 36.33, unit = "mg/L", refHigh = 6.0,
+                recordedAt = "2026-03-14T09:00:00"),
+            lab("2026-03-13", testName = "超敏C反应蛋白(hs-CRP)", value = 0.4, unit = "mg/L", refHigh = 1.0,
+                recordedAt = "2026-03-14T09:00:00"),
+        )
+        val crp = LabTrends.buildOne(LabIndicator.CRP, rows)
+        val hs = LabTrends.buildOne(LabIndicator.HSCRP, rows)
+
+        assertEquals("CRP 必须保留 36.33（而不是被 0.4 顶掉）", listOf(36.33f), crp.points.map { it.value })
+        assertEquals("hs-CRP 归自己那一格", listOf(0.4f), hs.points.map { it.value })
+        assertEquals("两项互不干扰，都不算同日冲突", 0, crp.sameDateConflict)
+        assertEquals(0, hs.sameDateConflict)
+        // 阈值各取自己那份化验单的参考上限
+        assertEquals(6f, crp.threshold)
+        assertEquals(1f, hs.threshold)
     }
 
     @Test
@@ -228,9 +269,10 @@ class LabTrendTest {
     fun `build 会为每个指标各出一条序列（没数据也给空序列）`() {
         val trends = LabTrends.build(listOf(lab("2026-06-01", value = 10.0)), from, to)
         assertEquals(LabIndicator.entries.size, trends.size)
-        assertEquals(listOf(LabIndicator.ESR, LabIndicator.CRP), trends.map { it.indicator })
+        assertEquals(LabIndicator.entries.toList(), trends.map { it.indicator })
         assertTrue("ESR 有数据", !trends[0].isEmpty)
         assertTrue("CRP 无数据也必须返回空序列（UI 才能显示「暂无」而不是整格消失）", trends[1].isEmpty)
+        assertTrue("hs-CRP 同理", trends[2].isEmpty)
     }
 
     @Test

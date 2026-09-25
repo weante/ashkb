@@ -490,7 +490,7 @@ interface LabResultDao {
      * 趋势页的炎症指标**刻意不设日期界**（v1.0.55）：化验是几个月一次的稀疏采样，
      * 套上「近 7/30/90 天」几乎永远是空的（用户实测正是如此）。行数天然很少（每年几次）。
      */
-    @Query("SELECT * FROM lab_results ORDER BY date")
+    @Query("SELECT * FROM lab_results ORDER BY date, recorded_at, id")
     suspend fun allOrdered(): List<LabResult>
 
     @Query("SELECT * FROM lab_results ORDER BY date DESC LIMIT :limit")

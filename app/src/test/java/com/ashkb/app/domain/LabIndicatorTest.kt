@@ -30,14 +30,44 @@ class LabIndicatorTest {
     }
 
     @Test
-    fun `C 反应蛋白的各种写法都能匹配（含超敏写法）`() {
+    fun `C 反应蛋白的各种写法都能匹配`() {
         val forms = listOf(
             "C反应蛋白", "C-反应蛋白", "CRP", "crp", "C反应蛋白(CRP)", "C-反应蛋白（CRP）",
             "c反应蛋白测定", "crp测定",
-            // 超敏 CRP 是同一蛋白的高敏检测、单位同为 mg/L，故并入同一序列
-            "超敏C反应蛋白", "超敏C反应蛋白(hs-CRP)", "hs-CRP", "超敏CRP",
         )
-        forms.forEach { assertTrue("应匹配：$it", LabIndicator.CRP.matches(it)) }
+        forms.forEach { assertTrue("应匹配 CRP：$it", LabIndicator.CRP.matches(it)) }
+    }
+
+    /**
+     * 回归锁（v1.0.55 实测事故）：**超敏 CRP 必须与常规 CRP 分开**。
+     *
+     * 同一份化验单常同时报这两项，量级差一个数量级（炎症期 CRP 36.33 mg/L，
+     * 而 hs-CRP 0.4 mg/L 仍属正常）。v1.0.54 把 hs-CRP 并进了 CRP，
+     * 按日期去重时常选中 hs-CRP 的小数值 → **图上 CRP 是 0.4、化验单上却是 36.33**。
+     */
+    @Test
+    fun `超敏C反应蛋白自成一项 绝不再并入常规 CRP`() {
+        val hsForms = listOf(
+            "超敏C反应蛋白", "超敏C反应蛋白(hs-CRP)", "hs-CRP", "Hs-Crp", "超敏CRP",
+            "超敏C反应蛋白(CRP)", "超敏C反应蛋白测定",
+        )
+        hsForms.forEach {
+            assertTrue("应匹配 HSCRP：$it", LabIndicator.HSCRP.matches(it))
+            assertFalse("**绝不能**匹配常规 CRP：$it", LabIndicator.CRP.matches(it))
+        }
+        // 反向：常规 CRP 的写法不能被 HSCRP 认领（否则同一行会被画两遍）
+        listOf("C反应蛋白", "CRP", "C-反应蛋白(CRP)").forEach {
+            assertFalse("HSCRP 不应匹配常规写法：$it", LabIndicator.HSCRP.matches(it))
+        }
+    }
+
+    @Test
+    fun `超敏 CRP 是二级指标 无数据时不占格子`() {
+        assertTrue("ESR 恒占格", LabIndicator.ESR.alwaysShow)
+        assertTrue("CRP 恒占格", LabIndicator.CRP.alwaysShow)
+        assertFalse("hs-CRP 仅在有数据时占格", LabIndicator.HSCRP.alwaysShow)
+        // 单项测试里更要紧的：三项互不重复，项数就是 3
+        assertEquals(3, LabIndicator.entries.size)
     }
 
     // ======================= 名称匹配：不该认的绝不认 =======================
@@ -78,8 +108,8 @@ class LabIndicatorTest {
             "C反应蛋白定量", "C反应蛋白检测", "C-反应蛋白(crp)测定", "超敏C反应蛋白(hs-CRP)测定",
         )
         shouldMatch.forEach {
-            val hit = LabIndicator.ESR.matches(it) || LabIndicator.CRP.matches(it)
-            assertTrue("应匹配：$it", hit)
+            val hit = LabIndicator.entries.any { ind -> ind.matches(it) }
+            assertTrue("应被某个炎症指标认领：$it", hit)
         }
     }
 

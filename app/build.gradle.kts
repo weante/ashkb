@@ -26,8 +26,8 @@ android {
         applicationId = "com.ashkb.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 60
-        versionName = "1.0.55"
+        versionCode = 61
+        versionName = "1.0.56"
     }
 
     signingConfigs {

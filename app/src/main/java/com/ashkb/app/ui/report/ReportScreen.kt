@@ -399,26 +399,29 @@ private fun TrendCharts(t: ReportRepository.Trends) {
         MiniSeries("hr", stringResource(R.string.vitals_heart_rate), " bpm", hrPoints, null, cs.tertiary, noDataText),
     )
 
-    // 炎症指标：ESR / CRP 恒占两格（没数据就明写「暂无」并给出取数入口，而不是悄悄不显示）。
+    // 炎症指标：ESR / CRP 恒占两格（没数据就明写「暂无」并给出取数入口，而不是悄悄不显示）；
+    // 二级指标（超敏 CRP）**仅在真有数据时才占格**——它是附加检测，没数据就不该白占一位。
     // 标题只用中文名：格子窄，带上英文缩写会被右侧数值挤成省略号（v1.0.55 之前的实测观感问题）；
     // 缩写仍出现在无障碍描述与展开后的大图标题里。
-    val labSeries = t.labs.map { lab ->
-        MiniSeries(
-            key = "lab-${lab.indicator.code}",
-            title = lab.indicator.label,
-            unit = " ${lab.indicator.canonicalUnit}",
-            sheetTitle = "${lab.indicator.label} ${lab.indicator.abbr}",
-            points = lab.points.map { TrendPoint(it.date, it.value) },
-            threshold = lab.threshold,
-            accent = cs.tertiary,
-            emptyText = noLabText,
-            caveat = if (lab.points.isEmpty()) {
-                stringResource(R.string.report_lab_import_hint)
-            } else {
-                labCaveat(lab)
-            },
-        )
-    }
+    val labSeries = t.labs
+        .filter { it.indicator.alwaysShow || !it.isEmpty }
+        .map { lab ->
+            MiniSeries(
+                key = "lab-${lab.indicator.code}",
+                title = lab.indicator.label,
+                unit = " ${lab.indicator.canonicalUnit}",
+                sheetTitle = "${lab.indicator.label} ${lab.indicator.abbr}",
+                points = lab.points.map { TrendPoint(it.date, it.value) },
+                threshold = lab.threshold,
+                accent = cs.tertiary,
+                emptyText = noLabText,
+                caveat = if (lab.points.isEmpty()) {
+                    stringResource(R.string.report_lab_import_hint)
+                } else {
+                    labCaveat(lab)
+                },
+            )
+        }
 
     // ⚠️ **两套独立的时间轴**：化验是几个月一次的稀疏采样，与每日/每周记录放在同一根轴上，
     // 要么把化验挤成右侧一个点，要么把日常指标压成左侧一条线——两边都失去意义。
@@ -555,10 +558,12 @@ private fun MiniSeriesCell(
 private fun labCaveat(lab: LabTrend): String? {
     val mismatch = lab.unitMismatch
     val assumed = lab.unitAssumed
+    val conflict = lab.sameDateConflict
     val unit = lab.indicator.canonicalUnit
     val m = if (mismatch > 0) stringResource(R.string.report_lab_unit_mismatch, mismatch) else null
     val a = if (assumed > 0) stringResource(R.string.report_lab_unit_assumed, assumed, unit) else null
-    return listOfNotNull(m, a).joinToString("；").ifBlank { null }
+    val c = if (conflict > 0) stringResource(R.string.report_lab_same_date_conflict, conflict) else null
+    return listOfNotNull(m, a, c).joinToString("；").ifBlank { null }
 }
 
 // 趋势图已抽到 ui/components/TrendChart.kt
