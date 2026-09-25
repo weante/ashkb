@@ -39,35 +39,25 @@ class LabIndicatorTest {
     }
 
     /**
-     * 回归锁（v1.0.55 实测事故）：**超敏 CRP 必须与常规 CRP 分开**。
+     * v1.0.57：**hs-CRP 完全不参与趋势**（用户明确要求「hs-CRP 不要」）。
      *
-     * 同一份化验单常同时报这两项，量级差一个数量级（炎症期 CRP 36.33 mg/L，
-     * 而 hs-CRP 0.4 mg/L 仍属正常）。v1.0.54 把 hs-CRP 并进了 CRP，
-     * 按日期去重时常选中 hs-CRP 的小数值 → **图上 CRP 是 0.4、化验单上却是 36.33**。
+     * 前情三步：v1.0.54 把 hs-CRP 并入 CRP（两者量级差一个数量级，画出错数）；
+     * v1.0.56 拆成独立指标；**v1.0.57 按用户要求整项移除**——
+     * 这类记录既不再算作 CRP，也不再单独占格。
      */
     @Test
-    fun `超敏C反应蛋白自成一项 绝不再并入常规 CRP`() {
+    fun `超敏 CRP 记录不参与任何趋势`() {
         val hsForms = listOf(
             "超敏C反应蛋白", "超敏C反应蛋白(hs-CRP)", "hs-CRP", "Hs-Crp", "超敏CRP",
             "超敏C反应蛋白(CRP)", "超敏C反应蛋白测定",
         )
-        hsForms.forEach {
-            assertTrue("应匹配 HSCRP：$it", LabIndicator.HSCRP.matches(it))
-            assertFalse("**绝不能**匹配常规 CRP：$it", LabIndicator.CRP.matches(it))
+        for (name in hsForms) {
+            assertTrue(
+                "不应被任何指标认领：$name",
+                LabIndicator.entries.none { it.matches(name) },
+            )
         }
-        // 反向：常规 CRP 的写法不能被 HSCRP 认领（否则同一行会被画两遍）
-        listOf("C反应蛋白", "CRP", "C-反应蛋白(CRP)").forEach {
-            assertFalse("HSCRP 不应匹配常规写法：$it", LabIndicator.HSCRP.matches(it))
-        }
-    }
-
-    @Test
-    fun `超敏 CRP 是二级指标 无数据时不占格子`() {
-        assertTrue("ESR 恒占格", LabIndicator.ESR.alwaysShow)
-        assertTrue("CRP 恒占格", LabIndicator.CRP.alwaysShow)
-        assertFalse("hs-CRP 仅在有数据时占格", LabIndicator.HSCRP.alwaysShow)
-        // 单项测试里更要紧的：三项互不重复，项数就是 3
-        assertEquals(3, LabIndicator.entries.size)
+        assertEquals("指标目录只剩 ESR 与 CRP", 2, LabIndicator.entries.size)
     }
 
     // ======================= 名称匹配：不该认的绝不认 =======================
@@ -105,7 +95,7 @@ class LabIndicatorTest {
         val shouldMatch = listOf(
             "红细胞沉降率测定", "红细胞沉降率(ESR)测定", "红细胞沉降率检测", "红细胞沉降率定量",
             "血沉检测", "血沉检验", "血沉(ESR)测定",
-            "C反应蛋白定量", "C反应蛋白检测", "C-反应蛋白(crp)测定", "超敏C反应蛋白(hs-CRP)测定",
+            "C反应蛋白定量", "C反应蛋白检测", "C-反应蛋白(crp)测定",
         )
         shouldMatch.forEach {
             val hit = LabIndicator.entries.any { ind -> ind.matches(it) }

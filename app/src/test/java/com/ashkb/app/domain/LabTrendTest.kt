@@ -176,7 +176,7 @@ class LabTrendTest {
     }
 
     @Test
-    fun `同一天多条只留 recordedAt 最新的一条 并如实计数冲突`() {
+    fun `同日多条不同值全部保留 并计数冲突日期`() {
         val t = esr(
             listOf(
                 lab("2026-06-10", value = 10.0, recordedAt = "2026-06-10T07:00:00"),
@@ -184,15 +184,14 @@ class LabTrendTest {
                 lab("2026-06-10", value = 15.0, recordedAt = "2026-06-10T11:00:00"),
             )
         )
-        assertEquals(1, t.points.size)
-        assertEquals(22f, t.points.first().value)
-        // 被丢掉的两条与保留值都不同 → 计 2 条冲突（UI 会说「同日有 2 条不同数值」）
-        assertEquals(2, t.sameDateConflict)
+        assertEquals("三个不同值一个都不能丢", 3, t.points.size)
+        assertEquals(listOf(10f, 15f, 22f), t.points.map { it.value })
+        assertEquals("同一日期 → 计 1 个冲突日期", 1, t.conflictDates)
         assertTrue(t.hasCaveat)
     }
 
     @Test
-    fun `同一天重复录入同一个值不算冲突`() {
+    fun `同一天重复录入同一个值合并为一个点 不算冲突`() {
         val t = esr(
             listOf(
                 lab("2026-06-10", value = 15.0, recordedAt = "2026-06-10T07:00:00"),
@@ -200,33 +199,38 @@ class LabTrendTest {
             )
         )
         assertEquals(1, t.points.size)
-        assertEquals("值相同 = 重复录入，无信息损失", 0, t.sameDateConflict)
+        assertEquals("同 x 同 y，重复画看不出差别", 0, t.conflictDates)
         assertTrue(!t.hasCaveat)
     }
 
     /**
-     * **回归锁（v1.0.55 实测事故）**：用户 2026-03-13 的化验单上 C反应蛋白(CRP) = **36.33 mg/L**，
-     * 但趋势图把该日画成了 **0.4**——因为同日还有一条 hs-CRP 0.4，而 v1.0.54 把 hs-CRP 并进了 CRP，
-     * 去重时选中了小数值。修法：hs-CRP 独立成项。此测锁住「CRP 就是 CRP」。
+     * **回归锁（v1.0.57 定稿，直接来自用户真实数据）**：用户 2026-03-13 有**两条 CRP** 记录
+     * （36.33 mg/L 与 0.4 mg/L）。v1.0.54–v1.0.56 一直按「同日保留最近录入的一条」去重，
+     * 连续两版都画成 0.4，而用户化验单上写的是 **36.33** —— 图与单据矛盾。
+     *
+     * 根子在于：**「从多条里挑一条」这个动作本身就是错的**。现在两个值都画出，
+     * 36.33 一定在图上；同一天两个值会表现为同一横坐标上的一段竖线，
+     * 配合「有 N 个日期存在多条不同数值（均已画出）」的说明，用户自己就能看出这天有两条记录。
      */
     @Test
-    fun `同日 CRP 与超敏 CRP 各归各的 不会互相顶掉`() {
+    fun `同日两条不同 CRP 全部画出 36点33 不会再被顶掉`() {
         val rows = listOf(
-            lab("2026-03-13", testName = "C反应蛋白(CRP)", value = 36.33, unit = "mg/L", refHigh = 6.0,
-                recordedAt = "2026-03-14T09:00:00"),
-            lab("2026-03-13", testName = "超敏C反应蛋白(hs-CRP)", value = 0.4, unit = "mg/L", refHigh = 1.0,
-                recordedAt = "2026-03-14T09:00:00"),
+            lab(
+                "2026-03-13", testName = "C反应蛋白(CRP)", value = 36.33, unit = "mg/L", refHigh = 6.0,
+                recordedAt = "2026-03-14T09:00:00",
+            ),
+            lab(
+                "2026-03-13", testName = "C反应蛋白(CRP)", value = 0.4, unit = "mg/L", refHigh = 6.0,
+                recordedAt = "2026-03-14T10:00:00",
+            ),
         )
         val crp = LabTrends.buildOne(LabIndicator.CRP, rows)
-        val hs = LabTrends.buildOne(LabIndicator.HSCRP, rows)
 
-        assertEquals("CRP 必须保留 36.33（而不是被 0.4 顶掉）", listOf(36.33f), crp.points.map { it.value })
-        assertEquals("hs-CRP 归自己那一格", listOf(0.4f), hs.points.map { it.value })
-        assertEquals("两项互不干扰，都不算同日冲突", 0, crp.sameDateConflict)
-        assertEquals(0, hs.sameDateConflict)
-        // 阈值各取自己那份化验单的参考上限
-        assertEquals(6f, crp.threshold)
-        assertEquals(1f, hs.threshold)
+        assertTrue("36.33 必须出现在图上", crp.points.any { it.value > 36f })
+        assertEquals("两个值都要画，一个不丢", listOf(0.4f, 36.33f), crp.points.map { it.value })
+        assertEquals("该日有多条数值 → 必须如实说明", 1, crp.conflictDates)
+        assertTrue(crp.hasCaveat)
+        assertEquals("参考上限取化验单自带的 6", 6f, crp.threshold)
     }
 
     @Test
@@ -272,7 +276,6 @@ class LabTrendTest {
         assertEquals(LabIndicator.entries.toList(), trends.map { it.indicator })
         assertTrue("ESR 有数据", !trends[0].isEmpty)
         assertTrue("CRP 无数据也必须返回空序列（UI 才能显示「暂无」而不是整格消失）", trends[1].isEmpty)
-        assertTrue("hs-CRP 同理", trends[2].isEmpty)
     }
 
     @Test

@@ -28,25 +28,12 @@ enum class LabIndicator(
     val canonicalUnit: String,
     /** 参考上限兜底值（化验单自带 `refHigh` 时优先用它，见 [LabTrend.threshold]） */
     val defaultRefHigh: Float,
-    /** 是否**无数据也占一格**（一级指标）。二级指标没数据就不占位，避免纯粹的空格子。 */
-    val alwaysShow: Boolean = true,
 ) {
     /** 血沉：男性 0–15、女性 0–20 mm/h 为常见界值，随访多以 <20 为「不活动」。 */
     ESR("esr", "血沉", "ESR", "mm/h", ClinicalThresholds.ESR_HIGH),
 
     /** C 反应蛋白：常规上限多写作 <8 mg/L（部分实验室写 <5）。 */
-    CRP("crp", "C反应蛋白", "CRP", "mg/L", ClinicalThresholds.CRP_HIGH),
-
-    /**
-     * 超敏 C 反应蛋白（hs-CRP）。
-     *
-     * **必须是独立指标，不能并入 [CRP]**（v1.0.55 实测事故）：同一份化验单常同时报 CRP 与 hs-CRP，
-     * 而两者量级差一个数量级（炎症期 CRP 可 36.33 mg/L，hs-CRP 0.4 mg/L 仍属正常）。
-     * v1.0.54 把 hs-CRP 的写法并进了 CRP 序列，于是按日期去重时**常常选中 hs-CRP 的小数值**——
-     * 用户看到的 CRP 曲线是 0.4，而化验单上明明是 36.33（**图与单据直接矛盾，且毫无提示**）。
-     * 「同一个蛋白」不等于「同一个检测」；量级不同的两项**永远不要合并成一条序列**。
-     */
-    HSCRP("hscrp", "超敏C反应蛋白", "hs-CRP", "mg/L", ClinicalThresholds.HSCRP_HIGH, alwaysShow = false);
+    CRP("crp", "C反应蛋白", "CRP", "mg/L", ClinicalThresholds.CRP_HIGH);
 
     /** 该指标接受的指标名写法（**已归一**的形态）。要支持新的化验单写法就往这里加。 */
     val aliases: Set<String>
@@ -61,13 +48,9 @@ enum class LabIndicator(
                 "c反应蛋白", "crp", "c-反应蛋白",
                 "c反应蛋白(crp)", "c-反应蛋白(crp)",
                 "c反应蛋白测定", "c反应蛋白定量", "crp测定",
-                // ⚠️ 这里**刻意不含**任何「超敏 / hs-CRP」写法：hs-CRP 是独立检测、量级不同，
-                // 并入会把 0.4 mg/L 画成 CRP 的 36.33（v1.0.55 实测事故，见 HSCRP 的说明）。
-            )
-            HSCRP -> setOf(
-                "超敏c反应蛋白", "超敏crp", "hs-crp", "hscrp", "highsensitivitycrp",
-                "超敏c反应蛋白(hs-crp)", "超敏c反应蛋白(crp)", "超敏c反应蛋白(hscrp)",
-                "超敏c反应蛋白测定", "超敏c反应蛋白定量",
+                // ⚠️ 这里**刻意不含**任何「超敏 / hs-CRP」写法，且 [HSCRP 已移除]：
+                // 超敏 CRP 与常规 CRP 量级差约一个数量级，混在一起会画出错数（v1.0.54–v1.0.56 实测）。
+                // 用户明确要求「hs-CRP 不要」，故这类记录**不入任何趋势**（而不是混进 CRP）。
             )
         }
 
@@ -89,7 +72,7 @@ enum class LabIndicator(
         if (u.isEmpty()) return null
         return when (this) {
             ESR -> if (u in ESR_ACCEPTED_UNITS) 1.0 else null
-            CRP, HSCRP -> when (u) {
+            CRP -> when (u) {
                 "mg/l" -> 1.0
                 "mg/dl" -> 10.0 // 1 mg/dL = 10 mg/L
                 else -> null

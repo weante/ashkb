@@ -32,7 +32,6 @@ object ClinicalThresholds {
      */
     const val ESR_HIGH = 20f  // mm/h（男性 0–15、女性 0–20 均以此为常见随访界）
     const val CRP_HIGH = 8f   // mg/L（部分实验室写 <5）
-    const val HSCRP_HIGH = 3f // mg/L（高敏检测，界值远严于常规 CRP；不同实验室差异大，仅作兜底）
 
     /** 复诊：逾期 > 7 天为危险，0–7 天为提醒。 */
     const val FOLLOWUP_OVERDUE_DAYS = 7L
