@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.SelfImprovement
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -61,6 +62,7 @@ import com.ashkb.app.data.entity.InjSite
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.SkipReason
 import com.ashkb.app.data.repo.TodayItem
+import com.ashkb.app.domain.MinimalMode
 import com.ashkb.app.domain.MissedDose
 import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.ui.components.AlertBanner
@@ -91,6 +93,9 @@ fun TodayScreen(
     val alerts by vm.alerts.collectAsStateWithLifecycle()
     val symptomRecorded by vm.symptomRecorded.collectAsStateWithLifecycle()
     val exerciseDone by vm.exerciseDone.collectAsStateWithLifecycle()
+    // v1.0.65 B12：极简模式状态机
+    val minimalPrompt by vm.minimalPrompt.collectAsStateWithLifecycle()
+    val isMinimal = profile?.uiMode == MinimalMode.MODE_MINIMAL
     val context = LocalContext.current
     var skipTarget by remember { mutableStateOf<TodayItem?>(null) }
     var injTarget by remember { mutableStateOf<TodayItem?>(null) }
@@ -117,6 +122,21 @@ fun TodayScreen(
             )
         }
 
+        // ---- v1.0.65 B12：极简模式横幅（发作期输入减负；退出入口就在此处）----
+        if (isMinimal) {
+            item {
+                AlertBanner(
+                    tone = StatusTone.Warning,
+                    icon = Icons.Rounded.SelfImprovement,
+                    title = stringResource(R.string.minimal_mode_title) +
+                        (profile?.minimalSince?.take(10)?.let { " · " + stringResource(R.string.minimal_mode_since, it) } ?: ""),
+                    body = stringResource(R.string.minimal_mode_note),
+                    actionLabel = stringResource(R.string.minimal_exit),
+                    onAction = { vm.exitMinimalMode() },
+                )
+            }
+        }
+
         // ---- 告警必须成为视觉主角（原为 error.copy(alpha=0.10) 的扁平卡）----
         if (alerts.isNotEmpty()) {
             item {
@@ -132,6 +152,7 @@ fun TodayScreen(
         }
 
         // ---- 两枚大按钮（≥56dp），取代两个同款小卡 ----
+        // v1.0.65 B12：极简模式下只留核心的「症状记录」，隐藏运动入口（减负）
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 QuickEntryButton(
@@ -142,14 +163,16 @@ fun TodayScreen(
                     modifier = Modifier.weight(1f),
                     onClick = onOpenSymptom,
                 )
-                QuickEntryButton(
-                    icon = Icons.Rounded.FitnessCenter,
-                    title = stringResource(R.string.exercise_today_title),
-                    status = if (exerciseDone > 0) stringResource(R.string.today_exercise_done, exerciseDone) else stringResource(R.string.exercise_by_stage),
-                    done = exerciseDone > 0,
-                    modifier = Modifier.weight(1f),
-                    onClick = onOpenExercise,
-                )
+                if (!isMinimal) {
+                    QuickEntryButton(
+                        icon = Icons.Rounded.FitnessCenter,
+                        title = stringResource(R.string.exercise_today_title),
+                        status = if (exerciseDone > 0) stringResource(R.string.today_exercise_done, exerciseDone) else stringResource(R.string.exercise_by_stage),
+                        done = exerciseDone > 0,
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenExercise,
+                    )
+                }
             }
         }
 
@@ -233,6 +256,41 @@ fun TodayScreen(
     missedGuideTarget?.let { target ->
         MissedDoseDialog(item = target, onDismiss = { missedGuideTarget = null })
     }
+
+    // v1.0.65 B12：连续 3 天无核心记录 → 问原因；身体不适 / 住院 → 极简模式
+    if (minimalPrompt) {
+        AlertDialog(
+            onDismissRequest = { /* 必须选一项：不给点外部关闭，避免留下"未回答"状态 */ },
+            title = { Text(stringResource(R.string.minimal_prompt_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Text(
+                        stringResource(R.string.minimal_prompt_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    MinimalMode.REASONS.forEach { reason ->
+                        TextButton(
+                            onClick = { vm.answerMinimalPrompt(reason) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                stringResource(minimalReasonLabel(reason)),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+        )
+    }
+}
+
+/** B12：询问原因 → 文案资源。 */
+private fun minimalReasonLabel(reason: String) = when (reason) {
+    MinimalMode.REASON_ILLNESS -> R.string.minimal_reason_illness
+    MinimalMode.REASON_HOSPITAL -> R.string.minimal_reason_hospital
+    else -> R.string.minimal_reason_other
 }
 
 /** 今日页主角：一眼看清"今天还剩什么"。 */

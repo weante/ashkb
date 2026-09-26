@@ -10,7 +10,10 @@ import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.MedicationRepository
+import com.ashkb.app.data.repo.MinimalPromptStore
 import com.ashkb.app.data.repo.TodayItem
+import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.MinimalMode
 import com.ashkb.app.reminder.ReminderScheduler
 import java.time.Duration
 import java.time.LocalDate
@@ -20,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -29,6 +33,7 @@ import kotlinx.coroutines.launch
 class TodayViewModel(
     private val repo: MedicationRepository,
     private val healthRepo: HealthRepository,
+    private val app: AshkbApplication,
 ) : ViewModel() {
 
     private val _date = MutableStateFlow(LocalDate.now())
@@ -66,6 +71,39 @@ class TodayViewModel(
         _date.flatMapLatest { healthRepo.observeExerciseLogs(it.toString()) }.map { it.size }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    // ---- v1.0.65 B12：极简模式状态机 ----
+
+    /**
+     * 是否该弹「连续未记录」原因询问。
+     *
+     * 三个前置条件缺一不可：① 已建档；② 当前**不是**极简态（极简期间不再追问）；
+     * ③ 今天还没问过。满足后再看近 [MinimalMode.THRESHOLD_DAYS] 天的症状记录是否连续缺失。
+     */
+    val minimalPrompt: StateFlow<Boolean> =
+        combine(_date, healthRepo.observeProfile()) { d, p -> d to p }
+            .map { (d, p) ->
+                if (p == null || p.uiMode == MinimalMode.MODE_MINIMAL) return@map false
+                if (MinimalPromptStore.lastAskedDate(app) == d.toString()) return@map false
+                val from = d.minusDays(MinimalMode.THRESHOLD_DAYS - 1L).toString()
+                MinimalMode.shouldPrompt(healthRepo.symptomDatesBetween(from, d.toString()), d)
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    /** 回答询问：无论选什么都记「今天问过」；身体不适 / 住院才切极简。 */
+    fun answerMinimalPrompt(reason: String) {
+        viewModelScope.launch {
+            MinimalPromptStore.markAsked(app, date.toString())
+            if (MinimalMode.entersMinimal(reason)) {
+                healthRepo.setMinimalMode(true, nowIso())
+            }
+        }
+    }
+
+    /** 退出极简模式（清 uiMode + minimalSince）。 */
+    fun exitMinimalMode() {
+        viewModelScope.launch { healthRepo.setMinimalMode(false, nowIso()) }
+    }
+
     fun checkIn(item: TodayItem, injSite: String? = null, reaction: String = "none") {
         viewModelScope.launch {
             repo.checkIn(item.med, item.slotKey, item.slotTime, reaction, injSite)
@@ -97,7 +135,7 @@ class TodayViewModel(
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                TodayViewModel(app.medicationRepository, app.healthRepository)
+                TodayViewModel(app.medicationRepository, app.healthRepository, app)
             }
         }
     }

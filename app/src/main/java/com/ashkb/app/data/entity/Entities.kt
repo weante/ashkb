@@ -113,6 +113,12 @@ data class Profile(
     @ColumnInfo(name = "weight_target_high") val weightTargetHigh: Double? = null,
     /** 极简模式（红线三状态机 e2：发作期输入减负） */
     @ColumnInfo(name = "ui_mode") val uiMode: String = "normal", // normal / minimal
+    /**
+     * v1.0.65 B12：进入极简模式的时刻（null = 非极简）。
+     * 与 [uiMode] 成对维护——`uiMode == minimal` 时必须有值，退出时清空。
+     * Room v15→v16 迁移新增列。
+     */
+    @ColumnInfo(name = "minimal_since") val minimalSince: String? = null,
     @ColumnInfo(name = "created_at") val createdAt: String,
     @ColumnInfo(name = "updated_at") val updatedAt: String,
 )

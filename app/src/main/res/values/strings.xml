@@ -1168,5 +1168,15 @@
     <string name="profile_sedentary_short">久坐 %1$d h/天</string>
     <string name="profile_sleep_short">睡眠 %1$d h/天</string>
     <string name="exercise_lifestyle_notes_title">生活方式提示</string>
+    <!-- v1.0.65 B12：极简模式状态机 -->
+    <string name="minimal_mode_title">极简模式</string>
+    <string name="minimal_mode_since">自 %1$s 起</string>
+    <string name="minimal_mode_note">已减少输入项，只保留用药与症状记录。好转后请退出。</string>
+    <string name="minimal_exit">退出极简模式</string>
+    <string name="minimal_prompt_title">最近 3 天没有症状记录</string>
+    <string name="minimal_prompt_body">如因身体不适或住院暂时无法记录，可切换极简模式（只留核心项）。选择「其他原因」则保持完整记录。</string>
+    <string name="minimal_reason_illness">身体不适</string>
+    <string name="minimal_reason_hospital">住院</string>
+    <string name="minimal_reason_other">其他原因（继续完整记录）</string>
 </resources>
 

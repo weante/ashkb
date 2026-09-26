@@ -116,6 +116,9 @@ fun ProfileEditScreen(
                                     emergencyMedSummary = initial?.emergencyMedSummary,
                                     emergencyNote = initial?.emergencyNote,
                                     uiMode = initial?.uiMode ?: "normal",
+                                    // v1.0.65 B12：极简进入时刻不在本表单呈现，必须透传——
+                                    // 否则保存会把极简态重置成「有 ui_mode 无 minimal_since」的不一致状态
+                                    minimalSince = initial?.minimalSince,
                                     weightTargetLow = wLow.toDoubleOrNull(),
                                     weightTargetHigh = wHigh.toDoubleOrNull(),
                                     createdAt = initial?.createdAt ?: now,

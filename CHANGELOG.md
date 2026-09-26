@@ -4,6 +4,38 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.65] — 2026-09-26
+
+**B12 极简模式状态机（红线三 e2：发作期输入减负）：连续 3 天无核心记录 → 问原因 → 身体不适/住院切极简。**
+
+⚠️ **含数据库迁移 Room v15 → v16**（`profile` 新增 `minimal_since` 列），**可覆盖安装**，迁移自动执行。**含 v1.0.44 ~ v1.0.64 全部内容。**
+
+### 状态机
+
+- **判定**：连续 **3 天**没有「核心记录」→ 触发询问
+- **核心记录 = 症状日记录**（`symptom_daily`）。理由：它是本 App 唯一「每日必填且与用药清单无关」的自评入口，客观可判定。**刻意不选「用药打卡」**——无在用药品时它天然为空，会把「没药可吃」误判成「没记录」；也不选「运动打卡」——运动本就非每日必做
+- **询问**：三项 —— 身体不适 / 住院 / 其他原因
+- **切换**：只有「身体不适 / 住院」进极简模式；「其他原因」**不改界面**——否则会掩盖真实的数据缺口
+- **去重**：同一天只问一次（`app_prefs`），次日若仍无记录继续累积
+
+### 极简模式界面
+
+- 今日页顶部横幅：「极简模式 · 自 YYYY-MM-DD 起」+ **退出极简模式** 按钮
+- 输入减负：隐藏「运动」快捷入口，只留核心的「症状记录」；告警与用药打卡**照常保留**（安全相关不降级）
+
+### 数据一致性（关键）
+
+- `ui_mode` 与 `minimal_since` **成对维护**：极简态必须有进入时刻，退出必须清空。`MinimalMode.isConsistent` 把这条不变式写成可测断言
+- **建档表单补透传** `minimalSince`——否则编辑档案会把极简态重置成「有 ui_mode 无 minimal_since」的不一致状态
+
+### 实现细节
+
+- 新增 `domain/MinimalMode.kt`（纯函数状态机 + 封顶计数的连续缺失判定）+ `data/repo/MinimalPromptStore.kt`
+- `HealthRepository` 加 `symptomDatesBetween`（区间日期集合）与 `setMinimalMode`（成对写入）
+- `TodayViewModel` 加 `app`（读 prefs）+ `minimalPrompt` 流 + `answerMinimalPrompt` / `exitMinimalMode`
+- `AppDatabase` 加 `MIGRATION_15_16`；备份/恢复引擎**无需改动**（表名走 `sqlite_master` 动态发现、列名走 `PRAGMA table_info` 动态校验）
+- 单测 450 → 458 条（`MinimalModeTest` 8）
+
 ## [v1.0.64] — 2026-09-26
 
 **B13 生活方式画像：采集「吸烟 / 久坐 / 运动习惯 / 睡眠」并驱动运动处方个性化 + 修掉知识库悬空挂点。**

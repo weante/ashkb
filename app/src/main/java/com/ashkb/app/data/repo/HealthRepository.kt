@@ -30,6 +30,7 @@ import com.ashkb.app.data.entity.WeightLog
 import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.LabImport
+import com.ashkb.app.domain.MinimalMode
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import org.json.JSONArray
@@ -73,6 +74,29 @@ class HealthRepository(private val context: Context) {
 
     // ---- 观察 ----
     fun observeProfile(): Flow<Profile?> = profileDao.observe()
+
+    /**
+     * v1.0.65 B12：区间内**有症状记录**的日期集合——极简模式「连续缺失」判定用。
+     * 只取 date 一列即可，避免把整行症状带出来。
+     */
+    suspend fun symptomDatesBetween(from: String, to: String): Set<String> =
+        symptomDao.between(from, to).mapTo(mutableSetOf()) { it.date }
+
+    /**
+     * v1.0.65 B12：切换极简模式。
+     * `uiMode` 与 `minimalSince` **成对维护**（极简必须有进入时刻，退出必须清空）——
+     * 任何别的写法都会让 [com.ashkb.app.domain.MinimalMode.isConsistent] 不成立。
+     */
+    suspend fun setMinimalMode(minimal: Boolean, nowIso: String) = db.withTransaction {
+        val cur = profileDao.get() ?: return@withTransaction
+        profileDao.upsert(
+            cur.copy(
+                uiMode = if (minimal) MinimalMode.MODE_MINIMAL else MinimalMode.MODE_NORMAL,
+                minimalSince = if (minimal) nowIso else null,
+                updatedAt = nowIso,
+            )
+        )
+    }
     fun observeSymptom(date: String): Flow<SymptomDaily?> = symptomDao.observeByDate(date)
     fun observeBasdai(): Flow<List<BasdaiRecord>> = basdaiDao.observeRecent()
     fun observeActiveFlare(): Flow<FlareEvent?> = flareDao.observeActive()
