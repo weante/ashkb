@@ -1075,5 +1075,43 @@
     <string name="attach_downloading">正在从云端取回…</string>
     <string name="attach_download_failed">云端未找到该附件，或网络异常</string>
     <string name="attach_download_ok">已从云端取回</string>
+
+    <!-- v1.0.59 B5：多源提醒通道 -->
+    <string name="notif_channel_checkup_name">复诊提醒</string>
+    <string name="notif_channel_checkup_desc">复诊前一日与当日提醒</string>
+    <string name="notif_channel_questionnaire_name">问卷提醒</string>
+    <string name="notif_channel_questionnaire_desc">BASDAI 评估到期提醒</string>
+    <string name="notif_channel_exercise_name">运动提醒</string>
+    <string name="notif_channel_exercise_desc">运动计划提醒与升级重查</string>
+
+    <!-- 复诊提醒文案 -->
+    <string name="notif_checkup_prep_title">明日复诊提醒</string>
+    <string name="notif_checkup_day_title">今日复诊</string>
+    <string name="notif_checkup_prep_text">明日（%1$s）有复诊，请提前准备病历 / 化验单 / 影像资料</string>
+    <string name="notif_checkup_day_text">今日（%1$s）复诊，记得带上既往资料</string>
+
+    <!-- BASDAI 评估提醒文案 -->
+    <string name="notif_basdai_escalated_title">BASDAI 评估仍未完成</string>
+    <string name="notif_basdai_title">BASDAI 评估到期</string>
+    <string name="notif_basdai_escalated_text">距离评估日已过一段时间，请尽快完成 BASDAI 问卷</string>
+    <string name="notif_basdai_text">BASDAI 问卷评估周期已到，请完成本次自评</string>
+
+    <!-- 运动提醒文案 -->
+    <string name="notif_exercise_escalated_title">今日运动计划仍未完成</string>
+    <string name="notif_exercise_title">今日运动提醒</string>
+    <string name="notif_exercise_escalated_text">傍晚已过仍未完成今日运动处方，尽快补上</string>
+    <string name="notif_exercise_text">今日运动处方尚未完成，请按计划执行</string>
+
+    <!-- v1.0.59 B5：提醒设置入口 -->
+    <string name="reminder_settings_title">提醒设置</string>
+    <string name="reminder_settings_subtitle">复诊 / BASDAI / 运动提醒开关与周期</string>
+    <string name="reminder_checkup_switch">启用复诊提醒</string>
+    <string name="reminder_exercise_switch">启用运动提醒</string>
+    <string name="reminder_basdai_cycle_label">BASDAI 评估间隔</string>
+    <string name="reminder_basdai_cycle_7">每周</string>
+    <string name="reminder_basdai_cycle_14">每两周</string>
+    <string name="reminder_basdai_cycle_28">每四周（默认）</string>
+    <string name="reminder_basdai_cycle_56">每八周</string>
+    <string name="reminder_basdai_cycle_84">每十二周</string>
 </resources>
 

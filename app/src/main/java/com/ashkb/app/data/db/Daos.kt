@@ -226,6 +226,10 @@ interface BasdaiDao {
     @Query("SELECT * FROM basdai_records WHERE date = :date ORDER BY recorded_at DESC LIMIT 1")
     suspend fun byDate(date: String): BasdaiRecord?
 
+    /** v1.0.59 B5：最近一次评估记录（BasdaiReminderScheduler 推算 dueDate / Receiver 验真用）。 */
+    @Query("SELECT * FROM basdai_records ORDER BY date DESC, recorded_at DESC LIMIT 1")
+    suspend fun latest(): BasdaiRecord?
+
     @Upsert
     suspend fun upsert(record: BasdaiRecord)
 
@@ -471,6 +475,10 @@ interface CheckupRecordDao {
 
     @Upsert
     suspend fun upsert(record: CheckupRecord)
+
+    /** v1.0.59 B5：列出全部复诊记录（CheckupReminderScheduler.rescheduleAll / Receiver 验真用）。 */
+    @Query("SELECT * FROM checkup_records ORDER BY date DESC")
+    suspend fun listAll(): List<CheckupRecord>
 }
 
 @Dao

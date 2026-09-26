@@ -8,6 +8,7 @@ import android.os.Build
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.repo.MedicationRepository
 import java.time.LocalDate
+import java.time.LocalDateTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,6 +42,38 @@ class BootReceiver : BroadcastReceiver() {
                 // 槽位重建升级重查，用户明明吃过药却收到「未服药」提醒。
                 val doneRefs = MedicationRepository(context).doneSlotRefs(LocalDate.now())
                 ReminderScheduler.rescheduleAll(context, meds, doneRefs)
+
+                // v1.0.59 B5：三源提醒——各自 runCatching 兜底，互不影响
+                NotificationHelper.ensureChannels(context)
+                val today = LocalDate.now()
+                val now = LocalDateTime.now()
+                val cfg = com.ashkb.app.data.repo.ReminderConfigRepository(context)
+                if (cfg.checkupEnabled()) {
+                    runCatching {
+                        CheckupReminderScheduler.rescheduleAll(
+                            context, db.checkupRecordDao().listAll(), today, now,
+                        )
+                    }
+                } else {
+                    CheckupReminderScheduler.cancelAllFuture(context, db.checkupRecordDao().listAll())
+                }
+                runCatching {
+                    BasdaiReminderScheduler.rescheduleAll(
+                        context, db.basdaiDao().latest(), cfg.basdaiCycleDays(), today, now,
+                    )
+                }
+                if (cfg.exerciseEnabled()) {
+                    runCatching {
+                        val activePlan = db.exercisePlanDao().active()
+                        val hasLogged = db.exerciseLogDao().byDate(today.toString()).isNotEmpty()
+                        ExerciseReminderScheduler.rescheduleAll(
+                            context, activePlan, hasLogged, today, now,
+                        )
+                    }
+                } else {
+                    ExerciseReminderScheduler.cancelAllFuture(context, today)
+                }
+
                 // 权限回授场景顺手把 sys 通道告知一声（通道存在才发，免打扰用户）
                 if (action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED &&
                     Build.VERSION.SDK_INT >= 31

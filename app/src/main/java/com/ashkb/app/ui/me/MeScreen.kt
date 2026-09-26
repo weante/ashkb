@@ -20,6 +20,7 @@ import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Medication
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -28,7 +29,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -54,6 +58,7 @@ fun MeScreen(
 ) {
     val profile by vm.profile.collectAsStateWithLifecycle()
     val meds by vm.meds.collectAsStateWithLifecycle()
+    var showReminderSettings by rememberSaveable { mutableStateOf(false) }
 
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
@@ -116,6 +121,16 @@ fun MeScreen(
         // ---- M10 提醒与权限自检 ----
         item { ReminderSelfCheckCard() }
 
+        // ---- v1.0.59 B5：多源提醒设置入口 ----
+        item {
+            NavRow(
+                icon = Icons.Rounded.Notifications,
+                title = stringResource(R.string.reminder_settings_title),
+                subtitle = stringResource(R.string.reminder_settings_subtitle),
+                onClick = { showReminderSettings = true },
+            )
+        }
+
         // ---- P4 R20 备份与数据自主 ----
         item {
             NavRow(
@@ -130,6 +145,11 @@ fun MeScreen(
         item { AboutCard() }
 
         item { Spacer(Modifier.height(Spacing.xxl)) }
+    }
+
+    // v1.0.59 B5：多源提醒设置面板（开关 + BASDAI 周期）
+    if (showReminderSettings) {
+        ReminderSettingsSheet { showReminderSettings = false }
     }
 }
 

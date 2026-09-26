@@ -12,8 +12,10 @@ import com.ashkb.app.data.entity.ImagingRecord
 import com.ashkb.app.data.entity.LabResult
 import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.repo.HealthRepository
+import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.LabImport
+import com.ashkb.app.reminder.CheckupReminderScheduler
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -32,6 +34,7 @@ class CheckupViewModel(
     private val repo: HealthRepository,
     private val attachmentRepo: com.ashkb.app.data.repo.AttachmentRepository,
     private val backupRepo: com.ashkb.app.data.repo.BackupRepository,
+    private val app: AshkbApplication,
 ) : ViewModel() {
     private val _date = MutableStateFlow(LocalDate.now())
     val date: LocalDate get() = _date.value
@@ -96,7 +99,21 @@ class CheckupViewModel(
 
     // ---- 复诊记录 ----
     fun saveCheckupRecord(record: CheckupRecord) {
-        viewModelScope.launch { repo.saveCheckupRecord(record) }
+        viewModelScope.launch {
+            repo.saveCheckupRecord(record)
+            // v1.0.59 B5：复诊记录变更后即时重排提醒（nextDate 可能改）
+            val cfg = ReminderConfigRepository(app)
+            val all = com.ashkb.app.data.db.AppDatabase.get(app).checkupRecordDao().listAll()
+            if (cfg.checkupEnabled()) {
+                runCatching {
+                    CheckupReminderScheduler.rescheduleAll(
+                        app, all, LocalDate.now(), LocalDateTime.now(),
+                    )
+                }
+            } else {
+                CheckupReminderScheduler.cancelAllFuture(app, all)
+            }
+        }
     }
 
     // ---- 化验结果 ----
@@ -210,7 +227,7 @@ class CheckupViewModel(
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                CheckupViewModel(app.healthRepository, app.attachmentRepository, app.backupRepository)
+                CheckupViewModel(app.healthRepository, app.attachmentRepository, app.backupRepository, app)
             }
         }
     }

@@ -11,12 +11,17 @@ import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.data.repo.RecipeRepository
 import com.ashkb.app.data.repo.MedicationRepository
+import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.KbSeedRefresh
+import com.ashkb.app.reminder.BasdaiReminderScheduler
+import com.ashkb.app.reminder.CheckupReminderScheduler
+import com.ashkb.app.reminder.ExerciseReminderScheduler
 import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
 import java.io.File
 import java.time.LocalDate
+import java.time.LocalDateTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -62,10 +67,41 @@ class AshkbApplication : Application() {
                 // v1.0.43：带上「今日已打卡槽位」——rescheduleAll 会重建今日未打卡槽位尚未到时的
                 // 升级重查，避免每次冷启动都清掉当天的 +30 / +60 提醒
                 val today = LocalDate.now()
-                val meds = AppDatabase.get(this@AshkbApplication).medicationDao().observeActive().first()
+                val now = LocalDateTime.now()
+                val db = AppDatabase.get(this@AshkbApplication)
+                val meds = db.medicationDao().observeActive().first()
                 ReminderScheduler.rescheduleAll(
                     this@AshkbApplication, meds, medicationRepository.doneSlotRefs(today),
                 )
+                // v1.0.59 B5：三源提醒——各自 runCatching 兜底，互不影响（与 BootReceiver 对称）
+                val cfg = ReminderConfigRepository(this@AshkbApplication)
+                if (cfg.checkupEnabled()) {
+                    runCatching {
+                        CheckupReminderScheduler.rescheduleAll(
+                            this@AshkbApplication, db.checkupRecordDao().listAll(), today, now,
+                        )
+                    }
+                } else {
+                    CheckupReminderScheduler.cancelAllFuture(
+                        this@AshkbApplication, db.checkupRecordDao().listAll(),
+                    )
+                }
+                runCatching {
+                    BasdaiReminderScheduler.rescheduleAll(
+                        this@AshkbApplication, db.basdaiDao().latest(), cfg.basdaiCycleDays(), today, now,
+                    )
+                }
+                if (cfg.exerciseEnabled()) {
+                    runCatching {
+                        val activePlan = db.exercisePlanDao().active()
+                        val hasLogged = db.exerciseLogDao().byDate(today.toString()).isNotEmpty()
+                        ExerciseReminderScheduler.rescheduleAll(
+                            this@AshkbApplication, activePlan, hasLogged, today, now,
+                        )
+                    }
+                } else {
+                    ExerciseReminderScheduler.cancelAllFuture(this@AshkbApplication, today)
+                }
                 // P2 例行检查：发作第 7 天警报 + 知识条目复核到期（insertAlertOnce 幂等）
                 healthRepository.checkFlareDayAlert(today)
                 healthRepository.checkReviewDue(today.toString())

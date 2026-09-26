@@ -15,7 +15,9 @@ import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.entity.SymptomDaily
 import com.ashkb.app.data.repo.HealthRepository
+import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.reminder.BasdaiReminderScheduler
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -31,7 +33,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class SymptomViewModel(private val repo: HealthRepository) : ViewModel() {
+class SymptomViewModel(
+    private val repo: HealthRepository,
+    private val app: AshkbApplication,
+) : ViewModel() {
 
     private val _date = MutableStateFlow(LocalDate.now())
     val today: LocalDate get() = _date.value
@@ -118,6 +123,15 @@ class SymptomViewModel(private val repo: HealthRepository) : ViewModel() {
     fun saveBasdai(q1: Int, q2: Int, q3: Int, q4: Int, q5: Int, q6: Int, note: String?) {
         viewModelScope.launch {
             repo.saveBasdai(dateStr, q1, q2, q3, q4, q5, q6, note, backfill = _selectedDate.value != today)
+            // v1.0.59 B5：评估记录写入后即时重排 BASDAI 提醒（dueDate 推算依赖 latest）
+            val cfg = ReminderConfigRepository(app)
+            val db = com.ashkb.app.data.db.AppDatabase.get(app)
+            runCatching {
+                BasdaiReminderScheduler.rescheduleAll(
+                    app, db.basdaiDao().latest(), cfg.basdaiCycleDays(),
+                    LocalDate.now(), LocalDateTime.now(),
+                )
+            }
         }
     }
 
@@ -149,7 +163,7 @@ class SymptomViewModel(private val repo: HealthRepository) : ViewModel() {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                SymptomViewModel(app.healthRepository)
+                SymptomViewModel(app.healthRepository, app)
             }
         }
     }

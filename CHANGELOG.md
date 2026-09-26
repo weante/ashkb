@@ -4,6 +4,33 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.59] — 2026-09-26
+
+**B5 多源提醒：提醒链从「仅用药」扩到「用药 + 复诊 + BASDAI 问卷 + 运动」四源同台。**
+
+⚠️ **无数据库结构变更**（仍为 Room v15），可覆盖安装。**含 v1.0.44 ~ v1.0.58 全部内容。**
+
+### 三源新提醒
+
+- **复诊提醒**：`nextDate` 提前 1 天（09:00）+ 当日（09:00）各 1 次，无升级链
+- **BASDAI 问卷**：评估日 20:00 + +1/+2 天 20:00 升级重查（周期可配：每周 / 每两周 / 每四周（默认）/ 每八周 / 每十二周）
+- **运动提醒**：18:00 首次 + 20:00 / 22:00 升级（今日已打卡则不排）
+
+### 三源独立通道
+
+`checkup_reminders`（HIGH）/ `questionnaire_reminders`（DEFAULT）/ `exercise_reminders`（DEFAULT）——让用户可分别静音。
+
+### 设置入口
+
+「我的」页新增「提醒设置」卡：复诊 / 运动开关 + BASDAI 周期单选。每次变更即时写入并重排（开关关闭则 cancelAllFuture）。
+
+### 实现细节
+
+- 三源 Scheduler 各为独立 object，复用 `setExactAndAllowWhileIdle` 降级 `setWindow` 模式
+- requestCode 命名空间隔离（`chk|` / `bas|` / `exc|`），通知 ID 前缀防与用药撞
+- `BootReceiver` / `AshkbApplication` 启动期 + 4 个 ViewModel 数据变更点（saveCheckupRecord / saveBasdai / checkIn / activate-deactivate）即时 reschedule
+- 18 条单测（CheckupReminderScheduler 6 + BasdaiReminderScheduler 5 + ExerciseReminderScheduler 7），覆盖 7 天窗口 / 升级链 / 幂等 / 取消语义
+
 ## [v1.0.58] — 2026-09-25
 
 **v1.0.57 的收尾：拖动读数不再只报一条（同日多值全部报出）；并按用户要求撤掉小图下那行「同日多条数值」说明。**

@@ -9,9 +9,12 @@ import com.ashkb.app.AshkbApplication
 import com.ashkb.app.data.entity.ExerciseLog
 import com.ashkb.app.data.entity.ExercisePlan
 import com.ashkb.app.data.repo.HealthRepository
+import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.domain.ExercisePlanProgress
 import com.ashkb.app.domain.ExercisePlanTemplates
+import com.ashkb.app.reminder.ExerciseReminderScheduler
 import java.time.LocalDate
+import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,7 +44,10 @@ data class ExercisePlansUiState(
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ExercisePlansViewModel(private val repo: HealthRepository) : ViewModel() {
+class ExercisePlansViewModel(
+    private val repo: HealthRepository,
+    private val app: AshkbApplication,
+) : ViewModel() {
 
     /** 种子结果（页面常驻提示用，不弹 Snackbar） */
     private val seeded = MutableStateFlow<Int?>(null)
@@ -101,6 +107,8 @@ class ExercisePlansViewModel(private val repo: HealthRepository) : ViewModel() {
         viewModelScope.launch {
             repo.activateExercisePlan(id, LocalDate.now().toString())
             logsRefresh.value += 1
+            // v1.0.59 B5：启用新计划后即时重排运动提醒
+            rescheduleExerciseReminders()
         }
     }
 
@@ -109,6 +117,25 @@ class ExercisePlansViewModel(private val repo: HealthRepository) : ViewModel() {
         viewModelScope.launch {
             repo.deactivateExercisePlan(id)
             logsRefresh.value += 1
+            // v1.0.59 B5：停用后无 active plan → 清掉所有未来运动提醒
+            ExerciseReminderScheduler.cancelAllFuture(app, LocalDate.now())
+        }
+    }
+
+    /** v1.0.59 B5：重排运动提醒（按当前 active plan + 今日打卡状态） */
+    private suspend fun rescheduleExerciseReminders() {
+        val cfg = ReminderConfigRepository(app)
+        val db = com.ashkb.app.data.db.AppDatabase.get(app)
+        if (cfg.exerciseEnabled()) {
+            runCatching {
+                val activePlan = db.exercisePlanDao().active()
+                val hasLogged = db.exerciseLogDao().byDate(LocalDate.now().toString()).isNotEmpty()
+                ExerciseReminderScheduler.rescheduleAll(
+                    app, activePlan, hasLogged, LocalDate.now(), LocalDateTime.now(),
+                )
+            }
+        } else {
+            ExerciseReminderScheduler.cancelAllFuture(app, LocalDate.now())
         }
     }
 
@@ -116,7 +143,7 @@ class ExercisePlansViewModel(private val repo: HealthRepository) : ViewModel() {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                ExercisePlansViewModel(app.healthRepository)
+                ExercisePlansViewModel(app.healthRepository, app)
             }
         }
     }

@@ -11,8 +11,10 @@ import com.ashkb.app.data.entity.ExerciseLog
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.repo.HealthRepository
+import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.ExerciseEngine
+import com.ashkb.app.reminder.ExerciseReminderScheduler
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -38,7 +40,10 @@ data class ExerciseUiState(
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ExerciseViewModel(private val repo: HealthRepository) : ViewModel() {
+class ExerciseViewModel(
+    private val repo: HealthRepository,
+    private val app: AshkbApplication,
+) : ViewModel() {
 
     private val _date = MutableStateFlow(LocalDate.now())
     val date: LocalDate get() = _date.value
@@ -100,6 +105,25 @@ class ExerciseViewModel(private val repo: HealthRepository) : ViewModel() {
                     status = "done", notes = notes,
                 )
             )
+            // v1.0.59 B5：运动打卡后即时重排提醒（今日已完成 → slotsFor 返回空，自然清掉今日升级）
+            rescheduleExerciseReminders()
+        }
+    }
+
+    /** v1.0.59 B5：重排运动提醒（按当前 active plan + 今日打卡状态） */
+    private suspend fun rescheduleExerciseReminders() {
+        val cfg = ReminderConfigRepository(app)
+        val db = com.ashkb.app.data.db.AppDatabase.get(app)
+        if (cfg.exerciseEnabled()) {
+            runCatching {
+                val activePlan = db.exercisePlanDao().active()
+                val hasLogged = db.exerciseLogDao().byDate(LocalDate.now().toString()).isNotEmpty()
+                ExerciseReminderScheduler.rescheduleAll(
+                    app, activePlan, hasLogged, LocalDate.now(), LocalDateTime.now(),
+                )
+            }
+        } else {
+            ExerciseReminderScheduler.cancelAllFuture(app, LocalDate.now())
         }
     }
 
@@ -125,7 +149,7 @@ class ExerciseViewModel(private val repo: HealthRepository) : ViewModel() {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                ExerciseViewModel(app.healthRepository)
+                ExerciseViewModel(app.healthRepository, app)
             }
         }
     }
