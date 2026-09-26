@@ -29,7 +29,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -46,6 +49,7 @@ import androidx.navigation.toRoute
 
 import com.ashkb.app.CrashLogger
 import com.ashkb.app.R
+import com.ashkb.app.data.repo.DisclaimerStore
 import com.ashkb.app.ui.backup.BackupScreen
 import com.ashkb.app.ui.backup.BackupViewModel
 import com.ashkb.app.ui.checkup.CheckupScreen
@@ -107,6 +111,21 @@ import com.ashkb.app.ui.wellness.WellnessViewModel
  */
 @Composable
 fun AppShell() {
+    // v1.0.63 C12：首启免责声明门禁——未确认前不创建任何 ViewModel（也就不会打开数据库）。
+    val shellContext = LocalContext.current
+    var disclaimerAccepted by rememberSaveable {
+        mutableStateOf(DisclaimerStore.isAccepted(shellContext))
+    }
+    if (!disclaimerAccepted) {
+        FirstLaunchDisclaimer(
+            onAccept = {
+                DisclaimerStore.accept(shellContext)
+                disclaimerAccepted = true
+            },
+        )
+        return
+    }
+
     val nav = rememberNavController()
     val snackbar = remember { SnackbarHostState() }
 

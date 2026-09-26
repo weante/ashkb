@@ -17,6 +17,7 @@ import com.ashkb.app.R
 import com.ashkb.app.data.entity.CheckupItem
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.domain.CheckupPrep
+import com.ashkb.app.ui.components.DisclaimerNote
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.theme.Spacing
@@ -95,12 +96,7 @@ internal fun CheckupPrepCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                stringResource(R.string.checkup_prep_disclaimer),
-                Modifier.padding(top = Spacing.xs),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            DisclaimerNote(R.string.checkup_prep_disclaimer)
         }
     }
 }

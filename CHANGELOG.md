@@ -4,6 +4,42 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.63] — 2026-09-26
+
+**C12 免责声明收口：首启声明门禁（显著位置）+ 自动提示统一前缀。**
+
+⚠️ **无数据库结构变更**（仍为 Room v15），可覆盖安装。**含 v1.0.44 ~ v1.0.62 全部内容。**
+
+### 首启声明门禁
+
+- 首次启动全屏展示免责声明，**点「我已阅读并理解」前不进入应用本体**；确认后写入 `app_prefs`
+- 四条要点：非医疗建议 / 不替代诊疗 · 用药与调整以主治医师医嘱为准 · 数据仅存本机不上传 · 不是医疗器械
+- **门禁在创建任何 ViewModel 之前**——未确认前不会打开数据库
+- prefs 不跨备份恢复，换机后需重新确认（合规上期望如此）
+
+### 自动提示统一前缀
+
+- 新增唯一文案来源 `domain/Disclaimer.kt`（`PREFIX` = 「仅供参考，以主治医师医嘱为准。」），
+  与 `RecipeSources.DISCLAIMER` 同理放 domain：**合规底线措辞必须能被单测锁定**
+- 新增共享组件 `DisclaimerNote`，应用于三处**自动生成**的健康提示：
+  漏服处理指引 / 复诊准备清单 / 跨院化验提示
+- 连带把三处提示各自的「以…为准」措辞收敛，避免与统一前缀重复：
+  `missed_dose_disclaimer`（去「与主治医师医嘱」——前缀已覆盖）、
+  `checkup_prep_disclaimer`（去「与主治医师」）、
+  `lab_unit_group_hint`（去「仅供参考」）
+
+### 保留不变（刻意）
+
+- 知识库 / 食谱的**条目级**声明与 PDF 页脚**保持自足完整文本**——它们要脱离 App 被阅读，
+  不能依赖统一前缀
+- 「关于」卡原有的 `me_license_note`（含完整免责声明）不动
+
+### 实现细节
+
+- 新增 `domain/Disclaimer.kt` + `data/repo/DisclaimerStore.kt` + `ui/DisclaimerScreen.kt` + `ui/components/DisclaimerNote.kt`
+- `AppShell` 顶部加门禁早返回（`rememberSaveable` + prefs）
+- 单测 429 → 435 条（`DisclaimerTest` 6 条锁定措辞）
+
 ## [v1.0.62] — 2026-09-26
 
 **C11 提醒可靠性收口：电池白名单 / 自启动引导 + 端到端「测试提醒」验证。**

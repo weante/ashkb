@@ -64,6 +64,7 @@ import com.ashkb.app.data.repo.TodayItem
 import com.ashkb.app.domain.MissedDose
 import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.ui.components.AlertBanner
+import com.ashkb.app.ui.components.DisclaimerNote
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.StatusChip
@@ -678,11 +679,7 @@ private fun MissedDoseDialog(item: TodayItem, onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 if (guide == null) {
                     // 理论上入口只在漏服态出现；兜底给通用提示而不是空白弹窗
-                    Text(
-                        stringResource(R.string.missed_dose_disclaimer),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    DisclaimerNote(R.string.missed_dose_disclaimer)
                 } else {
                     Text(
                         stringResource(
@@ -712,11 +709,7 @@ private fun MissedDoseDialog(item: TodayItem, onDismiss: () -> Unit) {
                         )
                     }
                     HorizontalDivider(Modifier.padding(vertical = Spacing.xs))
-                    Text(
-                        stringResource(R.string.missed_dose_disclaimer),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    DisclaimerNote(R.string.missed_dose_disclaimer)
                 }
             }
         },

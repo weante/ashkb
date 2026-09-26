@@ -62,6 +62,7 @@ import com.ashkb.app.domain.LabImportRow
 import com.ashkb.app.domain.LabUnits
 import com.ashkb.app.domain.ReportImportParser
 import com.ashkb.app.R
+import com.ashkb.app.ui.components.DisclaimerNote
 import com.ashkb.app.ui.components.DividerList
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.StatusChip
@@ -252,11 +253,14 @@ internal fun LabsList(
             // C3：跨院多单位提示放列表顶部——先声明"不可比"，再看下面的分组数值
             if (mixedUnits.isNotEmpty()) {
                 item(key = "lab-unit-hint") {
-                    StatusChip(
-                        text = stringResource(R.string.lab_unit_group_hint),
-                        tone = StatusTone.Warning,
-                        icon = Icons.Rounded.WarningAmber,
-                    )
+                    Column {
+                        StatusChip(
+                            text = stringResource(R.string.lab_unit_group_hint),
+                            tone = StatusTone.Warning,
+                            icon = Icons.Rounded.WarningAmber,
+                        )
+                        DisclaimerNote()
+                    }
                 }
             }
             item {
