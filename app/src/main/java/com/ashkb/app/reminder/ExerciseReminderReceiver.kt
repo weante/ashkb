@@ -48,7 +48,9 @@ class ExerciseReminderReceiver : BroadcastReceiver() {
                     NotificationHelper.cancelExercise(context, dateStr, escalation)
                     return@launch
                 }
-                NotificationHelper.postExerciseReminder(context, dateStr, escalation)
+                // v1.0.60 B8：免打扰时段静默投递
+                val silent = NotificationHelper.isInDndNow(context)
+                NotificationHelper.postExerciseReminder(context, dateStr, escalation, silent)
             } finally {
                 result.finish()
             }

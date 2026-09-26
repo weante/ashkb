@@ -47,7 +47,9 @@ class BasdaiReminderReceiver : BroadcastReceiver() {
                     NotificationHelper.cancelBasdai(context, dueDateStr, escalation)
                     return@launch
                 }
-                NotificationHelper.postBasdaiReminder(context, dueDateStr, escalation)
+                // v1.0.60 B8：免打扰时段静默投递
+                val silent = NotificationHelper.isInDndNow(context)
+                NotificationHelper.postBasdaiReminder(context, dueDateStr, escalation, silent)
             } finally {
                 result.finish()
             }

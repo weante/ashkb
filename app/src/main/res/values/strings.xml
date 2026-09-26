@@ -1113,5 +1113,14 @@
     <string name="reminder_basdai_cycle_28">每四周（默认）</string>
     <string name="reminder_basdai_cycle_56">每八周</string>
     <string name="reminder_basdai_cycle_84">每十二周</string>
+    <!-- v1.0.60 B8：免打扰时段 + 通知组合并 -->
+    <string name="notif_channel_silent_name">免打扰时段提醒</string>
+    <string name="notif_channel_silent_desc">免打扰时段内的提醒静默投递，不响铃不震动</string>
+    <string name="notif_group_summary_title">提醒</string>
+    <string name="notif_group_summary_text">您有 %1$d 条待处理提醒</string>
+    <string name="reminder_dnd_switch">免打扰时段</string>
+    <string name="reminder_dnd_subtitle">时段内提醒不响铃不震动，通知栏仍可见</string>
+    <string name="reminder_dnd_start">开始</string>
+    <string name="reminder_dnd_end">结束</string>
 </resources>
 

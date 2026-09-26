@@ -4,6 +4,33 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.60] — 2026-09-26
+
+**B8 免打扰时段 + 同时段多提醒合并推送：四源提醒叠加后的体验补丁。**
+
+⚠️ **无数据库结构变更**（仍为 Room v15），可覆盖安装。**含 v1.0.44 ~ v1.0.59 全部内容。**
+
+### 免打扰时段
+
+- 我的页「提醒设置」新增免打扰开关 + 起止时间选择（默认 22:00–07:00，跨午夜）
+- 时段内所有提醒**静默投递**：不响铃、不震动，通知栏仍可见（用户醒后可见）
+- 用药提醒也静默投递（不顺延，避免漏服窗口问题）
+- 开关 / 时间变更只写 prefs，**无需重排闹钟**——Receiver 触发时实时读配置
+
+### 同时段多提醒合并推送
+
+- 所有提醒通知归入同一通知组 `ashkb_reminders`
+- 2+ 条提醒同时存在时自动折叠为 summary（"您有 N 条待处理提醒"），仅 summary 发声
+- 单条提醒时无 summary，自身正常发声
+
+### 实现细节
+
+- 新增 `domain/DndWindow.kt` 纯函数（跨午夜支持，左闭右开），12 条单测
+- 新增静默通道 `reminder_silent`（IMPORTANCE_LOW，无振动无声音）
+- `NotificationHelper.postXxxReminder` 加 `silent` 参数 + `setGroup` + `updateGroupSummary`
+- 4 个 Receiver 触发时调用 `NotificationHelper.isInDndNow(context)` 决定通道
+- 单测 412 → 424 条
+
 ## [v1.0.59] — 2026-09-26
 
 **B5 多源提醒：提醒链从「仅用药」扩到「用药 + 复诊 + BASDAI 问卷 + 运动」四源同台。**

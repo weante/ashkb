@@ -38,7 +38,9 @@ class CheckupReminderReceiver : BroadcastReceiver() {
                     NotificationHelper.cancelCheckup(context, nextDate, phase)
                     return@launch
                 }
-                NotificationHelper.postCheckupReminder(context, nextDate, phase)
+                // v1.0.60 B8：免打扰时段静默投递
+                val silent = NotificationHelper.isInDndNow(context)
+                NotificationHelper.postCheckupReminder(context, nextDate, phase, silent)
             } finally {
                 result.finish()
             }

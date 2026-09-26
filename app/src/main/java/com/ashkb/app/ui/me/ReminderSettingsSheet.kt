@@ -1,5 +1,7 @@
 package com.ashkb.app.ui.me
 
+import android.app.TimePickerDialog
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,6 +37,7 @@ import com.ashkb.app.reminder.ExerciseReminderScheduler
 import com.ashkb.app.ui.theme.Spacing
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -59,6 +62,10 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
     var checkup by remember { mutableStateOf(cfg.checkupEnabled()) }
     var exercise by remember { mutableStateOf(cfg.exerciseEnabled()) }
     var basdaiCycle by remember { mutableStateOf(cfg.basdaiCycleDays()) }
+    // v1.0.60 B8：免打扰时段
+    var dndEnabled by remember { mutableStateOf(cfg.dndEnabled()) }
+    var dndStart by remember { mutableStateOf(cfg.dndStart()) }
+    var dndEnd by remember { mutableStateOf(cfg.dndEnd()) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -122,6 +129,30 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
                 },
             )
 
+            // ---- v1.0.60 B8：免打扰时段 ----
+            SettingSwitchRow(
+                title = stringResource(R.string.reminder_dnd_switch),
+                subtitle = stringResource(R.string.reminder_dnd_subtitle),
+                checked = dndEnabled,
+                onCheckedChange = { v ->
+                    dndEnabled = v
+                    cfg.setDndEnabled(v)
+                    // 只改 prefs，无需重排闹钟——Receiver 触发时实时读 DND 配置
+                },
+            )
+            if (dndEnabled) {
+                DndTimeRow(
+                    label = stringResource(R.string.reminder_dnd_start),
+                    value = dndStart,
+                    onPicked = { dndStart = it; cfg.setDndStart(it) },
+                )
+                DndTimeRow(
+                    label = stringResource(R.string.reminder_dnd_end),
+                    value = dndEnd,
+                    onPicked = { dndEnd = it; cfg.setDndEnd(it) },
+                )
+            }
+
             // ---- BASDAI 评估周期 ----
             Text(
                 stringResource(R.string.reminder_basdai_cycle_label),
@@ -175,13 +206,51 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun SettingSwitchRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun SettingSwitchRow(
+    title: String,
+    subtitle: String? = null,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
     Row(
         Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall)
+            }
+        }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+/** v1.0.60 B8：免打扰起止时间选择行，点击弹出系统 TimePickerDialog。 */
+@Composable
+private fun DndTimeRow(label: String, value: String, onPicked: (String) -> Unit) {
+    val context = LocalContext.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = Spacing.xs)
+            .clickable {
+                val parts = value.split(":")
+                val h = parts.getOrNull(0)?.toIntOrNull() ?: 22
+                val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                TimePickerDialog(
+                    context,
+                    { _, hour, minute ->
+                        onPicked(String.format(Locale.US, "%02d:%02d", hour, minute))
+                    },
+                    h, m, true,
+                ).show()
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyMedium)
     }
 }
