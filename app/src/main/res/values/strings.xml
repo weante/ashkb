@@ -1133,5 +1133,19 @@
     <string name="strong_reminder_taken">已服用</string>
     <string name="strong_reminder_later">稍后处理</string>
     <string name="strong_reminder_time_hint">计划时间 %1$s</string>
+    <!-- v1.0.62 C11：电池白名单 / 自启动引导 / 测试提醒 -->
+    <string name="reminder_battery">电池白名单</string>
+    <string name="reminder_battery_ok">已加入，后台不被限制</string>
+    <string name="reminder_battery_no">未加入，部分机型可能延迟或拦截提醒</string>
+    <string name="reminder_request_battery">加入电池白名单</string>
+    <string name="reminder_autostart">自启动</string>
+    <string name="reminder_autostart_hint">部分厂商（小米 / 华为 / OPPO / vivo 等）需手动允许自启动，否则重启后精确闹钟可能失效。系统未提供查询接口，请按机型在下方入口确认。</string>
+    <string name="reminder_open_autostart">打开自启动设置</string>
+    <string name="reminder_test">测试提醒</string>
+    <string name="reminder_test_hint">10 秒后经真实闹钟链发送一条测试通知，用于验证「权限 + 精确闹钟 + 通知通道」整条链路是否正常。</string>
+    <string name="reminder_send_test">发送测试提醒</string>
+    <string name="reminder_test_scheduled">已安排，10 秒后应收到通知；若未收到请检查上方各项权限</string>
+    <string name="notif_test_title">测试提醒</string>
+    <string name="notif_test_text">提醒链工作正常（本机通知可用）</string>
 </resources>
 

@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- v1.0.61 B9：升级链末级「强提醒」用全屏 Intent 唤醒锁屏（Android 14+ 需用户在设置中授予） -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- v1.0.62 C11：引导用户把本应用加入电池白名单（否则国产 ROM 可能掐掉后台精确闹钟） -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- P4 R20：WebDAV 备份网络访问（R3：强制 HTTPS，明文 http 一律拒绝） -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -48,6 +50,11 @@
 
         <receiver
             android:name=".reminder.CheckInActionReceiver"
+            android:exported="false" />
+
+        <!-- v1.0.62 C11：测试提醒闹钟触发 -->
+        <receiver
+            android:name=".reminder.TestReminderReceiver"
             android:exported="false" />
 
         <!-- v1.0.59 B5：多源提醒——三源各自独立 Receiver，互不影响 -->

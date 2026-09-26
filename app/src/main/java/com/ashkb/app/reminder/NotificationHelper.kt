@@ -28,6 +28,8 @@ object NotificationHelper {
     /** v1.0.60 B8：所有提醒归入同一通知组，2+ 条时折叠为 summary。 */
     const val GROUP_REMINDERS = "ashkb_reminders"
     private const val SUMMARY_ID = 100001
+    /** v1.0.62 C11：测试提醒通知 ID（固定单发）。 */
+    private const val NOTIF_ID_TEST = 100002
 
     fun ensureChannels(context: Context) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -303,6 +305,27 @@ object NotificationHelper {
     fun cancelExercise(context: Context, date: String, escalation: Int) {
         NotificationManagerCompat.from(context).cancel(notifIdExercise(date, escalation))
         updateGroupSummary(context)
+    }
+
+    /**
+     * v1.0.62 C11：测试提醒通知——用于「提醒可靠性自检」的端到端链路验证。
+     *
+     * 刻意**不归入 `ashkb_reminders` 组**：它是自检的一次性通知，不参与提醒折叠统计。
+     */
+    fun postTestReminder(context: Context, silent: Boolean = false) {
+        if (!canPost(context)) return
+        val open = openMainActivity(context, "test")
+        val channel = if (silent) CHANNEL_REMINDER_SILENT else CHANNEL_SYS
+        val n = NotificationCompat.Builder(context, channel)
+            .setSmallIcon(R.drawable.ic_stat_pill)
+            .setContentTitle(context.getString(R.string.notif_test_title))
+            .setContentText(context.getString(R.string.notif_test_text))
+            .setPriority(if (silent) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(open)
+            .build()
+        runCatching { NotificationManagerCompat.from(context).notify(NOTIF_ID_TEST, n) }
     }
 
     private fun openMainActivity(context: Context, key: String): PendingIntent =

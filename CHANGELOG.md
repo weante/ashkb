@@ -4,6 +4,40 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.62] — 2026-09-26
+
+**C11 提醒可靠性收口：电池白名单 / 自启动引导 + 端到端「测试提醒」验证。**
+
+⚠️ **无数据库结构变更**（仍为 Room v15），可覆盖安装。**含 v1.0.44 ~ v1.0.61 全部内容。**
+
+### 电池白名单
+
+- 自检卡新增「电池白名单」一行，用官方接口（`PowerManager.isIgnoringBatteryOptimizations`）显示**真实状态**
+- 未加入时给「加入电池白名单」按钮：优先官方直连弹窗，ROM 不支持则兜底到电池优化列表页
+- Manifest 加 `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
+
+### 自启动引导
+
+- 新增「自启动」区块 + 「打开自启动设置」按钮：按厂商（小米 / 华为 / 荣耀 / OPPO / 一加 / realme / vivo / iQOO / 三星 / 魅族）组件名**尽力跳转**，全部失败兜底到应用详情页
+- **刻意不做状态行**——系统未提供任何公开查询接口，假装能查到状态是欺骗用户
+
+### 测试提醒（端到端链路验证）
+
+- 新增「发送测试提醒」按钮：**真排一个 10 秒后的精确闹钟** → `TestReminderReceiver` → 发通知
+- 验证的是整条链路（权限 + 精确闹钟 + 通知通道 + 投递），而不只是权限状态——「权限全给了但厂商后台策略掐掉闹钟」这类故障只有这样才暴露
+- 同样尊重免打扰时段（DND 时静默投递）
+
+### 其他修复
+
+- **自检卡状态从系统设置页返回后自动刷新**：此前各项状态只在首次组合时读一次，用户刚授予权限、切回来仍是旧值（用 `ON_RESUME` 生命周期观察者触发重读）
+
+### 实现细节
+
+- 新增 `reminder/ReminderTest.kt`（`nowMs` 可注入）+ `reminder/TestReminderReceiver.kt` + `reminder/SystemSetupGuides.kt`
+- `NotificationHelper.postTestReminder`（走 `sys_notices` 通道，**刻意不归入提醒折叠组**）
+- 动作按钮由横向 `Row` 改纵向满宽 `Column`（按钮从 2 个增到最多 4 个，横排会溢出）
+- 单测 425 → 429 条（`ReminderTestSchedulerTest` 4 条）
+
 ## [v1.0.61] — 2026-09-26
 
 **B9 升级链第三级「强提醒」：用药漏服的最后一道防线——末级升级改用全屏 Intent 唤醒锁屏。**

@@ -29,6 +29,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,10 +38,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
 import com.ashkb.app.domain.Labels
+import com.ashkb.app.reminder.ReminderTest
+import com.ashkb.app.reminder.SystemSetupGuides
 import com.ashkb.app.ui.components.KeyValueRow
 import com.ashkb.app.ui.components.NavRow
 import com.ashkb.app.ui.components.SectionCard
@@ -194,37 +200,123 @@ private fun spineLabel(k: String?) = when (k) {
 @Composable
 private fun ReminderSelfCheckCard() {
     val context = LocalContext.current
-    val notifOk = androidx.core.content.ContextCompat.checkSelfPermission(
-        context, android.Manifest.permission.POST_NOTIFICATIONS
-    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-    val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-    val exactOk = if (Build.VERSION.SDK_INT >= 31) am.canScheduleExactAlarms() else true
+
+    // v1.0.62 C11：从系统设置页返回时刷新各项状态——否则用户刚授予权限、
+    // 切回来仍是旧值（本节此前只在首次组合时读一次，见 CHANGELOG）。
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var refreshTick by remember { mutableStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshTick++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val notifOk = remember(refreshTick) {
+        androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.POST_NOTIFICATIONS
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+    val exactOk = remember(refreshTick) {
+        val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        if (Build.VERSION.SDK_INT >= 31) am.canScheduleExactAlarms() else true
+    }
     // v1.0.61 B9：Android 14+ 全屏 Intent 需用户显式授予；14 以下默认可用
-    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    val fsOk = if (Build.VERSION.SDK_INT >= 34) nm.canUseFullScreenIntent() else true
+    val fsOk = remember(refreshTick) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= 34) nm.canUseFullScreenIntent() else true
+    }
+    // v1.0.62 C11：电池白名单（有官方查询接口，故可显示真实状态）
+    val batteryOk = remember(refreshTick) {
+        SystemSetupGuides.isIgnoringBatteryOptimizations(context)
+    }
+
+    var testScheduled by remember { mutableStateOf(false) }
 
     SectionCard(title = stringResource(R.string.reminder_selfcheck_title)) {
         CheckRow(stringResource(R.string.reminder_notification_permission), if (notifOk) stringResource(R.string.permission_granted) else stringResource(R.string.reminder_no_permission), notifOk)
         CheckRow(stringResource(R.string.reminder_exact_alarm), if (exactOk) stringResource(R.string.reminder_exact_ok) else stringResource(R.string.reminder_no_exact), exactOk)
         CheckRow(stringResource(R.string.reminder_fullscreen), if (fsOk) stringResource(R.string.reminder_fullscreen_ok) else stringResource(R.string.reminder_fullscreen_no), fsOk)
+        CheckRow(stringResource(R.string.reminder_battery), if (batteryOk) stringResource(R.string.reminder_battery_ok) else stringResource(R.string.reminder_battery_no), batteryOk)
+
         Spacer(Modifier.height(Spacing.md))
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        // v1.0.62 C11：动作按钮改纵向满宽——从 2 个增到最多 4 个后横向 Row 会溢出
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
             if (!exactOk && Build.VERSION.SDK_INT >= 31) {
-                OutlinedButton(onClick = {
-                    context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-                }) { Text(stringResource(R.string.reminder_request_exact_alarm)) }
+                OutlinedButton(
+                    onClick = { context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.reminder_request_exact_alarm)) }
             }
             if (!fsOk && Build.VERSION.SDK_INT >= 34) {
-                OutlinedButton(onClick = {
-                    runCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)) }
-                }) { Text(stringResource(R.string.reminder_request_fullscreen)) }
+                OutlinedButton(
+                    onClick = {
+                        runCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)) }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.reminder_request_fullscreen)) }
             }
-            OutlinedButton(onClick = {
-                context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                })
-            }) { Text(stringResource(R.string.reminder_notification_settings)) }
+            if (!batteryOk) {
+                OutlinedButton(
+                    onClick = { SystemSetupGuides.requestIgnoreBatteryOptimizations(context) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.reminder_request_battery)) }
+            }
+            OutlinedButton(
+                onClick = {
+                    context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    })
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(R.string.reminder_notification_settings)) }
         }
+
+        // ---- v1.0.62 C11：自启动引导（无公开查询接口，只给入口 + 说明，不做状态行）----
+        Spacer(Modifier.height(Spacing.md))
+        Text(stringResource(R.string.reminder_autostart), style = MaterialTheme.typography.titleSmall)
+        Text(
+            stringResource(R.string.reminder_autostart_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = Spacing.xxs),
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        OutlinedButton(
+            onClick = { SystemSetupGuides.openAutoStartSettings(context) },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(stringResource(R.string.reminder_open_autostart)) }
+
+        // ---- v1.0.62 C11：测试提醒（端到端链路验证）----
+        Spacer(Modifier.height(Spacing.md))
+        Text(stringResource(R.string.reminder_test), style = MaterialTheme.typography.titleSmall)
+        Text(
+            stringResource(R.string.reminder_test_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = Spacing.xxs),
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        OutlinedButton(
+            onClick = {
+                ReminderTest.schedule(context)
+                testScheduled = true
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(stringResource(R.string.reminder_send_test)) }
+        if (testScheduled) {
+            Text(
+                stringResource(R.string.reminder_test_scheduled),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = Spacing.xs),
+            )
+        }
+
         Text(
             stringResource(R.string.reminder_note),
             style = MaterialTheme.typography.bodySmall,
