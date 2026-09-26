@@ -1152,5 +1152,21 @@
     <string name="disclaimer_gate_subtitle">ASHKB 是个人健康管理记录工具，不是医疗服务。请先了解以下边界：</string>
     <string name="disclaimer_gate_footer">点击下方按钮即表示你已阅读并理解上述内容。</string>
     <string name="disclaimer_gate_accept">我已阅读并理解</string>
+    <!-- v1.0.64 B13：生活方式画像 -->
+    <string name="profile_lifestyle_title">生活方式</string>
+    <string name="profile_lifestyle_note">仅用于生成通用提示与排序，不参与诊断或用药决策。</string>
+    <string name="profile_smoking_field">吸烟</string>
+    <string name="profile_smoking_never">从不</string>
+    <string name="profile_smoking_former">已戒</string>
+    <string name="profile_smoking_current">现吸</string>
+    <string name="profile_habit_field">运动习惯</string>
+    <string name="profile_habit_none">无</string>
+    <string name="profile_habit_occasional">偶尔</string>
+    <string name="profile_habit_regular">规律</string>
+    <string name="profile_sedentary_field">久坐 小时/天</string>
+    <string name="profile_sleep_field">睡眠 小时/天</string>
+    <string name="profile_sedentary_short">久坐 %1$d h/天</string>
+    <string name="profile_sleep_short">睡眠 %1$d h/天</string>
+    <string name="exercise_lifestyle_notes_title">生活方式提示</string>
 </resources>
 

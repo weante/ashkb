@@ -45,6 +45,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
 import com.ashkb.app.domain.Labels
+import com.ashkb.app.domain.Lifestyle
+import com.ashkb.app.domain.LifestylePrescription
 import com.ashkb.app.reminder.ReminderTest
 import com.ashkb.app.reminder.SystemSetupGuides
 import com.ashkb.app.ui.components.KeyValueRow
@@ -100,6 +102,7 @@ fun MeScreen(
                     KeyValueRow("HLA-B27", Labels.hlaB27(p.hlaB27))
                     KeyValueRow(stringResource(R.string.profile_disease_stage), stageLabel(p.diseaseStage))
                     KeyValueRow(stringResource(R.string.profile_spine_mobility), spineLabel(p.spineMobility))
+                    KeyValueRow(stringResource(R.string.profile_lifestyle_title), lifestyleLabel(p.lifestyle))
                     KeyValueRow(stringResource(R.string.profile_allergy_history), p.allergies ?: stringResource(R.string.common_unfilled))
                     KeyValueRow(stringResource(R.string.profile_blood_type), p.emergencyBloodType ?: stringResource(R.string.common_unfilled))
                 }
@@ -188,6 +191,31 @@ private fun stageLabel(k: String?) = when (k) {
     "controlled" -> stringResource(R.string.stage_controlled)
     "flare" -> stringResource(R.string.stage_flare_filtered)
     else -> stringResource(R.string.stage_not_set_conservative)
+}
+
+/** v1.0.64 B13：生活方式一行摘要——只列已登记项，全空则显示「未填」。 */
+@Composable
+private fun lifestyleLabel(raw: String?): String {
+    val l = Lifestyle.fromJson(raw)
+    if (!LifestylePrescription.hasContent(l)) return stringResource(R.string.common_unfilled)
+    return buildList {
+        val smokingText = when (l.smoking) {
+            Lifestyle.SMOKING_NEVER -> stringResource(R.string.profile_smoking_never)
+            Lifestyle.SMOKING_FORMER -> stringResource(R.string.profile_smoking_former)
+            Lifestyle.SMOKING_CURRENT -> stringResource(R.string.profile_smoking_current)
+            else -> null
+        }
+        if (smokingText != null) add("${stringResource(R.string.profile_smoking_field)} $smokingText")
+        l.sedentaryHours?.let { add(stringResource(R.string.profile_sedentary_short, it)) }
+        val habitText = when (l.exerciseHabit) {
+            Lifestyle.HABIT_NONE -> stringResource(R.string.profile_habit_none)
+            Lifestyle.HABIT_OCCASIONAL -> stringResource(R.string.profile_habit_occasional)
+            Lifestyle.HABIT_REGULAR -> stringResource(R.string.profile_habit_regular)
+            else -> null
+        }
+        if (habitText != null) add("${stringResource(R.string.profile_habit_field)} $habitText")
+        l.sleepHours?.let { add(stringResource(R.string.profile_sleep_short, it)) }
+    }.joinToString(" · ")
 }
 
 @Composable

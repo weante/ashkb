@@ -10,6 +10,7 @@ import com.ashkb.app.R
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.domain.KbSearch
+import com.ashkb.app.domain.Lifestyle
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -95,11 +96,20 @@ class KnowledgeViewModel(private val repo: HealthRepository) : ViewModel() {
         }
 
     val uiState: StateFlow<KnowledgeUiState> =
-        combine(entries, query, category, overdue) { list, q, c, od ->
+        combine(entries, query, category, overdue, repo.observeProfile()) { list, q, c, od, p ->
+            // v1.0.64 B13：生活方式画像置顶——修掉 kb_seed_edu.json 里 edu-003（吸烟条目）
+            // 的悬空挂点（其 applicable_scene 写着「profile 吸烟状态登记后知识库置顶」，
+            // 但 lifestyle 此前从未被采集，联动永远不触发）。
+            // 只在「全部」视图置顶：检索结果与分类视图保持用户自己的排序意图。
+            val pinned = Lifestyle.fromJson(p?.lifestyle).pinnedKbIds()
+            val ordered = if (q.isBlank() && c == null && pinned.isNotEmpty()) {
+                val pinnedSet = pinned.toSet()
+                list.filter { it.id in pinnedSet } + list.filter { it.id !in pinnedSet }
+            } else {
+                list
+            }
             KnowledgeUiState(
-                // entries 已由 searchQuery + category 决定（分类走 observeKbByCategory，DAO 已按 category 过滤），
-                // 无需在此再 filter 一次。
-                entries = list,
+                entries = ordered,
                 category = c, query = q, overdueCount = od,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), KnowledgeUiState())

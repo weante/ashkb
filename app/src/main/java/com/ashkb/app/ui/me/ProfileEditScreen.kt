@@ -30,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.Lifestyle
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
@@ -63,6 +64,12 @@ fun ProfileEditScreen(
     // v10（C9）体重目标区间（kg）——可留空
     var wLow by remember { mutableStateOf(initial?.weightTargetLow?.toString() ?: "") }
     var wHigh by remember { mutableStateOf(initial?.weightTargetHigh?.toString() ?: "") }
+    // v1.0.64 B13：生活方式画像（此前 lifestyle 列只被透传、从未采集）
+    val life = remember { Lifestyle.fromJson(initial?.lifestyle) }
+    var smoking by remember { mutableStateOf(life.smoking) }
+    var habit by remember { mutableStateOf(life.exerciseHabit) }
+    var sedentary by remember { mutableStateOf(life.sedentaryHours?.toString() ?: "") }
+    var sleepH by remember { mutableStateOf(life.sleepHours?.toString() ?: "") }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -99,7 +106,13 @@ fun ProfileEditScreen(
                                     emergencyBloodType = bloodType.trim().ifBlank { null },
                                     // v10：未在本表单呈现的字段必须从 initial 透传——
                                     // 否则保存会把它们重置为实体默认值（潜在数据丢失）
-                                    lifestyle = initial?.lifestyle,
+                                    // （lifestyle 自 v1.0.64 B13 起已在本表单采集，不再透传）
+                                    lifestyle = Lifestyle(
+                                        smoking = smoking,
+                                        sedentaryHours = sedentary.toIntOrNull(),
+                                        exerciseHabit = habit,
+                                        sleepHours = sleepH.toIntOrNull(),
+                                    ).toJson(),
                                     emergencyMedSummary = initial?.emergencyMedSummary,
                                     emergencyNote = initial?.emergencyNote,
                                     uiMode = initial?.uiMode ?: "normal",
@@ -206,6 +219,49 @@ fun ProfileEditScreen(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // v1.0.64 B13：生活方式画像（驱动运动页个性化提示 + 知识库置顶）
+            Text(stringResource(R.string.profile_lifestyle_title), style = MaterialTheme.typography.labelMedium)
+            Text(
+                stringResource(R.string.profile_lifestyle_note),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(stringResource(R.string.profile_smoking_field), style = MaterialTheme.typography.labelSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                listOf(
+                    Lifestyle.SMOKING_NEVER to stringResource(R.string.profile_smoking_never),
+                    Lifestyle.SMOKING_FORMER to stringResource(R.string.profile_smoking_former),
+                    Lifestyle.SMOKING_CURRENT to stringResource(R.string.profile_smoking_current),
+                    Lifestyle.SMOKING_UNKNOWN to stringResource(R.string.common_unknown),
+                ).forEach { (k, l) ->
+                    FilterChip(selected = smoking == k, onClick = { smoking = k }, label = { Text(l) })
+                }
+            }
+            Text(stringResource(R.string.profile_habit_field), style = MaterialTheme.typography.labelSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                listOf(
+                    Lifestyle.HABIT_NONE to stringResource(R.string.profile_habit_none),
+                    Lifestyle.HABIT_OCCASIONAL to stringResource(R.string.profile_habit_occasional),
+                    Lifestyle.HABIT_REGULAR to stringResource(R.string.profile_habit_regular),
+                    Lifestyle.HABIT_UNKNOWN to stringResource(R.string.common_unknown),
+                ).forEach { (k, l) ->
+                    FilterChip(selected = habit == k, onClick = { habit = k }, label = { Text(l) })
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                OutlinedTextField(
+                    sedentary, { sedentary = it.filter { c -> c.isDigit() }.take(2) },
+                    label = { Text(stringResource(R.string.profile_sedentary_field)) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    sleepH, { sleepH = it.filter { c -> c.isDigit() }.take(2) },
+                    label = { Text(stringResource(R.string.profile_sleep_field)) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                )
+            }
             Text(
                 stringResource(R.string.profile_local_data_note) +
                     stringResource(R.string.stage_update_note),

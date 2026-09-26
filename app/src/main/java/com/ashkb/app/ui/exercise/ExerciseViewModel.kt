@@ -14,6 +14,8 @@ import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.ExerciseEngine
+import com.ashkb.app.domain.Lifestyle
+import com.ashkb.app.domain.LifestylePrescription
 import com.ashkb.app.reminder.ExerciseReminderScheduler
 import java.time.Duration
 import java.time.LocalDate
@@ -37,6 +39,8 @@ data class ExerciseUiState(
     val blocked: List<ExerciseEngine.ExerciseCard> = emptyList(),
     val stage: String = "unknown",
     val cervicalInvolved: Boolean = false,
+    /** v1.0.64 B13：生活方式画像驱动的个性化提示（不改处方本身，只随处方展示）。 */
+    val lifestyleNotes: List<String> = emptyList(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -75,6 +79,8 @@ class ExerciseViewModel(
                 plan = plan, blocked = blocked,
                 stage = p?.diseaseStage ?: "unknown",
                 cervicalInvolved = ExerciseEngine.cervicalInvolved(p?.spineMobility),
+                // v1.0.64 B13：生活方式 → 个性化提示（纯函数；未登记则为空列表）
+                lifestyleNotes = LifestylePrescription.advice(Lifestyle.fromJson(p?.lifestyle)),
             )
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExerciseUiState())

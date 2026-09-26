@@ -51,6 +51,7 @@ import com.ashkb.app.data.entity.ExerciseLog
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.ExerciseEngine
 import com.ashkb.app.ui.components.AlertBanner
+import com.ashkb.app.ui.components.DisclaimerNote
 import com.ashkb.app.ui.components.DividerList
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.NavRow
@@ -319,6 +320,20 @@ private fun PrescriptionHero(ui: com.ashkb.app.ui.exercise.ExerciseUiState, yest
                     tone = if (feverish) StatusTone.Danger else StatusTone.Neutral,
                 )
             }
+        }
+
+        // v1.0.64 B13：生活方式画像驱动的个性化提示——随处方展示，不改处方本身
+        // （过滤依据仍是分期与活动度；吸烟/久坐/睡眠不构成排除某项运动的依据）
+        if (ui.lifestyleNotes.isNotEmpty()) {
+            Text(
+                stringResource(R.string.exercise_lifestyle_notes_title),
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(top = Spacing.sm),
+            )
+            ui.lifestyleNotes.forEach { note ->
+                Text("· $note", style = MaterialTheme.typography.bodySmall)
+            }
+            DisclaimerNote()
         }
     }
 }
