@@ -374,6 +374,7 @@ class BackupRepository(private val context: Context) {
                 p.diagnoseYear?.let { put("diagnose_year", it) }
                 put("hla_b27", p.hlaB27)
                 put("disease_stage", p.diseaseStage)
+                p.sacroiliitisGrade?.let { put("sacroiliitis_grade", it) }
                 p.allergies?.let { put("allergies", it) }
                 p.emergencyBloodType?.let { put("emergency_blood_type", it) }
             })
@@ -419,6 +420,7 @@ class BackupRepository(private val context: Context) {
             // R1：旧档案 JSON 的 active 归一化为 controlled（与迁移 v7→v8 同义；其余未识别值原样透传，引擎按 flare 保守处理）
             diseaseStage = po.optString("disease_stage", existing?.diseaseStage ?: "unknown")
                 .let { if (it == "active") "controlled" else it },
+            sacroiliitisGrade = po.optString("sacroiliitis_grade").ifBlank { existing?.sacroiliitisGrade },
             allergies = po.optString("allergies").ifBlank { existing?.allergies },
             emergencyBloodType = po.optString("emergency_blood_type").ifBlank { existing?.emergencyBloodType },
         )

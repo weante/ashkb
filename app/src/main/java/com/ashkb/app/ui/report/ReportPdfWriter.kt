@@ -165,6 +165,10 @@ object ReportPdfWriter {
             )
             d.kv("HLA-B27", Labels.hlaB27(p.hlaB27))
             d.kv(context.getString(R.string.pdf_label_disease_stage), stage(context, p.diseaseStage))
+            d.kv(
+                context.getString(R.string.profile_sacroiliitis_field),
+                Labels.sacroiliitisGrade(p.sacroiliitisGrade),
+            )
             p.allergies?.let { d.kv(context.getString(R.string.pdf_label_allergies), it) }
             p.emergencyBloodType?.let { d.kv(context.getString(R.string.pdf_label_blood_type), it) }
         }

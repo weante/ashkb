@@ -30,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.Labels
 import com.ashkb.app.domain.Lifestyle
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.theme.Size
@@ -61,6 +62,8 @@ fun ProfileEditScreen(
     // R27 矩阵两输入：分期维 + 颈椎受累维（驱动 M4 运动过滤 / M5 预警灵敏度）
     var stage by remember { mutableStateOf(initial?.diseaseStage ?: "unknown") }
     var spine by remember { mutableStateOf(initial?.spineMobility ?: "none") }
+    // v1.0.67 C1：骶髂关节影像分期（null = 未评估）
+    var sacroGrade by remember { mutableStateOf(initial?.sacroiliitisGrade) }
     // v10（C9）体重目标区间（kg）——可留空
     var wLow by remember { mutableStateOf(initial?.weightTargetLow?.toString() ?: "") }
     var wHigh by remember { mutableStateOf(initial?.weightTargetHigh?.toString() ?: "") }
@@ -101,6 +104,7 @@ fun ProfileEditScreen(
                                     hlaB27 = hla,
                                     diseaseStage = stage,
                                     spineMobility = spine,
+                                    sacroiliitisGrade = sacroGrade,
                                     comorbidities = csvToJson(comorbid),
                                     allergies = csvToJson(allergies),
                                     emergencyBloodType = bloodType.trim().ifBlank { null },
@@ -191,6 +195,27 @@ fun ProfileEditScreen(
                 label = { Text(stringResource(R.string.profile_allergy_field)) },
                 modifier = Modifier.fillMaxWidth(),
             )
+            // v1.0.67 C1：骶髂关节影像分期（改良纽约标准 mNY，0–IV）
+            Text(stringResource(R.string.profile_sacroiliitis_field), style = MaterialTheme.typography.labelMedium)
+            Text(
+                stringResource(R.string.profile_sacroiliitis_note),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                FilterChip(
+                    selected = sacroGrade == null,
+                    onClick = { sacroGrade = null },
+                    label = { Text(Labels.sacroiliitisGrade(null)) },
+                )
+                Labels.SACROILIITIS_KEYS.forEach { k ->
+                    FilterChip(
+                        selected = sacroGrade == k,
+                        onClick = { sacroGrade = k },
+                        label = { Text(Labels.sacroiliitisGrade(k)) },
+                    )
+                }
+            }
             OutlinedTextField(
                 bloodType, { bloodType = it },
                 label = { Text(stringResource(R.string.profile_blood_field)) },

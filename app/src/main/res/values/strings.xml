@@ -1185,5 +1185,8 @@
     <string name="emergency_lockscreen_body">血型 / 诊断 / 过敏 / 关键用药 / 紧急联系人</string>
     <string name="emergency_lockscreen_desc">开启后以上信息以常驻通知显示在锁屏上，急救时无需解锁即可查看。</string>
     <string name="emergency_lockscreen_privacy">⚠️ 健康信息将出现在锁屏，请自行权衡隐私。默认关闭，可随时关掉。</string>
+    <!-- v1.0.67 C1：骶髂关节影像分期 -->
+    <string name="profile_sacroiliitis_field">骶髂关节影像分期</string>
+    <string name="profile_sacroiliitis_note">按改良纽约标准（mNY）X 线分期：0 正常 / I 可疑 / II 轻度 / III 中度 / IV 重度（强直）。请照影像报告填写。</string>
 </resources>
 

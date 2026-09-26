@@ -14,6 +14,22 @@ object Labels {
         "stable" -> "缓解期"; "controlled" -> "控制中"; "flare" -> "发作期"; else -> "未评估"
     }
 
+    /**
+     * v1.0.67 C1：骶髂关节影像分期的可选值（改良纽约标准 mNY，X 线 0–IV）。
+     * 单独暴露 key 清单，UI 不必自己写一遍字面量。
+     */
+    val SACROILIITIS_KEYS = listOf("0", "1", "2", "3", "4")
+
+    /** 骶髂关节影像分期 → 展示文本（含罗马数字，key 不出现在 UI）。 */
+    fun sacroiliitisGrade(key: String?): String = when (key) {
+        "0" -> "0 正常"
+        "1" -> "I 可疑"
+        "2" -> "II 轻度"
+        "3" -> "III 中度"
+        "4" -> "IV 重度"
+        else -> "未评估"
+    }
+
     fun dietPattern(key: String?): String = when (key) {
         "mediterranean" -> "地中海式"; "paleo" -> "旧石器式"
         "vegan" -> "纯素"; "vegetarian" -> "素食"

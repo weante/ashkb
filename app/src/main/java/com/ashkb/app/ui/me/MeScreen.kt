@@ -102,6 +102,7 @@ fun MeScreen(
                     KeyValueRow("HLA-B27", Labels.hlaB27(p.hlaB27))
                     KeyValueRow(stringResource(R.string.profile_disease_stage), stageLabel(p.diseaseStage))
                     KeyValueRow(stringResource(R.string.profile_spine_mobility), spineLabel(p.spineMobility))
+                    KeyValueRow(stringResource(R.string.profile_sacroiliitis_field), Labels.sacroiliitisGrade(p.sacroiliitisGrade))
                     KeyValueRow(stringResource(R.string.profile_lifestyle_title), lifestyleLabel(p.lifestyle))
                     KeyValueRow(stringResource(R.string.profile_allergy_history), p.allergies ?: stringResource(R.string.common_unfilled))
                     KeyValueRow(stringResource(R.string.profile_blood_type), p.emergencyBloodType ?: stringResource(R.string.common_unfilled))

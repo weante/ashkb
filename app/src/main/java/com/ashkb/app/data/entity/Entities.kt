@@ -101,6 +101,11 @@ data class Profile(
     /** R1 三态：stable（缓解期）/ controlled（控制中）/ flare（发作期）——驱动 M4 运动过滤与 M5 预警灵敏度；unknown 由引擎按 flare 保守处理 */
     @ColumnInfo(name = "disease_stage") val diseaseStage: String = "unknown", // stable / controlled / flare / unknown
     @ColumnInfo(name = "spine_mobility") val spineMobility: String? = null, // none / mild / moderate / severe（颈椎受累=moderate+）
+    /**
+     * v1.0.67 C1：骶髂关节影像分期（改良纽约标准 mNY，0–IV）——规划 M0「诊断信息全量」缺此项。
+     * 存 "0".."4"；null/"unknown" = 未评估。Room v16→v17 迁移新增列。
+     */
+    @ColumnInfo(name = "sacroiliitis_grade") val sacroiliitisGrade: String? = null,
     @ColumnInfo(name = "comorbidities") val comorbidities: String? = null, // JSON 数组
     @ColumnInfo(name = "allergies") val allergies: String? = null, // JSON 数组
     @ColumnInfo(name = "lifestyle") val lifestyle: String? = null, // JSON
