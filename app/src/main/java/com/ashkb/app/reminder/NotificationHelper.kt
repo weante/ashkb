@@ -1,5 +1,6 @@
 package com.ashkb.app.reminder
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -25,11 +26,15 @@ object NotificationHelper {
     const val CHANNEL_EXERCISE = "exercise_reminders"
     /** v1.0.60 B8：免打扰时段的静默通道——不响不震，通知栏仍可见。 */
     const val CHANNEL_REMINDER_SILENT = "reminder_silent"
+    /** v1.0.66 B6a：锁屏紧急信息的常驻通道——静默、锁屏公开可见。 */
+    const val CHANNEL_EMERGENCY_LOCKSCREEN = "emergency_lockscreen"
     /** v1.0.60 B8：所有提醒归入同一通知组，2+ 条时折叠为 summary。 */
     const val GROUP_REMINDERS = "ashkb_reminders"
     private const val SUMMARY_ID = 100001
     /** v1.0.62 C11：测试提醒通知 ID（固定单发）。 */
     private const val NOTIF_ID_TEST = 100002
+    /** v1.0.66 B6a：锁屏紧急信息常驻通知 ID（固定单条）。 */
+    private const val NOTIF_ID_EMERGENCY_CARD = 100003
 
     fun ensureChannels(context: Context) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -67,6 +72,15 @@ object NotificationHelper {
                 description = context.getString(R.string.notif_channel_silent_desc)
                 enableVibration(false)
                 setSound(null, null)
+            }
+        )
+        // v1.0.66 B6a：锁屏紧急信息——静默 + 锁屏公开可见
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_EMERGENCY_LOCKSCREEN, context.getString(R.string.notif_channel_emergency_name), NotificationManager.IMPORTANCE_LOW).apply {
+                description = context.getString(R.string.notif_channel_emergency_desc)
+                enableVibration(false)
+                setSound(null, null)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
         )
     }
@@ -326,6 +340,37 @@ object NotificationHelper {
             .setContentIntent(open)
             .build()
         runCatching { NotificationManagerCompat.from(context).notify(NOTIF_ID_TEST, n) }
+    }
+
+    /**
+     * v1.0.66 B6a：锁屏紧急信息——**常驻 + 锁屏公开可见**。
+     *
+     * `VISIBILITY_PUBLIC` 让内容在锁屏直接显示、无需解锁（急救场景的关键）；
+     * `setOngoing(true)` 使其不可被划掉（避免家人误清）；
+     * 通道为 IMPORTANCE_LOW，故不响不震（常驻卡不是"提醒"）。
+     * 刻意**不归入提醒折叠组**——它不是待处理提醒。
+     */
+    fun postLockscreenEmergencyCard(context: Context, title: String, lines: List<String>) {
+        if (!canPost(context)) return
+        val open = openMainActivity(context, "emergency_lockscreen")
+        val body = lines.joinToString("\n")
+        val n = NotificationCompat.Builder(context, CHANNEL_EMERGENCY_LOCKSCREEN)
+            .setSmallIcon(R.drawable.ic_stat_pill)
+            .setContentTitle(title)
+            .setContentText(lines.firstOrNull().orEmpty())
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(open)
+            .build()
+        runCatching { NotificationManagerCompat.from(context).notify(NOTIF_ID_EMERGENCY_CARD, n) }
+    }
+
+    fun cancelLockscreenEmergencyCard(context: Context) {
+        runCatching { NotificationManagerCompat.from(context).cancel(NOTIF_ID_EMERGENCY_CARD) }
     }
 
     private fun openMainActivity(context: Context, key: String): PendingIntent =

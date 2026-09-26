@@ -1178,5 +1178,12 @@
     <string name="minimal_reason_illness">身体不适</string>
     <string name="minimal_reason_hospital">住院</string>
     <string name="minimal_reason_other">其他原因（继续完整记录）</string>
+    <!-- v1.0.66 B6a：锁屏紧急信息 -->
+    <string name="notif_channel_emergency_name">锁屏紧急信息</string>
+    <string name="notif_channel_emergency_desc">常驻的紧急信息卡，锁屏可直接查看（静默，不响铃）</string>
+    <string name="emergency_lockscreen_title">锁屏显示紧急信息</string>
+    <string name="emergency_lockscreen_body">血型 / 诊断 / 过敏 / 关键用药 / 紧急联系人</string>
+    <string name="emergency_lockscreen_desc">开启后以上信息以常驻通知显示在锁屏上，急救时无需解锁即可查看。</string>
+    <string name="emergency_lockscreen_privacy">⚠️ 健康信息将出现在锁屏，请自行权衡隐私。默认关闭，可随时关掉。</string>
 </resources>
 

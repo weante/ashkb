@@ -16,6 +16,7 @@ import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.KbSeedRefresh
 import com.ashkb.app.reminder.BasdaiReminderScheduler
 import com.ashkb.app.reminder.CheckupReminderScheduler
+import com.ashkb.app.reminder.EmergencyLockscreenPublisher
 import com.ashkb.app.reminder.ExerciseReminderScheduler
 import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
@@ -102,6 +103,9 @@ class AshkbApplication : Application() {
                 } else {
                     ExerciseReminderScheduler.cancelAllFuture(this@AshkbApplication, today)
                 }
+                // v1.0.66 B6a：锁屏紧急信息——启动时同步一次（兜住"改完数据后没进紧急卡页"的情况）；
+                // 开关关闭时该调用内部会撤下通知，故无需外层判断
+                runCatching { EmergencyLockscreenPublisher.refresh(this@AshkbApplication) }
                 // P2 例行检查：发作第 7 天警报 + 知识条目复核到期（insertAlertOnce 幂等）
                 healthRepository.checkFlareDayAlert(today)
                 healthRepository.checkReviewDue(today.toString())

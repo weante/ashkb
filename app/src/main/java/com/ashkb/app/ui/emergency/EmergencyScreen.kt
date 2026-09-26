@@ -42,6 +42,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,6 +50,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,9 +65,11 @@ import com.ashkb.app.data.entity.EmergencyContact
 import com.ashkb.app.data.entity.EmergencyEvent
 import com.ashkb.app.data.entity.EmergencyScene
 import com.ashkb.app.data.entity.KbEntry
+import com.ashkb.app.data.repo.EmergencyLockscreenStore
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.EmergencyMeds
 import com.ashkb.app.domain.Labels
+import com.ashkb.app.reminder.EmergencyLockscreenPublisher
 import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.DividerList
@@ -79,6 +83,7 @@ import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
 import com.ashkb.app.ui.theme.accent
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 private fun Context.dial(phone: String) {
@@ -106,8 +111,16 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
     var showEventForm by remember { mutableStateOf(false) }
     var showAllEvents by remember { mutableStateOf(false) }
     var exporting by remember { mutableStateOf(false) }
+    // v1.0.66 B6a：锁屏紧急信息开关
+    var lockscreenEnabled by remember { mutableStateOf(EmergencyLockscreenStore.enabled(context)) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { cards = vm.emergencyCards() }
+
+    // 开关开启时，页面内数据一变就同步锁屏卡（用户正在编辑联系人 / 档案 / 药单）
+    LaunchedEffect(lockscreenEnabled, contacts, profile, meds) {
+        if (lockscreenEnabled) EmergencyLockscreenPublisher.refresh(context)
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -158,6 +171,46 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                         onAction = { selectedCard = card },
                         titleStyle = MaterialTheme.typography.titleLarge,
                     )
+                }
+
+                // ---- v1.0.66 B6a：锁屏紧急信息开关 ----
+                item {
+                    SectionCard(
+                        title = stringResource(R.string.emergency_lockscreen_title),
+                        subtitle = stringResource(R.string.emergency_lockscreen_body),
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                        ) {
+                            Text(
+                                stringResource(R.string.emergency_lockscreen_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Switch(
+                                checked = lockscreenEnabled,
+                                onCheckedChange = { v ->
+                                    lockscreenEnabled = v
+                                    scope.launch {
+                                        if (v) {
+                                            EmergencyLockscreenStore.setEnabled(context, true)
+                                            EmergencyLockscreenPublisher.refresh(context)
+                                        } else {
+                                            EmergencyLockscreenPublisher.disable(context)
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                        Text(
+                            stringResource(R.string.emergency_lockscreen_privacy),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = Spacing.xs),
+                        )
+                    }
                 }
 
                 // ---- 紧急联系人 ----
