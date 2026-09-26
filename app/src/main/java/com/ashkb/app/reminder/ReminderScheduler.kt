@@ -27,6 +27,17 @@ object ReminderScheduler {
     /** 每级升级重查的间隔（分钟）。 */
     const val ESCALATION_STEP_MINUTES = 30L
 
+    /**
+     * v1.0.61 B9：末级升级 = **强提醒**（全屏 Intent）。
+     *
+     * 语义：升级链最后一级（esc == [MAX_ESCALATION]）是「漏服的最后一道防线」——
+     * 此时已连续提醒两次仍未确认，改用全屏 Intent 唤醒锁屏并接管界面。
+     * 仅用药链启用（BASDAI / 运动为非紧急源，全屏会过度打扰）。
+     *
+     * 纯函数，供 [NotificationHelper.postMedReminder] 与单测共用。
+     */
+    fun isStrongEscalation(escalation: Int): Boolean = escalation >= MAX_ESCALATION
+
     /** 槽位标识（`medId|slotKey`）：用于「今日已打卡槽位」集合，维度与 request code 一致。 */
     fun slotRef(medId: String?, slotKey: String?): String = "$medId|$slotKey"
 

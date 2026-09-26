@@ -1,6 +1,7 @@
 package com.ashkb.app.ui.me
 
 import android.app.AlarmManager
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -198,16 +199,25 @@ private fun ReminderSelfCheckCard() {
     ) == android.content.pm.PackageManager.PERMISSION_GRANTED
     val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     val exactOk = if (Build.VERSION.SDK_INT >= 31) am.canScheduleExactAlarms() else true
+    // v1.0.61 B9：Android 14+ 全屏 Intent 需用户显式授予；14 以下默认可用
+    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    val fsOk = if (Build.VERSION.SDK_INT >= 34) nm.canUseFullScreenIntent() else true
 
     SectionCard(title = stringResource(R.string.reminder_selfcheck_title)) {
         CheckRow(stringResource(R.string.reminder_notification_permission), if (notifOk) stringResource(R.string.permission_granted) else stringResource(R.string.reminder_no_permission), notifOk)
         CheckRow(stringResource(R.string.reminder_exact_alarm), if (exactOk) stringResource(R.string.reminder_exact_ok) else stringResource(R.string.reminder_no_exact), exactOk)
+        CheckRow(stringResource(R.string.reminder_fullscreen), if (fsOk) stringResource(R.string.reminder_fullscreen_ok) else stringResource(R.string.reminder_fullscreen_no), fsOk)
         Spacer(Modifier.height(Spacing.md))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             if (!exactOk && Build.VERSION.SDK_INT >= 31) {
                 OutlinedButton(onClick = {
                     context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
                 }) { Text(stringResource(R.string.reminder_request_exact_alarm)) }
+            }
+            if (!fsOk && Build.VERSION.SDK_INT >= 34) {
+                OutlinedButton(onClick = {
+                    runCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)) }
+                }) { Text(stringResource(R.string.reminder_request_fullscreen)) }
             }
             OutlinedButton(onClick = {
                 context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {

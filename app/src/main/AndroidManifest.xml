@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- v1.0.61 B9：升级链末级「强提醒」用全屏 Intent 唤醒锁屏（Android 14+ 需用户在设置中授予） -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- P4 R20：WebDAV 备份网络访问（R3：强制 HTTPS，明文 http 一律拒绝） -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -28,6 +30,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- v1.0.61 B9：强提醒全屏界面——锁屏可见 + 点亮屏幕，独立任务栈不进最近任务 -->
+        <activity
+            android:name=".ReminderFullScreenActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Ashkb" />
 
         <receiver
             android:name=".reminder.ReminderReceiver"

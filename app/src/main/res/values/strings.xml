@@ -1122,5 +1122,16 @@
     <string name="reminder_dnd_subtitle">时段内提醒不响铃不震动，通知栏仍可见</string>
     <string name="reminder_dnd_start">开始</string>
     <string name="reminder_dnd_end">结束</string>
+    <!-- v1.0.61 B9：升级链第三级「强提醒（全屏）」 -->
+    <string name="notif_med_strong_title">请立即处理用药：%1$s %2$s</string>
+    <string name="notif_med_strong_text">多次提醒未确认，已升级为全屏强提醒。请完成打卡或说明跳过原因</string>
+    <string name="reminder_fullscreen">强提醒（全屏）</string>
+    <string name="reminder_fullscreen_ok">已允许，末级提醒可全屏</string>
+    <string name="reminder_fullscreen_no">未允许，末级提醒仅横幅</string>
+    <string name="reminder_request_fullscreen">允许强提醒</string>
+    <string name="strong_reminder_heading">该服药了</string>
+    <string name="strong_reminder_taken">已服用</string>
+    <string name="strong_reminder_later">稍后处理</string>
+    <string name="strong_reminder_time_hint">计划时间 %1$s</string>
 </resources>
 

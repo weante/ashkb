@@ -227,6 +227,26 @@ class ReminderSchedulerTest {
         assertTrue(times.contains(escAt(1, pastBase)))
     }
 
+    // ---- B9（v1.0.61）：末级升级 = 强提醒 ----
+
+    @Test
+    fun `末级升级判定为强提醒 其余不是`() {
+        // 0 首次 / 1 重复 —— 仍走普通通知
+        for (esc in 0 until ReminderScheduler.MAX_ESCALATION) {
+            assertTrue(
+                "esc=$esc 不该判定为强提醒",
+                !ReminderScheduler.isStrongEscalation(esc),
+            )
+        }
+        // 末级（== MAX_ESCALATION）→ 强提醒（全屏 Intent）
+        assertTrue(
+            "末级升级应判定为强提醒",
+            ReminderScheduler.isStrongEscalation(ReminderScheduler.MAX_ESCALATION),
+        )
+        // 越界防御：超过上限仍为强提醒（不会退回普通通知）
+        assertTrue(ReminderScheduler.isStrongEscalation(ReminderScheduler.MAX_ESCALATION + 1))
+    }
+
     private companion object {
         /** 固定的「现在」：20:10——`pastSlot` 刚好过点，`futureSlot` 还没到点 */
         val NOW: LocalDateTime = LocalDateTime.of(2026, 6, 15, 20, 10)

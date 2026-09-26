@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.ashkb.app.MainActivity
 import com.ashkb.app.R
+import com.ashkb.app.ReminderFullScreenActivity
 import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.domain.DndWindow
 import java.time.LocalDateTime
@@ -126,6 +127,7 @@ object NotificationHelper {
         dose: String,
         escalation: Int,
         silent: Boolean = false,
+        strong: Boolean = false,
     ) {
         if (!canPost(context)) return
         val open = PendingIntent.getActivity(
@@ -143,14 +145,20 @@ object NotificationHelper {
             context, (medId + (slotKey ?: "prn")).hashCode(), doneIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val title = if (escalation > 0)
-            context.getString(R.string.notif_med_escalated_title, medName, dose)
-        else context.getString(R.string.notif_med_title, medName, dose)
-        val text = if (escalation > 0)
-            context.getString(R.string.notif_med_escalated_text)
-        else context.getString(R.string.notif_med_text)
+        // v1.0.61 B9：末级升级 → 强提醒（全屏 Intent 唤醒锁屏）；免打扰时段内不升级全屏
+        val effectiveStrong = strong && !silent
+        val title = when {
+            effectiveStrong -> context.getString(R.string.notif_med_strong_title, medName, dose)
+            escalation > 0 -> context.getString(R.string.notif_med_escalated_title, medName, dose)
+            else -> context.getString(R.string.notif_med_title, medName, dose)
+        }
+        val text = when {
+            effectiveStrong -> context.getString(R.string.notif_med_strong_text)
+            escalation > 0 -> context.getString(R.string.notif_med_escalated_text)
+            else -> context.getString(R.string.notif_med_text)
+        }
         val channel = if (silent) CHANNEL_REMINDER_SILENT else CHANNEL_MED
-        val n = NotificationCompat.Builder(context, channel)
+        val builder = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_stat_pill)
             .setContentTitle(title)
             .setContentText(text)
@@ -160,7 +168,20 @@ object NotificationHelper {
             .setContentIntent(open)
             .setGroup(GROUP_REMINDERS)
             .addAction(0, context.getString(R.string.notif_action_taken), done)
-            .build()
+        if (effectiveStrong) {
+            val fsIntent = Intent(context, ReminderFullScreenActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra(ReminderFullScreenActivity.EXTRA_MED_ID, medId)
+                putExtra(ReminderFullScreenActivity.EXTRA_SLOT_KEY, slotKey)
+                putExtra(ReminderFullScreenActivity.EXTRA_SLOT_TIME, slotTime)
+            }
+            val fs = PendingIntent.getActivity(
+                context, ("fs|" + medId + (slotKey ?: "prn")).hashCode(), fsIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            builder.setFullScreenIntent(fs, true)
+        }
+        val n = builder.build()
         runCatching { NotificationManagerCompat.from(context).notify(notifId(medId, slotKey), n) }
         updateGroupSummary(context)
     }

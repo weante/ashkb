@@ -4,6 +4,32 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.61] — 2026-09-26
+
+**B9 升级链第三级「强提醒」：用药漏服的最后一道防线——末级升级改用全屏 Intent 唤醒锁屏。**
+
+⚠️ **无数据库结构变更**（仍为 Room v15），可覆盖安装。**含 v1.0.44 ~ v1.0.60 全部内容。**
+
+### 强提醒（全屏）
+
+- 用药升级链的**末级**（+60 分钟仍未确认）从「普通重复提醒」升级为**强提醒**：以 `fullScreenIntent` 拉起全屏界面，锁屏时可直接唤醒亮屏并覆盖锁屏
+- 全屏界面显示药名 + 剂量 + 计划时间，两个操作：**已服用**（免开应用直接写库打卡）/ **稍后处理**
+- **仅用药链启用**——BASDAI / 运动为非紧急源，全屏会过度打扰
+- **免打扰时段内不升级全屏**（V1.0.60 DND 的静默投递优先级更高）
+
+### Android 14 适配
+
+- 新增 `USE_FULL_SCREEN_INTENT` 权限；Android 14+ 该系统权限**默认不授予**非通话/闹钟类应用
+- 「提醒可靠性自检」卡新增「强提醒（全屏）」一行，未授予时给「允许强提醒」按钮跳系统设置（`ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`）
+- 未授予时**优雅降级**为横幅（HIGH 通道仍有效），不报错、不丢提醒
+
+### 实现细节
+
+- 新增 `ReminderFullScreenActivity`（`showWhenLocked` + `turnScreenOn` + 独立任务栈不进最近任务；API 27 边界守卫）
+- `ReminderScheduler.isStrongEscalation(escalation)` 纯函数判定末级（含单测）
+- `NotificationHelper.postMedReminder` 加 `strong` 参数 + `setFullScreenIntent`
+- 单测 424 → 425 条
+
 ## [v1.0.60] — 2026-09-26
 
 **B8 免打扰时段 + 同时段多提醒合并推送：四源提醒叠加后的体验补丁。**

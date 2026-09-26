@@ -56,8 +56,10 @@ class ReminderReceiver : BroadcastReceiver() {
                 }
                 // v1.0.60 B8：免打扰时段静默投递（不响不震，通知栏仍可见）
                 val silent = NotificationHelper.isInDndNow(context)
+                // v1.0.61 B9：末级升级 → 强提醒（全屏 Intent）
+                val strong = ReminderScheduler.isStrongEscalation(escalation)
                 NotificationHelper.postMedReminder(
-                    context, medId, slotKey, slotTime, med.name, med.dose, escalation, silent
+                    context, medId, slotKey, slotTime, med.name, med.dose, escalation, silent, strong
                 )
                 if (escalation < ReminderScheduler.MAX_ESCALATION) {
                     val fire = runCatching { LocalDateTime.parse(fireIso) }
