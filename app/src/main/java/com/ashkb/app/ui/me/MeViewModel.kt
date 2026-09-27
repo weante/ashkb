@@ -66,6 +66,16 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
         repo.observeArchivedMedications()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /**
+     * v1.0.71：删除已停用药品（连带其打卡记录与变更记录）。
+     *
+     * 只在「已停用药品」折叠区提供入口；repo 侧对「仍在用」的药直接拒绝并**不做任何改动**
+     * （返回 null），故这里无需再判一次。
+     */
+    fun deleteArchivedMedication(id: String) {
+        viewModelScope.launch { repo.deleteArchivedMedication(id) }
+    }
+
     /** R03：新增药核对清单查询（suspend 由 UI 协程调用） */
     suspend fun interactionsFor(med: Medication): List<KbEntry> = repo.interactionsFor(med)
 

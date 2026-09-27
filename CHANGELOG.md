@@ -4,6 +4,49 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.71] — 2026-09-27
+
+**v1.0.70 真机走查修复版：两处系统设置跳转缺陷（含一个「点了没反应」的死按钮）+ 一处 chip 组溢出缺陷；另按需求新增「删除已停用药品」。**
+
+⚠️ **无数据库结构变更**（仍为 Room v17），可覆盖安装。**含 v1.0.44 ~ v1.0.70 全部内容。**
+
+### 真机走查背景
+
+在 **Xiaomi 15 Pro / Android 16 (API 36) / HyperOS OS3.0.308** 上，对 GitHub pre-release v1.0.70 资产
+（与手机内 `base.apk` 的 SHA-256 逐字节一致）做了逐项走查。**已通过项**：Android 16 的 WebDAV 反射回归
+（PROPFIND / MKCOL / PUT 全部正常，`HANDOFF.md` §9.8 结项）、8 个通知通道、电池白名单、锁屏紧急卡
+（系统级核实 `ONGOING_EVENT` + `VISIBILITY_PUBLIC`）、测试提醒端到端、冷启动与五 Tab。
+
+### 修复（按影响分级）
+
+| 级别 | 问题 | 根因 | 修法 |
+|---|---|---|---|
+| **中危** | 「允许强提醒」按钮点了**毫无反应**（无跳转、无提示、不崩溃） | 原实现 `runCatching { startActivity(Intent(ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)) }`：① **漏 `data=package:`**（该 action 的 intent-filter 要求 package 数据，不带即 `No activity found`）② 异常被 `runCatching` **静默吞掉** | 新增 `SystemSetupGuides.openFullScreenIntentSettings()`：带 package 数据 → 失败兜底应用详情页 → 仍失败**给文字提示**，绝不静默 |
+| **低危** | 「申请精确闹钟」跳到「**全部应用**」的闹钟列表，需自己找 ASHKB | 同根因（漏 `data=package:`）：不带 → `AlarmsAndRemindersActivity`；带上 → `AlarmsAndRemindersAppActivity` | 同上，新增 `openExactAlarmSettings()` |
+| **中危** | 骶髂关节影像分期 **6 个 chip 溢出**：「III 中度」「IV 重度」被挤出屏幕外，**根本选不到** | 该组用 `Row` 且无换行/滚动（6 项合计超屏宽）。**同一个坑项目里修过一次**（`TodayScreen` 注射部位那组的注释即为「旧 Row 会把后面的选项截在屏幕外」），v1.0.67 新增该分组时回退成了 `Row`，且漏了最小触摸目标 | `Row` → `FlowRow` + `verticalArrangement`，补 `heightIn(min = Size.touchMin)` |
+
+### 新增：删除已停用药品（用户需求）
+
+- 「已停用药品」折叠区每行新增「删除」入口（**只有在用→停用过的药才可删**，DAO 里另有 `is_archived = 1` 的 SQL 门禁）
+- **连带删除**该药的打卡记录与变更记录（事务内四步：计数 → 删日志 → 删变更 → 删药档）
+- 确认框**按有无打卡记录分两版**，有记录时**必须报出条数**，并与「历史依从率会随之变化」一并说明——
+  不可逆操作不把「删掉多少」讲清楚就是骗用户（判定见 `domain/MedDeletion`）
+- 边界：仍在用的药**没有入口**（必须先走「停用」，留下停药原因与生效日）
+
+### 实现细节
+
+- `data/db/Daos.kt`：`MedicationDao.deleteArchived`（带 `is_archived = 1` 门禁）、`MedicationLogDao.countOfMed` / `deleteOfMed`、`MedicationChangeDao.deleteOfMed`
+- `data/repo/MedicationRepository.kt`：`deleteArchivedMedication(medId): Int?`（`withTransaction`；仍在用或不存在 → 返回 null 且**不做任何改动**）；`ArchivedMedication` 增 `logCount`
+- `domain/MedDeletion.kt`：纯函数（`canDelete` / `variant` / `normalizeCount`）
+- `ui/me/MedsScreen.kt`：`ArchivedRow` 接入既有破坏性操作形态 `DestructiveAction`
+- `reminder/SystemSetupGuides.kt`：两个设置跳转 + 统一私有 `openAppSettings`
+- `ui/me/ProfileEditScreen.kt`、`ui/me/MeScreen.kt`：上表三处修复
+
+### 测试
+
+- 新增 `MedDeletionTest` 6 条（在用不可删 / 已停用可删 / 有记录走报条数变体 / 无记录走另一变体 / 负数按 0 处理且不进报条数分支 / 正数原样返回）
+- 单测总数 **498 → 504 条全绿**
+
 ## [v1.0.70] — 2026-09-27
 
 **C8c 姿势 / 睡姿建议：C8 最后一项子需求收口——建议以带出处的知识条目落地，不硬编码文案。**

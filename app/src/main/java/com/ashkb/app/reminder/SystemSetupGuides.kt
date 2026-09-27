@@ -43,6 +43,44 @@ object SystemSetupGuides {
     }
 
     /**
+     * v1.0.71：打开「精确闹钟」设置页。
+     *
+     * **必须带 `data=package:`**：不带时本 ROM 只解析到「全部应用」的闹钟列表
+     * （`Settings$AlarmsAndRemindersActivity`），用户还得自己在列表里找 ASHKB；带上才是
+     * 本应用专属页（`Settings$AlarmsAndRemindersAppActivity`）。真机实测见 v1.0.71 CHANGELOG。
+     */
+    fun openExactAlarmSettings(context: Context): Boolean =
+        openAppSettings(context, Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+
+    /**
+     * v1.0.71：打开「强提醒（全屏）」设置页。
+     *
+     * **这是 v1.0.70 的一处真缺陷**：原实现为
+     * `runCatching { startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)) }` ——
+     * 既**没带 `data=package:`**，又把异常**静默吞掉**。该 action 的 intent-filter 要求 package
+     * 数据，不带即 `No activity found` → `ActivityNotFoundException` → 按钮点了毫无反应
+     * （HyperOS / Android 16 真机实测；logcat 可见 `START … act=…MANAGE_APP_USE_FULL_SCREEN_INTENT`
+     * 之后没有任何设置页被拉起）。
+     */
+    fun openFullScreenIntentSettings(context: Context): Boolean =
+        openAppSettings(context, Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
+
+    /**
+     * 统一的系统设置导航：**带 package 数据** → 失败兜底「应用详情」页 → 仍失败返回 `false`。
+     *
+     * 调用方拿到 `false` 必须给用户一句文字提示（「请到设置里手动开启」）——**不能静默**：
+     * 静默失败表现为「按钮点了没反应」，用户既不知道坏了、也不知道该去哪开。
+     */
+    private fun openAppSettings(context: Context, action: String): Boolean {
+        val target = Intent(action).apply { data = Uri.parse("package:${context.packageName}") }
+        if (runCatching { context.startActivity(target) }.isSuccess) return true
+        val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:${context.packageName}")
+        }
+        return runCatching { context.startActivity(fallback) }.isSuccess
+    }
+
+    /**
      * 打开自启动设置：按厂商组件名依次尝试，全部失败则落到「应用详情」页
      * （详情页内通常可找到权限 / 自启动相关入口）。
      *

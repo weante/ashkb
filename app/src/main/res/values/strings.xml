@@ -441,6 +441,7 @@
     <string name="reminder_notification_permission">通知权限</string>
     <string name="reminder_notification_settings">通知设置</string>
     <string name="reminder_request_exact_alarm">申请精确闹钟</string>
+    <string name="settings_open_failed">打不开该设置页，请到「设置 → 应用管理 → ASHKB → 权限管理」里手动开启</string>
     <string name="reminder_selfcheck_title">提醒可靠性自检</string>
     <string name="report_avg_pain">平均疼痛</string>
     <string name="report_avg_stiffness">平均晨僵</string>
@@ -669,6 +670,9 @@
     <string name="meds_stop_reason_line">原因：%1$s</string>
     <string name="meds_stop_reason_none">停用原因无记录</string>
     <string name="meds_stop_note_line">备注：%1$s</string>
+    <string name="meds_delete_confirm">删除「%1$s」？</string>
+    <string name="meds_delete_note_with_logs">将永久删除该药品档案，并连带删除其 %1$d 条打卡记录（含注射部位 / 跳过原因 / 备注）。此操作不可恢复，历史依从率会随之变化。</string>
+    <string name="meds_delete_note_no_logs">将永久删除该药品档案。该药没有打卡记录；此操作不可恢复。</string>
     <string name="med_view_history">查看用药记录</string>
     <string name="med_history_title">%1$s · 用药记录</string>
     <string name="med_history_empty">近 90 天没有「%1$s」的用药记录</string>

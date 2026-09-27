@@ -49,6 +49,7 @@ import com.ashkb.app.domain.Lifestyle
 import com.ashkb.app.domain.LifestylePrescription
 import com.ashkb.app.reminder.ReminderTest
 import com.ashkb.app.reminder.SystemSetupGuides
+import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.ui.components.KeyValueRow
 import com.ashkb.app.ui.components.NavRow
 import com.ashkb.app.ui.components.SectionCard
@@ -277,14 +278,25 @@ private fun ReminderSelfCheckCard() {
         ) {
             if (!exactOk && Build.VERSION.SDK_INT >= 31) {
                 OutlinedButton(
-                    onClick = { context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)) },
+                    // v1.0.71：带 package 数据直达**本应用**专属页（原实现不带 data → 只跳到
+                    // 「全部应用」的闹钟列表，用户还得自己找 ASHKB）；跳不动时给文字提示，不静默
+                    onClick = {
+                        if (!SystemSetupGuides.openExactAlarmSettings(context)) {
+                            GlobalMessages.post(context.getString(R.string.settings_open_failed))
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.reminder_request_exact_alarm)) }
             }
             if (!fsOk && Build.VERSION.SDK_INT >= 34) {
                 OutlinedButton(
+                    // v1.0.71 修复 v1.0.70 的**死按钮**：原实现 `runCatching { startActivity(
+                    // Intent(ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)) }` 既漏 data=package:
+                    // 又把 ActivityNotFoundException 静默吞掉 → HyperOS 上点了毫无反应。
                     onClick = {
-                        runCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)) }
+                        if (!SystemSetupGuides.openFullScreenIntentSettings(context)) {
+                            GlobalMessages.post(context.getString(R.string.settings_open_failed))
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.reminder_request_fullscreen)) }

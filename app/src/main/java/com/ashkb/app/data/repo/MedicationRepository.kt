@@ -1,6 +1,7 @@
 package com.ashkb.app.data.repo
 
 import android.content.Context
+import androidx.room.withTransaction
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.db.Ids
 import com.ashkb.app.data.entity.KbEntry
@@ -11,6 +12,7 @@ import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.entity.Reaction
 import com.ashkb.app.data.entity.StopReason
 import com.ashkb.app.domain.AdherenceCalc
+import com.ashkb.app.domain.MedDeletion
 import com.ashkb.app.domain.MedLogEdit
 import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.reminder.ReminderScheduler
@@ -235,9 +237,32 @@ class MedicationRepository(private val context: Context) {
                     stopDate = c?.effectiveDate,
                     stopReason = c?.reason?.let { StopReason.fromKey(it) },
                     stopNote = c?.reasonNote,
+                    // v1.0.71：删除入口的确认框必须说出「连带删掉几条打卡记录」
+                    logCount = logDao.countOfMed(med.id),
                 )
             }
         }
+
+    /**
+     * v1.0.71：**删除**已停用药品——连带其打卡记录与变更记录（用户 2026-09-27 拍板）。
+     *
+     * 为什么连带删打卡记录：只删药档而留着记录，报表依从率仍会把它们算进去，「清掉测试用药的
+     * 痕迹」就清不干净。代价是历史统计会变，故确认框如实报条数（[MedDeletion]）。
+     *
+     * 只有「已停用」的药可删（[MedDeletion.canDelete] + DAO 里的 SQL 门禁）；
+     * 事务内四步（计数 → 删日志 → 删变更 → 删药档），任一失败整体回滚。
+     *
+     * @return 实际删除的打卡记录条数；`null` = 该药不存在或仍在用（未归档）→ **未做任何改动**
+     */
+    suspend fun deleteArchivedMedication(medId: String): Int? = db.withTransaction {
+        val med = medDao.byId(medId) ?: return@withTransaction null
+        if (!MedDeletion.canDelete(med.isArchived)) return@withTransaction null
+        val logs = logDao.countOfMed(medId)
+        logDao.deleteOfMed(medId)
+        changeDao.deleteOfMed(medId)
+        medDao.deleteArchived(medId)
+        logs
+    }
 
     /** 已停用药品视图项（[stopReason] null = 无停药变更记录，见 [observeArchivedMedications]） */
     data class ArchivedMedication(
@@ -245,6 +270,8 @@ class MedicationRepository(private val context: Context) {
         val stopDate: String?,
         val stopReason: StopReason?,
         val stopNote: String?,
+        /** v1.0.71：该药名下打卡记录条数（删除确认框用，0 = 无记录） */
+        val logCount: Int = 0,
     )
 
     /**

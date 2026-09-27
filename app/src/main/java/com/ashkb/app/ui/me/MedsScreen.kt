@@ -61,9 +61,11 @@ import com.ashkb.app.data.entity.StopReason
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.ClinicalThresholds
+import com.ashkb.app.domain.MedDeletion
 import com.ashkb.app.domain.MedLogEdit
 import com.ashkb.app.domain.StopWarning
 import com.ashkb.app.ui.checkup.SheetColumn
+import com.ashkb.app.ui.components.DestructiveAction
 import com.ashkb.app.ui.components.DividerList
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.ScreenTopBar
@@ -168,6 +170,7 @@ fun MedsScreen(
                         expanded = archivedExpanded,
                         onToggle = { archivedExpanded = !archivedExpanded },
                         onOpenHistory = { historyTarget = it },
+                        onDelete = { vm.deleteArchivedMedication(it) },
                     )
                 }
             }
@@ -333,6 +336,7 @@ private fun ArchivedSection(
     expanded: Boolean,
     onToggle: () -> Unit,
     onOpenHistory: (Medication) -> Unit,
+    onDelete: (String) -> Unit,
 ) {
     SectionCard(title = stringResource(R.string.meds_archived_section, items.size)) {
         Row(
@@ -357,14 +361,22 @@ private fun ArchivedSection(
         }
         if (expanded) {
             DividerList(items, key = { it.med.id }) { a ->
-                ArchivedRow(a = a, onOpenHistory = { onOpenHistory(a.med) })
+                ArchivedRow(
+                    a = a,
+                    onOpenHistory = { onOpenHistory(a.med) },
+                    onDelete = { onDelete(a.med.id) },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun RowScope.ArchivedRow(a: MedicationRepository.ArchivedMedication, onOpenHistory: () -> Unit) {
+private fun RowScope.ArchivedRow(
+    a: MedicationRepository.ArchivedMedication,
+    onOpenHistory: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Column(
         Modifier
             .weight(1f)
@@ -408,6 +420,18 @@ private fun RowScope.ArchivedRow(a: MedicationRepository.ArchivedMedication, onO
             )
         }
     }
+    // v1.0.71：删除已停用药品（连带其打卡记录）。确认文案分两版，有记录时**必须报出条数**——
+    // 不可逆操作不把「删掉多少」讲清楚就是骗用户（判定与变体见 domain/MedDeletion）。
+    DestructiveAction(
+        label = stringResource(R.string.common_delete),
+        confirmTitle = stringResource(R.string.meds_delete_confirm, a.med.name),
+        confirmBody = when (MedDeletion.variant(a.logCount)) {
+            MedDeletion.Variant.WITH_LOGS ->
+                stringResource(R.string.meds_delete_note_with_logs, MedDeletion.normalizeCount(a.logCount))
+            MedDeletion.Variant.NO_LOGS -> stringResource(R.string.meds_delete_note_no_logs)
+        },
+        onConfirm = onDelete,
+    )
 }
 
 /**

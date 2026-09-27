@@ -68,6 +68,15 @@ interface MedicationDao {
     /** v1.0.48：已停用（归档）药品——药单「已停用药品」区用，按停用时间倒序 */
     @Query("SELECT * FROM medications WHERE is_archived = 1 ORDER BY updated_at DESC")
     fun observeArchived(): Flow<List<Medication>>
+
+    /**
+     * v1.0.71：物理删除已停用药品。
+     *
+     * SQL 里再加一道 `is_archived = 1` 门禁（调用方已校验，这里是第二道防线）：
+     * 在用药品必须先走「停用」才可能被删——一条 DELETE 抹掉在服医嘱是不可接受的。
+     */
+    @Query("DELETE FROM medications WHERE id = :id AND is_archived = 1")
+    suspend fun deleteArchived(id: String)
 }
 
 @Dao
@@ -104,6 +113,20 @@ interface MedicationLogDao {
             "ORDER BY date DESC, scheduled_time DESC",
     )
     fun observeByMedSince(medId: String, from: String): Flow<List<MedicationLog>>
+
+    /** v1.0.71：某条药名下的打卡记录条数——删除确认框要如实报出条数（不可逆操作不能含糊）。 */
+    @Query("SELECT COUNT(*) FROM medication_logs WHERE med_id = :medId")
+    suspend fun countOfMed(medId: String): Int
+
+    /**
+     * v1.0.71：随药档一并**物理删除**该药的全部打卡记录。
+     *
+     * 为什么连带删：只删药档而留着记录，报表依从率仍会把它们算进去——用户要清掉
+     * 「测试用药」的痕迹就清不干净（用户 2026-09-27 拍板）。代价是历史统计会变，
+     * 故确认框必须报出条数（见 [com.ashkb.app.domain.MedDeletion]）。
+     */
+    @Query("DELETE FROM medication_logs WHERE med_id = :medId")
+    suspend fun deleteOfMed(medId: String)
 }
 
 @Dao
@@ -125,6 +148,10 @@ interface MedicationChangeDao {
      */
     @Query("SELECT * FROM medication_changes WHERE change_type = 'stop' ORDER BY recorded_at DESC")
     fun observeStops(): Flow<List<MedicationChange>>
+
+    /** v1.0.71：随药档一并删除该药的变更记录，避免留下指向已删药档的孤儿行。 */
+    @Query("DELETE FROM medication_changes WHERE med_id = :medId")
+    suspend fun deleteOfMed(medId: String)
 }
 
 @Dao

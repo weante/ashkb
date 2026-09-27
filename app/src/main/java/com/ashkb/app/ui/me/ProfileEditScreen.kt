@@ -2,6 +2,8 @@ package com.ashkb.app.ui.me
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,7 +42,7 @@ import com.ashkb.app.ui.theme.Spacing
  * M0 建档：AS 专属字段（过敏史 / 血型 / 合并症为禁忌检查与紧急卡数据源）。
  * 原为 10 字段 `AlertDialog`，改为全屏表单（route `profile/edit`）。
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ProfileEditScreen(
     initial: Profile?,
@@ -202,17 +204,26 @@ fun ProfileEditScreen(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            // v1.0.71 修复：6 个 chip（未评估 + 0–IV）用 Row 会溢出——「III 中度」「IV 重度」
+            // 被挤到屏幕外，用户根本选不到（真机实测，见 v1.0.71 CHANGELOG）。
+            // 改用 FlowRow 自动换行，与注射部位那组同一成例（TodayScreen 的旧 Row 注释）；
+            // 同时补最小触摸目标（原实现漏了）。
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
                 FilterChip(
                     selected = sacroGrade == null,
                     onClick = { sacroGrade = null },
                     label = { Text(Labels.sacroiliitisGrade(null)) },
+                    modifier = Modifier.heightIn(min = Size.touchMin),
                 )
                 Labels.SACROILIITIS_KEYS.forEach { k ->
                     FilterChip(
                         selected = sacroGrade == k,
                         onClick = { sacroGrade = k },
                         label = { Text(Labels.sacroiliitisGrade(k)) },
+                        modifier = Modifier.heightIn(min = Size.touchMin),
                     )
                 }
             }
