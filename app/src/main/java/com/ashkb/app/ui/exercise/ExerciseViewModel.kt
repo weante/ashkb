@@ -16,6 +16,7 @@ import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.ExerciseEngine
 import com.ashkb.app.domain.Lifestyle
 import com.ashkb.app.domain.LifestylePrescription
+import com.ashkb.app.domain.MorningWarmup
 import com.ashkb.app.reminder.ExerciseReminderScheduler
 import java.time.Duration
 import java.time.LocalDate
@@ -93,6 +94,15 @@ class ExerciseViewModel(
     val yesterdaySymptom: StateFlow<com.ashkb.app.data.entity.SymptomDaily?> =
         _date.flatMapLatest { repo.observeSymptom(it.minusDays(1).toString()) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /**
+     * v1.0.69 C8b：晨僵时长驱动的**起床热身序列**——把此前只当判读依据展示的晨僵接进处方。
+     * 动作取当日处方里的 L1 轻柔项，本流只决定「要不要提示、提示什么」。
+     */
+    val warmup: StateFlow<MorningWarmup.Sequence?> =
+        combine(uiState, yesterdaySymptom) { ui, y ->
+            MorningWarmup.build(y?.morningStiffnessMin, ui.plan)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     /** R21：昨日已完成但未反馈的打卡（combine 取昨日日期，单层 flatMapLatest 更直白） */
     val feedbackPending: StateFlow<List<ExerciseLog>> =

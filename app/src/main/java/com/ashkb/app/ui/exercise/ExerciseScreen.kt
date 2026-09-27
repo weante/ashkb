@@ -74,6 +74,8 @@ fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -> Unit, onBack: () ->
     val todayLogs by vm.todayLogs.collectAsStateWithLifecycle()
     val pending by vm.feedbackPending.collectAsStateWithLifecycle()
     val yesterday by vm.yesterdaySymptom.collectAsStateWithLifecycle()
+    // v1.0.69 C8b：晨僵驱动的起床热身序列
+    val warmup by vm.warmup.collectAsStateWithLifecycle()
 
     var checkInTarget by remember { mutableStateOf<ExerciseEngine.ExerciseCard?>(null) }
     var feedbackTarget by remember { mutableStateOf<ExerciseLog?>(null) }
@@ -103,7 +105,7 @@ fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -> Unit, onBack: () ->
 
             // ---- 当日处方 hero：大号结论 + 分期色带 + 判读依据 ----
             item {
-                PrescriptionHero(ui = ui, yesterday = yesterday)
+                PrescriptionHero(ui = ui, yesterday = yesterday, warmup = warmup)
             }
 
             // ---- B7 入口：周期康复计划（4–12 周按周递进的模板与完成度） ----
@@ -225,9 +227,13 @@ fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -> Unit, onBack: () ->
     }
 }
 
-/** 处方 hero：大号结论文字 + 分期状态色带 + 昨日判读依据（疼痛 / 晨僵 / 体温）。 */
+/** 处方 hero：大号结论文字 + 分期状态色带 + 昨日判读依据（疼痛 / 晨僵 / 体温）+ B13 画像提示 + C8b 起床热身。 */
 @Composable
-private fun PrescriptionHero(ui: com.ashkb.app.ui.exercise.ExerciseUiState, yesterday: com.ashkb.app.data.entity.SymptomDaily?) {
+private fun PrescriptionHero(
+    ui: com.ashkb.app.ui.exercise.ExerciseUiState,
+    yesterday: com.ashkb.app.data.entity.SymptomDaily?,
+    warmup: com.ashkb.app.domain.MorningWarmup.Sequence?,
+) {
     val tone = when (ui.stage) {
         "stable" -> StatusTone.Success
         "controlled" -> StatusTone.Info
@@ -320,6 +326,28 @@ private fun PrescriptionHero(ui: com.ashkb.app.ui.exercise.ExerciseUiState, yest
                     tone = if (feverish) StatusTone.Danger else StatusTone.Neutral,
                 )
             }
+        }
+
+        // v1.0.69 C8b：晨僵驱动的起床热身序列——动作取当日处方里的 L1 轻柔项
+        // （不新造医学建议；无 L1 项时只给非处方的通用提示）
+        if (warmup != null) {
+            Text(
+                stringResource(R.string.exercise_warmup_title),
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(top = Spacing.sm),
+            )
+            Text(warmup.headline, style = MaterialTheme.typography.titleSmall)
+            if (warmup.steps.isEmpty()) {
+                Text(
+                    stringResource(R.string.exercise_warmup_no_l1),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                warmup.steps.forEachIndexed { i, s ->
+                    Text("${i + 1}. $s", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            Text(warmup.note, style = MaterialTheme.typography.bodySmall)
         }
 
         // v1.0.64 B13：生活方式画像驱动的个性化提示——随处方展示，不改处方本身
