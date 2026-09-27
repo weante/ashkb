@@ -50,6 +50,7 @@ import com.ashkb.app.R
 import com.ashkb.app.data.entity.ExerciseLog
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.ExerciseEngine
+import com.ashkb.app.domain.PostureAdvice
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.DisclaimerNote
 import com.ashkb.app.ui.components.DividerList
@@ -361,6 +362,31 @@ private fun PrescriptionHero(
             ui.lifestyleNotes.forEach { note ->
                 Text("· $note", style = MaterialTheme.typography.bodySmall)
             }
+            DisclaimerNote()
+        }
+
+        // v1.0.70 C8c：姿势 / 睡姿建议——内容出自知识库 edu-005（NASS 体位教育），
+        // 本块只做展示位拆分，不新造医学建议。
+        if (PostureAdvice.shouldShow(ui.plan)) {
+            Text(
+                stringResource(R.string.exercise_posture_title),
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(top = Spacing.sm),
+            )
+            Text(
+                stringResource(R.string.exercise_posture_daily),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            PostureAdvice.DAILY.forEach { Text("· $it", style = MaterialTheme.typography.bodySmall) }
+            Text(
+                stringResource(R.string.exercise_posture_sleep),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            PostureAdvice.SLEEP.forEach { Text("· $it", style = MaterialTheme.typography.bodySmall) }
+            Text(
+                stringResource(R.string.exercise_posture_source),
+                style = MaterialTheme.typography.bodySmall,
+            )
             DisclaimerNote()
         }
     }

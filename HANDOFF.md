@@ -1,7 +1,7 @@
 # ASHKB 开发交接文档
 
 > 本文档面向接手本仓库开发的 AI 会话（TraeWork Code 模式 / TraeCode）或人类工程师。
-> 记录截至 **v1.0.69**（versionCode 74，2026-09-26）的全部工程知识。
+> 记录截至 **v1.0.70**（versionCode 75，2026-09-27）的全部工程知识。
 > 应用本身介绍见 `README.md`，版本历史见 `CHANGELOG.md`。
 
 ## 1. 项目一句话
@@ -27,7 +27,7 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）：面向强直性脊柱�
 $env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.7\bin\gradle.bat" -p patient-health-app assembleDebug assembleRelease testDebugUnitTest
 ```
 
-- 全量构建约 2~3 分钟；**489 条单测**必须全过才算交付（其中 31 条用 Robolectric，见 §8 S1）
+- 全量构建约 2~3 分钟；**498 条单测**必须全过才算交付（其中 31 条用 Robolectric，见 §8 S1）
 - **⚠️ 构建前先看可用内存（v1.0.48 踩到）**：本机 Gradle 守护进程在**物理内存不足**时会直接
   死于原生分配失败（`Native memory allocation (malloc) failed ... Chunk::new` → 
   `Gradle build daemon disappeared unexpectedly`），**且此时 assemble 任务可能已经拷出了旧 APK**——
@@ -253,7 +253,7 @@ app/src/main/java/com/ashkb/app/
 | ~~C5~~ | ~~停药 / 漏服原因枚举~~ —— **已于 v1.0.37 落地**（停药新增 感染发热 / 准备手术 / 经济原因（各带提示）；漏服新增 遗忘 / 外出 / 药物用完；旧枚举 key 全保留，历史日志兼容） | — |
 | ~~C6~~ | ~~服药三态「固定 / PRN / 减量中」+「医生批准的减量方案不触发停药警示」~~ —— **已于 v1.0.37 落地**（`medications.dose_state` + `taper_note`；编辑表单三态选择器 + 减量备注；`domain/StopWarning` 在「减量中」且原因「自行停药」时豁免警示，含生物制剂强化警示） | — |
 | ~~C7~~ | ~~漏服与延迟处理指引~~ —— **已于 v1.0.33 落地**（今日页漏服卡新增入口；口服 ≤2h 尽快补服 / >2h 跳过且**勿加倍**；注射 ≤48h 窗口内补注 / >48h 超窗**先联系医生**；免疫抑制类加提示；只给通用提示不做剂量决策） | 注射只有「顺延」，无补服规则与超窗分级 |
-| C8 🔶 | **「久坐每 30–45 分钟起身提醒」✅ 已于 v1.0.68 落地**（`domain/SedentaryReminder.kt` 纯函数 `nextFire`（窗口内固定网格，走完则次日窗口起点）/ `isWithinWindow`（陈旧闹钟兜底）/ `isValidWindow`；`reminder/SedentaryReminderScheduler.kt` **链式单发**（任何时刻只有一个待触发闹钟，不用 `setRepeating`）+ `SedentaryReminderReceiver`（不在窗口内静默丢弃但**仍续链**，否则链断永久失效）；`ReminderConfigRepository` 加开关 / 间隔 / 起止小时；提醒设置面板加开关（默认关）+ 间隔 chips，活动时段固定 9:00–18:00 只读；通道 `sedentary_reminders`（DEFAULT，DND 时走静默）；通知固定 ID 单条覆盖；`AshkbApplication` + `BootReceiver` 各重排一次）。**「晨僵时长驱动起床热身序列」✅ 已于 v1.0.69 落地**（新增 `domain/MorningWarmup.kt` 纯函数 `build(minutes, plan)`——**动作不新造**，直接取当日处方里的 L1 轻柔项（R27 已判定可做且排除 pause/拦截），封顶 `MAX_STEPS=4`；阈值分档 `MIN_REPORTABLE=15`（低于不提示）/ `PROLONGED=30`（加「明显延长」+ 常提示炎症活动 + 连续多日需复诊告知医生），与既有 `ExerciseEngine.interpretFeedback` 同一口径；处方无 L1 项时 steps 为空、UI 给非处方通用提示；`ExerciseViewModel` 加 `warmup` 流（`combine(uiState, yesterdaySymptom)`），`ExerciseScreen` 的 `PrescriptionHero` 加 `warmup` 参数渲染；`MorningWarmupTest` 9）。**只剩「姿势 / 睡姿建议」未做** | M4；晨僵仅作处方页「判读依据」展示，`ExerciseEngine.todayPlan()` 不吃晨僵 |
+| C8 🔶 | **「久坐每 30–45 分钟起身提醒」✅ 已于 v1.0.68 落地**（`domain/SedentaryReminder.kt` 纯函数 `nextFire`（窗口内固定网格，走完则次日窗口起点）/ `isWithinWindow`（陈旧闹钟兜底）/ `isValidWindow`；`reminder/SedentaryReminderScheduler.kt` **链式单发**（任何时刻只有一个待触发闹钟，不用 `setRepeating`）+ `SedentaryReminderReceiver`（不在窗口内静默丢弃但**仍续链**，否则链断永久失效）；`ReminderConfigRepository` 加开关 / 间隔 / 起止小时；提醒设置面板加开关（默认关）+ 间隔 chips，活动时段固定 9:00–18:00 只读；通道 `sedentary_reminders`（DEFAULT，DND 时走静默）；通知固定 ID 单条覆盖；`AshkbApplication` + `BootReceiver` 各重排一次）。**「晨僵时长驱动起床热身序列」✅ 已于 v1.0.69 落地**（新增 `domain/MorningWarmup.kt` 纯函数 `build(minutes, plan)`——**动作不新造**，直接取当日处方里的 L1 轻柔项（R27 已判定可做且排除 pause/拦截），封顶 `MAX_STEPS=4`；阈值分档 `MIN_REPORTABLE=15`（低于不提示）/ `PROLONGED=30`（加「明显延长」+ 常提示炎症活动 + 连续多日需复诊告知医生），与既有 `ExerciseEngine.interpretFeedback` 同一口径；处方无 L1 项时 steps 为空、UI 给非处方通用提示；`ExerciseViewModel` 加 `warmup` 流（`combine(uiState, yesterdaySymptom)`），`ExerciseScreen` 的 `PrescriptionHero` 加 `warmup` 参数渲染；`MorningWarmupTest` 9）。**「姿势 / 睡姿建议」✅ 已于 v1.0.70 落地**（新增知识库条目 `edu-005`（`payload.key = posture_sleep_advice`，来源 NASS axSpA 体位教育），**建议以带出处的知识条目落地，非硬编码文案**；`domain/PostureAdvice.kt` 只做展示位拆分（日常姿势 2 条 / 睡姿卧具 3 条，`shouldShow(plan)` 处方非空即展示），运动页处方 hero 新增「姿势 / 睡姿建议」块 + 来源行 + `DisclaimerNote`；`Lifestyle.pinnedKbIds()` 睡眠时长登记后置顶 `edu-005`；`PostureAdviceTest` 9）。**C8 全部子项完成** | M4；晨僵仅作处方页「判读依据」展示，`ExerciseEngine.todayPlan()` 不吃晨僵 |
 | ~~C9~~ | ~~体重「目标区间提示」~~ —— **已于 v1.0.33 落地**（档案可设上下限，容忍填反自动交换；体重卡显示在区间内 / 低于 / 高于 x kg；未设时不打扰） | M2 |
 | ~~C10~~ | ~~生物制剂续方提醒 + 结核 / 乙肝 / 丙肝筛查初始节点~~ —— **已于 v1.0.37 落地**（`domain/ScreeningSeeds` + `HealthRepository.seedBiologicScreeningItems()` 一键种入 4 项，按名称幂等去重；复诊项目卡片内入口） | — |
 | ~~C11~~ | ~~电池白名单 / 自启动引导（仅一行文字提示，无跳转按钮）、提醒自检缺「写入测试提醒验证」~~ —— **已于 v1.0.62 落地**（电池白名单用 `PowerManager.isIgnoringBatteryOptimizations` 显示真实状态 + 一键加入；自启动按厂商组件名尽力跳转 + 兜底应用详情（**刻意不做状态行**：系统无公开查询接口）；「发送测试提醒」真排 10 秒后精确闹钟 → `TestReminderReceiver` 发通知，验整条链路；另修「从系统设置返回后自检状态不刷新」） | M10 |
@@ -285,7 +285,7 @@ M8 家属协作全部（家属端 / 共享子集 / 设备令牌 / 命令协议 /
   - VM / 通知 / PDF 硬编码文案（v1.0.10 §遗留）——v1.0.24 三层共 124 条下沉 strings.xml（`notif_` / `vm_` / `pdf_` 前缀）。**边界**：`data/` 与 `domain/` 层的异常消息与领域标签保持硬编码——domain 层按设计纯 JVM 无 Context，且那些是数据/提示词而非界面文案
   - **规划缺口 A1：紧急卡缺「当前用药」**——v1.0.26 落地。放弃闲置的 `Profile.emergency_med_summary`（无读写），改为纯函数 `domain/EmergencyMeds.kt` 从在用药单自动汇总：未归档 + 结束日期口径筛选 → 免疫抑制类（BIOLOGIC / JAK / CSDMARD / GLUCOCORTICOID）置顶标注 → 12 条封顶；紧急卡页面（`EmergencyScreen`，刻意放在 `profile?.let` 之外，未建档也显示）与打印版 PDF（`EmergencyCard.meds` 字段）两处同源。单测 +16 条
    - **规划缺口 A2：备份恢复码**——v1.0.27 落地。备份文件格式升级 **v2 信封（magic `ASHKBAK2`）**：随机 256-bit DEK 加密内容，DEK 再被口令/恢复码分别包装进两个密钥槽（类 LUKS keyslot），任一可解；槽 id 进 AAD 防槽交换。恢复码 160-bit Base32（32 字符 8 组，`domain/RecoveryCode.kt` 纯函数），Keystore 加密落盘（`vault_config` prefs）。**解密归一化兜底**：先按原样逐槽尝试，输入形似恢复码再按归一化形态重试（任意抄写形态可解；口令第一轮命中不受影响）。`ASHKBAK1` 旧格式永久兼容读取（`encryptLegacy` 仅测试用）；未设恢复码也用 v2 单槽（格式不分裂）。pre-restore 快照同带恢复码槽。**A3 决策**：不引入 Argon2id（Android 无内置 / BC 冲突史 / native +1MB），v2 槽自带 KDF 参数可将来无破坏升级
-- **测试基线**：**489 条单测全绿**；新增功能须同步补测（`app/src/test/.../`，**44 个测试文件**覆盖 backup / 加密（v2+v3）/ 附件路径与远端比对 / PROPFIND 解析 / 停药警示与三态 / 化验单位分组 / 筛查种子 / 补剂上限与错开 / 食谱种子与出处台账 / 计划模板编解码 / 计划完成度 / 通用名键 / 运动分级 / 导入解析 / 排程计算 / 知识库检索 / 紧急卡用药汇总 / 恢复码 / 复诊准备 / 漏服 / 体重目标 / **服药依从口径与用药记录修正不变量 / 注射部位存库键稳定性 / ISO 时刻与时间选择器口径（`hhmm`、`timeParts`、槽位标签 = 计划时刻）/ 崩溃留档凭据脱敏 / 源码正则花括号静态守卫 / 提醒链「取消-重建」语义（Robolectric，含末级强提醒判定）/ 测试提醒排程（Robolectric：延迟换算 / 幂等 / 取消）/ 免打扰时段判定（跨午夜 / 同日 / 左闭右开边界）/ 免责声明措辞 / 生活方式画像编解码与置顶挂点 / 生活方式→处方提示 / 极简模式状态机（连续缺失封顶 / 阈值边界 / 原因映射 / 成对不变式）/ 锁屏紧急卡文案（JSON 展平 / 免疫抑制标注 / 封顶报总数 / 联系人优先级）/ 档案标签映射（骶髂关节分期 0–IV 与未评估兜底）/ 久坐提醒时刻计算（网格 / 窗口边界 / 次日续排 / 非法窗口）/ 晨僵热身序列（阈值分档边界 15/30 / 只取 L1 / 封顶 4 条 / 无 L1 与空处方）/ 炎症指标名称归一与单位换算 / 化验行→序列的三类口径 / 小多图共享时间轴 / 趋势图选中读数（同日多值全取 + 气泡从大到小）**）
+- **测试基线**：**498 条单测全绿**；新增功能须同步补测（`app/src/test/.../`，**45 个测试文件**覆盖 backup / 加密（v2+v3）/ 附件路径与远端比对 / PROPFIND 解析 / 停药警示与三态 / 化验单位分组 / 筛查种子 / 补剂上限与错开 / 食谱种子与出处台账 / 计划模板编解码 / 计划完成度 / 通用名键 / 运动分级 / 导入解析 / 排程计算 / 知识库检索 / 紧急卡用药汇总 / 恢复码 / 复诊准备 / 漏服 / 体重目标 / **服药依从口径与用药记录修正不变量 / 注射部位存库键稳定性 / ISO 时刻与时间选择器口径（`hhmm`、`timeParts`、槽位标签 = 计划时刻）/ 崩溃留档凭据脱敏 / 源码正则花括号静态守卫 / 提醒链「取消-重建」语义（Robolectric，含末级强提醒判定）/ 测试提醒排程（Robolectric：延迟换算 / 幂等 / 取消）/ 免打扰时段判定（跨午夜 / 同日 / 左闭右开边界）/ 免责声明措辞 / 生活方式画像编解码与置顶挂点 / 生活方式→处方提示 / 极简模式状态机（连续缺失封顶 / 阈值边界 / 原因映射 / 成对不变式）/ 锁屏紧急卡文案（JSON 展平 / 免疫抑制标注 / 封顶报总数 / 联系人优先级）/ 档案标签映射（骶髂关节分期 0–IV 与未评估兜底）/ 久坐提醒时刻计算（网格 / 窗口边界 / 次日续排 / 非法窗口）/ 晨僵热身序列（阈值分档边界 15/30 / 只取 L1 / 封顶 4 条 / 无 L1 与空处方）/ 姿势睡姿建议（条目 id 一致性 / 要点去重 / 避免俯卧 / 睡眠画像置顶）/ 炎症指标名称归一与单位换算 / 化验行→序列的三类口径 / 小多图共享时间轴 / 趋势图选中读数（同日多值全取 + 气泡从大到小）**）
   - ⚠️ **测试条数有三处副本**：本节、§2「必须全过才算交付」、`README.md` 的「测试」段。**改一处必须三处同改**——README 曾同时写着 114 / 205 两个互相矛盾的数（N2），本节也曾长期停在 264 而 §2/README 已到 339。**交付前用 `app\build\test-results\testDebugUnitTest\*.xml` 汇总实际条数再回填。**
 
 ## 9. 装机回归清单（可勾选）

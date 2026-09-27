@@ -116,6 +116,36 @@
     }
   },
   {
+    "id": "edu-005",
+    "category": "edu",
+    "title": "姿势与睡姿：避免俯卧与长时间固定屈曲体位，睡硬板床",
+    "summary": "AS 患者应保持脊柱中立、避免长时间固定于屈曲姿势；睡眠建议仰卧或侧卧、用薄枕 / 低枕，睡较硬的床垫，俯卧（趴睡）应避免。",
+    "severity_level": "low",
+    "applicable_scene": "运动处方页姿势提示块；知识库教育区；久坐提醒文案依据",
+    "source_name": "NASS（英国国家强直性脊柱炎协会）axSpA 运动与体位患者教育；ASAS-EULAR 2022 运动建议",
+    "source_url": "https://nass.co.uk/managing-my-as/exercise/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-27",
+    "review_due": "2027-03-27",
+    "version": 1,
+    "payload": {
+      "key": "posture_sleep_advice",
+      "content": "日常姿势要点：保持脊柱中立位，避免长时间维持同一屈曲姿势（如含胸驼背久坐、低头看手机）；坐姿用有靠背的硬椅，必要时腰后垫小枕维持腰椎前凸；站立时重心均匀、目视前方。睡姿要点：优先仰卧或侧卧，枕头不宜过高（侧卧时枕高约与单侧肩宽相当，仰卧时用薄枕）；床垫以较硬、支撑性好为宜，避免过软的弹簧床；不建议俯卧（趴睡）——俯卧需扭转颈部且不利于脊柱伸展，AS 患者尤应避免。以上为一般性体位建议，不替代医生针对个体的评估。",
+      "evidence": [
+        "NASS：Try to keep your spine in a neutral position and avoid staying in the same position for long periods.",
+        "NASS：A firm mattress is generally recommended; sleeping on your front should be avoided as it puts your neck in a twisted position.",
+        "NASS：Using a small pillow or rolled towel in the small of your back can help maintain the natural curve of your lower back when sitting.",
+        "ASAS-EULAR 2022：Exercise and posture/positioning are recommended as part of the non-pharmacological management of axSpA."
+      ],
+      "action": [
+        "运动处方页展示姿势 / 睡姿提示块（与生活方式画像提示并列）",
+        "久坐提醒文案引用本条作为「起身活动」的体位依据",
+        "守口径：本条为一般性体位建议（severity=low），不构成个体化治疗或诊断建议"
+      ],
+      "app_link": "运动页姿势提示块；知识库教育区；久坐提醒依据"
+    }
+  },
+  {
     "id": "edu-th-001",
     "category": "edu",
     "title": "发热预警阈值：38.5 ℃",

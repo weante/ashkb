@@ -33,8 +33,14 @@ data class Lifestyle(
      * 修掉 `kb_seed_edu.json`「edu-003 吸烟条目」的悬空挂点：
      * 其 `applicable_scene` 写着「profile 吸烟状态登记后知识库置顶」，但此前 `lifestyle`
      * 从未被采集，该联动永远不触发。
+     *
+     * v1.0.70 C8c：睡眠时长登记后追加置顶 `edu-005`（姿势 / 睡姿建议）——
+     * 睡姿是该条目的核心内容之一，与睡眠画像天然相关。
      */
-    fun pinnedKbIds(): List<String> = if (hasSmokingHistory) listOf(KB_SMOKING) else emptyList()
+    fun pinnedKbIds(): List<String> = buildList {
+        if (hasSmokingHistory) add(KB_SMOKING)
+        if (sleepHours != null) add(KB_POSTURE)
+    }
 
     /** 序列化为扁平 JSON；数值为 null 时整键省略（`fromJson` 对应回落 null）。 */
     fun toJson(): String {
@@ -60,6 +66,9 @@ data class Lifestyle(
 
         /** 吸烟条目的知识库 id（见 kb_seed_edu.json）。 */
         const val KB_SMOKING = "edu-003"
+
+        /** 姿势 / 睡姿建议条目的知识库 id（v1.0.70 C8c，见 kb_seed_edu.json）。 */
+        const val KB_POSTURE = "edu-005"
 
         private val SMOKING_VALUES =
             setOf(SMOKING_NEVER, SMOKING_FORMER, SMOKING_CURRENT, SMOKING_UNKNOWN)

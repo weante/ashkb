@@ -1203,5 +1203,9 @@
     <!-- v1.0.69 C8b：晨僵驱动的起床热身序列 -->
     <string name="exercise_warmup_title">起床热身序列</string>
     <string name="exercise_warmup_no_l1">今日处方暂无 L1 轻柔项，可从最轻的日常活动开始（缓慢起床、室内慢走），以疼痛不加重为界。</string>
+    <string name="exercise_posture_title">姿势 / 睡姿建议</string>
+    <string name="exercise_posture_daily">日常姿势</string>
+    <string name="exercise_posture_sleep">睡姿 / 卧具</string>
+    <string name="exercise_posture_source">依据：NASS axSpA 体位教育（知识库 edu-005）</string>
 </resources>
 
