@@ -79,7 +79,9 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 **一处自我纠错**：早先把 `mUserLockedFields=4` 读作「MIUI 锁定了重要性」是**误读**——该位是 `USER_LOCKED_VIBRATION`（振动）。「重要性被 MIUI 提到 4」仍成立（`mImportance=4` vs `mOriginalImp=2`），但两者都与本问题无关。
 
-**刻意不做**：不把通知伪装成 `CATEGORY_MESSAGE` / conversation 去骗过系统分类器（语义不实，且属对抗系统行为）。**⚠️ 仍待验**：MIUI 的过滤是否连 `fullScreenIntent` 一并压（若压，末级强提醒会被静默吞掉）。
+**刻意不做**：不把通知伪装成 `CATEGORY_MESSAGE` / conversation 去骗过系统分类器（语义不实，且属对抗系统行为）。
+
+**✅ 追加结论（2026-09-27 22:10 实测，v1.0.72 装机后）**：这道过滤**不会压掉 `fullScreenIntent`**——末级强提醒在小米上**闭环**：闹钟被正常消耗、通知记录确实挂着 `fullscreenIntent=PendingIntent{… startActivity}`、用户看到 **22:10 亮屏全屏**（「该服药了 / 测试-全屏 1000mg / 计划时间 21:10」+「已服用」「稍后处理」）。前提是通道页那两个开关已打开；且该设置**扛住了版本升级**（v1.0.71 → v1.0.72 覆盖安装后仍生效）。
 ### 刻意不做
 
 - **不做「小米权限是否已开」的状态行**：官方明确**没有查询接口**，假装能查到就是欺骗用户
