@@ -28,6 +28,8 @@ object NotificationHelper {
     const val CHANNEL_REMINDER_SILENT = "reminder_silent"
     /** v1.0.66 B6a：锁屏紧急信息的常驻通道——静默、锁屏公开可见。 */
     const val CHANNEL_EMERGENCY_LOCKSCREEN = "emergency_lockscreen"
+    /** v1.0.68 C8a：久坐起身提醒通道。 */
+    const val CHANNEL_SEDENTARY = "sedentary_reminders"
     /** v1.0.60 B8：所有提醒归入同一通知组，2+ 条时折叠为 summary。 */
     const val GROUP_REMINDERS = "ashkb_reminders"
     private const val SUMMARY_ID = 100001
@@ -35,6 +37,8 @@ object NotificationHelper {
     private const val NOTIF_ID_TEST = 100002
     /** v1.0.66 B6a：锁屏紧急信息常驻通知 ID（固定单条）。 */
     private const val NOTIF_ID_EMERGENCY_CARD = 100003
+    /** v1.0.68 C8a：久坐提示 ID（固定单条，覆盖而非堆积）。 */
+    private const val NOTIF_ID_SEDENTARY = 100004
 
     fun ensureChannels(context: Context) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -81,6 +85,12 @@ object NotificationHelper {
                 enableVibration(false)
                 setSound(null, null)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            }
+        )
+        // v1.0.68 C8a：久坐起身提醒——DEFAULT（要有存在感），免打扰时段内改走静默通道
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_SEDENTARY, context.getString(R.string.notif_channel_sedentary_name), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = context.getString(R.string.notif_channel_sedentary_desc)
             }
         )
     }
@@ -371,6 +381,28 @@ object NotificationHelper {
 
     fun cancelLockscreenEmergencyCard(context: Context) {
         runCatching { NotificationManagerCompat.from(context).cancel(NOTIF_ID_EMERGENCY_CARD) }
+    }
+
+    /**
+     * v1.0.68 C8a：久坐起身提醒。
+     *
+     * 固定 ID（单条覆盖）：几次提醒在通知栏里叠成一堆没有意义；
+     * 清掉旧的一条、换成新的时刻即可。
+     */
+    fun postSedentaryReminder(context: Context, silent: Boolean = false) {
+        if (!canPost(context)) return
+        val open = openMainActivity(context, "sedentary")
+        val channel = if (silent) CHANNEL_REMINDER_SILENT else CHANNEL_SEDENTARY
+        val n = NotificationCompat.Builder(context, channel)
+            .setSmallIcon(R.drawable.ic_stat_pill)
+            .setContentTitle(context.getString(R.string.notif_sedentary_title))
+            .setContentText(context.getString(R.string.notif_sedentary_text))
+            .setPriority(if (silent) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(open)
+            .build()
+        runCatching { NotificationManagerCompat.from(context).notify(NOTIF_ID_SEDENTARY, n) }
     }
 
     private fun openMainActivity(context: Context, key: String): PendingIntent =

@@ -2,6 +2,7 @@ package com.ashkb.app.data.repo
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.ashkb.app.domain.SedentaryReminder
 
 /**
  * 提醒配置（v1.0.59 B5）。
@@ -47,6 +48,23 @@ class ReminderConfigRepository(context: Context) {
     fun dndEnd(): String = prefs.getString(KEY_DND_END, DEFAULT_DND_END) ?: DEFAULT_DND_END
     fun setDndEnd(value: String) = prefs.edit().putString(KEY_DND_END, value).apply()
 
+    // ---- v1.0.68 C8a：久坐起身提醒 ----
+    /** 默认 **关闭**——一天最多十几次提醒，必须由用户显式开启。 */
+    fun sedentaryEnabled(): Boolean = prefs.getBoolean(KEY_SEDENTARY_ENABLED, false)
+    fun setSedentaryEnabled(on: Boolean) = prefs.edit().putBoolean(KEY_SEDENTARY_ENABLED, on).apply()
+
+    fun sedentaryIntervalMin(): Int =
+        prefs.getInt(KEY_SEDENTARY_INTERVAL, SedentaryReminder.DEFAULT_INTERVAL_MIN)
+    fun setSedentaryIntervalMin(min: Int) = prefs.edit().putInt(KEY_SEDENTARY_INTERVAL, min).apply()
+
+    fun sedentaryStartHour(): Int =
+        prefs.getInt(KEY_SEDENTARY_START, SedentaryReminder.DEFAULT_START_HOUR)
+    fun setSedentaryStartHour(hour: Int) = prefs.edit().putInt(KEY_SEDENTARY_START, hour).apply()
+
+    fun sedentaryEndHour(): Int =
+        prefs.getInt(KEY_SEDENTARY_END, SedentaryReminder.DEFAULT_END_HOUR)
+    fun setSedentaryEndHour(hour: Int) = prefs.edit().putInt(KEY_SEDENTARY_END, hour).apply()
+
     companion object {
         const val PREFS_NAME = "reminder_config"
         const val DEFAULT_BASDAI_CYCLE = 28L
@@ -61,6 +79,12 @@ class ReminderConfigRepository(context: Context) {
         const val KEY_DND_END = "dnd_end"
         const val DEFAULT_DND_START = "22:00"
         const val DEFAULT_DND_END = "07:00"
+
+        // v1.0.68 C8a：久坐起身提醒
+        const val KEY_SEDENTARY_ENABLED = "sedentary_reminder_enabled"
+        const val KEY_SEDENTARY_INTERVAL = "sedentary_interval_min"
+        const val KEY_SEDENTARY_START = "sedentary_start_hour"
+        const val KEY_SEDENTARY_END = "sedentary_end_hour"
 
         /** 候选周期清单（天）：周 / 双周 / 月 / 双月 / 季。 */
         val CYCLE_CHOICES = listOf(7L, 14L, 28L, 56L, 84L)

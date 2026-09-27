@@ -57,6 +57,11 @@
             android:name=".reminder.TestReminderReceiver"
             android:exported="false" />
 
+        <!-- v1.0.68 C8a：久坐起身提醒闹钟触发 -->
+        <receiver
+            android:name=".reminder.SedentaryReminderReceiver"
+            android:exported="false" />
+
         <!-- v1.0.59 B5：多源提醒——三源各自独立 Receiver，互不影响 -->
         <receiver
             android:name=".reminder.CheckupReminderReceiver"

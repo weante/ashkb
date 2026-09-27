@@ -20,6 +20,7 @@ import com.ashkb.app.reminder.EmergencyLockscreenPublisher
 import com.ashkb.app.reminder.ExerciseReminderScheduler
 import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
+import com.ashkb.app.reminder.SedentaryReminderScheduler
 import java.io.File
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -106,6 +107,8 @@ class AshkbApplication : Application() {
                 // v1.0.66 B6a：锁屏紧急信息——启动时同步一次（兜住"改完数据后没进紧急卡页"的情况）；
                 // 开关关闭时该调用内部会撤下通知，故无需外层判断
                 runCatching { EmergencyLockscreenPublisher.refresh(this@AshkbApplication) }
+                // v1.0.68 C8a：久坐起身提醒——链式单发，启动时重排一次（开关关闭则不排）
+                runCatching { SedentaryReminderScheduler.rescheduleAll(this@AshkbApplication, now) }
                 // P2 例行检查：发作第 7 天警报 + 知识条目复核到期（insertAlertOnce 幂等）
                 healthRepository.checkFlareDayAlert(today)
                 healthRepository.checkReviewDue(today.toString())

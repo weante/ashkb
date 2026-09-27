@@ -74,6 +74,9 @@ class BootReceiver : BroadcastReceiver() {
                     ExerciseReminderScheduler.cancelAllFuture(context, today)
                 }
 
+                // v1.0.68 C8a：久坐起身提醒（第四源）——链式单发，重启后重排一次
+                runCatching { SedentaryReminderScheduler.rescheduleAll(context, now) }
+
                 // 权限回授场景顺手把 sys 通道告知一声（通道存在才发，免打扰用户）
                 if (action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED &&
                     Build.VERSION.SDK_INT >= 31

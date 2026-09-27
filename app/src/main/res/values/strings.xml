@@ -1188,5 +1188,17 @@
     <!-- v1.0.67 C1：骶髂关节影像分期 -->
     <string name="profile_sacroiliitis_field">骶髂关节影像分期</string>
     <string name="profile_sacroiliitis_note">按改良纽约标准（mNY）X 线分期：0 正常 / I 可疑 / II 轻度 / III 中度 / IV 重度（强直）。请照影像报告填写。</string>
+    <!-- v1.0.68 C8a：久坐起身提醒 -->
+    <string name="notif_channel_sedentary_name">久坐起身提醒</string>
+    <string name="notif_channel_sedentary_desc">活动时段内按固定间隔提醒起身活动</string>
+    <string name="notif_sedentary_title">该起身活动一下了</string>
+    <string name="notif_sedentary_text">站起来走动 2–3 分钟，比一次性长时间运动更有效对抗僵硬</string>
+    <string name="reminder_sedentary_switch">久坐起身提醒</string>
+    <string name="reminder_sedentary_note">活动时段内按间隔提醒起身走动 2–3 分钟。默认关闭。</string>
+    <string name="reminder_sedentary_interval_label">提醒间隔</string>
+    <string name="reminder_sedentary_interval_30">每 30 分钟</string>
+    <string name="reminder_sedentary_interval_45">每 45 分钟</string>
+    <string name="reminder_sedentary_window_label">活动时段</string>
+    <string name="reminder_sedentary_window_value">%1$d:00 – %2$d:00</string>
 </resources>
 

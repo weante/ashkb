@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -31,9 +32,11 @@ import androidx.compose.ui.res.stringResource
 import com.ashkb.app.R
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.repo.ReminderConfigRepository
+import com.ashkb.app.domain.SedentaryReminder
 import com.ashkb.app.reminder.BasdaiReminderScheduler
 import com.ashkb.app.reminder.CheckupReminderScheduler
 import com.ashkb.app.reminder.ExerciseReminderScheduler
+import com.ashkb.app.reminder.SedentaryReminderScheduler
 import com.ashkb.app.ui.theme.Spacing
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -66,6 +69,9 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
     var dndEnabled by remember { mutableStateOf(cfg.dndEnabled()) }
     var dndStart by remember { mutableStateOf(cfg.dndStart()) }
     var dndEnd by remember { mutableStateOf(cfg.dndEnd()) }
+    // v1.0.68 C8a：久坐起身提醒
+    var sedentary by remember { mutableStateOf(cfg.sedentaryEnabled()) }
+    var sedentaryInterval by remember { mutableStateOf(cfg.sedentaryIntervalMin()) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -150,6 +156,55 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
                     label = stringResource(R.string.reminder_dnd_end),
                     value = dndEnd,
                     onPicked = { dndEnd = it; cfg.setDndEnd(it) },
+                )
+            }
+
+            // ---- v1.0.68 C8a：久坐起身提醒 ----
+            SettingSwitchRow(
+                title = stringResource(R.string.reminder_sedentary_switch),
+                subtitle = stringResource(R.string.reminder_sedentary_note),
+                checked = sedentary,
+                onCheckedChange = { v ->
+                    sedentary = v
+                    cfg.setSedentaryEnabled(v)
+                    scope.launch {
+                        withContext(Dispatchers.IO) { SedentaryReminderScheduler.rescheduleAll(context) }
+                    }
+                },
+            )
+            if (sedentary) {
+                Text(stringResource(R.string.reminder_sedentary_interval_label), style = MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    SedentaryReminder.INTERVAL_CHOICES.forEach { min ->
+                        FilterChip(
+                            selected = sedentaryInterval == min,
+                            onClick = {
+                                sedentaryInterval = min
+                                cfg.setSedentaryIntervalMin(min)
+                                scope.launch {
+                                    withContext(Dispatchers.IO) { SedentaryReminderScheduler.rescheduleAll(context) }
+                                }
+                            },
+                            label = {
+                                Text(
+                                    stringResource(
+                                        if (min == 30) R.string.reminder_sedentary_interval_30
+                                        else R.string.reminder_sedentary_interval_45,
+                                    ),
+                                )
+                            },
+                        )
+                    }
+                }
+                // 活动时段本版固定 9:00–18:00（配置项已在 ReminderConfigRepository 备好，
+                // 后续加时间选择器即可；此处只读展示，避免误以为可改）
+                Text(
+                    stringResource(
+                        R.string.reminder_sedentary_window_value,
+                        cfg.sedentaryStartHour(), cfg.sedentaryEndHour(),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
