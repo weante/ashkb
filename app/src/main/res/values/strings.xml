@@ -442,7 +442,13 @@
     <string name="reminder_notification_settings">通知设置</string>
     <string name="reminder_request_exact_alarm">申请精确闹钟</string>
     <string name="settings_open_failed">打不开该设置页，请到「设置 → 应用管理 → ASHKB → 权限管理」里手动开启</string>
+    <string name="reminder_miui_title">小米 / HyperOS 额外设置</string>
+    <string name="reminder_miui_hint">小米系统默认不允许应用在锁屏上显示内容，也不允许从后台弹出界面，因此「强提醒（全屏）」与「锁屏紧急信息」还需你在系统里手动允许——权限管理 → 其他权限 → 打开：%1$s（自启动建议一并打开，开机后重排提醒要用）。\n\n若通知不弹横幅、或不上锁屏：进「设置 → 应用设置 → ASHKB → 通知管理」，逐个通道 ①打开「悬浮通知」（横幅）②把「在锁定屏幕上」设为「显示通知及其内容」（锁屏）——这两项小米默认都不给第三方应用开；实测打开后横幅与锁屏均恢复（用户 2026-09-27 亲测）。这两个开关由系统保存，应用无法代设。\n\n另外小米还有一套「通知过滤」分级，会把部分应用的通知折叠进「不重要通知」，同属系统判定、应用无法申请也无法查询，故此处不显示状态。</string>
+    <string name="reminder_miui_open">打开小米权限管理</string>
+    <string name="emergency_lockscreen_miui_hint">小米 / HyperOS：本卡弹不弹横幅、能不能上锁屏，由「设置 → 应用设置 → ASHKB → 通知管理 → 锁屏紧急信息」这一页里的两个开关决定，而它们默认都不给第三方应用开——①打开「悬浮通知」（横幅）；②把「在锁定屏幕上」设为「显示通知及其内容」（锁屏）。实测两处都打开后，横幅与锁屏即恢复正常。另外「权限管理 → 其他权限」里的「锁屏显示」也建议打开。这两个通道开关由系统保存，应用无法代设。</string>
     <string name="reminder_selfcheck_title">提醒可靠性自检</string>
+    <string name="reminder_check_states">各项状态</string>
+    <string name="reminder_selfcheck_summary">%1$d/%2$d 项已就绪 · 点开逐项处理</string>
     <string name="report_avg_pain">平均疼痛</string>
     <string name="report_avg_stiffness">平均晨僵</string>
     <string name="report_basdai_section">疾病活动度（BASDAI）</string>
@@ -1187,7 +1193,7 @@
     <string name="notif_channel_emergency_desc">常驻的紧急信息卡，锁屏可直接查看（静默，不响铃）</string>
     <string name="emergency_lockscreen_title">锁屏显示紧急信息</string>
     <string name="emergency_lockscreen_body">血型 / 诊断 / 过敏 / 关键用药 / 紧急联系人</string>
-    <string name="emergency_lockscreen_desc">开启后以上信息以常驻通知显示在锁屏上，急救时无需解锁即可查看。</string>
+    <string name="emergency_lockscreen_desc">开启后以上信息以常驻通知呈现，急救时可从通知栏直接查看。⚠️ 能否出现在「锁屏」由系统决定：小米 / HyperOS 需在系统里把本通道的「在锁定屏幕上」设为「显示通知及其内容」（路径见下方说明），其他系统按通知的可见性设置显示。</string>
     <string name="emergency_lockscreen_privacy">⚠️ 健康信息将出现在锁屏，请自行权衡隐私。默认关闭，可随时关掉。</string>
     <!-- v1.0.67 C1：骶髂关节影像分期 -->
     <string name="profile_sacroiliitis_field">骶髂关节影像分期</string>

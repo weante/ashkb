@@ -3,6 +3,7 @@ package com.ashkb.app.ui.emergency
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -69,7 +71,9 @@ import com.ashkb.app.data.repo.EmergencyLockscreenStore
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.EmergencyMeds
 import com.ashkb.app.domain.Labels
+import com.ashkb.app.domain.XiaomiCompat
 import com.ashkb.app.reminder.EmergencyLockscreenPublisher
+import com.ashkb.app.reminder.SystemSetupGuides
 import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.DividerList
@@ -210,6 +214,25 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(top = Spacing.xs),
                         )
+                        // v1.0.72：小米 / HyperOS 专属提示。官方《适配常见问题》§9：MIUI **默认不允许
+                        // 应用在锁屏上显示内容/Activity**，需用户主动授予「锁屏显示」；§10：该权限
+                        // **没有查询接口** → 只能给文字 + 跳转按钮，不做状态行。
+                        if (XiaomiCompat.isXiaomi(Build.BRAND, Build.MANUFACTURER)) {
+                            Text(
+                                stringResource(R.string.emergency_lockscreen_miui_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = Spacing.sm),
+                            )
+                            OutlinedButton(
+                                onClick = {
+                                    if (!SystemSetupGuides.openMiuiPermissionEditor(context)) {
+                                        GlobalMessages.post(context.getString(R.string.settings_open_failed))
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
+                            ) { Text(stringResource(R.string.reminder_miui_open)) }
+                        }
                     }
                 }
 

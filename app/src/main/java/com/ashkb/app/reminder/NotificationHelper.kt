@@ -79,6 +79,14 @@ object NotificationHelper {
             }
         )
         // v1.0.66 B6a：锁屏紧急信息——静默 + 锁屏公开可见
+        //
+        // ⚠️ v1.0.72 真机结论（小米 15 Pro / HyperOS 2）：这里的 `lockscreenVisibility = PUBLIC`
+        // **在小米上不生效也不会回写**——`dumpsys notification` 里该通道始终是
+        // `mLockscreenVisibility=-1000`（NO_OVERRIDE），用户改与不改都一样；MIUI 把「每通道锁屏
+        // 可见性」存在它自己的存储里。实测**唯一的开关在系统侧**：
+        //   设置 → 应用设置 → ASHKB → 通知管理 → 锁屏紧急信息 → 在锁定屏幕上 → 显示通知及其内容
+        // （默认**不是**这一项；用户改成它之后，锁屏上即稳定可见 —— 见 HANDOFF §7）。
+        // AOSP 侧保留 PUBLIC 仍然正确（Pixel 等原生系统按此显示内容），故不删，仅在此备案。
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_EMERGENCY_LOCKSCREEN, context.getString(R.string.notif_channel_emergency_name), NotificationManager.IMPORTANCE_LOW).apply {
                 description = context.getString(R.string.notif_channel_emergency_desc)

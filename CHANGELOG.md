@@ -4,6 +4,92 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.72] — 2026-09-27
+
+**小米 / HyperOS 适配收口：依据小米官方文档补齐「锁屏显示 / 后台弹出界面 / 自启动」引导，自启动跳转改用官方 action。**
+
+⚠️ **无数据库结构变更**（仍为 Room v17），可覆盖安装。**含 v1.0.44 ~ v1.0.71 全部内容。**
+
+### 依据（小米官方《开发最佳实践与兼容性建议（适配常见问题）》）
+
+> 抓自 `dev.mi.com/docs/appsmarket/technical_docs/adaptation_FAQ/`（真机走查后逐条核对原文）：
+> 「9、为什么不能在锁屏显示 Activity」「10、如何获取某项权限是否开启？」「11、为什么我的 Alarm 不太精确？」「12、我的应用为什么不能自启动？」
+
+| 官方条目 | 原文要点 | 对本应用的含义 |
+|---|---|---|
+| **§9 不能在锁屏显示 Activity** | MIUI 引入了**锁屏显示窗口权限控制**，**默认不能在锁屏上显示 Activity**（`WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD`），需要用户主动授予 | v1.0.61 的**末级强提醒全屏**（锁屏上拉起 `ReminderFullScreenActivity`）与 v1.0.66 的**锁屏紧急信息**都受此约束 |
+| **§10 如何获取某项权限是否开启** | **暂时没有这个查询接口**……可引导用户跳转应用权限管理页面手动开启：`miui.intent.action.APP_PERM_EDITOR` + `extra_pkgname` | 只能**给指引 + 跳转按钮**，**不做状态行**（与 v1.0.62 对自启动的立场一致） |
+| **§12 我的应用为什么不能自启动** | MIUI 上自启动由用户控制，**默认不开放**；自启动**包含开机自启动与接收系统广播** | `BootReceiver` 重排闹钟依赖它 → 跳转改用官方 action `miui.intent.action.OP_AUTO_START` |
+| **§11 为什么我的 Alarm 不太精确** | Google 与 MIUI 均启用**对齐唤醒**，会把一小段时间内的 Alarm 对齐到某个时间点一起执行（省电） | 解释真机走查里「末级提醒晚了几分钟」——属系统省电策略，**非缺陷** |
+
+真机实测补充（`adb shell cmd appops get <pkg>`）：MIUI 私有 appops **`MIUIOP(10020)` = 锁屏显示内容**、**`MIUIOP(10021)` = 后台弹出界面**、`MIUIOP(10014)` = 精确闹钟，**默认均为 `ignore`**。也就是说小米上要把「锁屏上显示 Activity」跑通，除 AOSP 的 `USE_FULL_SCREEN_INTENT` 之外**还得过 MIUI 这两道私有开关**，而它们**没有查询接口**。
+
+### 改动
+
+- 新增 `domain/XiaomiCompat.kt`（纯函数）：小米系判定（Xiaomi / Redmi / POCO，品牌或厂商任一命中，大小写与空白无关）+ 需要用户手动开启的开关清单（锁屏显示 → 后台弹出界面 → 自启动，顺序即重要性）
+- `reminder/SystemSetupGuides.kt`
+  - 新增 `openMiuiPermissionEditor()`：按官方写法用 `miui.intent.action.APP_PERM_EDITOR` + `CATEGORY_DEFAULT` + `extra_pkgname`；**先 `resolveActivity` 判断**（不按品牌硬判，换皮 ROM 也能命中），解析不到兜底应用详情页
+  - `openAutoStartSettings()`：**先试官方 action `miui.intent.action.OP_AUTO_START`**，再走原有厂商组件名，最后兜底
+  - 抽出 `openAppDetails()` 供四处复用（原为两处各自内联）
+- `ui/me/MeScreen.kt`（提醒可靠性自检卡）：小米设备上新增「小米 / HyperOS 额外设置」区块——一段说明 + 「打开小米权限管理」按钮
+- `ui/emergency/EmergencyScreen.kt`（锁屏紧急信息块）：小米专属一句提示 + 同一按钮
+- `strings.xml` 新增 4 条文案（`reminder_miui_title` / `reminder_miui_hint` / `reminder_miui_open` / `emergency_lockscreen_miui_hint`）
+
+### 改动（UI：自检整块移入二级页）
+
+「我的」页此前把**提醒可靠性自检**整块摊平：4 行状态 + 最多 5 个跳转按钮 + 自启动引导 + 测试提醒 + 小米区块——都是**一次性设置**，却占着主页最显眼的位置（用户反馈「塞太多无用的一次性测试权限列表」）。现改为：
+
+- 新增二级页 `ui/me/ReminderCheckScreen.kt`（路由 `ReminderCheck`）：原有内容与行为**逐项照搬**（v1.0.61 强提醒授权引导、v1.0.62 回前台刷新与测试提醒、v1.0.71 的 `data=package:` 修复、v1.0.72 的小米专属区块），只是换了承载位置
+- 「我的」页只留**一行入口**（`NavRow`，图标 + 「提醒可靠性自检」+ 摘要「n/4 项已就绪 · 点开逐项处理」），未就绪时带数量 badge
+- 状态读取抽成 `rememberReminderCheckState()`（`internal`），入口行与二级页**共用**，避免两处各写一遍而漂移；回前台重读（v1.0.62 的修复）随之复用
+- `MeScreen.kt`：**424 → 227 行**，清掉 17 个因搬迁而失效的 import（`getValue`/`setValue` 保留——属性委托编译期必需）
+- 新增文案 `reminder_check_states`（各项状态）、`reminder_selfcheck_summary`（`%1$d/%2$d 项已就绪 · 点开逐项处理`）
+
+刻意**没有**改变任何权限判定逻辑与跳转目标——本次纯粹是信息架构调整。
+
+### 追查：不弹横幅 + 不上锁屏 —— 定论与修复路径（用户亲测）
+
+**定论**：两个症状来自**同一页里的两个小米通道开关**，而它们**默认都不给第三方应用开**：
+
+> **设置 → 应用设置 → ASHKB → 通知管理 → 锁屏紧急信息**
+> ① 打开 **「悬浮通知」** ⇒ **横幅恢复**
+> ② 把 **「在锁定屏幕上」** 设为 **「显示通知及其内容」** ⇒ **锁屏恢复**
+>
+> （用户 2026-09-27 依次打开，两项均恢复正常；此前两者都没有。）
+
+**为什么 App 侧改不动**：`NotificationHelper` 早在 v1.0.66 就写了 `lockscreenVisibility = PUBLIC`，但 `dumpsys notification` 里该通道**改动前后都是 `mLockscreenVisibility=-1000`（NO_OVERRIDE）**——MIUI 把每通道的这两项存在**它自己的存储**里，既不读也不回写 AOSP 的通道字段（通道 `mImportance=4` 同样是 MIUI 自己提的）。⇒ 当通道参数与通知 `vis=PUBLIC` 全部正确、却既不弹横幅又不上锁屏时，**别再查通道参数**，直接引导用户去这一页开两个开关。
+
+**背景机制（非决定性闸门）：MIUI 的「通知过滤」分级（FBO）**
+
+| 证据 | 内容 |
+|---|---|
+| `settings get secure KEY_FBO_DATA` | `{"groupIndex":2,"level1":[微信/QQ/微博/小红书/mi health/WhatsApp…],"level2":[…支付宝/滴滴…],"level3":[…QQ音乐…],"startLevelTime":[3 个时间戳]}` —— 每个 level 恰好 9 个包、带轮换时间戳；**不在任何 level 的包按「不重要」处理**（本应用即属此类） |
+| SystemUI 原文日志 | `strings MiuiSystemUI.apk \| grep -i unimportant` → `"No heads up: unimportant notification:"` |
+| 系统聚合条目 | `NotificationRecord(pkg=com.android.systemui … tag=UNIMPORTANT channel=id_aggregate)`，对应 `unimportant_entrance` / `unimportant_notification.xml` / `ClickSetUnimportant(pkg=…)` / `miui.util.NotificationFilterHelper` |
+| 时间线吻合 | 21:11:03 点「发送测试提醒」→ 同一秒生成该聚合条目 |
+
+⇒ 这解释了「为什么本应用会被判定为次要、通知会被折叠」，但**通道页那两个开关可以直接覆盖它**——所以它不是不可绕过的闸门，此处只作背景记录。
+
+本版据此改动：
+
+- `emergency_lockscreen_miui_hint`：写明上面**两个开关**与验证结论
+- `reminder_miui_hint`：同样写明，并区分「横幅＝悬浮通知」「锁屏＝在锁定屏幕上」
+- `emergency_lockscreen_desc`：不再承诺「显示在锁屏上，无需解锁即可查看」，改为说明由系统决定
+- `NotificationHelper` 通道创建处加注释：AOSP 的 `lockscreenVisibility` 在 MIUI 上不生效（保留仍正确——Pixel 等原生系统按此显示）
+
+**一处自我纠错**：早先把 `mUserLockedFields=4` 读作「MIUI 锁定了重要性」是**误读**——该位是 `USER_LOCKED_VIBRATION`（振动）。「重要性被 MIUI 提到 4」仍成立（`mImportance=4` vs `mOriginalImp=2`），但两者都与本问题无关。
+
+**刻意不做**：不把通知伪装成 `CATEGORY_MESSAGE` / conversation 去骗过系统分类器（语义不实，且属对抗系统行为）。**⚠️ 仍待验**：MIUI 的过滤是否连 `fullScreenIntent` 一并压（若压，末级强提醒会被静默吞掉）。
+### 刻意不做
+
+- **不做「小米权限是否已开」的状态行**：官方明确**没有查询接口**，假装能查到就是欺骗用户
+- **不改通知通道参数**：`emergency_lockscreen` 通道已随 v1.0.66 发布，通道重要性一经创建即由用户掌控；本轮先给指引，待真机确认「锁屏可见性是否还受通道重要性影响」后再决定是否新建通道
+
+### 测试
+
+- 新增 `XiaomiCompatTest` 8 条（小米/红米/POCO 命中、厂商兜底、大小写与空白不敏感、其它厂商不命中、空值不命中、开关清单恰为三项、锁屏显示排首位）
+- 单测总数 **504 → 512 条全绿**
+
 ## [v1.0.71] — 2026-09-27
 
 **v1.0.70 真机走查修复版：两处系统设置跳转缺陷（含一个「点了没反应」的死按钮）+ 一处 chip 组溢出缺陷；另按需求新增「删除已停用药品」。**

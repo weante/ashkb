@@ -31,6 +31,9 @@ import com.ashkb.app.R
 @Serializable data object Wellness
 @Serializable data object Checkup
 @Serializable data object Emergency
+// v1.0.72：提醒可靠性自检——原先整块摊平在「我的」页（4 行状态 + 5 个跳转按钮 + 自启动 + 测试提醒），
+// 属一次性设置却占着主页；现改为二级页，「我的」只留一行入口 + 状态摘要。
+@Serializable data object ReminderCheck
 @Serializable data object Backup
 @Serializable data object Meds
 // v1.0.39：B3 推荐食谱库 / B7 周期康复计划

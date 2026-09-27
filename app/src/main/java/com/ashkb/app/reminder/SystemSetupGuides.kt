@@ -74,20 +74,62 @@ object SystemSetupGuides {
     private fun openAppSettings(context: Context, action: String): Boolean {
         val target = Intent(action).apply { data = Uri.parse("package:${context.packageName}") }
         if (runCatching { context.startActivity(target) }.isSuccess) return true
-        val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-            data = Uri.parse("package:${context.packageName}")
+        return openAppDetails(context)
+    }
+
+    /** 兜底：应用详情页（Android 标准做法，任何 ROM 都可用）。 */
+    private fun openAppDetails(context: Context): Boolean = runCatching {
+        context.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:${context.packageName}")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
+    }.isSuccess
+
+    /**
+     * v1.0.72：跳转小米 / HyperOS 的「应用权限管理」页（小米**官方推荐**做法）。
+     *
+     * 官方原文（《开发最佳实践与兼容性建议（适配常见问题）》§10）：**暂时没有这个查询接口**，
+     * 可引导用户跳转应用权限管理页面手动开启——
+     * `Intent().setAction("miui.intent.action.APP_PERM_EDITOR").addCategory(Intent.CATEGORY_DEFAULT)`
+     * `.putExtra("extra_pkgname", "应用包名")`。
+     *
+     * 为什么用户需要它（同文 §9）：MIUI **默认不允许应用在锁屏上显示 Activity**，
+     * 需用户主动授予「锁屏显示」；本应用的末级强提醒（锁屏上拉起全屏）与锁屏紧急卡都受此约束。
+     *
+     * **用 `resolveActivity` 而不是按品牌硬判**：该 action 只在 MIUI 系 ROM 上可解析，
+     * 换皮 ROM 也能正确命中；解析不到再兜底应用详情页。
+     */
+    fun openMiuiPermissionEditor(context: Context): Boolean {
+        val intent = Intent("miui.intent.action.APP_PERM_EDITOR").apply {
+            addCategory(Intent.CATEGORY_DEFAULT)
+            putExtra("extra_pkgname", context.packageName)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        return runCatching { context.startActivity(fallback) }.isSuccess
+        if (context.packageManager.resolveActivity(intent, 0) != null) {
+            if (runCatching { context.startActivity(intent) }.isSuccess) return true
+        }
+        return openAppDetails(context)
     }
 
     /**
-     * 打开自启动设置：按厂商组件名依次尝试，全部失败则落到「应用详情」页
-     * （详情页内通常可找到权限 / 自启动相关入口）。
+     * 打开自启动设置：**先试小米官方 action，再按厂商组件名依次尝试**，全部失败落到「应用详情」页。
      *
-     * 组件名随 ROM 版本变化，故一律 `runCatching` 逐个吞掉失败——
+     * 官方依据（《适配常见问题》§12）：「在 MIUI 上应用的自启动由用户进行控制，默认不开放自启动权限，
+     * 其中自启动包含开机自启动和接收系统广播等方式启动」→ 引导 `miui.intent.action.OP_AUTO_START`。
+     * 组件名随 ROM 版本变化，故组件那一段一律 `runCatching` 逐个吞掉失败——
      * 跳不进去不是错误，只是这家 ROM 不认这个入口。
      */
     fun openAutoStartSettings(context: Context) {
+        // v1.0.72：官方 action 优先（组件名会随 ROM 漂移，官方 action 更稳）
+        val official = Intent("miui.intent.action.OP_AUTO_START").apply {
+            addCategory(Intent.CATEGORY_DEFAULT)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        if (context.packageManager.resolveActivity(official, 0) != null) {
+            if (runCatching { context.startActivity(official) }.isSuccess) return
+        }
         for ((pkg, cls) in AUTO_START_COMPONENTS) {
             val intent = Intent().apply {
                 component = ComponentName(pkg, cls)
@@ -95,15 +137,7 @@ object SystemSetupGuides {
             }
             if (runCatching { context.startActivity(intent) }.isSuccess) return
         }
-        // 兜底：应用详情页
-        runCatching {
-            context.startActivity(
-                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.parse("package:${context.packageName}")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                },
-            )
-        }
+        openAppDetails(context)
     }
 
     /** 常见厂商自启动管理页组件（尽力而为，顺序即优先级）。 */

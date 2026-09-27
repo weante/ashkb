@@ -68,6 +68,7 @@ import com.ashkb.app.ui.me.MeViewModel
 import com.ashkb.app.ui.me.MedEditScreen
 import com.ashkb.app.ui.me.MedsScreen
 import com.ashkb.app.ui.me.ProfileEditScreen
+import com.ashkb.app.ui.me.ReminderCheckScreen
 import com.ashkb.app.ui.navigation.Backup
 import com.ashkb.app.ui.navigation.Checkup
 import com.ashkb.app.ui.navigation.Emergency
@@ -79,6 +80,7 @@ import com.ashkb.app.ui.navigation.Me
 import com.ashkb.app.ui.navigation.MedEdit
 import com.ashkb.app.ui.navigation.Meds
 import com.ashkb.app.ui.navigation.ProfileEdit
+import com.ashkb.app.ui.navigation.ReminderCheck
 import com.ashkb.app.ui.navigation.Recipes
 import com.ashkb.app.ui.navigation.Report
 import com.ashkb.app.ui.navigation.Symptom
@@ -240,6 +242,7 @@ fun AppShell() {
                     onOpenMeds = { nav.navigate(Meds) },
                     onOpenBackup = { nav.navigate(Backup) },
                     onEditProfile = { nav.navigate(ProfileEdit) },
+                    onOpenReminderCheck = { nav.navigate(ReminderCheck) },
                 )
             }
 
@@ -261,6 +264,8 @@ fun AppShell() {
             }
             composable<Checkup> { CheckupScreen(vm = checkupVm, onBack = { nav.popBackStack() }) }
             composable<Emergency> { EmergencyScreen(vm = emergencyVm, onBack = { nav.popBackStack() }) }
+            // v1.0.72：提醒可靠性自检（从「我的」入口进入的二级页）
+            composable<ReminderCheck> { ReminderCheckScreen(onBack = { nav.popBackStack() }) }
             composable<Backup> { BackupScreen(vm = backupVm, onBack = { nav.popBackStack() }) }
             composable<Meds> {
                 MedsScreen(
