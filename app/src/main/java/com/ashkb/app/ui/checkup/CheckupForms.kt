@@ -142,7 +142,10 @@ internal fun VaccineFormSheet(onSave: (VaccineRecord) -> Unit, onDismiss: () -> 
     var date by remember { mutableStateOf(LocalDate.now().toString()) }
     var dose by remember { mutableStateOf("") }
     var hospital by remember { mutableStateOf("") }
-    var confirm by remember { mutableStateOf(DoctorConfirm.CONFIRMED) }
+    // v1.0.73：默认必须是「待确认」而非「医生同意」——此前默认 CONFIRMED，患者登记活疫苗时
+    // 只要不动这个 chip，就会被静默记成「医生已确认」，活疫苗 × 生物制剂的安全警报永不触发
+    // （安全默认值反转）。医学上「未表态」不等于「已同意」，故默认取最保守档。
+    var confirm by remember { mutableStateOf(DoctorConfirm.PENDING) }
     var nextDue by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
 

@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 
 import com.ashkb.app.R
 import com.ashkb.app.domain.XiaomiCompat
+import com.ashkb.app.reminder.ReminderHealth
 import com.ashkb.app.reminder.ReminderTest
 import com.ashkb.app.reminder.SystemSetupGuides
 import com.ashkb.app.ui.GlobalMessages
@@ -96,6 +97,21 @@ fun ReminderCheckScreen(onBack: () -> Unit) {
                     stringResource(R.string.reminder_battery),
                     if (state.batteryOk) stringResource(R.string.reminder_battery_ok) else stringResource(R.string.reminder_battery_no),
                     state.batteryOk,
+                )
+                // v1.0.73（P0-1）：**闹钟注册实证行**——这是全页唯一能证明「提醒真的排上了」的一项。
+                // 权限可以全绿而闹钟一个都没注册成功（小米 MIUIOP(10014) 默认 ignore），故必须显示。
+                val health = remember(state.alarmsOk) { ReminderHealth.snapshot(context) }
+                CheckRow(
+                    stringResource(R.string.reminder_alarm_registration),
+                    when {
+                        health.attempted == 0 -> stringResource(R.string.reminder_alarm_none)
+                        health.hasFailure -> stringResource(
+                            R.string.reminder_alarm_failed,
+                            health.attempted, health.failed, health.lastError ?: "—",
+                        )
+                        else -> stringResource(R.string.reminder_alarm_ok, health.attempted, health.at ?: "—")
+                    },
+                    state.alarmsOk,
                 )
 
                 Spacer(Modifier.height(Spacing.md))
@@ -233,9 +249,11 @@ internal data class ReminderCheckState(
     val exactOk: Boolean,
     val fullScreenOk: Boolean,
     val batteryOk: Boolean,
+    /** v1.0.73（P0-1）：最近一次闹钟重排是否出现过注册失败——「权限显示已授权」也可能一条都没排上。 */
+    val alarmsOk: Boolean,
 ) {
-    val passed: Int get() = listOf(notifOk, exactOk, fullScreenOk, batteryOk).count { it }
-    val total: Int get() = 4
+    val passed: Int get() = listOf(notifOk, exactOk, fullScreenOk, batteryOk, alarmsOk).count { it }
+    val total: Int get() = 5
 }
 
 /**
@@ -273,7 +291,9 @@ private fun readReminderCheckState(context: Context): ReminderCheckState {
     }
     // v1.0.62 C11：电池白名单（有官方查询接口，故可显示真实状态）
     val batteryOk = SystemSetupGuides.isIgnoringBatteryOptimizations(context)
-    return ReminderCheckState(notifOk, exactOk, fullScreenOk, batteryOk)
+    // v1.0.73（P0-1）：闹钟注册台账——权限全绿也可能「一条都没排上」（小米 MIUIOP(10014) 默认 ignore）
+    val alarmsOk = !ReminderHealth.snapshot(context).hasFailure
+    return ReminderCheckState(notifOk, exactOk, fullScreenOk, batteryOk, alarmsOk)
 }
 
 /** 状态三重编码：图标 + 文字 + 颜色（此前是裸 `"✓"` / `"!"`）。 */

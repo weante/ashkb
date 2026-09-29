@@ -4,6 +4,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- v1.0.73（P1-3）：receiver 走 goAsync() + IO 协程，需唤醒锁防止 CPU 中途休眠——
+         否则通知会丢、且下一级升级闹钟排不上，链条一直断到下次打开应用 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- v1.0.61 B9：升级链末级「强提醒」用全屏 Intent 唤醒锁屏（Android 14+ 需用户在设置中授予） -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />

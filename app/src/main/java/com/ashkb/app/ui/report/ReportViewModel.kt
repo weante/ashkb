@@ -10,9 +10,11 @@ import androidx.lifecycle.viewmodel.initializer
 import com.ashkb.app.AshkbApplication
 import com.ashkb.app.R
 import com.ashkb.app.data.repo.ReportRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -118,7 +120,9 @@ class ReportViewModel(
             _busy.value = true
             try {
                 val snapshot = repo.checkupReport()
-                val pdf = ReportPdfWriter.writeCheckupReport(app, snapshot)
+                // v1.0.73（D3）：PDF 组装是多页 Canvas 绘制 + 文件写入，**必须离开主线程**——
+                // 原实现直接在 viewModelScope(=Main.immediate) 里调用，化验项多时会卡顿甚至 ANR。
+                val pdf = withContext(Dispatchers.IO) { ReportPdfWriter.writeCheckupReport(app, snapshot) }
                 onReady(shareIntent(pdf, "application/pdf"))
             } catch (e: Exception) {
                 onError(app.getString(R.string.vm_report_pdf_failed, e.message))
@@ -134,7 +138,8 @@ class ReportViewModel(
             _busy.value = true
             try {
                 val card = repo.emergencyCard()
-                val pdf = ReportPdfWriter.writeEmergencyCard(app, card)
+                // v1.0.73（D3）：同上，急救卡 PDF 也在 IO 线程组装
+                val pdf = withContext(Dispatchers.IO) { ReportPdfWriter.writeEmergencyCard(app, card) }
                 onReady(shareIntent(pdf, "application/pdf"))
             } catch (e: Exception) {
                 onError(app.getString(R.string.vm_emergency_pdf_failed, e.message))

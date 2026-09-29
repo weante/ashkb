@@ -157,6 +157,7 @@ object NotificationHelper {
         medId: String,
         slotKey: String?,
         slotTime: String?,
+        slotDate: java.time.LocalDate?,
         medName: String,
         dose: String,
         escalation: Int,
@@ -173,6 +174,9 @@ object NotificationHelper {
             putExtra(CheckInActionReceiver.EXTRA_MED_ID, medId)
             putExtra(CheckInActionReceiver.EXTRA_SLOT_KEY, slotKey)
             putExtra(CheckInActionReceiver.EXTRA_SLOT_TIME, slotTime)
+            // v1.0.73（P1-4）：把**槽位所属日期**带到打卡动作上——跨零点时 LocalDate.now()
+            // 已是次日，会把日志记到次日、原槽位永远空缺（依从率虚低）。
+            slotDate?.let { putExtra(CheckInActionReceiver.EXTRA_SLOT_DATE, it.toString()) }
             putExtra(CheckInActionReceiver.EXTRA_NOTIF_ID, notifId(medId, slotKey))
         }
         val done = PendingIntent.getBroadcast(
@@ -202,18 +206,31 @@ object NotificationHelper {
             .setContentIntent(open)
             .setGroup(GROUP_REMINDERS)
             .addAction(0, context.getString(R.string.notif_action_taken), done)
-        if (effectiveStrong) {
+        if (effectiveStrong && canUseFullScreen(context)) {
             val fsIntent = Intent(context, ReminderFullScreenActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 putExtra(ReminderFullScreenActivity.EXTRA_MED_ID, medId)
                 putExtra(ReminderFullScreenActivity.EXTRA_SLOT_KEY, slotKey)
                 putExtra(ReminderFullScreenActivity.EXTRA_SLOT_TIME, slotTime)
+                // v1.0.73（P1-4/P1-2）：全屏页的「已服用」要写回**槽位所属日**，「稍后」要能排 snooze
+                slotDate?.let { putExtra(ReminderFullScreenActivity.EXTRA_SLOT_DATE, it.toString()) }
             }
             val fs = PendingIntent.getActivity(
                 context, ("fs|" + medId + (slotKey ?: "prn")).hashCode(), fsIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             builder.setFullScreenIntent(fs, true)
+        } else if (effectiveStrong) {
+            // v1.0.73（P0-3）：**不再挂一个会被系统忽略的 FSI**。targetSdk 34 下若未授予
+            // USE_FULL_SCREEN_INTENT，`setFullScreenIntent` 会被静默忽略，被设计为「漏服最后
+            // 一道防线」的末级提醒会悄悄退化成一条普通横幅。此处改为**明确降级**：
+            //   · 常驻（setOngoing）——用户不处理就不会消失，仍走 CHANNEL_MED（IMPORTANCE_HIGH，有声音）
+            //   · 文案写明「未授予全屏权限、已用常驻提醒代替」，并指向自检页开启
+            // 打卡 / 跳过 / 全屏页「已服用」三条路径都会 cancel 它，故不会赖着不走。
+            // 注：即便本机已授予，MIUI 的私有开关（MIUIOP 10020/10021）仍可能拦住全屏——
+            // 那是系统行为、应用无法查询，故自检页给的是指引而非保证（见 HANDOFF §7）。
+            builder.setOngoing(true)
+            builder.setContentText(context.getString(R.string.notif_med_strong_degraded_text))
         }
         val n = builder.build()
         runCatching { NotificationManagerCompat.from(context).notify(notifId(medId, slotKey), n) }
@@ -227,6 +244,20 @@ object NotificationHelper {
 
     private fun notifId(medId: String, slotKey: String?): Int =
         ("n" + medId + (slotKey ?: "prn")).hashCode()
+
+    /**
+     * v1.0.73（P0-3）：本机是否**真的**能用全屏 Intent。
+     *
+     * API 34+ 起 `USE_FULL_SCREEN_INTENT` 是「按应用授予」的 appop：未授予时
+     * `setFullScreenIntent` 会被系统静默忽略（不报错、不异常），因此投递前必须先问能力，
+     * 否则「末级强提醒」会一路静默降级成普通横幅而无人知晓。
+     * 34 以下该权限安装即授予，无需检查。
+     */
+    private fun canUseFullScreen(context: Context): Boolean {
+        if (android.os.Build.VERSION.SDK_INT < 34) return true
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return false
+        return runCatching { nm.canUseFullScreenIntent() }.getOrDefault(false)
+    }
 
     // ======================= v1.0.59 B5：三源提醒通知 =======================
     //

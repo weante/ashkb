@@ -448,6 +448,10 @@
     <string name="emergency_lockscreen_miui_hint">小米 / HyperOS：本卡弹不弹横幅、能不能上锁屏，由「设置 → 应用设置 → ASHKB → 通知管理 → 锁屏紧急信息」这一页里的两个开关决定，而它们默认都不给第三方应用开——①打开「悬浮通知」（横幅）；②把「在锁定屏幕上」设为「显示通知及其内容」（锁屏）。实测两处都打开后，横幅与锁屏即恢复正常。另外「权限管理 → 其他权限」里的「锁屏显示」也建议打开。这两个通道开关由系统保存，应用无法代设。</string>
     <string name="reminder_selfcheck_title">提醒可靠性自检</string>
     <string name="reminder_check_states">各项状态</string>
+    <string name="reminder_alarm_registration">闹钟注册（最近一次重排）</string>
+    <string name="reminder_alarm_none">尚未重排过——打开应用或改药单后会写入台账</string>
+    <string name="reminder_alarm_ok">尝试注册 %1$d 个 · 无失败（%2$s）</string>
+    <string name="reminder_alarm_failed">⚠️ 尝试注册 %1$d 个 · 失败 %2$d 个（最近：%3$s）——提醒可能不会响，请检查系统「精确闹钟」与小米权限管理</string>
     <string name="reminder_selfcheck_summary">%1$d/%2$d 项已就绪 · 点开逐项处理</string>
     <string name="report_avg_pain">平均疼痛</string>
     <string name="report_avg_stiffness">平均晨僵</string>
@@ -599,6 +603,8 @@
     <string name="vitals_bpm_unit">次/分</string>
     <string name="vitals_editable_note">已回显当日原值，修改后提交将覆盖更新（可多次修改）。</string>
     <string name="vitals_heart_rate">心率</string>
+    <string name="vitals_need_one_value">至少填写一项数值再保存（空表单会把当天已录的数据覆盖掉）</string>
+    <string name="vitals_invalid_range">数值超出可信范围：体温 30–45 ℃ · 收缩压 50–300 · 舒张压 30–200 · 心率 20–250（且收缩压须大于舒张压）</string>
     <string name="vitals_heart_rate_field">心率 (次/分)</string>
     <string name="vitals_height_cm">身高 (cm)</string>
     <string name="vitals_height_short">身高</string>
@@ -1135,6 +1141,7 @@
     <!-- v1.0.61 B9：升级链第三级「强提醒（全屏）」 -->
     <string name="notif_med_strong_title">请立即处理用药：%1$s %2$s</string>
     <string name="notif_med_strong_text">多次提醒未确认，已升级为全屏强提醒。请完成打卡或说明跳过原因</string>
+    <string name="notif_med_strong_degraded_text">多次提醒未确认；系统未授予「全屏通知」权限，已用常驻提醒代替。请完成打卡或说明跳过原因（可在「我的 → 提醒可靠性自检」里开启全屏）</string>
     <string name="reminder_fullscreen">强提醒（全屏）</string>
     <string name="reminder_fullscreen_ok">已允许，末级提醒可全屏</string>
     <string name="reminder_fullscreen_no">未允许，末级提醒仅横幅</string>

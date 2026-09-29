@@ -47,8 +47,12 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
      * 尚未到时的升级重查，若不传会让已打卡槽位也重建出无用的重查闹钟。
      */
     private suspend fun rescheduleReminders(context: android.content.Context) {
-        val list = com.ashkb.app.data.db.AppDatabase.get(context).medicationDao().listActive()
-        ReminderScheduler.rescheduleAll(context, list, repo.doneSlotRefs(LocalDate.now()))
+        // v1.0.73（P1-17）：整段移出主线程——重排是「药 × 槽 × 3 次 binder」量级
+        // （约 8 天窗口），在保存药物/停药这条热路径上会造成可感知卡顿。
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val list = com.ashkb.app.data.db.AppDatabase.get(context).medicationDao().listActive()
+            ReminderScheduler.rescheduleAll(context, list, repo.doneSlotRefs(LocalDate.now()))
+        }
     }
 
     /** A3（v1.0.43）：按 id 直接查（不限于「在用」）——编辑页预填用，避免在 meds 流上无限等待 */

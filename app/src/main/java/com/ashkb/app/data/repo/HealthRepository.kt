@@ -31,6 +31,7 @@ import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.LabImport
 import com.ashkb.app.domain.MinimalMode
+import com.ashkb.app.domain.VaccineSafety
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import org.json.JSONArray
@@ -566,7 +567,9 @@ class HealthRepository(private val context: Context) {
         val toSave = if (record.id.isBlank()) record.copy(id = Ids.new("vac")) else record
         vaccineDao.upsert(toSave)
         // 活疫苗 + 未确认 → 疫苗安全警报（itx-010/012 联动）
-        if (record.vaccineType == "LIVE" && record.doctorConfirm == "PENDING") {
+        // v1.0.73：判定抽到 domain/VaccineSafety（纯函数 + 枚举比较 + 未知值保守兜底），
+        // 修掉「实体默认值小写 "pending" vs 此处大写比较」+「表单默认 CONFIRMED」两处安全默认值反转。
+        if (VaccineSafety.needsLiveVaccineAlert(record.vaccineType, record.doctorConfirm)) {
             insertAlertOnce(
                 type = "vaccine_live_pending", severity = "high", refDate = record.date,
                 message = "记录了活疫苗（${record.vaccineName}）但医生确认状态为「待确认」——AS 患者使用生物制剂 / DMARD 期间接种活疫苗有严重感染风险，请务必先与风湿科医生确认（itx-010/012）。",

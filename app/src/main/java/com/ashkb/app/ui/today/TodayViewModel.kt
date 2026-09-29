@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import com.ashkb.app.AshkbApplication
+import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.entity.Alert
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.Profile
@@ -14,11 +15,13 @@ import com.ashkb.app.data.repo.MinimalPromptStore
 import com.ashkb.app.data.repo.TodayItem
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.MinimalMode
+import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,6 +31,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TodayViewModel(
@@ -107,28 +111,42 @@ class TodayViewModel(
     fun checkIn(item: TodayItem, injSite: String? = null, reaction: String = "none") {
         viewModelScope.launch {
             repo.checkIn(item.med, item.slotKey, item.slotTime, reaction, injSite)
+            // v1.0.73：应用内打卡后撤掉该槽位已显示的通知——此前只有「通知动作」与「全屏页」
+            // 会撤，从今日页打卡会让通知一直挂到下一次升级触发才被清掉。
+            NotificationHelper.cancel(app, item.med.id, item.slotKey)
+            // v1.0.73（P1-17）：重排**紧随写入之后在同一协程内**完成——原先是 UI 侧另起一个协程
+            // 调 reschedule，`doneSlotRefs` 可能在打卡落库前读到，于是给刚打卡的槽位重排 +30/+60。
+            rescheduleInternal()
         }
     }
 
     fun skip(item: TodayItem, reason: String, note: String?) {
         viewModelScope.launch {
             repo.skip(item.med, item.slotKey, item.slotTime, reason, note)
+            // 主动跳过＝已结算：撤通知并重排（配合 ReminderReceiver 的 skipped 判定，
+            // 不再对用户明确跳过的剂量继续加急）
+            NotificationHelper.cancel(app, item.med.id, item.slotKey)
+            rescheduleInternal()
         }
     }
 
-    /** 注射顺延：锚点移至新日期（提醒由调用方重排） */
+    /** 注射顺延：锚点移至新日期，随后重排（提醒不再指向旧日期） */
     fun postpone(item: TodayItem, date: LocalDate) {
         viewModelScope.launch {
             repo.postponeInjection(item.med, date)
+            rescheduleInternal()
         }
     }
 
-    /** 打卡或药单变化后重排提醒（v1.0.43：只取消「已打卡槽位」的后续升级，其余槽位的升级链保留） */
-    fun reschedule(context: android.content.Context) {
-        viewModelScope.launch {
-            val meds = com.ashkb.app.data.db.AppDatabase.get(context).medicationDao().listActive()
-            ReminderScheduler.rescheduleAll(context, meds, repo.doneSlotRefs(LocalDate.now()))
-        }
+    /**
+     * 打卡 / 跳过 / 顺延后的重排。
+     *
+     * v1.0.73（P1-17）：整段移出主线程——重排是「药 × 槽 × 3 次 binder 调用」量级
+     * （约 8 天窗口），在主线程上会造成保存/打卡卡顿甚至 ANR。
+     */
+    private suspend fun rescheduleInternal() = withContext(Dispatchers.IO) {
+        val meds = AppDatabase.get(app).medicationDao().listActive()
+        ReminderScheduler.rescheduleAll(app, meds, repo.doneSlotRefs(LocalDate.now()))
     }
 
     companion object {

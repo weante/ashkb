@@ -81,6 +81,9 @@ class ReminderFullScreenActivity : ComponentActivity() {
         val medId = intent?.getStringExtra(EXTRA_MED_ID)
         val slotKey = intent?.getStringExtra(EXTRA_SLOT_KEY)
         val slotTime = intent?.getStringExtra(EXTRA_SLOT_TIME)
+        // v1.0.73（P1-4）：槽位所属日期——「已服用」要写回那一天；「稍后」用它排 snooze
+        val slotDate = intent?.getStringExtra(EXTRA_SLOT_DATE)
+            ?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }
 
         setContent {
             AshkbTheme {
@@ -88,6 +91,7 @@ class ReminderFullScreenActivity : ComponentActivity() {
                     medId = medId,
                     slotKey = slotKey,
                     slotTime = slotTime,
+                    slotDate = slotDate,
                     onTaken = { finish() },
                     onLater = { finish() },
                 )
@@ -99,6 +103,9 @@ class ReminderFullScreenActivity : ComponentActivity() {
         const val EXTRA_MED_ID = "med_id"
         const val EXTRA_SLOT_KEY = "slot_key"
         const val EXTRA_SLOT_TIME = "slot_time"
+
+        /** v1.0.73（P1-4）：槽位所属日期（ISO），跨零点打卡据此写回原槽位那天。 */
+        const val EXTRA_SLOT_DATE = "slot_date"
     }
 }
 
@@ -107,6 +114,7 @@ private fun StrongReminderScreen(
     medId: String?,
     slotKey: String?,
     slotTime: String?,
+    slotDate: java.time.LocalDate?,
     onTaken: () -> Unit,
     onLater: () -> Unit,
 ) {
@@ -159,7 +167,9 @@ private fun StrongReminderScreen(
                     val app = context.applicationContext as? AshkbApplication
                     if (app != null && medId != null) {
                         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-                            runCatching { app.medicationRepository.checkInByMedId(medId, slotKey, slotTime) }
+                            runCatching {
+                                app.medicationRepository.checkInByMedId(medId, slotKey, slotTime, slotDate)
+                            }
                             withContext(Dispatchers.Main) {
                                 com.ashkb.app.reminder.NotificationHelper.cancel(context, medId, slotKey)
                             }
@@ -175,7 +185,22 @@ private fun StrongReminderScreen(
             }
             Spacer(Modifier.height(Spacing.md))
             OutlinedButton(
-                onClick = onLater,
+                onClick = {
+                    // v1.0.73（P1-2）：**「稍后」不再是无副作用按钮**。esc=2 已是升级链末级，
+                    // 原实现只 finish() → 该次剂量此后再也不会被提醒（按钮语义与实现不符）。
+                    // 现在真排一次 snooze（默认 +15 分钟，「仍未确认」文案、不升级全屏、不再上链）。
+                    val app = context.applicationContext as? AshkbApplication
+                    if (app != null && medId != null) {
+                        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                            runCatching {
+                                com.ashkb.app.reminder.ReminderScheduler.scheduleSnooze(
+                                    context, medId, slotKey, slotTime, slotDate ?: java.time.LocalDate.now(),
+                                )
+                            }
+                        }
+                    }
+                    onLater()
+                },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(28.dp),
             ) {

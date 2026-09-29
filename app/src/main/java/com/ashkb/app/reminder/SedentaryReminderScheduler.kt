@@ -46,10 +46,8 @@ object SedentaryReminderScheduler {
         val pi = pending(context)
         val at = next.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val exact = if (Build.VERSION.SDK_INT >= 31) am.canScheduleExactAlarms() else true
-        runCatching {
-            if (exact) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
-            else am.setWindow(AlarmManager.RTC_WAKEUP, at, 15 * 60_000L, pi)
-        }
+        // v1.0.73（P0-1）：统一走 AlarmRegister——失败留档 + 计数，绝不静默
+        AlarmRegister.set(context, am, at, pi, exact, "sedentary")
     }
 
     fun cancelAllFuture(context: Context) {

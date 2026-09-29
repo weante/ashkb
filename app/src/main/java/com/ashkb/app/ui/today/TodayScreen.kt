@@ -96,7 +96,7 @@ fun TodayScreen(
     // v1.0.65 B12：极简模式状态机
     val minimalPrompt by vm.minimalPrompt.collectAsStateWithLifecycle()
     val isMinimal = profile?.uiMode == MinimalMode.MODE_MINIMAL
-    val context = LocalContext.current
+    // v1.0.73：不再需要 context——打卡 / 跳过 / 顺延后的重排已折进 TodayViewModel（写入后同协程 + IO）
     var skipTarget by remember { mutableStateOf<TodayItem?>(null) }
     var injTarget by remember { mutableStateOf<TodayItem?>(null) }
     var postponeTarget by remember { mutableStateOf<TodayItem?>(null) }
@@ -200,13 +200,11 @@ fun TodayScreen(
                     onCheckIn = {
                         if (item.med.route == "injection" && !item.isPrn) injTarget = item
                         else vm.checkIn(item)
-                        vm.reschedule(context)
                     },
                     onSkip = { skipTarget = item },
                     onPostpone = { postponeTarget = item },
                     onPrnTaken = {
                         vm.checkIn(item)
-                        vm.reschedule(context)
                     },
                     onMissedGuide = { missedGuideTarget = item },
                 )
@@ -220,7 +218,6 @@ fun TodayScreen(
             medName = target.med.name,
             onConfirm = { reason, note ->
                 vm.skip(target, reason, note)
-                vm.reschedule(context)
                 skipTarget = null
             },
             onDismiss = { skipTarget = null },
@@ -233,7 +230,6 @@ fun TodayScreen(
             lastSite = target.med.injLastSite,
             onConfirm = { site ->
                 vm.checkIn(target, injSite = site)
-                vm.reschedule(context)
                 injTarget = null
             },
             onDismiss = { injTarget = null },
@@ -246,7 +242,6 @@ fun TodayScreen(
             cycleDays = target.med.injCycleDays,
             onConfirm = { date ->
                 vm.postpone(target, date)
-                vm.reschedule(context)
                 postponeTarget = null
             },
             onDismiss = { postponeTarget = null },

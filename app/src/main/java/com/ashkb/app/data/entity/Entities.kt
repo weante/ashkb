@@ -660,7 +660,10 @@ data class VaccineRecord(
     @ColumnInfo(name = "vaccine_type") val vaccineType: String,
     @ColumnInfo(name = "dose") val dose: String? = null,
     @ColumnInfo(name = "hospital") val hospital: String? = null,
-    @ColumnInfo(name = "doctor_confirm") val doctorConfirm: String = "pending",
+    // v1.0.73：默认值必须与 DoctorConfirm.PENDING.name 一致——原先写死小写 "pending"，
+    // 而 HealthRepository 的活疫苗安全警报按 == "PENDING" 比较，导致「走默认值的路径」
+    // 静默跳过 high 级安全警报（安全默认值反转）。直接引用枚举名，杜绝再次漂移。
+    @ColumnInfo(name = "doctor_confirm") val doctorConfirm: String = DoctorConfirm.PENDING.name,
     @ColumnInfo(name = "reaction") val reaction: String? = null,
     @ColumnInfo(name = "next_due_date") val nextDueDate: String? = null,
     @ColumnInfo(name = "notes") val notes: String? = null,

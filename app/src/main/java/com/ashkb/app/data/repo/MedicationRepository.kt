@@ -138,14 +138,23 @@ class MedicationRepository(private val context: Context) {
         return items.sortedWith(compareBy({ !it.done && !it.skipped }, { it.slotTime ?: "99:99" }))
     }
 
-    // ---- 打卡写入（幂等：date+medId+slotKey 唯一） ----
-    suspend fun checkIn(med: Medication, slotKey: String?, slotTime: String?, reaction: String = Reaction.NONE.name, injSite: String? = null, note: String? = null) {
-        val date = LocalDate.now().toString()
-        val existing = slotKey?.let { logDao.find(med.id, date, it) }
+    // ---- 打卡写入（幂等：date+medId+slotKey 唯一；PRN 的 slotKey 为 NULL，SQLite 中 NULL 互不相等，故按需用药可多次记录） ----
+    /**
+     * @param date v1.0.73（P1-4）：**槽位所属日期**。默认今天（应用内打卡），但从通知动作 /
+     *   全屏页打卡时必须传入槽位那天的日期——跨零点时 `LocalDate.now()` 已是次日，会把日志记到
+     *   次日，原槽位永远空缺（依从率虚低，且 23:50 的剂量看起来「没吃」）。
+     */
+    suspend fun checkIn(
+        med: Medication, slotKey: String?, slotTime: String?,
+        reaction: String = Reaction.NONE.name, injSite: String? = null, note: String? = null,
+        date: LocalDate = LocalDate.now(),
+    ) {
+        val dateStr = date.toString()
+        val existing = slotKey?.let { logDao.find(med.id, dateStr, it) }
         val now = nowIso()
         val log = (existing ?: MedicationLog(
             id = Ids.new("mlog"),
-            date = date,
+            date = dateStr,
             recordedAt = now,
             backfill = false,
             medId = med.id,
@@ -294,9 +303,12 @@ class MedicationRepository(private val context: Context) {
     }
 
     // ---- 通知动作写入（ReminderReceiver / CheckInActionReceiver 共用） ----
-    suspend fun checkInByMedId(medId: String, slotKey: String?, slotTime: String?): Boolean {
+    /**
+     * @param slotDate v1.0.73（P1-4）：槽位所属日期；为 null 时按今天（应用内打卡）处理。
+     */
+    suspend fun checkInByMedId(medId: String, slotKey: String?, slotTime: String?, slotDate: LocalDate? = null): Boolean {
         val med = medDao.byId(medId) ?: return false
-        checkIn(med, slotKey, slotTime)
+        checkIn(med, slotKey, slotTime, date = slotDate ?: LocalDate.now())
         return true
     }
 }

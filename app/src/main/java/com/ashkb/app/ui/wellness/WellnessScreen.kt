@@ -588,11 +588,27 @@ private fun VitalsHero(vitals: Vitals?, onEdit: () -> Unit) {
 @Composable
 private fun VitalsSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
     val current by vm.vitalsToday.collectAsStateWithLifecycle()
-    var temp by remember { mutableStateOf(current?.temperature?.toString() ?: "") }
-    var sys by remember { mutableStateOf(current?.bpSys?.toString() ?: "") }
-    var dia by remember { mutableStateOf(current?.bpDia?.toString() ?: "") }
-    var hr by remember { mutableStateOf(current?.heartRate?.toString() ?: "") }
-    var notes by remember { mutableStateOf(current?.notes ?: "") }
+    // v1.0.73（D4）：remember 以行 id 为 key——原先用无 key 的 remember，冷启动时 `current` 先为
+    // null、后到达，字段会停在空白（与下面的「同日覆盖」叠加就是一次静默数据丢失）。
+    var temp by remember(current?.id) { mutableStateOf(current?.temperature?.toString() ?: "") }
+    var sys by remember(current?.id) { mutableStateOf(current?.bpSys?.toString() ?: "") }
+    var dia by remember(current?.id) { mutableStateOf(current?.bpDia?.toString() ?: "") }
+    var hr by remember(current?.id) { mutableStateOf(current?.heartRate?.toString() ?: "") }
+    var notes by remember(current?.id) { mutableStateOf(current?.notes ?: "") }
+
+    // v1.0.73（D4）：保存前必须「至少一项数值」且每项落在生理可信区间内。
+    // 此前空表单可直接提交，而 saveVitals 是**同日覆盖**——一次误提交会抹掉当天已录的血压/心率。
+    val tempVal = temp.trim().toDoubleOrNull()
+    val sysVal = sys.trim().toIntOrNull()
+    val diaVal = dia.trim().toIntOrNull()
+    val hrVal = hr.trim().toIntOrNull()
+    val anyValue = tempVal != null || sysVal != null || diaVal != null || hrVal != null
+    val rangesOk = (tempVal == null || tempVal in 30.0..45.0) &&
+        (sysVal == null || sysVal in 50..300) &&
+        (diaVal == null || diaVal in 30..200) &&
+        (hrVal == null || hrVal in 20..250) &&
+        (sysVal == null || diaVal == null || sysVal > diaVal)
+    val canSave = anyValue && rangesOk
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
@@ -606,14 +622,24 @@ private fun VitalsSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
             }
             OutlinedTextField(hr, { hr = it }, label = { Text(stringResource(R.string.vitals_heart_rate_field)) }, singleLine = true)
             OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
+            // v1.0.73（D4）：空表单 / 越界数值一律不允许提交（此前无 enabled 门，可直接覆盖当天数据）
+            if (!canSave) {
+                Text(
+                    stringResource(if (anyValue) R.string.vitals_invalid_range else R.string.vitals_need_one_value),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
+                enabled = canSave,
                 onClick = {
+                    if (!canSave) return@SheetSaveButton
                     vm.saveVitals(
-                        temperature = temp.toDoubleOrNull(),
-                        bpSys = sys.toIntOrNull(),
-                        bpDia = dia.toIntOrNull(),
-                        heartRate = hr.toIntOrNull(),
+                        temperature = tempVal,
+                        bpSys = sysVal,
+                        bpDia = diaVal,
+                        heartRate = hrVal,
                         notes = notes.ifBlank { null },
                     )
                     onDismiss()

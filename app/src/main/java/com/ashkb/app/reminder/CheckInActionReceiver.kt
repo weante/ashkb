@@ -16,6 +16,9 @@ class CheckInActionReceiver : BroadcastReceiver() {
         const val EXTRA_SLOT_KEY = "slot_key"
         const val EXTRA_SLOT_TIME = "slot_time"
         const val EXTRA_NOTIF_ID = "notif_id"
+
+        /** v1.0.73（P1-4）：槽位所属日期——跨零点打卡要记回原槽位那天。 */
+        const val EXTRA_SLOT_DATE = "slot_date"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -24,18 +27,23 @@ class CheckInActionReceiver : BroadcastReceiver() {
         val slotKey = intent.getStringExtra(EXTRA_SLOT_KEY)
         val slotTime = intent.getStringExtra(EXTRA_SLOT_TIME)
         val notifId = intent.getIntExtra(EXTRA_NOTIF_ID, -1)
+        // 老版本排下的通知没有这个 extra → 退化为「今天」，与旧行为一致
+        val slotDate = intent.getStringExtra(EXTRA_SLOT_DATE)
+            ?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }
 
+        val lock = WakeLock.acquire(context)
         val result = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 val repo = app.medicationRepository
-                repo.checkInByMedId(medId, slotKey, slotTime)
+                repo.checkInByMedId(medId, slotKey, slotTime, slotDate)
                 NotificationHelper.cancel(context, medId, slotKey)
                 if (notifId != -1) {
                     androidx.core.app.NotificationManagerCompat.from(context).cancel(notifId)
                 }
                 // 该槽位后续升级重查闹钟已无必要，且打卡后 rescheduleAll 由下次进应用/日界完成
             } finally {
+                lock?.let { runCatching { if (it.isHeld) it.release() } }
                 result.finish()
             }
         }

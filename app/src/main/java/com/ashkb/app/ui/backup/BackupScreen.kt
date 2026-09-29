@@ -72,6 +72,7 @@ import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.ui.components.DividerList
 import com.ashkb.app.ui.components.LoadingBlock
 import com.ashkb.app.ui.components.ScreenTopBar
+import com.ashkb.app.ui.components.SecureWindow
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.theme.Clinical
 import com.ashkb.app.ui.theme.Size
@@ -132,6 +133,8 @@ private fun SecretField(
 /** P4 R20 备份与数据自主页（协议 §3–§6）。 */
 @Composable
 fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
+    // v1.0.73：本页含备份口令 / 恢复码输入——禁截屏与最近任务缩略图（维护者口径：只加在口令与恢复码类页面）
+    SecureWindow()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val stage by vm.stage.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
@@ -277,6 +280,8 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                         onDismissRequest = { showRecoveryDialog = null },
                         title = { Text(stringResource(R.string.backup_recovery_dialog_title)) },
                         text = {
+                            // v1.0.73：恢复码是全库唯一的离线后门，展示期间禁截屏（AlertDialog 是独立窗口）
+                            SecureWindow()
                             Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                                 Text(
                                     stringResource(R.string.backup_recovery_dialog_body),
@@ -816,6 +821,9 @@ private fun WebDavSheet(vm: BackupViewModel, initialUrl: String, initialUser: St
     var davPass by remember { mutableStateOf("") }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
+        // v1.0.73：Sheet 自身是独立窗口，必须在本窗口内再禁一次截屏（Activity 上的标志管不到它）；
+        // 本 Sheet 含 WebDAV 口令输入框
+        SecureWindow()
         Column(
             Modifier
                 .fillMaxWidth()

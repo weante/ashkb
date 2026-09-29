@@ -32,6 +32,9 @@ class BootReceiver : BroadcastReceiver() {
         }
         if (!rebuild) return
 
+        // v1.0.73（P1-3）：本 receiver 要重建全部闹钟（含 5 条提醒链），必须持唤醒锁，
+        // 否则 CPU 中途休眠会导致整批闹钟只排了一半
+        val lock = WakeLock.acquire(context)
         val result = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
@@ -87,6 +90,7 @@ class BootReceiver : BroadcastReceiver() {
                     }
                 }
             } finally {
+                lock?.let { runCatching { if (it.isHeld) it.release() } }
                 result.finish()
             }
         }

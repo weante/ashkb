@@ -4,6 +4,74 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.73] — 2026-09-29
+
+**批次 1「看不见的失效」：把静默失效改成可见、把安全默认值改回保守、把跨零点身份锚回槽位。**
+
+⚠️ **无数据库结构变更**（仍为 Room v17），可覆盖安装。**含 v1.0.44 ~ v1.0.72 全部内容。**
+
+依据：三份外部审查报告的 P0/P1 条目 + 维护者 2026-09-29 的 9 项裁决（自用可靠性优先；医学规则**只改安全默认值方向**；备份威胁模型＝防设备丢失；锁屏卡保留现状；跨零点日志记**槽位所属日**；PRN 移出依从率、体征保留多条；漏服要补发；测试安全网投入半天到一天；AI 异常值**本地优先**）。
+
+### P0-1 闹钟注册失败不再静默（新增可观测层）
+
+- 新增 `reminder/AlarmRegister.kt`：6 处重复的 `runCatching { setExactAndAllowWhileIdle / setWindow }` 收敛为**唯一注册入口**——失败即 `CrashLogger.recordNonFatal` 留档 + 计数 + 来源标签（med / checkup / basdai / exercise / sedentary / test）
+- 新增 `reminder/ReminderHealth.kt`：注册台账（尝试 / 失败 / 最近错误 / 时间）落 SharedPreferences，**纯本地不上报**
+- 自检页新增第 5 项「**闹钟注册（最近一次重排）**」：无失败显示「尝试注册 N 个 · 无失败」，有失败显示红项 + 最近错误 + 排查指引；「我的」入口摘要随之变为 `n/5`
+- **为什么必须做**：`canScheduleExactAlarms()` 返回 true **不等于系统放行**——小米 `MIUIOP(10014)`（精确闹钟）默认 `ignore`（见 `WALKTHROUGH-v1.0.72.md`），此前会出现「自检页显示已授权、用户一条提醒都收不到」的自相矛盾状态
+
+### P0-2 活疫苗安全警报的「默认值反转」（三处一起修）
+
+- `Entities.kt`：`doctorConfirm` 默认值由小写 `"pending"` 改为 `DoctorConfirm.PENDING.name`（消除裸字符串契约，杜绝再次漂移）
+- `CheckupForms.kt`：表单默认由 `CONFIRMED` 改为 **`PENDING`**——此前患者登记活疫苗时**不动 chip 就被静默记成「医生已同意」**，high 级安全警报形同虚设（README 还把这条当卖点）
+- 判定抽到 `domain/VaccineSafety.kt`（纯函数、枚举比较、未知取值**保守兜底**为待确认），`HealthRepository` 改为调用它
+- 新增 `VaccineSafetyTest` 7 条——其中「小写 `pending` 也触发警报」正是被修掉的回归点
+
+### P0-3 末级强提醒不再「假装能全屏」
+
+- 投递前检查 `canUseFullScreenIntent()`（API 34+）：未授予时**不再挂一个会被系统静默忽略的 FSI**，改为**明确降级**——常驻提醒（`setOngoing`，不处理就不消失）+ 文案写明「未授予全屏权限、已用常驻提醒代替」+ 指向自检页
+- 打卡 / 跳过 / 全屏页「已服用」三条路径都会撤掉它，故不会赖着不走
+
+### P1-1 / P1-2 / P1-3
+
+- **P1-1**：升级链判据由 `status == "done"` 改为 **done 或 skipped 都算已结算**——用户主动「跳过（有原因）」后不再被 +30/+60 加急（原路径是「骚扰 → 关通知权限 → 提醒彻底失效」）；判定走 `AdherenceCalc` 常量
+- **P1-2**：「稍后」不再是无副作用按钮——真排一次 **snooze**（默认 +15 分钟、esc=1「仍未确认」文案、**不升级全屏、不再上链**）；`cancelAllFuture` 一并取消 snooze 闹钟
+- **P1-3**：新增 `WAKE_LOCK` 权限与 `reminder/WakeLock.kt`；`ReminderReceiver` / `CheckInActionReceiver` / `BootReceiver` 三个 `goAsync()` 接收器**持锁**（60 秒上限）并在 `finally` 释放——此前若 CPU 在协程中途休眠，通知会丢失**且下一级升级闹钟排不上**，链条一直断到下次打开应用
+
+### P1-4 跨零点身份锚回「槽位所属日」（本批最实质的结构性修复）
+
+- `ReminderScheduler`：排程新增 `slotDate` 参数并随 intent 透传（`EXTRA_SLOT_DATE`）；升级链 / 通知动作 / 全屏页 / 打卡写入**全部按槽位所属日归集**
+- `ReminderReceiver`：已结算校验改查 **`slotDate` 那天**——原用 `LocalDate.now()`，跨零点时已是次日 → 查不到 23:50 槽位的打卡 → **对已服的药补发提醒**，而打卡日志又被写到次日 → 原槽位永远空缺、依从率虚低
+- `MedicationRepository.checkIn` / `checkInByMedId`：新增 `date` 参数（默认今天＝应用内打卡；通知路径传**槽位日**）
+- `cancelAllFuture`：扫描窗口由 `today..+7` 扩为 **`today-1..+7`**——跨零点的 +30/+60 属于**前一天**的槽位，此前永远取消不掉（孤儿闹钟，每次冷启动都清不掉）
+
+### P1-5 闹钟身份改为 SHA-256 派生
+
+- `reqCode` 由 `String.hashCode()` 改为 **SHA-256 前 32 位**，身份锚定「medId + slotKey + **槽位日期** + 级数 + snooze 标志」：分布均匀，且与取消路径落在同一维度上（原实现把 `fireAt` 的日期当身份，跨零点即错位）
+
+### D3 / D4（本人审查发现，三份外部报告均未覆盖）
+
+- **D3**：复诊报告 / 急救卡 PDF 生成移入 `Dispatchers.IO`——原先在 `viewModelScope`（＝Main.immediate）里做多页 Canvas 绘制与文件写入
+- **D4**：体征录入加**保存门禁**——至少一项数值，且体温 30–45 ℃ / 收缩压 50–300 / 舒张压 30–200 / 心率 20–250 / 收缩压 > 舒张压；并以 `remember(current?.id)` 修正冷启动回填竞态。此前空表单可直接提交，而 `saveVitals` 是**同日覆盖** → 一次误提交即抹掉当天已录数据
+
+### P1-17 重排离开主线程
+
+- 今日页打卡 / 跳过 / 顺延后的重排**折进 ViewModel 同一协程**（消除「写入未提交就读 `doneSlotRefs`」的竞态），并下 IO；`MeViewModel` 的保存 / 停药重排同样下 IO；UI 侧 5 处独立的 `vm.reschedule(context)` 调用删除
+
+### 口令 / 恢复码页面禁截屏（维护者口径：只加在这类页面）
+
+- 新增 `ui/components/SecureWindow.kt`——同时覆盖 **Activity 窗口**与 **AlertDialog / ModalBottomSheet 自身窗口**（后两者是独立窗口，给 Activity 设标志管不到），离开组合即清除
+- 应用于备份页、恢复码展示弹窗、WebDAV 口令 Sheet
+
+### 测试与构建
+
+- 新增 `VaccineSafetyTest` 7 条；单测总数 **512 → 519 条全绿**；release / debug 均 versionCode **78**、真密钥签名
+
+### 刻意不做（本批边界）
+
+- 未把通知 id 全量换新（会让已存在的旧 id 通知无法被取消）；`notifId` 保持原方案，仅闹钟 requestCode 换为 SHA-256 派生
+- 依从率口径改造（PRN 移出 / 计划槽位快照 / 漏服补发 / 无数据态）与迁移测试安全网属**批次 2 / 3**，本批不动数据模型
+- 其余 4 个 VM（复诊 / 运动 / 运动计划 / BASDAI）的重排仍在主线程，随批次 2 一并处理
+
 ## [v1.0.72] — 2026-09-27
 
 **小米 / HyperOS 适配收口：依据小米官方文档补齐「锁屏显示 / 后台弹出界面 / 自启动」引导，自启动跳转改用官方 action。**
