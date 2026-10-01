@@ -4,6 +4,46 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.85] — 2026-10-02
+
+**批次 10：`BackupScreen` 拆分（第二批第 1 块）——根级 Flow 19 → 3。** 纯重构，无库结构变更、无行为改动，可覆盖安装。
+
+### 为什么先做这个屏幕
+
+第四轮性能审查报告 P1-6：附件同步期间 `attachSyncStage` / `attachSyncMsg` / `attachBytes` 三条 Flow **每秒发射多次**，而它们在**屏幕根部**收集 → **每个进度 tick 都重组整个 876 行屏幕**（含两个密码输入区）→ **输密码时被进度 tick 打断**。这是报告里**唯一用户可感知**的卡顿。
+
+### 做了什么（唯一改动文件 `ui/backup/BackupScreen.kt`）
+
+按 section 收口，各自在**内部**收集自己需要的 Flow：
+`AttachSyncSection`（7 条，★主目标，内部再拆 Toggle / Stats / Actions / Status 四个纯值子块）· `RecoveryCodeSection`（2）· `LocalBackupSection`（0 条 Flow，收的是**逐字输入的密码 state**）· `WebDavSection`（2）· `RestoreSection`（5，含逐字输入的恢复口令 state）· `LedgerSection`（1）· `BusyFooter`（1）· `WebDavSheet`（2）
+
+**根级只留 3 条，各有硬理由**：
+- `busy`：8 处共用的**整屏锁**，只在开/停两次翻转，留在根部让"整屏在忙"只有一处真相
+- `message`：屏级 Snackbar 通道，一次性事件，必与 busy 翻转同帧
+- `davPicked`：跨分区胶水（远程下载完成 → 喂恢复区 + 关远程列表 sheet），天然不属于任何单一 section
+
+### 一条硬证据（顺带验证了报告诊断是否成立）
+
+反汇编本文件编译产物后确认：`SectionCard { … }` 这类**非 inline composable lambda 是 replaceable group（只有 startReplaceGroup/endReplaceGroup），不是 restart group**（`BackupScreenKt$AttachSyncSection$1` 等的 invoke 里没有任何 startRestartGroup/updateScope）。所以 lambda 内的 state 读会算到**最近的外层 restartable 函数**——**改前确实是整个屏幕**，报告的说法成立，本次拆分真修掉了它。改后 7 条 Flow 的读点落在 `AttachSyncSection`（编译器报告确认该函数 `restartable skippable`）。
+
+### 行为等价性怎么保证的（本模块无 compose-ui-test 依赖，故是推理而非断言）
+
+1. **首帧值**：19 条全是 `StateFlow`，刻意沿用**与原来逐字相同的无参重载** `vm.x.collectAsStateWithLifecycle()`（初始值即首帧 `flow.value`），未手写 initialValue；所有 section 在同一次组合中急切组合（普通 `Column + verticalScroll`，非 Lazy）
+2. **节点序**：按 20 个区块做「归一化代码行多重集比对 + 逐块顺序比对」，差异只有回调外提与参数改名两类
+3. **逻辑等价**：`running = stage != null` 的取反、两个逐字输入 state 的读写点仍只在各自区内
+4. **结构等价**：新 section 均 `restartable skippable`，AttachSyncSection 的 3 个动作 lambda 被编译器 remember 化 → tick 时只有 AttachSyncStatus 重组
+
+**明确无法确认的**（不回避）：无 UI 自动化测试 → **渲染等价是推理不是断言**；重组次数未实测（无 Layout Inspector/tracing）；`LaunchedEffect(recoveryReveal)` 移入子 section 后 4 条 effect 的注册顺序变了；`davUrl` 现在 4 处各自 collect（同帧竞态窗口极小，未实测）；`BusyFooter` 现在**无条件**收集 `stage`（读 StateFlow 无副作用，但收集生命周期确实变了）。
+
+### 判断「不该拆」的地方
+
+加密说明卡 / 恢复演练卡 / 档案 JSON 卡（只吃已在根级的 `busy`，拆出去是 0 收益纯搬运；JSON 卡的导入 launcher 在根部注册，搬进去要连 launcher 一起搬）；`LaunchedEffect(Unit) { refreshAttachStats() }` 留在根级（"进页面"事件、不读 state、零重组代价）；`DavBackupPickerSheet` 本就内部自收。
+
+### 测试与构建
+
+- 单测 **678 条全绿**（数量不变——纯重构）；`detekt` 0 findings；**`:app:lintDebug` 0 error**（`BackupScreen.kt` 命中 0 条）
+- release / debug 均 versionCode **90 / 1.0.85**
+- 文件 876 → 1118 行（+242 来自 section 签名/入参与「为什么」注释；根函数 164 行）——**本批目标是重组范围，不是行数**
 ## [v1.0.84] — 2026-10-02
 
 **批次 9：Compose 性能第一批（第四轮性能审查报告的前 5 项 ROI）。** 无库结构变更，可覆盖安装。
