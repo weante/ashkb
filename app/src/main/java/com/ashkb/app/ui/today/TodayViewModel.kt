@@ -15,6 +15,7 @@ import com.ashkb.app.data.repo.MinimalPromptStore
 import com.ashkb.app.data.repo.TodayItem
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.MinimalMode
+import com.ashkb.app.domain.PendingDoses
 import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
 import java.time.Duration
@@ -45,11 +46,15 @@ class TodayViewModel(
 
     init {
         viewModelScope.launch {
+            // v1.0.74：进页面即算一次「昨天未记录」（跨零点补记卡的初值）
+            refreshYesterdayPending()
             while (true) {
                 val now = LocalDateTime.now()
                 val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
                 delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
                 _date.value = LocalDate.now()
+                // 跨日后「昨天」变了，补记卡必须重算
+                refreshYesterdayPending()
             }
         }
     }
@@ -117,6 +122,7 @@ class TodayViewModel(
             // v1.0.73（P1-17）：重排**紧随写入之后在同一协程内**完成——原先是 UI 侧另起一个协程
             // 调 reschedule，`doneSlotRefs` 可能在打卡落库前读到，于是给刚打卡的槽位重排 +30/+60。
             rescheduleInternal()
+            refreshYesterdayPending()
         }
     }
 
@@ -127,6 +133,7 @@ class TodayViewModel(
             // 不再对用户明确跳过的剂量继续加急）
             NotificationHelper.cancel(app, item.med.id, item.slotKey)
             rescheduleInternal()
+            refreshYesterdayPending()
         }
     }
 
@@ -146,7 +153,50 @@ class TodayViewModel(
      */
     private suspend fun rescheduleInternal() = withContext(Dispatchers.IO) {
         val meds = AppDatabase.get(app).medicationDao().listActive()
+
         ReminderScheduler.rescheduleAll(app, meds, repo.doneSlotRefs(LocalDate.now()))
+    }
+
+    // ---- v1.0.74：跨零点补记（「昨天还有 N 剂未记录」） ----
+
+    private val _yesterdayPending = MutableStateFlow<List<PendingDoses.Pending>>(emptyList())
+
+    /** 昨天已到点、却既未「已服」也未「跳过」的剂量；今日页顶部据此显示补记卡。 */
+    val yesterdayPending: StateFlow<List<PendingDoses.Pending>> = _yesterdayPending
+
+    /**
+     * 重算「昨天未记录」。凡是可能改变昨天记录的操作（打卡 / 跳过 / 跨日）后都要调一次。
+     *
+     * 判定口径走纯函数 [PendingDoses.unsettledOn] + 仓库的**已结算**槽位集合——
+     * done 与 skipped 都算结算，避免用户昨天明确跳过（写了原因）的剂量天天挂卡催补。
+     */
+    suspend fun refreshYesterdayPending() = withContext(Dispatchers.IO) {
+        val yesterday = LocalDate.now().minusDays(1)
+        val settled = repo.settledSlotRefs(yesterday)
+        val meds = AppDatabase.get(app).medicationDao().listActive()
+        _yesterdayPending.value = PendingDoses.unsettledOn(
+            date = yesterday,
+            meds = meds,
+            now = LocalDateTime.now(),
+            isSettled = { medId, slotKey -> ReminderScheduler.slotRef(medId, slotKey) in settled },
+        )
+    }
+
+    /**
+     * 补记昨天那一剂为「已服」——**写入槽位所属日**（昨天），不会算作今天。
+     *
+     * 这是 2026-09-30 真机实测暴露的缺口：用户在跨零点追问后回到应用打卡时，今日页只能给
+     * 「今天」的槽位打卡，于是昨天那剂永远补不上、而今天的剂量被提前 23 小时记录。
+     */
+    fun checkInYesterday(p: PendingDoses.Pending) {
+        viewModelScope.launch {
+            val med = repo.medicationById(p.medId) ?: return@launch
+            repo.checkIn(med, p.slotKey, p.slotTime, date = p.date)
+            // 该槽位若还有升级提醒挂着，一并撤掉
+            NotificationHelper.cancel(app, p.medId, p.slotKey)
+            rescheduleInternal()
+            refreshYesterdayPending()
+        }
     }
 
     companion object {

@@ -107,6 +107,31 @@ object ReminderScheduler {
                 }
             }
         }
+
+        // 3) v1.0.73.1（D2 补漏）：**昨天跨零点过来的、尚未到时的升级重查**必须重建。
+        //
+        // 为什么非有这一步不可：[cancelAllFuture] 现在会从 `today-1` 起扫（修 D2 的孤儿闹钟），
+        // 于是「23:55 那剂药」的 00:25 / 00:55 两个升级闹钟会在**任何一次重排**时被取消——
+        // 而第 1、2 步只重建 today 起的槽位，昨天那个槽位不在其中。净效果是：
+        // 用户在 00:10 打开一次应用（或打卡任何一剂药、或手机重启），**跨零点的追问链就被清空且不再重建**，
+        // 那剂漏服的药再也不会被追问（这比修复前的孤儿闹钟更糟：旧行为至少还能响一次）。
+        //
+        // 这里刻意**不**传「昨天已打卡槽位」：升级重查是否该静默，由接收器在触发时刻按
+        // `slotDate`（槽位所属日）查库决定（见 ReminderReceiver 的 settled 判定）。
+        // 代价是可能为已结算的槽位多排一个闹钟，触发时静默取消——换来的是调用方（4 处）无需各自
+        // 再算一遍「昨天的完成集合」，少一处漏传的机会（v1.0.44 的 N1 教训正是漏传导致的误提醒）。
+        val yesterday = today.minusDays(1)
+        for (med in meds) {
+            for (slot in ScheduleCalc.slotsFor(med, yesterday)) {
+                val time = slot.time ?: continue
+                val base = LocalDateTime.of(yesterday, LocalTime.parse(time))
+                for (esc in 1..MAX_ESCALATION) {
+                    val fire = base.plusMinutes(ESCALATION_STEP_MINUTES * esc)
+                    // 只重建「还没到点」的：已过点的早已触发或已无意义
+                    if (fire.isAfter(now)) schedule(context, am, med.id, slot.key, time, yesterday, fire, esc)
+                }
+            }
+        }
     }
 
     /**

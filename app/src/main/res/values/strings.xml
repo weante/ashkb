@@ -568,6 +568,10 @@
     <string name="today_all_done">今天的用药都记完了</string>
     <string name="today_build_then_add_note">建档后添加药品，这里会显示今天该服用的药与打卡入口</string>
     <string name="today_log_symptom">记症状</string>
+    <string name="today_yesterday_pending_title">昨天还有 %1$d 剂未记录</string>
+    <string name="today_yesterday_pending_hint">补记会写入 %1$s 的用药记录（不会算作今天）；若确实没吃，可在该药的「用药记录」里补一条跳过并写明原因</string>
+    <string name="today_yesterday_pending_plan">计划 %1$s</string>
+    <string name="today_yesterday_pending_mark">补记已服</string>
     <string name="today_meds_section">今日用药</string>
     <string name="today_no_med_plan">今天没有用药计划</string>
     <string name="today_not_recorded">今日未记录</string>

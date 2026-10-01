@@ -167,13 +167,16 @@ fun MeScreen(
 @Composable
 private fun AboutCard() {
     val context = LocalContext.current
-    val version = remember {
-        runCatching {
-            val pi = context.packageManager.getPackageInfo(context.packageName, 0)
-            val code = if (Build.VERSION.SDK_INT >= 28) pi.longVersionCode else pi.versionCode.toLong()
-            "v${pi.versionName} ($code)"
-        }.getOrDefault("")
-    }
+    // v1.0.74：**不再用 `remember` 缓存**。原先缓存导致一个真实的误判场景：
+    // 覆盖安装（`adb install -r` / 应用商店更新）后，若进程未被系统杀掉而只是换了包，
+    // 已组合过的「关于」卡会一直显示**旧版本号**——维护者据此以为没装上（2026-09-30 实测：
+    // 设备上已是 versionCode 79，界面仍显示 78，进程启动时刻早于更新时刻）。
+    // `getPackageInfo` 走 PackageManager 的进程内缓存，逐次读取代价可忽略，故直接现取。
+    val version = runCatching {
+        val pi = context.packageManager.getPackageInfo(context.packageName, 0)
+        val code = if (Build.VERSION.SDK_INT >= 28) pi.longVersionCode else pi.versionCode.toLong()
+        "v${pi.versionName} ($code)"
+    }.getOrDefault("")
     SectionCard(title = stringResource(R.string.me_about_title)) {
         KeyValueRow(stringResource(R.string.me_version_field), version)
         Text(

@@ -297,6 +297,20 @@ class MedicationRepository(private val context: Context) {
             .map { ReminderScheduler.slotRef(it.medId, it.slotKey) }
             .toSet()
 
+    /**
+     * v1.0.74：某日**已结算**的槽位（done 或 skipped）。
+     *
+     * 与 [doneSlotRefs] 的区别：那个只认 `done`（用于「重排时不再重建升级重查」——
+     * 用户主动跳过的槽位在 v1.0.73 之后也不该重建，故新代码一律用本方法）。
+     * 今日页的「昨天还有 N 剂未记录」卡必须用**已结算**口径，否则用户昨天明确跳过（写了原因）的
+     * 剂量会天天挂在卡片上催他补记。
+     */
+    suspend fun settledSlotRefs(date: LocalDate): Set<String> =
+        logsForDate(date)
+            .filter { it.status == AdherenceCalc.DONE || it.status == AdherenceCalc.SKIPPED }
+            .map { ReminderScheduler.slotRef(it.medId, it.slotKey) }
+            .toSet()
+
     /** R17 注射顺延：锚点移至新日期，周期从新日期起算重排；实际注射发生时才写日志（未记录=无行） */
     suspend fun postponeInjection(med: Medication, toDate: LocalDate) {
         medDao.upsert(med.copy(startDate = toDate.toString(), updatedAt = nowIso()))

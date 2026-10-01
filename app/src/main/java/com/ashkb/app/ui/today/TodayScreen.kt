@@ -95,6 +95,9 @@ fun TodayScreen(
     val exerciseDone by vm.exerciseDone.collectAsStateWithLifecycle()
     // v1.0.65 B12：极简模式状态机
     val minimalPrompt by vm.minimalPrompt.collectAsStateWithLifecycle()
+    // v1.0.74：昨天未记录的剂量（跨零点补记入口）
+    val yesterdayPending by vm.yesterdayPending.collectAsStateWithLifecycle()
+    val yesterdayDate = remember { java.time.LocalDate.now().minusDays(1).toString() }
     val isMinimal = profile?.uiMode == MinimalMode.MODE_MINIMAL
     // v1.0.73：不再需要 context——打卡 / 跳过 / 顺延后的重排已折进 TodayViewModel（写入后同协程 + IO）
     var skipTarget by remember { mutableStateOf<TodayItem?>(null) }
@@ -172,6 +175,46 @@ fun TodayScreen(
                         modifier = Modifier.weight(1f),
                         onClick = onOpenExercise,
                     )
+                }
+            }
+        }
+
+        // v1.0.74：跨零点补记卡——昨天已到点却没记录的剂量，在这里补记（写入槽位所属日）。
+        // 缺口背景（2026-09-30 真机实测）：23:55 那剂的追问落在次日 00:25，用户被提醒后回到应用
+        // 只能给「今天」的槽位打卡 → 昨天那剂永远补不上、今天那剂却被提前记录。通知上的「已服用」
+        // 走的是槽位所属日（v1.0.73），但用户往往直接回应用，故必须有这个入口。
+        if (yesterdayPending.isNotEmpty()) {
+            item {
+                SectionCard(
+                    title = stringResource(R.string.today_yesterday_pending_title, yesterdayPending.size),
+                ) {
+                    Text(
+                        stringResource(R.string.today_yesterday_pending_hint, yesterdayDate),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    yesterdayPending.forEach { p ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(p.medName, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    stringResource(R.string.today_yesterday_pending_plan, p.slotTime),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = { vm.checkInYesterday(p) },
+                                modifier = Modifier.height(Size.touchMin),
+                            ) {
+                                Text(stringResource(R.string.today_yesterday_pending_mark))
+                            }
+                        }
+                    }
                 }
             }
         }

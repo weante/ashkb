@@ -117,6 +117,10 @@ app/src/main/java/com/ashkb/app/
 
 ## 7. 近期教训（2026-09 迭代实录）
 
+- **覆盖安装不会杀掉进程（HyperOS 实测，2026-09-30）**：db install -r 成功后，应用进程可能**仍在运行旧代码**（实测装机时刻 22:07:32，进程启动于 21:56:21，ps -A -o PID,ETIME,NAME | grep ashkb 可见）。两条纪律：
+  ① 验证新版行为前**必须** db shell am force-stop com.ashkb.app 再启动，并用 ETIME 确认进程比装机时刻更年轻；
+  ② 界面里任何被 emember 缓存的「环境信息」（版本号、权限态等）都可能在覆盖安装后**显示过期**——「关于」卡已改为逐次现取（v1.0.74）。
+
 - **WebDAV HTTPS 反射坑**：`HttpsURLConnectionImpl` 的 `method` 字段在 `delegate` 指向的 `HttpURLConnectionImpl` 上；对包装类直接反射会找到无效影子字段且静默失败（MKCOL 实际按 GET 发出报 404）。修复见 `WebDavClient.forceMethod()`——先解引用 delegate 再沿类层级找字段。
 - **回调透传**：页面嵌套 composable（如 ReportScreen 内的 ExportPage）新增参数时要逐层透传，编译错误 `Unresolved reference` 先查函数签名链。
 - **化验列表翻页**：`CheckupViewModel` 用 `_labLimit` MutableStateFlow + `flatMapLatest` 实现窗口增长（初始 100 行，+100 递增），列表底部按钮 `canLoadMore = list.size >= limit` 判断隐藏。
