@@ -144,9 +144,24 @@ class WellnessViewModel(
         viewModelScope.launch { repo.archiveSupplement(id) }
     }
 
+    /**
+     * v1.0.81（批次 7）：删除整个补剂条目。
+     *
+     * 语义边界（文案上必须与详情里的逐条删除区分开）：**连带删除它名下的全部服用记录**，
+     * 理由与确认框报数口径见 `domain/SupplementDeletion`。
+     */
     fun deleteSupplement(id: String) {
         viewModelScope.launch { repo.deleteSupplement(id) }
     }
+
+    /**
+     * v1.0.81（批次 7）：删除整个补剂时，确认框要报出的「将一并删除的服用记录条数」。
+     *
+     * 打开确认框时查一次；失败返回 null，UI 据此**禁用确认按钮**——
+     * 宁可让用户再点一次，也不能让他删掉自己还没看清条数的一批记录（与批次 6 的复诊删除同款）。
+     */
+    suspend fun supplementLogCount(id: String): Int? =
+        runCatching { repo.countSupplementLogs(id) }.getOrNull()
 
     /** U3 单个补剂的服用历史流（近 90 天，仅 done） */
     fun observeSupplementHistory(sup: Supplement) =
@@ -179,6 +194,19 @@ class WellnessViewModel(
                 .filter { it.supId == supp.id }
                 .forEach { repo.deleteSupplementLog(it.id) }
         }
+    }
+
+    /**
+     * v1.0.81（批次 7）：在补剂详情里**只删这一条**服用记录（某一天记错了）。
+     *
+     * 与 [undoSupplementCheckIn] 的分工：那个只面向「今天」、且要删掉当天的**全部**行
+     * （撤销打卡 = 回到未记录态，删一行救不回卡片上的「已服用」胶囊）；这里是用户在详情里
+     * 指着某一行点删除，删的就是那一行——即使同一天因连点留下多行，其余行也不是他要删的。
+     *
+     * 无派生数据：补剂打卡不参与排程与警报，删完不需要重排提醒或重算警报。
+     */
+    fun deleteSupplementLog(id: String) {
+        viewModelScope.launch { repo.deleteSupplementLog(id) }
     }
 
     // ---- 饮食画像 ----

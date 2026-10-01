@@ -34,6 +34,7 @@ import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.LabImport
 import com.ashkb.app.domain.MinimalMode
+import com.ashkb.app.domain.SupplementHistory
 import com.ashkb.app.domain.VaccineSafety
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
@@ -443,9 +444,13 @@ class HealthRepository(private val context: Context) {
     fun observeSupplements(): Flow<List<Supplement>> = supplementDao.observeActive()
     fun observeSupplementLogs(date: String): Flow<List<SupplementLog>> = supplementLogDao.observeByDate(date)
 
-    /** U3 单个补剂的服用历史（近 90 天，仅 done） */
+    /**
+     * U3 单个补剂的服用历史（近 90 天，仅 done）。
+     * v1.0.81（批次 7）：窗口长度改为引用 `domain/SupplementHistory` 的常量——
+     * 弹层的行数上限与这里的窗口是同一条规则，散在两个文件里迟早只改一处。
+     */
     fun observeSupplementHistory(supId: String, name: String): Flow<List<SupplementLog>> =
-        supplementLogDao.observeHistoryFor(supId, name, LocalDate.now().minusDays(90).toString())
+        supplementLogDao.observeHistoryFor(supId, name, SupplementHistory.fromDate(LocalDate.now()))
 
     suspend fun saveSupplement(supp: Supplement) {
         val now = nowIso()
@@ -456,8 +461,25 @@ class HealthRepository(private val context: Context) {
 
     suspend fun archiveSupplement(id: String) = supplementDao.archive(id, nowIso())
 
-    /** U1 真删（supplement_logs 快照自持，历史不受影响） */
-    suspend fun deleteSupplement(id: String) = supplementDao.delete(id)
+    /** v1.0.81（批次 7）：某补剂名下的记录条数——删除确认框报数用（只读，无副作用）。 */
+    suspend fun countSupplementLogs(supId: String): Int = supplementLogDao.countBySupId(supId)
+
+    /**
+     * v1.0.81（批次 7）：删除整个补剂条目，**连带删除它名下的全部服用记录**。
+     *
+     * 为什么要级联、为什么必须报数：见 `domain/SupplementDeletion`（纯函数，有单测）。
+     * 为什么两条语句必须同事务：先删记录、再删档案，中途失败会留下「档案还在、记录没了」的半截状态；
+     * 同事务提交则要么都生效、要么都不生效。
+     *
+     * @return 实际连带删掉的记录条数（供确认框报数与测试断言；档案不存在时为 0）
+     */
+    suspend fun deleteSupplement(id: String): Int = db.withTransaction {
+        val removed = supplementLogDao.countBySupId(id)
+        // 不限日期：详情只列最近 90 天，但删档案要删掉它的**全部**记录，否则 90 天前的记录永远无人可见
+        supplementLogDao.deleteBySupId(id)
+        supplementDao.delete(id)
+        removed
+    }
 
     suspend fun checkInSupplement(log: SupplementLog) = db.withTransaction {
         val existing = log.supId?.let { supplementLogDao.find(it, log.date, log.slotKey) }

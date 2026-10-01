@@ -435,7 +435,14 @@ interface SupplementDao {
     @Query("UPDATE supplements SET is_archived = 1, updated_at = :now WHERE id = :id")
     suspend fun archive(id: String, now: String)
 
-    /** U1 真删（误录/停用后清理档案）；历史 supplement_logs 快照自持，不受影响 */
+    /**
+     * U1 真删（误录/停用后清理档案）。
+     *
+     * v1.0.81（批次 7）更正：**必须与 [SupplementLogDao.deleteBySupId] 同事务使用**
+     * （走 `HealthRepository.deleteSupplement`）。上一版注释写的「历史 supplement_logs 快照自持，不受影响」
+     * 说的是「只删这一行」，却漏了后果：记录会变成 `sup_id` 指向不存在补剂的孤儿行，
+     * 用户再也打不开、也删不掉它们。本方法本身仍是单表删除，级联由仓库层负责。
+     */
     @Query("DELETE FROM supplements WHERE id = :id")
     suspend fun delete(id: String)
 }
@@ -458,6 +465,25 @@ interface SupplementLogDao {
 
     @Upsert
     suspend fun upsert(log: SupplementLog)
+
+    /**
+     * v1.0.81（批次 7）：某补剂名下的记录条数（删除整个补剂时的确认框要如实报数）。
+     *
+     * 与 [deleteBySupId] **同一谓词**（`sup_id = :supId`）——报出的条数与实际删掉的条数必须是同一个数，
+     * 否则确认框就是在骗用户。刻意不按 `sup_name` 兜底匹配：`sup_id IS NULL` 的同名行不是这条档案的记录
+     * （App 自身写入的打卡恒带 sup_id，见 `WellnessViewModel.checkInSupplement`），按名字删会误伤导入的快照行。
+     */
+    @Query("SELECT COUNT(*) FROM supplement_logs WHERE sup_id = :supId")
+    suspend fun countBySupId(supId: String): Int
+
+    /**
+     * v1.0.81（批次 7）：随补剂档案一并删除它名下的全部记录（避免 `sup_id` 悬空的孤儿行）。
+     *
+     * 不限日期：详情弹层只列最近 90 天，但「删掉这个补剂」是删掉它的全部记录——
+     * 只删窗口内的会让 90 天前的记录永远留在库里且无人可见。
+     */
+    @Query("DELETE FROM supplement_logs WHERE sup_id = :supId")
+    suspend fun deleteBySupId(supId: String)
 
     /** C2（v1.0.37）：补剂依从统计——按状态计数（与 medication_logs 同口径）。 */
     @Query("SELECT COUNT(*) FROM supplement_logs WHERE date BETWEEN :from AND :to AND status = :status")

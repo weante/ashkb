@@ -100,9 +100,11 @@ fun WellnessScreen(vm: WellnessViewModel, onOpenRecipes: () -> Unit, onBack: () 
     var showSupplementForm by remember { mutableStateOf(false) }
     var showDietForm by remember { mutableStateOf(false) }
     var showAvoidManage by remember { mutableStateOf(false) }
-    var historySup by remember { mutableStateOf<Supplement?>(null) }
+    var detailSup by remember { mutableStateOf<Supplement?>(null) }
     // v1.0.38（B11）：编辑补剂时复用同一表单并预填既有值
     var editSup by remember { mutableStateOf<Supplement?>(null) }
+    // v1.0.81（批次 7）：待删的**整个补剂条目**（与详情里的逐条删除是两回事，文案各说各的）
+    var deletingSup by remember { mutableStateOf<Supplement?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         ScreenTopBar(title = stringResource(R.string.nutrition_bone_health_title), onBack = onBack)
@@ -215,7 +217,10 @@ fun WellnessScreen(vm: WellnessViewModel, onOpenRecipes: () -> Unit, onBack: () 
                     } else {
                         DividerList(supplements, key = { it.id }) { sup ->
                             Column(
-                                Modifier.weight(1f).clickable { historySup = sup },
+                                // v1.0.81（批次 7）：点整行打开「补剂详情」（最近服用记录 + 逐条删除）。
+                                // 状态变量就是下面弹层用的 detailSup——**同一个**变量：写成两份 state 的话，
+                                // 点击只改一份、弹层读另一份，点了没反应。
+                                Modifier.weight(1f).clickable { detailSup = sup },
                                 verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
                             ) {
                                 Text("${sup.name} ${sup.dose}", style = MaterialTheme.typography.bodyMedium)
@@ -258,12 +263,14 @@ fun WellnessScreen(vm: WellnessViewModel, onOpenRecipes: () -> Unit, onBack: () 
                                 }) { Text(stringResource(R.string.exercise_checkin_short)) }
                             }
                             TextButton(onClick = { editSup = sup }) { Text(stringResource(R.string.common_edit)) }
-                            DestructiveAction(
-                                label = stringResource(R.string.common_delete),
-                                confirmTitle = stringResource(R.string.wellness_delete_confirm, sup.name),
-                                confirmBody = stringResource(R.string.nutrition_supplement_delete_note),
-                                onConfirm = { vm.deleteSupplement(sup.id) },
-                            )
+                            // v1.0.81（批次 7）：这里的删除 = **删掉整个补剂条目**（连带它名下的服用记录，
+                            // 条数由确认框异步取并报出，见 SupplementDeleteDialog）。只想删某一天的记录时，
+                            // 走「点击补剂」打开的详情弹层——两种语义此前共用一句「删除…？」，
+                            // 而确认框里那句「已产生的服用记录仍保留」更是与实情相反，正是用户困惑的根源。
+                            TextButton(
+                                onClick = { deletingSup = sup },
+                                modifier = Modifier.heightIn(min = Size.touchMin),
+                            ) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
                         }
                         // B11：矿物类补剂与「螯合类」用药服用时间过近（间隔 < 2 小时）→ 错开提醒
                         val conflicts = remember(supplements, medications) {
@@ -390,8 +397,9 @@ fun WellnessScreen(vm: WellnessViewModel, onOpenRecipes: () -> Unit, onBack: () 
     if (showSupplementForm) SupplementSheet(vm = vm, onDismiss = { showSupplementForm = false })
     if (showDietForm) DietSheet(vm = vm, current = diet, onDismiss = { showDietForm = false })
     if (showAvoidManage) AvoidManageSheet(vm = vm, onDismiss = { showAvoidManage = false })
-    historySup?.let { sup -> SupplementHistorySheet(vm = vm, sup = sup, onDismiss = { historySup = null }) }
+    detailSup?.let { sup -> SupplementDetailSheet(vm = vm, sup = sup, onDismiss = { detailSup = null }) }
     editSup?.let { sup -> SupplementSheet(vm = vm, current = sup, onDismiss = { editSup = null }) }
+    deletingSup?.let { sup -> SupplementDeleteDialog(vm = vm, sup = sup, onDismiss = { deletingSup = null }) }
 }
 
 /**
@@ -1064,43 +1072,6 @@ private fun ChipGroup(options: List<Pair<String, String>>, selected: String, onS
                 label = { Text(label) },
                 modifier = Modifier.heightIn(min = Size.touchMin),
             )
-        }
-    }
-}
-
-/** U3 补剂服用历史：近 90 天打卡（done）按日倒序；「我什么时候吃过」一查即知。 */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SupplementHistorySheet(vm: WellnessViewModel, sup: Supplement, onDismiss: () -> Unit) {
-    val history by remember(sup.id) { vm.observeSupplementHistory(sup) }.collectAsStateWithLifecycle(initialValue = emptyList())
-
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        SheetColumn {
-            Text("${sup.name} ${sup.dose}", style = MaterialTheme.typography.titleLarge)
-            Text(
-                if (history.isEmpty()) stringResource(R.string.nutrition_supplement_history_empty, sup.name)
-                else stringResource(R.string.nutrition_supplement_history_count, history.size),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (history.isNotEmpty()) {
-                DividerList(history, key = { it.id }) { log ->
-                    Column(
-                        Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
-                    ) {
-                        Text(log.date, style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            stringResource(
-                                R.string.nutrition_supplement_history_entry,
-                                (log.takenAt ?: log.recordedAt).take(16).replace("T", " "),
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
         }
     }
 }
