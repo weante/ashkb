@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,6 +47,11 @@ import com.ashkb.app.ui.theme.colors
 /**
  * 胶囊标签。取代此前 3 份 `Card` 当胶囊的 badge 实现。
  * 状态一律三重编码：底色（tone）+ 图标 + 文字。
+ *
+ * v1.0.82（批次 8）：高度由**固定**改为**下限**（`height` → `heightIn(min = Size.chipHeight)`）。
+ * 原实现把高度钉死在 28dp，而 labelMedium 的行高是 18sp——提示类文案一旦换到第二行
+ * （化验页「同一项目有多个单位…」就是），第二行直接被裁掉。改下限后：单行 chip 高度分毫不变
+ * （内容 18dp + 上下 [Spacing.xs] 内边距 = 26dp，仍由 28dp 下限决定），多行则按内容长高。
  */
 @Composable
 fun StatusChip(
@@ -59,11 +65,12 @@ fun StatusChip(
         shape = CircleShape,
         color = bg,
         modifier = Modifier
-            .height(Size.chipHeight)
+            .heightIn(min = Size.chipHeight)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = Spacing.sm),
+            // 纵向内边距只在换行时才看得见（单行仍由上面的 28dp 下限托底），避免两行字顶到胶囊边
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {

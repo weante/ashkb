@@ -23,6 +23,8 @@ import com.ashkb.app.ui.theme.accent
 
 /**
  * v1.0.77（批次 3b）：**用药完成度（计划剂量口径）** + 次级「记录内完成度」的一体化展示块。
+ * v1.0.82（批次 8）：按维护者反馈瘦身——块内重复标题只在调用方没印标题时出现（见 [showTitle]）、
+ * 「覆盖起点」整行删除、口径说明压成一句。**口径逻辑与百分比一个字节都没动，只动展示。**
  *
  * 为什么两套口径要挤在同一个组件里、而不是各写一段：
  * 它们的分母不一样（计划剂量数 vs 已记录条数），**必须成对出现并解释差别**——
@@ -32,12 +34,14 @@ import com.ashkb.app.ui.theme.accent
  * 展示口径（每一条都是上面「不得给出无据结论」原则的落实）：
  *  · `rate == null`（无计划快照）→ 显示「—（暂无计划快照）」+ 原因，**不给百分比、不给达标判定**；
  *  · 有计划快照 → 百分比 + 「完成 / 部分 / 跳过 / 未记录」四段拆分（缺任何一段都会让用户对不上数）；
- *  · 紧跟一行**覆盖起点**：计划快照自 v1.0.77（批次 3b）起才有，更早的历史不含计划剂量；
- *  · 最后一行说明两个口径的分母差别，避免用户以为两个百分比在打架。
+ *  · 最后一句说明两个口径的分母差别，避免用户以为两个百分比在打架。
  *
  * @param dose 计划剂量口径的汇总（来自 `AdherenceCalc.doseCompletion`，调用方须先滤掉未到点的槽位）
  * @param record 记录内完成度（来自 `AdherenceCalc.completion`）——**次级说明行**，它覆盖更早的历史
  * @param days 统计窗口（天）；两套口径必须是同一个窗口
+ * @param showTitle 块内是否自印标题。药单弹层顶部只有「药名 + 剂量」，指标叫什么得由本块交代，
+ *   故默认 `true`；报表卡片的外层 [com.ashkb.app.ui.components.SectionCard] 已经印了**同一句**标题，
+ *   那边传 `false`——同一句标题只印一次，印两遍就是维护者说的「废话」。
  */
 @Composable
 fun DoseCompletionBlock(
@@ -45,12 +49,15 @@ fun DoseCompletionBlock(
     record: AdherenceCalc.Completion,
     days: Int,
     modifier: Modifier = Modifier,
+    showTitle: Boolean = true,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        Text(
-            stringResource(R.string.dose_completion_plan_title, days),
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        if (showTitle) {
+            Text(
+                stringResource(R.string.dose_completion_plan_title, days),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
         val rate = dose.ratePct
         if (rate == null) {
             Text(
@@ -86,13 +93,9 @@ fun DoseCompletionBlock(
                 color = tone.accent(),
                 trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             )
-            Text(
-                stringResource(R.string.dose_completion_coverage_note),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
         RecordCompletionLine(record = record, days = days)
+        // v1.0.82（批次 8）：口径说明从一段压成一句。它是两个百分比不打架的唯一解释，**不能删**。
         Text(
             stringResource(R.string.dose_completion_scope_note),
             style = MaterialTheme.typography.bodySmall,

@@ -155,10 +155,14 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
         item {
             // v1.0.77（批次 3b）：这张卡片的主指标改为**计划剂量口径**（分母 = 已到点的计划剂量数）——
             // 它才是「真正吃了多少剂」；「记录内完成度」降为块内的次级说明行（它覆盖更早的历史，
-            // 因为计划快照只有 v1.0.77 起的数据）。两套口径的差别与覆盖起点由 DoseCompletionBlock 统一解释。
+            // 因为计划快照只有 v1.0.77 起的数据）。两套口径的差别由 DoseCompletionBlock 统一解释。
+            // v1.0.82（批次 8）：块内标题传 false——卡片头部印的就是同一句 dose_completion_plan_title，
+            // 两处都印等于让用户把同一行字读两遍（维护者反馈的「废话太多」）。
             SectionCard(title = stringResource(R.string.dose_completion_plan_title, o.adherence.days)) {
                 val med = o.adherence
-                DoseCompletionBlock(dose = med.plan, record = med.record, days = med.days)
+                DoseCompletionBlock(
+                    dose = med.plan, record = med.record, days = med.days, showTitle = false,
+                )
                 if (med.medPrnCount > 0) {
                     // 按需（PRN）记录被移出了完成度，必须在卡片上说出它们的去处与条数
                     Spacer(Modifier.height(Spacing.xs))
@@ -192,7 +196,13 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("$rate%", style = DataLarge, color = accent)
                         Spacer(Modifier.padding(start = Spacing.lg))
-                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                        // v1.0.82（批次 8）：这一列必须参与权重分配，否则它会按内容宽度吃掉整行，
+                        // 右侧「达标」徽标只剩被挤压的残宽 → 两字被迫竖排后被裁（维护者截图反馈）。
+                        // fill = false：列宽按剩余空间收缩、不强行撑满，徽标得以按自身内容宽度测量。
+                        Column(
+                            modifier = Modifier.weight(1f, fill = false),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+                        ) {
                             Text(
                                 stringResource(R.string.report_supp_adherence_detail, sup.done, sup.partial, sup.skipped),
                                 style = MaterialTheme.typography.bodyMedium,
@@ -203,7 +213,9 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Spacer(Modifier.weight(1f))
+                        // 徽标紧跟内容（不再用 weight 撑开）——把剩余空间交给上面的列，
+                        // 权重撑开的写法在窄屏上会把徽标挤到零宽
+                        Spacer(Modifier.padding(start = Spacing.sm))
                         StatusChip(ClinicalThresholds.adherenceLabel(rate), tone)
                     }
                     Spacer(Modifier.height(Spacing.sm))

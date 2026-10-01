@@ -550,6 +550,8 @@ private fun MedicationMetricBlock(
         }
         return
     }
+    // v1.0.82（批次 8）：这里**必须**保留块内标题（showTitle 默认 true）——弹层顶部那行只有
+    // 「药名 + 剂量」，不说明下面这个百分比是什么口径；报表卡片那边才因头部重复而关掉它。
     DoseCompletionBlock(dose = dose, record = completion, days = MED_HISTORY_DAYS)
     if (prnCount > 0) {
         // 按需记录被移出了完成度，必须在这里说明去处，否则用户以为记录丢了
