@@ -1,13 +1,13 @@
 import java.util.Properties
 
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
-    id("org.jetbrains.kotlin.plugin.serialization")
-    id("com.google.devtools.ksp")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
     // 批次 2（测试安全网）：静态分析（配置见 config/detekt/detekt.yml，历史问题进基线）
-    id("io.gitlab.arturbosch.detekt")
+    alias(libs.plugins.detekt)
 }
 
 // 正式签名：凭据读自 local.properties（gitignore 排除，不入库）；
@@ -159,43 +159,43 @@ gradle.taskGraph.whenReady {
 
 dependencies {
     // Room（27 实体逐步启用，P1 落 4 表）
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
 
     // Compose
-    implementation(platform("androidx.compose:compose-bom:2024.09.03"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.activity:activity-compose:1.9.2")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
-    implementation("androidx.core:core-ktx:1.13.1")
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons.extended)
+    implementation(libs.activity.compose)
+    implementation(libs.lifecycle.runtime.compose)
+    implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.core.ktx)
 
     // 导航（UI 改版唯一新增依赖，见方案 §8.6）：规范化返回栈 / 状态保存 / 深链接
-    implementation("androidx.navigation:navigation-compose:2.8.4")
+    implementation(libs.navigation.compose)
 
     // JSON（种子 payload 解析，org.json 亦可用，此处统一 kotlinx）
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation(libs.kotlinx.serialization.json)
 
     // P5 单元测试：org.json 桥接（Android stub 的 org.json 在 JVM 单测中不可用）
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.json:json:20240303")
+    testImplementation(libs.junit)
+    testImplementation(libs.json)
 
     // S1（v1.0.53）：提醒链回归——`ReminderScheduler` 依赖 `AlarmManager`，纯 JVM 单测
     // （isReturnDefaultValues=true）完全覆盖不到，A1/N1 那类「只在真机暴露」的 bug 正源于此。
     // Robolectric 能模拟 AlarmManager（其核心能力），故用它断言「取消-重建」语义。
     // ⚠️ 不可用于检测 ICU 正则差异（已实测证伪，见 HANDOFF §7）。
     // 4.13 + instrumented android-all(API 34) 已在本机 Gradle / Maven 缓存中，可离线跑。
-    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation(libs.robolectric)
 
     // 批次 2（测试安全网）：instrumented 测试。
     // 目的：把「迁移是否真的把库结构改对」变成机器可判——schema 漂移校验要在真机上开一次库。
     // 版本选择：androidx.test.* 用本机缓存里已有的版本（离线可解析）；room-testing 与 Room 同版本。
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test:runner:1.5.0")
-    androidTestImplementation("androidx.room:room-testing:2.6.1")
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.room.testing)
 
     // S1b（手势回归）**已实测证伪、不予落地**（v1.0.53）：本环境能注入触摸事件
     // （最小 pointerInput 盒子能收到 down），但**驱动不了 M3 Slider 的拖动**——
