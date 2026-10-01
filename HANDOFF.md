@@ -484,7 +484,27 @@ M8 家属协作全部（家属端 / 共享子集 / 设备令牌 / 命令协议 /
 - [ ] **P5 手册 A / B / C 三组完整回填**（本清单即其修订版；A 组三机型提醒可靠性为核心）
 - [ ] **v1.0.71 起真机走查剩余项**（v1.0.61 ~ v1.0.70 的逐版要点见 `HANDOFF-STATUS.md` §2，本轮已完成部分见 §9.9）：久坐窗口与陈旧闹钟兜底、免打扰静默投递 + 同时段折叠、极简模式（需连续 3 天无核心记录才触发）、运动页「晨僵三档 + 姿势/睡姿块」视觉确认、骶髂分期在「我的」档案卡与复诊报告 PDF 的显示 + 档案 JSON 往返
 
-### 9.8b 历史 Room schema 补录方案（批次 2 的诚实边界，**待做**）
+### 9.8b 历史 Room schema 补录（**已完成：起点 4–18 全覆盖；起点 1–3 永久不可覆盖**）
+
+**结论（2026-10-01）**：已补录 `4.json` ~ `16.json`（13 个），加上原有的 `17/18/19.json`，
+**从 v4 起的所有升级路径都有自动化覆盖**，并且用真的 `MigrationTestHelper` 实测通过：
+13 条起点（4..16）各自 `createDatabase(name, N)` → `runMigrationsAndValidate(name, 19, true, *ALL_MIGRATIONS)`
+**13/13 全过**（含按 `19.json` 的结构校验）。补录办法：按 git 历史取「该版本号存续期内最后一个提交」，
+在**独立克隆**里逐个 checkout 并临时补上 `ksp { arg("room.schemaLocation", …) }` 导出（该配置 v1.0.75 才加）。
+
+**起点 1/2/3 是永久缺口，不是待办**：`git rev-list --max-parents=0` 的根提交上 `AppDatabase.kt` 已是
+`version = 4`，全历史 119 个提交只出现 version 4–17，`-S 'version = 2,'` / `'version = 3,'` 零命中；
+本地 git bundle、GitHub 远端（最早 tag 为 v1.0.1）、全盘搜索的 7 处 `AppDatabase.kt` 均无 1/2/3。
+代码里 `MIGRATION_1_2` / `2_3` / `3_4` 仍在、`MigrationCoverageTest` 仍要求迁移链从 1 起逐级无缺口，
+但**没有 1/2/3.json 就建不出对应旧库**，而伪造 schema 会让迁移测试给出**虚假的通过**——故不做。
+**以后不要再尝试补录 1/2/3**，除非出现含 v1–v3 的历史仓库。
+
+**尚未进 CI 的一步**：上述 `MigrationTestHelper` 实测目前跑在独立克隆里（`E:\ASHKB\schema-backfill` 的
+`BackfillMigrationProofTest`）。要收进主线需解决 schema 的测试期挂载——`MigrationTestHelper` 从 **assets**
+读 schema，挂到 `main` assets 会让 APK 多出约 1.2 MB（现 APK 2.58 MB）；挂到 `androidTest` assets 可行
+（`app/build.gradle.kts` 已配 `getByName("androidTest").assets.srcDir("$projectDir/schemas")` 且有 `room-testing`），
+但那样只能在真机 `connectedDebugAndroidTest` 跑、进不了 CI。取舍留给下一批。
+
 
 批次 2 已让 Room 导出 schema 并入库（pp/schemas/com.ashkb.app.data.db.AppDatabase/17.json），
 并加了两条机器可判的检查：MigrationCoverageTest（迁移链 1→17 无缺口）与 SchemaDriftTest

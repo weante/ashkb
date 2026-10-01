@@ -323,3 +323,10 @@ gh release edit v1.0.70 --prerelease=false --latest
   **非本应用**（全仓主代码无 observeForever 调用，已 grep 确认）
 - **仍未真机验证**：i_abnormal 的**并列展示**需要一条「AI 标记与本地判读不一致」的真实化验记录才会出现
   （可复制 AI 导入模板造一条：AI 标「正常」而数值超出参考范围）；漏服补发的汇总通知需等次日开机/启动才会触发
+### 历史 Room schema 补录完成（2026-10-01）
+
+- 新增 `app/schemas/com.ashkb.app.data.db.AppDatabase/4.json` ~ `16.json`（13 个，均为**当时提交上真实构建导出**，非逆向编造）
+- 用真的 `MigrationTestHelper` 实测：**起点 4..16 → 19 共 13 条升级路径 13/13 通过**（含按 19.json 的结构校验）
+- **起点 1/2/3 永久不可覆盖**（根提交已是 v4，全历史与远端/本地 bundle 均无 1/2/3；伪造会给出虚假通过，故不做）
+- 主线 `testDebugUnitTest --rerun`：**597 tests / 0 failures**（新增 JSON 未破坏任何测试）
+- 待办：把 `MigrationTestHelper` 实测收进主线（需解决 schema 的测试期挂载，见 HANDOFF §9.8b 末段）
