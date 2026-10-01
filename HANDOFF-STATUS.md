@@ -311,3 +311,15 @@ gh release edit v1.0.70 --prerelease=false --latest
 - **AI 异常值不再压制本地判读**；**BASDAI 4.0 收敛**到 ClinicalThresholds.basdaiHigh()（含 Double 重载，避免 	oInt() 截断）；新增 DateInput 拒绝不存在的日期
 - 单测 **540 → 585 条全绿**（59 个测试类）
 - **待做（v1.0.78）**：非法日期的表单提示文案；i_abnormal 列（库 v19）以实现「AI 标记与本地判定并列展示」；周月报/PDF 是否也显示计划口径
+### v1.0.78 真机验证（2026-10-01，Xiaomi 15 Pro / Android 16）
+
+- **覆盖安装**：1.0.77 → **1.0.78**（ersionCode 83），db install -r 成功
+- **库迁移真机首跑通过** ✅：v17 → v18 → v19 三次迁移后应用正常打开，logcat **无 FATAL / 无 Room/SQLite 异常**
+  - 直接证据（uiautomator 读屏）：药单 → 依那西普 → 用药记录弹层显示
+    「**用药完成度（计划剂量口径 · 近 90 天）** … 完成 1 · 部分 0 · 跳过 0 · 未记录 0（**共 1 剂计划**）」
+    —— 「共 1 剂计划」说明 planned_slots（v18 新表）**真的被物化写入**，不是空表
+  - 两个口径并列与「分母不同」说明行均正常渲染；「记录内完成度（90 天）100%（完成 5 …共 5 条记录）」与历史记录一致
+- **日志噪声甄别**：logcat 里的 observeForever on a background thread 属于小米 ML::MirrorCastManager，
+  **非本应用**（全仓主代码无 observeForever 调用，已 grep 确认）
+- **仍未真机验证**：i_abnormal 的**并列展示**需要一条「AI 标记与本地判读不一致」的真实化验记录才会出现
+  （可复制 AI 导入模板造一条：AI 标「正常」而数值超出参考范围）；漏服补发的汇总通知需等次日开机/启动才会触发
