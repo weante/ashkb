@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.0.82（versionCode 87）· 2026-10-01 · 批次 8（界面观感修复）；批次 7 已发布（v1.0.81）**。
+> **时点快照**：截至 **v1.0.83（versionCode 88）· 2026-10-01 · 批次 8 补充（提示条间距）；批次 7 已发布（v1.0.81）**。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号与测试条数以 `app/build.gradle.kts` 与 `app/build/test-results/testDebugUnitTest/*.xml` 为准。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -14,7 +14,7 @@
 | 工作树 | 提交 `022892e`（v1.0.74）已推送；工作树干净（`HANDOFF-STATUS.md` 已纳入版本管理） |
 | 全量单测 | **668 条，0 失败 / 0 错误 / 0 跳过**（69 个测试文件）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
-| APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 87 / versionName 1.0.82**（批次 8 产物） |
+| APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 88 / versionName 1.0.83**（批次 8 补充产物） |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
 | GitHub 正式版（Latest） | **v1.0.75**（2026-10-01 发布即正式版；两资产摘要与本地 `Get-FileHash` **逐字节一致**；v1.0.74 已加取代横幅） |
 | GitHub 预发布 | **v1.0.61 ~ v1.0.70**（历史预发布，各页已带「已被取代」横幅）；v1.0.72 已加「已被 v1.0.73 取代」横幅 |
@@ -379,3 +379,14 @@ AI 标记：正常；本地参考范围判读：偏高             ← v1.0.78 �
 - v1.0.80 真修（**未冻结 baseline**）后：`gh run list` → **`completed success`**（run `36878380610`，5m27s）。
 - 前置的 lint 修复由子代理在**独立 `git worktree`** 里单独验证过（只有它的两个文件时全绿），并用真实 JVM `String.format` 跑过全部 21 个改动字符串确认不会抛 `IllegalFormatConversionException`。
 - ⚠️ 记一个**承重细节**：`NotificationHelper` 的权限检查必须有 `SDK_INT >= 33` 判断——API 26–32 上 `POST_NOTIFICATIONS` 未定义、`checkSelfPermission` 恒为 DENIED，无条件检查会让这三个大版本的**所有提醒静默失效**。
+### 真机验证：批次 7 与批次 8（2026-10-01 深夜，Xiaomi 15 Pro / Android 16）
+
+维护者逐项确认 + 我 adb 读屏核对：
+
+| 项 | 结果 |
+|---|---|
+| **批次 7 补剂详情弹层**（v1.0.81 新界面） | ✅ **维护者真机确认可用**：「有删除按钮」——点补剂条目弹出详情、记录行可删，这是本批唯一无自动化测试的部分（仓库无 compose-ui-test 依赖） |
+| **批次 8 ① 概览页**（v1.0.82） | ✅ 读屏核对：「覆盖起点」行**已删除**；口径说明已是压缩版「计划口径分母 = 已到点的计划剂量（漏记算未记录）；记录口径分母 = 已记录条数」；补剂依从徽标文字完整为「达标」 |
+| **批次 8 ② 化验页提示条截断** | ✅ 维护者确认「正常了」——根因是 `StatusChip` 高度钉死 28dp（非 maxLines/padding），改 `heightIn(min=…)` 后两行不再被裁 |
+| **批次 8 ② 补充：贴太紧** | ✅ 维护者反馈「顶端死死贴着上层」→ v1.0.83 加 `Spacing.xs`（4dp，项目刻度里注释为「chip 间距」的值）。**未采用 1–2px**：低于视觉阈值会看着像渲染错位而非留白，且 `Spacing.xxs`(2dp) 的注释明确限定为「组件内部：图标与文字之间」 |
+| **批次 8 ③ 补剂依从「达标」挤压** | 已修（说明列改 `weight(1f, fill = false)`，徽标按内容宽度优先测量）；读屏确认徽标文字完整，**像素级观感待维护者最终确认** |

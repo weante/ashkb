@@ -325,7 +325,7 @@ internal fun LabsList(
             // C3：跨院多单位提示放列表顶部——先声明"不可比"，再看下面的分组数值
             if (mixedUnits.isNotEmpty()) {
                 item(key = "lab-unit-hint") {
-                    Column {
+                    Column(modifier = Modifier.padding(top = Spacing.xs)) {
                         StatusChip(
                             text = stringResource(R.string.lab_unit_group_hint),
                             tone = StatusTone.Warning,
