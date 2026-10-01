@@ -41,6 +41,23 @@ class ReportImportParserTest {
     }
 
     @Test
+    fun parseLab_aiAbnormal原样留档() {
+        // v1.0.78（批次 4 收尾）：AI 标记**同时写两处**——`abnormal` 是「本地判读结果或兜底值」
+        // （有参考范围时会被仓库的本地判读覆盖），`aiAbnormal` 只作留档，供界面并列展示分歧。
+        val text = """
+            日期: 2026-08-02
+            血沉(ESR), 15, mm/h, 0-20, 正常
+            C-反应蛋白(CRP), 10.8, mg/L, 0-8, 偏高
+            乙肝表面抗原(HBsAg), 阴性, -, 阴性
+        """.trimIndent()
+        val rows = ReportImportParser.parseLab(text)!!.rows
+        assertEquals("normal", rows[0].aiAbnormal)
+        assertEquals("解析阶段两列同源", rows[0].abnormal, rows[0].aiAbnormal)
+        assertEquals("high", rows[1].aiAbnormal)
+        assertNull("AI 没给标记时两列都为 null", rows[2].aiAbnormal)
+    }
+
+    @Test
     fun parseLab_skipsTemplateEcho() {
         // AI 复读模板说明 / 表头时不应产生数据行
         val text = """

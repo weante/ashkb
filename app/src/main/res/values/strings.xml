@@ -118,6 +118,8 @@
     <string name="common_date">日期</string>
     <string name="common_date_format_hint">格式：2026-09-01</string>
     <string name="common_date_format_hint2">日期格式 yyyy-MM-dd</string>
+    <string name="date_field_invalid">日期格式应为 2026-07-31（或 2026/7/31）；不存在的日期（如 2 月 30 日）不会被接受</string>
+    <string name="date_field_required">请填写日期（必填）</string>
     <string name="common_delete">删除</string>
     <string name="common_details">详情</string>
     <string name="common_doctor_final_note">就医核对时以医生意见为准</string>
@@ -676,6 +678,12 @@
     <string name="lab_ref_range_missing">该指标未记录参考范围（录入/AI 导入时未提供）</string>
     <string name="lab_value_high">%1$s 偏高</string>
     <string name="lab_value_low">%1$s 偏低</string>
+    <string name="lab_mark_note">AI 标记：%1$s；本地参考范围判读：%2$s</string>
+    <string name="lab_mark_high">偏高</string>
+    <string name="lab_mark_low">偏低</string>
+    <string name="lab_mark_normal">正常</string>
+    <string name="lab_mark_abnormal">异常</string>
+    <string name="lab_mark_unknown">未标注</string>
     <string name="me_in_use_prefix">"在用 %1$s 种 · "</string>
     <string name="me_med_disable">停用 %1$s</string>
     <string name="me_meds_count">在用药品（%1$s）</string>

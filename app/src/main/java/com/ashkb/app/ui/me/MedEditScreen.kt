@@ -57,6 +57,8 @@ import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.DrugKeyCatalog
 import com.ashkb.app.domain.ScheduleCalc
+import com.ashkb.app.ui.components.DateFieldRules
+import com.ashkb.app.ui.components.DateTextField
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
@@ -101,6 +103,13 @@ fun MedEditScreen(
     var prnReason by rememberSaveable { mutableStateOf("") }
     var storage by rememberSaveable { mutableStateOf("") }
     var startDate by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
+    // v1.0.78（批次 4 收尾）：注射周期锚点日期此前是自由文本、**无任何校验**——
+    // `2026-13-45` 一旦落库，「每 N 天」的周期推算会整体错位，且没有任何地方会报错。
+    // 该输入框只在「注射 + 每 N 天 / 自定义」分支出现，故校验也只在它可见时生效
+    // （不可见时不动既有值，避免挡住与它无关的编辑）。
+    val cycleAnchorVisible = route == "injection" && frequency != MedFrequency.PRN &&
+        (frequency == MedFrequency.Q2W || frequency == MedFrequency.CUSTOM)
+    val startDateOk = DateFieldRules.requiredOk(startDate)
     // ---- C6 服药三态：固定 / 按需 / 减量中（默认固定，编辑时按原值预填） ----
     var doseState by rememberSaveable { mutableStateOf(DoseState.FIXED) }
     var taperNote by rememberSaveable { mutableStateOf("") }
@@ -167,7 +176,7 @@ fun MedEditScreen(
         },
         weeklyWeekday = if (frequency == MedFrequency.WEEKLY || frequency == MedFrequency.BIW) weekday else null,
         weeklyWeekday2 = if (frequency == MedFrequency.BIW) weekday2 else null,
-        startDate = startDate,
+        startDate = DateFieldRules.toIsoOrNull(startDate) ?: startDate,
         injCycleDays = if (route == "injection") cycleDays.toIntOrNull() ?: 14 else null,
         storage = storage.trim().ifBlank { null },
         takeWithFood = if (route == "oral") food else null,
@@ -220,6 +229,8 @@ fun MedEditScreen(
                             if (editMissing) return@Button
                             if (step == 1) {
                                 if (name.isBlank() || nameKey.isBlank() || dose.isBlank()) return@Button
+                                // v1.0.78（批次 4 收尾）：锚点日期非法时不许进入核对步骤（按钮已同步置灰）
+                                if (cycleAnchorVisible && !startDateOk) return@Button
                                 if (frequency == MedFrequency.BIW && weekday == weekday2) {
                                     biwError = true
                                     return@Button
@@ -234,7 +245,7 @@ fun MedEditScreen(
                                 onSaved()
                             }
                         },
-                        enabled = !editMissing,
+                        enabled = !editMissing && (!cycleAnchorVisible || startDateOk),
                         modifier = Modifier.weight(1f).heightIn(min = Size.touchMin),
                     ) { Text(if (step == 1) stringResource(R.string.med_next_verify) else stringResource(R.string.checkup_save_record)) }
                 }
@@ -339,15 +350,18 @@ fun MedEditScreen(
                         // v1.0.51：注射类此前**没有任何「计划用药时间」入口**——时刻选择只在口服分支里，
                         // 注射的时刻被静默写成表单默认值 08:00，用户既看不到也改不了；
                         // 今日卡又只显示「注射」不显示时刻，于是「计划用药时间」在全应用都无处可见。
-                        if (frequency == MedFrequency.Q2W || frequency == MedFrequency.CUSTOM) {
+                        // 与顶部 cycleAnchorVisible 同一判定：**校验生效的范围 == 输入框可见的范围**，
+                        // 两处各写一遍条件迟早会漂移（改了这里忘了那里，就会出现「看得见却没人校验」）
+                        if (cycleAnchorVisible) {
                             OutlinedTextField(
                                 cycleDays, { cycleDays = it.filter { c -> c.isDigit() }.take(3) },
                                 label = { Text(stringResource(R.string.med_inj_cycle_field)) },
                                 modifier = Modifier.fillMaxWidth(),
                             )
-                            OutlinedTextField(
-                                startDate, { startDate = it },
-                                label = { Text(stringResource(R.string.med_cycle_anchor_date)) },
+                            DateTextField(
+                                value = startDate,
+                                onValueChange = { startDate = it },
+                                label = stringResource(R.string.med_cycle_anchor_date),
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }

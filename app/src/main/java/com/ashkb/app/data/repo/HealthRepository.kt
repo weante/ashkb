@@ -489,7 +489,9 @@ class HealthRepository(private val context: Context) {
         // （包括「正常」）。于是 **AI 说正常，本地就再也不判读**：真实超出参考范围的数值被静默标成
         // 正常，从趋势图与 PDF 里消失（第三份审查报告 S-12「AI 幻觉能遮盖真实异常值」）。
         // 现在：只要**有参考范围**就一律本地判读；AI 标记仅在本地**无法判读**（没有参考范围）时兜底。
-        // （「AI 标记与本地判定并列展示」需要新增一列，随库 v19 落地，见 HANDOFF §8b 第 4 条。）
+        // v1.0.78（批次 4 收尾）：AI 的原始标记已另存 `ai_abnormal` 一列（库 v19），
+        // 故本地判读**只覆盖 `abnormal`**——下面这行刻意不碰 `aiAbnormal`，两列谁也别覆盖谁，
+        // 否则「并列展示」就无从谈起（`LabRow` 只在两列不一致时才多显示一行说明）。
         val localAbnormal = if (result.value != null) {
             when {
                 result.refHigh != null && result.value > result.refHigh -> "high"
@@ -531,7 +533,9 @@ class HealthRepository(private val context: Context) {
                     checkupId = null, testName = row.testName,
                     value = row.value, valueText = row.valueText,
                     unit = row.unit, refLow = row.refLow, refHigh = row.refHigh,
-                    abnormal = row.abnormal, notes = note,
+                    // v1.0.78（批次 4 收尾）：两列都写——`aiAbnormal` 留 AI 原值（并列展示），
+                    // `abnormal` 交给 saveLabResult 的本地判读覆盖 / 无参考范围时兜底。
+                    abnormal = row.abnormal, aiAbnormal = row.aiAbnormal, notes = note,
                 )
             )
         }

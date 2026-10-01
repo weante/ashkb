@@ -43,8 +43,9 @@ import com.ashkb.app.data.entity.WeightLog
  * 迁移测试按它逐级校验迁移清单无缺口——此前版本号只出现在注解里，测试无从校验。
  *
  * v1.0.77（批次 3b）：17 → 18，新增 `planned_slots`（计划槽位快照）。
+ * v1.0.78（批次 4 收尾）：18 → 19，`lab_results` 新增 `ai_abnormal`（AI 导入的原始异常标记留档）。
  */
-internal const val ASHKB_DB_VERSION = 18
+internal const val ASHKB_DB_VERSION = 19
 
 @Database(
     entities = [
@@ -493,6 +494,28 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
+         * v1.0.78（批次 4 收尾）：`lab_results` 补 `ai_abnormal`（AI 导入的原始异常标记）。
+         *
+         * 为什么加这一列：v1.0.77 把 `abnormal` 交给「本地参考范围判定优先」后，AI 的原始标记被本地判读
+         * 覆盖掉了——「AI 说正常、本地判读偏高」这类分歧在库里彻底消失。维护者口径是
+         * 「本地优先 + **AI 标记并列展示**」，故两列并存：
+         * `abnormal` = 本地判读结果（无参考范围时沿用 AI 值兜底），`ai_abnormal` = AI 原值（只读留档）。
+         *
+         * 列定义与 Room 导出的 `19.json` 中 `lab_results` 的 `` `ai_abnormal` TEXT `` **逐字一致**
+         * （含反引号写法），由 `MigrationTableParityTest` 逐列比对锁住。
+         * 唯一无法一致的是**列位置**：`ALTER TABLE ... ADD COLUMN` 只能追加到末尾（Room 新建库时按实体
+         * 声明序排在 `abnormal` 之后）。SQLite 按列名取值，位置差异不影响任何读写路径。
+         *
+         * 可空、无默认值、**不回填**：旧行 / 旧备份都没有这一列 → NULL = 「非 AI 导入 / AI 未给标记」，
+         * 属合法业务态；回填反而会把本地判读伪造成「AI 当初也这么标」。
+         */
+        private val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `lab_results` ADD COLUMN `ai_abnormal` TEXT")
+            }
+        }
+
+        /**
          * 批次 2（测试安全网）：**迁移清单的唯一来源**。
          *
          * 由 [get] 与迁移测试共用。此前清单直接内联在 `addMigrations(...)` 里，测试看不到，
@@ -503,7 +526,7 @@ abstract class AppDatabase : RoomDatabase() {
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
             MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
             MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
-            MIGRATION_17_18,
+            MIGRATION_17_18, MIGRATION_18_19,
         )
 
         fun get(context: Context): AppDatabase =

@@ -613,7 +613,21 @@ data class LabResult(
     @ColumnInfo(name = "unit") val unit: String? = null,
     @ColumnInfo(name = "ref_low") val refLow: Double? = null,
     @ColumnInfo(name = "ref_high") val refHigh: Double? = null,
+    /**
+     * v1.0.78（批次 4 收尾）：**本地参考范围判读结果**（high / low / normal）；
+     * 没有参考范围、本地判不了时沿用 AI 导入的标记兜底（即「本地判读结果或兜底值」）。
+     */
     @ColumnInfo(name = "abnormal") val abnormal: String? = null,
+    /**
+     * v1.0.78（批次 4 收尾）：**AI 导入时的原始异常标记**（high / low / normal），
+     * 与本地判读结果 [abnormal] **并列展示**，本身**不参与任何判定**。
+     *
+     * 为什么必须单独一列：`abnormal` 自 v1.0.77 起由「本地参考范围判定优先」接管，而 AI 的原始标记
+     * 原本写进**同一列**——本地判读一覆盖，「AI 说正常 / 本地判读偏高」这类分歧就永久丢失，
+     * 而复诊时恰恰要把这种分歧摆给医生看（第三份审查报告 S-12：AI 幻觉不得遮盖真实异常值）。
+     * 可空 = 非 AI 导入（手工录入）或 AI 未给标记，属合法业务态。
+     */
+    @ColumnInfo(name = "ai_abnormal") val aiAbnormal: String? = null,
     @ColumnInfo(name = "notes") val notes: String? = null,
 )
 

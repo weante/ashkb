@@ -26,6 +26,8 @@ import com.ashkb.app.data.entity.DoctorConfirm
 import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.entity.VaccineType
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.ui.components.DateFieldRules
+import com.ashkb.app.ui.components.DateTextField
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import java.time.LocalDate
@@ -88,6 +90,10 @@ internal fun CheckupRecordFormSheet(
     var nextDate by remember { mutableStateOf("") }
     var conclusion by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
+    // v1.0.78（批次 4 收尾）：日期此前是自由文本且**零校验**——`2026-13-45` 会被原样写进 date 列。
+    // 这里与输入框提示共用 DateFieldRules 同一套判定，保存按钮与提示不会互相矛盾。
+    val dateOk = DateFieldRules.requiredOk(date)
+    val nextDateOk = DateFieldRules.optionalOk(nextDate)
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
@@ -100,28 +106,32 @@ internal fun CheckupRecordFormSheet(
                 selected = checkType.name,
                 onSelect = { checkType = CheckupType.valueOf(it) },
             )
-            OutlinedTextField(date, { date = it }, label = { Text(stringResource(R.string.common_date)) }, singleLine = true)
+            DateTextField(value = date, onValueChange = { date = it }, label = stringResource(R.string.common_date))
             OutlinedTextField(hospital, { hospital = it },
                 label = { Text(stringResource(R.string.common_hospital)) }, singleLine = true)
             OutlinedTextField(doctor, { doctor = it },
                 label = { Text(stringResource(R.string.checkup_doctor_short)) }, singleLine = true)
-            OutlinedTextField(nextDate, { nextDate = it },
-                label = { Text(stringResource(R.string.checkup_next_date_field)) }, singleLine = true)
+            DateTextField(
+                value = nextDate, onValueChange = { nextDate = it },
+                label = stringResource(R.string.checkup_next_date_field), required = false,
+            )
             OutlinedTextField(conclusion, { conclusion = it },
                 label = { Text(stringResource(R.string.imaging_conclusion)) })
             OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes)) })
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
-                enabled = itemName.isNotBlank(),
+                enabled = itemName.isNotBlank() && dateOk && nextDateOk,
                 onClick = {
-                    if (itemName.isNotBlank()) {
+                    // 双保险：按钮已按同一判定置灰，这里再拦一次——非法日期绝不落库
+                    val isoDate = DateFieldRules.toIsoOrNull(date)
+                    if (itemName.isNotBlank() && isoDate != null) {
                         onSave(
                             CheckupRecord(
-                                id = "", date = date, recordedAt = nowIso(),
+                                id = "", date = isoDate, recordedAt = nowIso(),
                                 itemName = itemName.trim(), checkType = checkType.name,
                                 hospital = hospital.ifBlank { null },
                                 doctor = doctor.ifBlank { null },
-                                nextDate = nextDate.ifBlank { null },
+                                nextDate = DateFieldRules.toIsoOrNull(nextDate),
                                 conclusion = conclusion.ifBlank { null },
                                 notes = notes.ifBlank { null },
                             )
@@ -148,6 +158,9 @@ internal fun VaccineFormSheet(onSave: (VaccineRecord) -> Unit, onDismiss: () -> 
     var confirm by remember { mutableStateOf(DoctorConfirm.PENDING) }
     var nextDue by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
+    // v1.0.78（批次 4 收尾）：同复诊表单——接种日期必填、加强日期可留空，非法一律不许保存
+    val dateOk = DateFieldRules.requiredOk(date)
+    val nextDueOk = DateFieldRules.optionalOk(nextDue)
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
@@ -160,7 +173,7 @@ internal fun VaccineFormSheet(onSave: (VaccineRecord) -> Unit, onDismiss: () -> 
                 selected = type.name,
                 onSelect = { type = VaccineType.valueOf(it) },
             )
-            OutlinedTextField(date, { date = it }, label = { Text(stringResource(R.string.vaccine_date)) }, singleLine = true)
+            DateTextField(value = date, onValueChange = { date = it }, label = stringResource(R.string.vaccine_date))
             OutlinedTextField(dose, { dose = it },
                 label = { Text(stringResource(R.string.vaccine_dose_field)) }, singleLine = true)
             OutlinedTextField(hospital, { hospital = it },
@@ -171,22 +184,26 @@ internal fun VaccineFormSheet(onSave: (VaccineRecord) -> Unit, onDismiss: () -> 
                 selected = confirm.name,
                 onSelect = { confirm = DoctorConfirm.valueOf(it) },
             )
-            OutlinedTextField(nextDue, { nextDue = it },
-                label = { Text(stringResource(R.string.vaccine_booster_date)) }, singleLine = true)
+            DateTextField(
+                value = nextDue, onValueChange = { nextDue = it },
+                label = stringResource(R.string.vaccine_booster_date), required = false,
+            )
             OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.exercise_notes_reaction)) })
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
-                enabled = name.isNotBlank(),
+                enabled = name.isNotBlank() && dateOk && nextDueOk,
                 onClick = {
-                    if (name.isNotBlank()) {
+                    // 双保险：非法日期绝不落库（按钮已按同一判定置灰）
+                    val isoDate = DateFieldRules.toIsoOrNull(date)
+                    if (name.isNotBlank() && isoDate != null) {
                         onSave(
                             VaccineRecord(
-                                id = "", date = date, recordedAt = nowIso(),
+                                id = "", date = isoDate, recordedAt = nowIso(),
                                 vaccineName = name.trim(), vaccineType = type.name,
                                 dose = dose.ifBlank { null },
                                 hospital = hospital.ifBlank { null },
                                 doctorConfirm = confirm.name,
-                                nextDueDate = nextDue.ifBlank { null },
+                                nextDueDate = DateFieldRules.toIsoOrNull(nextDue),
                                 notes = notes.ifBlank { null },
                             )
                         )

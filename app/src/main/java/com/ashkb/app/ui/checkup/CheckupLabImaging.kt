@@ -89,6 +89,34 @@ private fun labValueText(lab: LabResult): String =
 
 private fun LabResult.isAbnormal() = abnormal == "high" || abnormal == "low"
 
+/**
+ * v1.0.78（批次 4 收尾）：异常标记 key（`high` / `low` / `normal` / …）→ 展示文案。
+ * key 绝不出现在 UI，文案一律走 strings.xml（改版方案 §11）。
+ */
+@Composable
+private fun labMarkLabel(key: String?): String = when (key) {
+    "high" -> stringResource(R.string.lab_mark_high)
+    "low" -> stringResource(R.string.lab_mark_low)
+    "normal" -> stringResource(R.string.lab_mark_normal)
+    "abnormal" -> stringResource(R.string.lab_mark_abnormal)
+    else -> stringResource(R.string.lab_mark_unknown)
+}
+
+/**
+ * v1.0.78（批次 4 收尾）：AI 原始标记与本地判读**不一致**时的并列说明；一致（或任一侧缺失）返回 null。
+ *
+ * 为什么只在不一致时显示：`abnormal` 已由本地参考范围判读接管（v1.0.77），AI 标记只在本地判不了时
+ * 兜底——两条口径相同是常态，逐行加一句「AI 也这么标」纯属噪声；只有**分歧**才值得占一行：
+ * 那正是「AI 说正常、参考范围说偏高」这类必须让复诊医生看见的信息（第三份审查报告 S-12）。
+ */
+@Composable
+private fun labMarkConflictNote(lab: LabResult): String? {
+    val ai = lab.aiAbnormal ?: return null
+    val local = lab.abnormal ?: return null
+    if (ai == local) return null
+    return stringResource(R.string.lab_mark_note, labMarkLabel(ai), labMarkLabel(local))
+}
+
 /** X1：该指标的参考范围文案（refLow/refHigh 缺一侧时按 ≥/≤ 表述；都缺则如实说明）。 */
 @Composable
 private fun refRangeText(lab: LabResult): String {
@@ -114,6 +142,14 @@ private fun RowScope.LabRow(lab: LabResult) {
         if (showRef) {
             Text(
                 refRangeText(lab),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // v1.0.78（批次 4 收尾）：AI 标记与本地判读分歧时并列展示（一致则整行不出现）
+        labMarkConflictNote(lab)?.let { note ->
+            Text(
+                note,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

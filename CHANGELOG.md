@@ -4,6 +4,40 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.78] — 2026-10-01
+
+**批次 4 收尾：AI 标记与本地判读「并列展示」+ 表单日期校验落地。**
+
+⚠️ **含数据库结构变更：Room v18 → v19**（lab_results 新增 i_abnormal 列，**加列型迁移，不动既有数据**）。可覆盖安装，数据保留。
+
+### A. i_abnormal：AI 原始标记只读留档，与本地判读并列展示
+
+v1.0.77 已让「本地参考范围判定优先」，但当时**把 AI 的原始标记覆盖掉了**——而维护者批的口径是「本地优先 + **AI 标记并列展示**」。本版补完：
+
+- LabResult 新增 i_abnormal 列（库 v19）；只有 **AI 导入路径**写它，手工录入恒为 NULL
+- saveLabResult 的本地判读**只覆盖 bnormal，绝不碰 iAbnormal**；无参考范围时 bnormal 沿用 AI 值兜底
+- **旧行不回填**：NULL = 非 AI 导入或 AI 未给标记（合法业务态）；回填会把本地判读伪造成「AI 当初也这么标」
+- **界面并列展示**（LabRow，化验列表与详情弹窗共用）：仅当 AI 标记与本地判读**不一致**时显示一行小字「AI 标记：正常；本地参考范围判读：偏高」；一致或缺一侧**整行不渲染**（不占位、无噪声）
+- 刻意**不加**的地方及理由：日期分组的「N 项异常」计数（按本地口径统计，正是要的结论）；AI 导入确认页（入库前两者必然相同，该页要展示的就是 AI 原文）；PDF 化验节（刻意「只列异常项」的医生向结论文本，塞入导入链路中间态会引入医生无法解释的概念）；趋势图（只用数值，无标记可并列）
+
+### B. 表单日期校验（7 处自由文本日期输入，改了 5 处零校验的）
+
+- 复诊记录表单：检查日期（必填）/ 下次日期（可选）；疫苗表单：接种日期（必填）/ 加强日期（可选）；药单编辑：注射周期锚点日期（必填）
+- 统一走 DateInput.normalizeOrNull：**输入框提示与保存按钮 enabled 共用同一判定**（不会出现「提示说不行、按钮还能点」），非法时红框 + supportingText + 保存置灰 + onClick 二次拦截，落库前规范化为 ISO
+- 可选字段**留空合法**（存 NULL）；必填字段留空视为非法
+- 未改 EmergencyScreen / TodayScreen 两处：它们本就有 isError + supportingText + nabled，且用严格 ISO 解析，与其提示文案自洽（改成宽松口径只会扩大行为变更面）
+
+### 测试与构建
+
+- 单测 **585 → 597 条全绿**（61 个测试类）；detekt **0 code smells**；erifySpecSync 门通过
+- 新增：LabAbnormalPriorityTest 4 条（真 Room + 真仓库：不一致时两列都保留 / 本地判读不覆盖 AI 留档 / 无参考范围沿用 AI 兜底 / 手工录入不产生 AI 标记）、DateFieldRulesTest 6 条、迁移逐列一致 1 条、parser 留档 1 条
+- 迁移自证：MigrationCoverageTest（链 1→19 无缺口）+ SchemaDriftTest（实体↔新库建表逐表一致）+ 新增「加列型迁移与 19.json 逐列一致」（按 18.json 建老库 → 跑 18→19 → PRAGMA table_info 与 19.json 声明逐列比对）
+- release / debug 均 versionCode **83 / 1.0.78**
+
+### 本批未做
+
+- version catalog（gradle/libs.versions.toml）已写好但**尚未被构建脚本引用**——切换需改 uild.gradle.kts，留待下一版一并验证
+- 历史 16 个版本的 schema 补录（方案见 HANDOFF.md §9.8b）
 ## [v1.0.77] — 2026-10-01
 
 **批次 3b「计划槽位快照」+ 批次 4「医学规则（仅安全默认值方向）」的合并发布。**

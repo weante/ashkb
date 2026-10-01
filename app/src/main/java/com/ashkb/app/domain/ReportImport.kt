@@ -15,7 +15,17 @@ data class LabImportRow(
     val unit: String? = null,
     val refLow: Double? = null,
     val refHigh: Double? = null,
-    val abnormal: String? = null, // high / low / null=交由仓库按参考范围判读
+    /**
+     * v1.0.78（批次 4 收尾）：**本地判读结果或兜底值**（high / low / normal）。
+     * 解析阶段它取 AI 给的标记，入库时由 `HealthRepository.saveLabResult` 按参考范围**本地判读覆盖**；
+     * 只有没有参考范围、本地判不了时才沿用这个 AI 值兜底（本地优先 + AI 兜底）。
+     */
+    val abnormal: String? = null,
+    /**
+     * v1.0.78（批次 4 收尾）：AI 的**原始**标记，原样留档、**不参与判定**，与 [abnormal] 并列展示。
+     * 与 [abnormal] 分开存的原因见 `LabResult.aiAbnormal` 的注释。
+     */
+    val aiAbnormal: String? = null,
 )
 
 data class LabImport(
@@ -86,6 +96,10 @@ object ReportImportParser {
         val ref = parts.getOrNull(3)?.takeIf { it.isNotBlank() && it != "参考范围" }
         val mark = parts.getOrNull(4)?.takeIf { it.isNotBlank() }
         val (refLow, refHigh) = parseRange(ref)
+        // v1.0.78（批次 4 收尾）：AI 标记**同时写两处**——
+        // `aiAbnormal` 原样留档（与本地判读并列展示用），`abnormal` 作为「本地判读结果或兜底值」的初值
+        // （有参考范围时会被仓库的本地判读覆盖，没有参考范围时它就是最终入库的兜底值）。
+        val aiMark = markAbnormal(mark)
         return LabImportRow(
             testName = name,
             value = valueText.toDoubleOrNull(),
@@ -93,7 +107,8 @@ object ReportImportParser {
             unit = unit,
             refLow = refLow,
             refHigh = refHigh,
-            abnormal = markAbnormal(mark),
+            abnormal = aiMark,
+            aiAbnormal = aiMark,
         )
     }
 
