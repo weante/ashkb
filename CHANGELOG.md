@@ -4,6 +4,48 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.75] — 2026-10-01
+
+**批次 2「测试安全网」：把「迁移是否真的改对了库」变成机器可判，并给 CI 装上四道门。**
+
+⚠️ **无数据库结构变更**（仍为 Room v17），可覆盖安装。含 v1.0.44 ~ v1.0.74 全部内容。
+
+依据：第三份审查报告 P0-4 / P1-12 / P1-16 / S-13 与第四份报告的 CI 规范门建议；维护者已批准「投入半天到一天 + 允许 test-only 依赖」。
+
+### 1. Room schema 导出并入库（P0-4 的核心）
+
+- pp/build.gradle.kts 增加 ksp { arg("room.schemaLocation", …) }——此前 xportSchema = true 但**从未配置位置**，仓库里一个 schema 文件都没有
+- 导出 pp/schemas/com.ashkb.app.data.db.AppDatabase/17.json（90 KB）并入库：此后任何实体改动都会在 git 里留下结构 diff
+- 迁移清单与版本号收敛为**单一来源**：顶层常量 ASHKB_DB_VERSION + AppDatabase.ALL_MIGRATIONS（此前内联在 ddMigrations(...) 里，测试看不到，也无法校验完整性）
+
+### 2. 迁移安全网（两条机器可判的检查）
+
+- **MigrationCoverageTest（4 条，纯 JVM）**：迁移链 1→17 逐级无缺口、无重复/乱序、当前版本 schema 已导出、schema 内版本号与常量一致
+- **`SchemaDriftTest`（Robolectric 单测，进 CI）**：新建库后把**真实建表语句**与导出 schema 逐表比对（28 张表逐字一致，仅抹平 `IF NOT EXISTS` 这类语义等价的书写差异）——「实体改了、迁移没跟上」从「用户升级时才崩」提前到**每次 CI**。另在 androidTest 源集落地首个用例 `RealDatabaseSchemaTest`，用**生产工厂 + 真实库文件**再验一遍
+- 诚实边界：历史 16 个版本的 schema 无法凭空重建，故「从旧版本升级」的路径仍需按 git 历史逐版本导出补录（方案见 HANDOFF.md §9）
+
+### 3. CI 四道门 + 静态分析
+
+- **规范一致性门 erifySpecSync**（新增 Gradle 任务）：版本号 / 单测条数在 pp/build.gradle.kts、README.md、HANDOFF.md、HANDOFF-STATUS.md 四处必须一致，库版本必须有对应 schema 文件——把每次发版的人工核对变成机器门
+- **schema 漂移门**：CI 里 git diff --exit-code app/schemas，改了实体不提交 schema 直接失败
+- **验签门**：CI 打印签名摘要；配置 ASHKB_EXPECTED_CERT_SHA256 后严格比对
+- **detekt**：继承官方规则集 + 项目化让步，历史问题全部进基线（config/detekt/baseline.xml），**基线之外的新问题让构建失败**
+- **Android Lint** 纳入 CI（错误即失败）
+- 配套 elease-tooling/verify-release.ps1：交付前把 APK 的签名证书摘要与 local.properties 里的期望值比对
+
+### 4. 不再静默用 debug 签名（S-13）
+
+- 此前 local.properties 缺 keystore 时，ssembleRelease 会安静产出一个 **debug 签名的「正式包」**：它无法覆盖安装正式版（用户只能卸载重装、丢数据），而交付者不逐字节验签根本发现不了
+- 现在产出 release 包时缺签名**直接构建失败**；CI 显式设置 ASHKB_ALLOW_DEBUG_SIGNING=1 放行并打印醒目告警
+
+### 5. 本机构建绕行（环境说明，不入库）
+
+- 本机到官方 Maven 仓库（repo1 / dl.google.com / plugins.gradle.org）连接被重置，改用**用户级** ~/.gradle/init.gradle 指向国内镜像；**项目文件保持官方仓库地址**（可移植，不影响 CI）
+
+### 测试与构建
+
+- 单测 **527 → 532 条全绿**（新增 `MigrationCoverageTest` 4 条 + `SchemaDriftTest` 1 条）；androidTest 源集首个用例 `RealDatabaseSchemaTest`
+- release / debug 均 versionCode **80 / 1.0.75**
 ## [v1.0.74] — 2026-09-30
 
 **批次 1 补漏：跨零点的追问链不再被一次重排清空。**

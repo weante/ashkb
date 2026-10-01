@@ -1,0 +1,318 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>ComplexCondition:BackupEngine.kt$BackupEngine$backupCols != null &amp;&amp; backupCols.isNotEmpty() &amp;&amp; rows.isNotEmpty() &amp;&amp; rows.first().keys().asSequence().toList() != backupCols.toList()</ID>
+    <ID>ComplexCondition:BackupRepository.kt$BackupRepository$!name.startsWith("ashkb-backup-") || !name.endsWith(".ashkb") || name.contains('/') || name.contains('?')</ID>
+    <ID>ComplexCondition:ExerciseEngine.kt$ExerciseEngine$cervical &amp;&amp; (cervicalCondition == "cervical_only" || cervicalCondition == "breaststroke_block" || cervicalCondition == "pose_filter")</ID>
+    <ID>ComplexCondition:ReportImport.kt$ReportImportParser$name.isBlank() || name == "项目" || name.startsWith("#") || name.startsWith("例") || name.startsWith("-") || name.startsWith("—") || name.startsWith("·") || name.startsWith("说明") || name.startsWith("备注")</ID>
+    <ID>ComplexCondition:ScheduleCalc.kt$ScheduleCalc$h == null || m == null || h !in 0..23 || m !in 0..59</ID>
+    <ID>ComplexCondition:VaultCipher.kt$VaultCipher$salt.size != SALT_LEN || iv.size != IV_LEN || wrapped.isEmpty() || iter !in MIN_ITER..MAX_ITER</ID>
+    <ID>CyclomaticComplexMethod:AttachmentSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AttachmentSheet( vm: CheckupViewModel, checkupId: String?, title: String, onDismiss: () -&gt; Unit, allowLink: Boolean = false, onLinkSource: ((String?) -&gt; Unit)? = null, )</ID>
+    <ID>CyclomaticComplexMethod:BackupEngine.kt$BackupEngine$fun verifyAgainst(db: SupportSQLiteDatabase, manifest: JSONObject, tablesJson: JSONObject? = null): VerifyResult</ID>
+    <ID>CyclomaticComplexMethod:BackupEngine.kt$BackupEngine$private fun insertTable(db: SupportSQLiteDatabase, table: String, rows: JSONArray)</ID>
+    <ID>CyclomaticComplexMethod:BackupRepository.kt$BackupRepository$suspend fun exportProfileJson(): String</ID>
+    <ID>CyclomaticComplexMethod:BackupScreen.kt$@Composable fun BackupScreen(vm: BackupViewModel, onBack: () -&gt; Unit)</ID>
+    <ID>CyclomaticComplexMethod:CheckupLabImaging.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: () -&gt; Unit)</ID>
+    <ID>CyclomaticComplexMethod:CheckupScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CheckupScreen(vm: CheckupViewModel, onBack: () -&gt; Unit)</ID>
+    <ID>CyclomaticComplexMethod:EmergencyScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -&gt; Unit)</ID>
+    <ID>CyclomaticComplexMethod:ExerciseEngine.kt$ExerciseEngine$fun evaluate( entry: KbEntry, diseaseStage: String?, spineMobility: String?, ): ExerciseCard</ID>
+    <ID>CyclomaticComplexMethod:ExerciseScreen.kt$@Composable private fun PrescriptionHero( ui: com.ashkb.app.ui.exercise.ExerciseUiState, yesterday: com.ashkb.app.data.entity.SymptomDaily?, warmup: com.ashkb.app.domain.MorningWarmup.Sequence?, )</ID>
+    <ID>CyclomaticComplexMethod:LabTrend.kt$LabTrends$fun buildOne( indicator: LabIndicator, rows: List&lt;LabResult&gt;, from: String? = null, to: String? = null, ): LabTrend</ID>
+    <ID>CyclomaticComplexMethod:MedEditScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun MedEditScreen( vm: MeViewModel, editId: String? = null, onSaved: () -&gt; Unit, onBack: () -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:NotificationHelper.kt$NotificationHelper$fun postMedReminder( context: Context, medId: String, slotKey: String?, slotTime: String?, slotDate: java.time.LocalDate?, medName: String, dose: String, escalation: Int, silent: Boolean = false, strong: Boolean = false, )</ID>
+    <ID>CyclomaticComplexMethod:ProfileEditScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable fun ProfileEditScreen( initial: Profile?, onSave: (Profile) -&gt; Unit, onBack: () -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:RegexLiteralGuardTest.kt$internal fun extractRegexLiterals(src: String): List&lt;String&gt;</ID>
+    <ID>CyclomaticComplexMethod:ReminderCheckScreen.kt$@Composable fun ReminderCheckScreen(onBack: () -&gt; Unit)</ID>
+    <ID>CyclomaticComplexMethod:ReminderReceiver.kt$ReminderReceiver$override fun onReceive(context: Context, intent: Intent)</ID>
+    <ID>CyclomaticComplexMethod:ReminderScheduler.kt$ReminderScheduler$fun rescheduleAll( context: Context, meds: List&lt;Medication&gt;, doneSlotRefs: Set&lt;String&gt;, now: LocalDateTime = LocalDateTime.now(), )</ID>
+    <ID>CyclomaticComplexMethod:ReportPdfWriter.kt$ReportPdfWriter$fun writeCheckupReport(context: Context, r: ReportRepository.CheckupReport): File</ID>
+    <ID>CyclomaticComplexMethod:ReportPdfWriter.kt$ReportPdfWriter$fun writeEmergencyCard(context: Context, c: ReportRepository.EmergencyCard): File</ID>
+    <ID>CyclomaticComplexMethod:ReportScreen.kt$@Composable private fun OverviewPage(o: ReportRepository.Overview?)</ID>
+    <ID>CyclomaticComplexMethod:SmallTrendChart.kt$@Composable fun SmallTrendChart( title: String, points: List&lt;TrendPoint&gt;, unit: String, threshold: Float?, fromDate: String, toDate: String, emptyText: String, modifier: Modifier = Modifier, accent: Color = MaterialTheme.colorScheme.primary, caveat: String? = null, onClick: (() -&gt; Unit)? = null, )</ID>
+    <ID>CyclomaticComplexMethod:SymptomDialogs.kt$@Composable internal fun BasdaiDialog( date: LocalDate, existing: BasdaiRecord?, onConfirm: (Int, Int, Int, Int, Int, Int, String?) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:SymptomScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SymptomScreen(vm: SymptomViewModel, onBack: () -&gt; Unit)</ID>
+    <ID>CyclomaticComplexMethod:TodayScreen.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun MedCheckCard( item: TodayItem, today: LocalDate, onCheckIn: () -&gt; Unit, onSkip: () -&gt; Unit, onPostpone: () -&gt; Unit, onPrnTaken: () -&gt; Unit, onMissedGuide: () -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:TodayScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TodayScreen( vm: TodayViewModel, onMedListNeeded: () -&gt; Unit, onOpenSymptom: () -&gt; Unit = {}, onOpenExercise: () -&gt; Unit = {}, )</ID>
+    <ID>CyclomaticComplexMethod:TrendChart.kt$@Composable fun TrendChart( points: List&lt;TrendPoint&gt;, unit: String, label: String, threshold: Float? = null, accent: Color = MaterialTheme.colorScheme.primary, modifier: Modifier = Modifier, )</ID>
+    <ID>CyclomaticComplexMethod:VaultCipher.kt$VaultCipher$private fun decryptSlotted(magic: String, secret: CharArray, header: JSONObject, headerBytes: ByteArray, ct: ByteArray): Decrypted</ID>
+    <ID>CyclomaticComplexMethod:WellnessScreen.kt$@Composable private fun VitalsHero(vitals: Vitals?, onEdit: () -&gt; Unit)</ID>
+    <ID>CyclomaticComplexMethod:WellnessScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun VitalsSheet(vm: WellnessViewModel, onDismiss: () -&gt; Unit)</ID>
+    <ID>CyclomaticComplexMethod:WellnessScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class) @Composable fun WellnessScreen(vm: WellnessViewModel, onOpenRecipes: () -&gt; Unit, onBack: () -&gt; Unit)</ID>
+    <ID>CyclomaticComplexMethod:WellnessScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, onDismiss: () -&gt; Unit)</ID>
+    <ID>ForEachOnRange:ExercisePlanTemplates.kt$ExercisePlanTemplates$3..4</ID>
+    <ID>ForEachOnRange:ExercisePlanTemplates.kt$ExercisePlanTemplates$5..8</ID>
+    <ID>ForEachOnRange:ExercisePlanTemplates.kt$ExercisePlanTemplates$9..11</ID>
+    <ID>ForEachOnRange:KbDetailDialog.kt$0 until arr.length()</ID>
+    <ID>ForEachOnRange:WebDavClient.kt$WebDavClient$0 until keepDaily</ID>
+    <ID>ForEachOnRange:WebDavClient.kt$WebDavClient$0 until keepMonthly</ID>
+    <ID>ForEachOnRange:WebDavClient.kt$WebDavClient$0 until keepWeekly</ID>
+    <ID>FunctionNaming:BackupEngine.kt$BackupEngine$private fun m_rows(manifest: JSONObject, t: String): Int</ID>
+    <ID>FunctionNaming:BackupEngine.kt$BackupEngine$private fun m_sha(manifest: JSONObject, t: String): String</ID>
+    <ID>FunctionOnlyReturningConstant:HealthRepository.kt$private fun BodyMeasure.weightKg(): Double?</ID>
+    <ID>LongMethod:AppDatabase.kt$AppDatabase.Companion.&lt;no name provided&gt;$override fun migrate(db: SupportSQLiteDatabase)</ID>
+    <ID>LongMethod:AppShell.kt$@Composable fun AppShell()</ID>
+    <ID>LongMethod:AttachmentSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AttachmentSheet( vm: CheckupViewModel, checkupId: String?, title: String, onDismiss: () -&gt; Unit, allowLink: Boolean = false, onLinkSource: ((String?) -&gt; Unit)? = null, )</ID>
+    <ID>LongMethod:BackupScreen.kt$@Composable fun BackupScreen(vm: BackupViewModel, onBack: () -&gt; Unit)</ID>
+    <ID>LongMethod:CheckupLabImaging.kt$@Composable internal fun ImagingList( records: List&lt;ImagingRecord&gt;, onImport: () -&gt; Unit, onView: (ImagingRecord) -&gt; Unit, onAttach: (ImagingRecord) -&gt; Unit, onLink: (ImagingRecord) -&gt; Unit, )</ID>
+    <ID>LongMethod:CheckupLabImaging.kt$@Composable internal fun LabsList( labs: List&lt;LabResult&gt;, canLoadMore: Boolean, onLoadMore: () -&gt; Unit, onImport: () -&gt; Unit, onAttachDate: (String) -&gt; Unit, onLinkDate: (String) -&gt; Unit, )</ID>
+    <ID>LongMethod:CheckupLabImaging.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: () -&gt; Unit)</ID>
+    <ID>LongMethod:CheckupScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CheckupScreen(vm: CheckupViewModel, onBack: () -&gt; Unit)</ID>
+    <ID>LongMethod:EmergencyScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -&gt; Unit)</ID>
+    <ID>LongMethod:EmergencyScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun EmergencyEventSheet( onSave: (EmergencyEvent) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    <ID>LongMethod:ExercisePlansScreen.kt$@Composable private fun PlanCard( plan: ExercisePlan, progress: ExercisePlanProgress.Progress?, expanded: Boolean, onToggle: () -&gt; Unit, onActivate: () -&gt; Unit, onDeactivate: () -&gt; Unit, )</ID>
+    <ID>LongMethod:ExerciseScreen.kt$@Composable private fun PrescriptionHero( ui: com.ashkb.app.ui.exercise.ExerciseUiState, yesterday: com.ashkb.app.data.entity.SymptomDaily?, warmup: com.ashkb.app.domain.MorningWarmup.Sequence?, )</ID>
+    <ID>LongMethod:ExerciseScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -&gt; Unit, onBack: () -&gt; Unit)</ID>
+    <ID>LongMethod:Forms.kt$@Composable fun ScoreInput( value: Int, onValueChange: (Int) -&gt; Unit, range: IntRange = 0..10, label: String, unrecorded: Boolean = false, lowLabel: String = stringResource(R.string.common_none), highLabel: String = stringResource(R.string.symptom_scale_worst), tone: (Int) -&gt; StatusTone, )</ID>
+    <ID>LongMethod:KbDetailDialog.kt$@Composable fun KbDetailDialog( entry: KbEntry, onSaveNote: (String?) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    <ID>LongMethod:KnowledgeScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun KnowledgeScreen(vm: KnowledgeViewModel)</ID>
+    <ID>LongMethod:MeScreen.kt$@Composable fun MeScreen( vm: MeViewModel, onOpenMeds: () -&gt; Unit = {}, onOpenBackup: () -&gt; Unit = {}, onEditProfile: () -&gt; Unit = {}, onOpenReminderCheck: () -&gt; Unit = {}, )</ID>
+    <ID>LongMethod:MedEditScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun MedEditScreen( vm: MeViewModel, editId: String? = null, onSaved: () -&gt; Unit, onBack: () -&gt; Unit, )</ID>
+    <ID>LongMethod:MedsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun MedsScreen( vm: MeViewModel, onAdd: () -&gt; Unit, onEdit: (Medication) -&gt; Unit, onBack: () -&gt; Unit, )</ID>
+    <ID>LongMethod:ProfileEditScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable fun ProfileEditScreen( initial: Profile?, onSave: (Profile) -&gt; Unit, onBack: () -&gt; Unit, )</ID>
+    <ID>LongMethod:RecipesScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun RecipesScreen(vm: RecipesViewModel, onBack: () -&gt; Unit)</ID>
+    <ID>LongMethod:ReminderCheckScreen.kt$@Composable fun ReminderCheckScreen(onBack: () -&gt; Unit)</ID>
+    <ID>LongMethod:ReminderFullScreenActivity.kt$@Composable private fun StrongReminderScreen( medId: String?, slotKey: String?, slotTime: String?, slotDate: java.time.LocalDate?, onTaken: () -&gt; Unit, onLater: () -&gt; Unit, )</ID>
+    <ID>LongMethod:ReminderSettingsSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ReminderSettingsSheet(onDismiss: () -&gt; Unit)</ID>
+    <ID>LongMethod:ReportPdfWriter.kt$ReportPdfWriter$fun writeCheckupReport(context: Context, r: ReportRepository.CheckupReport): File</ID>
+    <ID>LongMethod:ReportScreen.kt$@Composable private fun OverviewPage(o: ReportRepository.Overview?)</ID>
+    <ID>LongMethod:ReportScreen.kt$@Composable private fun PeriodicPage( vm: ReportViewModel, p: ReportRepository.PeriodicReport?, days: Int, )</ID>
+    <ID>LongMethod:ReportScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun TrendCharts(t: ReportRepository.Trends)</ID>
+    <ID>LongMethod:SmallTrendChart.kt$@Composable fun SmallTrendChart( title: String, points: List&lt;TrendPoint&gt;, unit: String, threshold: Float?, fromDate: String, toDate: String, emptyText: String, modifier: Modifier = Modifier, accent: Color = MaterialTheme.colorScheme.primary, caveat: String? = null, onClick: (() -&gt; Unit)? = null, )</ID>
+    <ID>LongMethod:SymptomScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SymptomScreen(vm: SymptomViewModel, onBack: () -&gt; Unit)</ID>
+    <ID>LongMethod:TodayScreen.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun MedCheckCard( item: TodayItem, today: LocalDate, onCheckIn: () -&gt; Unit, onSkip: () -&gt; Unit, onPostpone: () -&gt; Unit, onPrnTaken: () -&gt; Unit, onMissedGuide: () -&gt; Unit, )</ID>
+    <ID>LongMethod:TodayScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TodayScreen( vm: TodayViewModel, onMedListNeeded: () -&gt; Unit, onOpenSymptom: () -&gt; Unit = {}, onOpenExercise: () -&gt; Unit = {}, )</ID>
+    <ID>LongMethod:TrendChart.kt$@Composable fun TrendChart( points: List&lt;TrendPoint&gt;, unit: String, label: String, threshold: Float? = null, accent: Color = MaterialTheme.colorScheme.primary, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:WellnessScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class) @Composable fun WellnessScreen(vm: WellnessViewModel, onOpenRecipes: () -&gt; Unit, onBack: () -&gt; Unit)</ID>
+    <ID>LongParameterList:HealthRepository.kt$HealthRepository$( date: String, q1: Int, q2: Int, q3: Int, q4: Int, q5: Int, q6: Int, notes: String?, backfill: Boolean = false, )</ID>
+    <ID>LongParameterList:NotificationHelper.kt$NotificationHelper$( context: Context, medId: String, slotKey: String?, slotTime: String?, slotDate: java.time.LocalDate?, medName: String, dose: String, escalation: Int, silent: Boolean = false, strong: Boolean = false, )</ID>
+    <ID>LongParameterList:ReminderScheduler.kt$ReminderScheduler$( context: Context, am: AlarmManager, medId: String, slotKey: String?, slotTime: String?, slotDate: LocalDate, fireAt: LocalDateTime, escalation: Int, )</ID>
+    <ID>LongParameterList:SymptomViewModel.kt$SymptomViewModel$( morningStiffnessMin: Int?, nightPain: Int?, painScore: Int?, feverish: Boolean, feverTemp: Double?, eyeSymptom: Boolean, neuroRedFlag: Boolean, mood: Int?, sleep: Int?, fatigue: Int?, notes: String?, )</ID>
+    <ID>LongParameterList:TrendChart.kt$( label: String, points: List&lt;TrendPoint&gt;, unit: String, threshold: Float?, dirRise: String, dirFall: String, dirFlat: String, summary: TrendSummary, )</ID>
+    <ID>LoopWithTooManyJumpStatements:ExercisePlanTemplates.kt$ExercisePlanTemplates$while</ID>
+    <ID>LoopWithTooManyJumpStatements:LabTrend.kt$LabTrends$for</ID>
+    <ID>LoopWithTooManyJumpStatements:RegexLiteralGuardTest.kt$while</ID>
+    <ID>LoopWithTooManyJumpStatements:ReminderScheduler.kt$ReminderScheduler$for</ID>
+    <ID>LoopWithTooManyJumpStatements:VaultCipher.kt$VaultCipher$for</ID>
+    <ID>LoopWithTooManyJumpStatements:WebDavClient.kt$WebDavClient$while</ID>
+    <ID>MagicNumber:AdherenceCalc.kt$AdherenceCalc$0.5</ID>
+    <ID>MagicNumber:AlarmRegister.kt$AlarmRegister$15</ID>
+    <ID>MagicNumber:AlarmRegister.kt$AlarmRegister$60_000L</ID>
+    <ID>MagicNumber:AppDatabase.kt$Ids$35</ID>
+    <ID>MagicNumber:AppDatabase.kt$Ids$36</ID>
+    <ID>MagicNumber:AttachmentSheet.kt$1024.0</ID>
+    <ID>MagicNumber:AttachmentSheet.kt$1_048_576.0</ID>
+    <ID>MagicNumber:AttachmentSheet.kt$1_048_576L</ID>
+    <ID>MagicNumber:BackupRepository.kt$BackupRepository$120_000</ID>
+    <ID>MagicNumber:BackupRepository.kt$BackupRepository$500</ID>
+    <ID>MagicNumber:BackupScreen.kt$1_024.0</ID>
+    <ID>MagicNumber:BackupScreen.kt$1_024L</ID>
+    <ID>MagicNumber:BackupScreen.kt$1_048_576.0</ID>
+    <ID>MagicNumber:BackupScreen.kt$1_048_576L</ID>
+    <ID>MagicNumber:BackupViewModel.kt$BackupViewModel$12</ID>
+    <ID>MagicNumber:BackupViewModel.kt$BackupViewModel$19</ID>
+    <ID>MagicNumber:BackupViewModel.kt$BackupViewModel$6</ID>
+    <ID>MagicNumber:BasdaiReminderScheduler.kt$BasdaiReminderScheduler$31</ID>
+    <ID>MagicNumber:BootReceiver.kt$BootReceiver$31</ID>
+    <ID>MagicNumber:CheckupReminderScheduler.kt$CheckupReminderScheduler$31</ID>
+    <ID>MagicNumber:ExercisePlanProgress.kt$ExercisePlanProgress$6</ID>
+    <ID>MagicNumber:ExercisePlanProgress.kt$ExercisePlanProgress$7</ID>
+    <ID>MagicNumber:ExercisePlanProgress.kt$ExercisePlanProgress$7L</ID>
+    <ID>MagicNumber:ExerciseReminderScheduler.kt$ExerciseReminderScheduler$31</ID>
+    <ID>MagicNumber:HealthRepository.kt$HealthRepository$90</ID>
+    <ID>MagicNumber:KeystoreCipher.kt$KeystoreCipher$256</ID>
+    <ID>MagicNumber:LabTrend.kt$LabTrends$1e-6</ID>
+    <ID>MagicNumber:Lifestyle.kt$Lifestyle.Companion$24</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$33</ID>
+    <ID>MagicNumber:MissedDose.kt$MissedDose$23</ID>
+    <ID>MagicNumber:MissedDose.kt$MissedDose$59</ID>
+    <ID>MagicNumber:MissedDose.kt$MissedDose$60</ID>
+    <ID>MagicNumber:MissedDose.kt$MissedDose$60.0</ID>
+    <ID>MagicNumber:MissedDose.kt$MissedDose$60L</ID>
+    <ID>MagicNumber:NotificationHelper.kt$NotificationHelper$34</ID>
+    <ID>MagicNumber:RecoveryCode.kt$RecoveryCode$0xFF</ID>
+    <ID>MagicNumber:RecoveryCode.kt$RecoveryCode$8</ID>
+    <ID>MagicNumber:ReminderCheckScreen.kt$31</ID>
+    <ID>MagicNumber:ReminderCheckScreen.kt$34</ID>
+    <ID>MagicNumber:ReminderFullScreenActivity.kt$ReminderFullScreenActivity$27</ID>
+    <ID>MagicNumber:ReminderScheduler.kt$ReminderScheduler$0xFF</ID>
+    <ID>MagicNumber:ReminderScheduler.kt$ReminderScheduler$16</ID>
+    <ID>MagicNumber:ReminderScheduler.kt$ReminderScheduler$24</ID>
+    <ID>MagicNumber:ReminderScheduler.kt$ReminderScheduler$31</ID>
+    <ID>MagicNumber:ReminderScheduler.kt$ReminderScheduler$8</ID>
+    <ID>MagicNumber:ReminderTest.kt$ReminderTest$31</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter$12f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter$15</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter$20</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter$60</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter$8</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$10.5f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$110f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$12f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$14f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$16f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$18f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$20f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$22f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$24f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$34f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$40f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$50f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$6f</ID>
+    <ID>MagicNumber:ReportPdfWriter.kt$ReportPdfWriter.Doc$8f</ID>
+    <ID>MagicNumber:ReportRepository.kt$ReportRepository$120</ID>
+    <ID>MagicNumber:ReportRepository.kt$ReportRepository$180</ID>
+    <ID>MagicNumber:ReportRepository.kt$ReportRepository$30</ID>
+    <ID>MagicNumber:ReportRepository.kt$ReportRepository$365</ID>
+    <ID>MagicNumber:ReportRepository.kt$ReportRepository$90</ID>
+    <ID>MagicNumber:ScheduleCalc.kt$ScheduleCalc$23</ID>
+    <ID>MagicNumber:ScheduleCalc.kt$ScheduleCalc$59</ID>
+    <ID>MagicNumber:SedentaryReminder.kt$SedentaryReminder$23</ID>
+    <ID>MagicNumber:SedentaryReminder.kt$SedentaryReminder$24</ID>
+    <ID>MagicNumber:SedentaryReminder.kt$SedentaryReminder$60</ID>
+    <ID>MagicNumber:SedentaryReminderScheduler.kt$SedentaryReminderScheduler$31</ID>
+    <ID>MagicNumber:SupplementTiming.kt$SupplementTiming$23</ID>
+    <ID>MagicNumber:SupplementTiming.kt$SupplementTiming$59</ID>
+    <ID>MagicNumber:SupplementTiming.kt$SupplementTiming$60</ID>
+    <ID>MagicNumber:TrendChart.kt$0.05f</ID>
+    <ID>MagicNumber:TrendChart.kt$1e-3f</ID>
+    <ID>MagicNumber:VaultCipher.kt$VaultCipher$0xFF</ID>
+    <ID>MagicNumber:VaultCipher.kt$VaultCipher$12</ID>
+    <ID>MagicNumber:VaultCipher.kt$VaultCipher$16</ID>
+    <ID>MagicNumber:VaultCipher.kt$VaultCipher$24</ID>
+    <ID>MagicNumber:VaultCipher.kt$VaultCipher$8</ID>
+    <ID>MagicNumber:WebDavClient.kt$WebDavClient$10_000</ID>
+    <ID>MagicNumber:WebDavClient.kt$WebDavClient$200</ID>
+    <ID>MagicNumber:WebDavClient.kt$WebDavClient$201</ID>
+    <ID>MagicNumber:WebDavClient.kt$WebDavClient$204</ID>
+    <ID>MagicNumber:WebDavClient.kt$WebDavClient$20_000</ID>
+    <ID>MagicNumber:WebDavClient.kt$WebDavClient$299</ID>
+    <ID>MagicNumber:WebDavClient.kt$WebDavClient$300</ID>
+    <ID>MagicNumber:WebDavClient.kt$WebDavClient$399</ID>
+    <ID>MagicNumber:WebDavClient.kt$WebDavClient$401</ID>
+    <ID>MagicNumber:WebDavClient.kt$WebDavClient$403</ID>
+    <ID>MagicNumber:WebDavClient.kt$WebDavClient$404</ID>
+    <ID>MagicNumber:WebDavClient.kt$WebDavClient$405</ID>
+    <ID>MaxLineLength:AppDatabase.kt$AppDatabase.Companion.&lt;no name provided&gt;$db.execSQL("CREATE INDEX IF NOT EXISTS `index_medication_changes_effective_date` ON `medication_changes` (`effective_date`)")</ID>
+    <ID>MaxLineLength:AppDatabase.kt$AppDatabase.Companion.&lt;no name provided&gt;$db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_supplement_logs_date_sup_id_slot_key` ON `supplement_logs` (`date`, `sup_id`, `slot_key`)")</ID>
+    <ID>MaxLineLength:BackupScreen.kt$)</ID>
+    <ID>MaxLineLength:BackupScreen.kt$Text(if (showAllLedger) stringResource(R.string.common_collapse) else stringResource(R.string.backup_view_all_count, ledger.size))</ID>
+    <ID>MaxLineLength:CheckupLabImaging.kt$"${ImagingRecord.modalityLabel(imp.modality)} · ${imp.bodyPart} · ${imp.date ?: stringResource(R.string.symptom_unrecognized_today)}"</ID>
+    <ID>MaxLineLength:CheckupLabImaging.kt$"high" -&gt; StatusChip(text = stringResource(R.string.lab_value_high, text), tone = StatusTone.Danger, icon = Icons.Rounded.TrendingUp, onClick = onClick)</ID>
+    <ID>MaxLineLength:CheckupLabImaging.kt$"low" -&gt; StatusChip(text = stringResource(R.string.lab_value_low, text), tone = StatusTone.Warning, icon = Icons.Rounded.TrendingDown, onClick = onClick)</ID>
+    <ID>MaxLineLength:CheckupLabImaging.kt$subtitle = if (abnormalCount &gt; 0) stringResource(R.string.lab_count_abnormal, rows.size, abnormalCount) else stringResource(R.string.lab_count_plain, rows.size)</ID>
+    <ID>MaxLineLength:CheckupLists.kt${ StatusChip(text = stringResource(R.string.vaccine_live), tone = StatusTone.Danger, icon = Icons.Rounded.WarningAmber) }</ID>
+    <ID>MaxLineLength:EmergencyScreen.kt$OutlinedTextField(hospital, { hospital = it }, label = { Text(stringResource(R.string.imaging_hospital_label)) }, singleLine = true)</ID>
+    <ID>MaxLineLength:EmergencyScreen.kt$OutlinedTextField(hospitalName, { hospitalName = it }, label = { Text(stringResource(R.string.checkup_hospital_field)) }, singleLine = true)</ID>
+    <ID>MaxLineLength:EmergencyScreen.kt$OutlinedTextField(outcome, { outcome = it }, label = { Text(stringResource(R.string.symptom_outcome_label)) }, singleLine = true)</ID>
+    <ID>MaxLineLength:EmergencyScreen.kt$OutlinedTextField(relation, { relation = it }, label = { Text(stringResource(R.string.emergency_relation)) }, singleLine = true)</ID>
+    <ID>MaxLineLength:EmergencyScreen.kt$Text(if (exporting) stringResource(R.string.backup_generating) else stringResource(R.string.emergency_export_print))</ID>
+    <ID>MaxLineLength:ExerciseEngine.kt$ExerciseEngine$if</ID>
+    <ID>MaxLineLength:ExerciseScreen.kt$"recommend" -&gt; stringResource(R.string.common_recommended)</ID>
+    <ID>MaxLineLength:ExerciseScreen.kt$TextButton(onClick = { onConfirm(duration.toIntOrNull(), intensity, note.ifBlank { null }) }) { Text(stringResource(R.string.exercise_checkin_done)) }</ID>
+    <ID>MaxLineLength:ExerciseScreen.kt$listOf("better" to stringResource(R.string.symptom_outcome_improved), "same" to stringResource(R.string.trend_flat_short), "worse" to stringResource(R.string.symptom_worse))</ID>
+    <ID>MaxLineLength:ExerciseScreen.kt$listOf("low" to stringResource(R.string.severity_low), "moderate" to stringResource(R.string.severity_moderate), "high" to stringResource(R.string.severity_high))</ID>
+    <ID>MaxLineLength:KbDetailDialog.kt$StatusChip(text = stringResource(R.string.checkup_overdue_note), tone = StatusTone.Warning, icon = Icons.Rounded.Schedule)</ID>
+    <ID>MaxLineLength:KbDetailDialog.kt$stringResource(R.string.knowledge_evidence_meta, entry.sourceTier, entry.adaptedAt, entry.reviewDue, entry.version)</ID>
+    <ID>MaxLineLength:KnowledgeScreen.kt$"interaction" -&gt; stringResource(R.string.knowledge_interaction_title)</ID>
+    <ID>MaxLineLength:KnowledgeScreen.kt$StatusChip(text = stringResource(R.string.checkup_overdue_short), tone = StatusTone.Warning, icon = Icons.Rounded.Schedule)</ID>
+    <ID>MaxLineLength:KnowledgeScreen.kt$StatusChip(text = stringResource(R.string.knowledge_high_risk), tone = StatusTone.Danger, icon = Icons.Rounded.WarningAmber)</ID>
+    <ID>MaxLineLength:MeScreen.kt$"moderate" -&gt; stringResource(R.string.profile_mobility_moderate_cervical)</ID>
+    <ID>MaxLineLength:MeScreen.kt$KeyValueRow(stringResource(R.string.profile_blood_type), p.emergencyBloodType ?: stringResource(R.string.common_unfilled))</ID>
+    <ID>MaxLineLength:MeScreen.kt$KeyValueRow(stringResource(R.string.profile_diagnosis_year), p.diagnoseYear?.toString() ?: stringResource(R.string.common_unfilled))</ID>
+    <ID>MaxLineLength:MedEditScreen.kt$"· ${if (e.severityLevel == "high") stringResource(R.string.knowledge_high_risk_prefix) else stringResource(R.string.common_notice_prefix)}${e.title}"</ID>
+    <ID>MaxLineLength:MedEditScreen.kt$FilterChip(selected = route == "injection", onClick = { route = "injection" }, label = { Text(stringResource(R.string.med_route_injection)) })</ID>
+    <ID>MaxLineLength:MedEditScreen.kt$FilterChip(selected = route == "oral", onClick = { route = "oral" }, label = { Text(stringResource(R.string.med_route_oral)) })</ID>
+    <ID>MaxLineLength:MedEditScreen.kt$listOf("with_food" to stringResource(R.string.med_with_meal), "empty_stomach" to stringResource(R.string.med_fasting), "any" to stringResource(R.string.common_any))</ID>
+    <ID>MaxLineLength:MedEditScreen.kt$listOf(1 to stringResource(R.string.weekday_one), 2 to stringResource(R.string.weekday_two), 3 to stringResource(R.string.weekday_three), 4 to stringResource(R.string.weekday_four), 5 to stringResource(R.string.weekday_five), 6 to stringResource(R.string.weekday_six), 7 to stringResource(R.string.weekday_sunday))</ID>
+    <ID>MaxLineLength:NotificationHelper.kt$NotificationHelper$NotificationChannel(CHANNEL_CHECKUP, context.getString(R.string.notif_channel_checkup_name), NotificationManager.IMPORTANCE_HIGH)</ID>
+    <ID>MaxLineLength:NotificationHelper.kt$NotificationHelper$NotificationChannel(CHANNEL_EMERGENCY_LOCKSCREEN, context.getString(R.string.notif_channel_emergency_name), NotificationManager.IMPORTANCE_LOW)</ID>
+    <ID>MaxLineLength:NotificationHelper.kt$NotificationHelper$NotificationChannel(CHANNEL_EXERCISE, context.getString(R.string.notif_channel_exercise_name), NotificationManager.IMPORTANCE_DEFAULT)</ID>
+    <ID>MaxLineLength:NotificationHelper.kt$NotificationHelper$NotificationChannel(CHANNEL_MED, context.getString(R.string.notif_channel_med_name), NotificationManager.IMPORTANCE_HIGH)</ID>
+    <ID>MaxLineLength:NotificationHelper.kt$NotificationHelper$NotificationChannel(CHANNEL_QUESTIONNAIRE, context.getString(R.string.notif_channel_questionnaire_name), NotificationManager.IMPORTANCE_DEFAULT)</ID>
+    <ID>MaxLineLength:NotificationHelper.kt$NotificationHelper$NotificationChannel(CHANNEL_REMINDER_SILENT, context.getString(R.string.notif_channel_silent_name), NotificationManager.IMPORTANCE_LOW)</ID>
+    <ID>MaxLineLength:NotificationHelper.kt$NotificationHelper$NotificationChannel(CHANNEL_SEDENTARY, context.getString(R.string.notif_channel_sedentary_name), NotificationManager.IMPORTANCE_DEFAULT)</ID>
+    <ID>MaxLineLength:NotificationHelper.kt$NotificationHelper$NotificationChannel(CHANNEL_SYS, context.getString(R.string.notif_channel_sys_name), NotificationManager.IMPORTANCE_DEFAULT)</ID>
+    <ID>MaxLineLength:ProfileEditScreen.kt$listOf("positive" to stringResource(R.string.checkup_positive), "negative" to stringResource(R.string.checkup_negative), "unknown" to stringResource(R.string.common_unknown))</ID>
+    <ID>MaxLineLength:RecipeSources.kt$RecipeSources$"Erciyes University. Evaluation of the Effect of the Mediterranean Diet on Disease Activity … in Patients With Axial Spondyloarthritis Receiving Biologic Therapy (NCT07170384，进行中)."</ID>
+    <ID>MaxLineLength:RecipeSources.kt$RecipeSources$"Hulander E, et al. Dietary intake is related to disease activity and inflammation in radiographic axial spondyloarthritis. Scand J Rheumatol 2025;54(5)."</ID>
+    <ID>MaxLineLength:RecipeSources.kt$RecipeSources$"Macfarlane TV, et al. Relationship between diet and ankylosing spondylitis: a systematic review. Eur J Rheumatol 2018;5(1):45-52."</ID>
+    <ID>MaxLineLength:RecipeSources.kt$RecipeSources$"Ramonda R, Cozzi G, Oliviero F. Nutritional guidance in spondyloarthritis: confronting the evidence gap. Clin Exp Rheumatol 2025;37:269."</ID>
+    <ID>MaxLineLength:RecipeSources.kt$RecipeSources$"Van den Bruel K, et al. Nutrition and diet in rheumatoid arthritis, axial spondyloarthritis, and psoriatic arthritis: a systematic review. Front Med 2025;12:1655165."</ID>
+    <ID>MaxLineLength:RecipeSources.kt$RecipeSources$"Yang L, et al. A Possible Role of Intestinal Microbiota in the Pathogenesis of Ankylosing Spondylitis. Int J Mol Sci 2016;17(12):2126."</ID>
+    <ID>MaxLineLength:RecipeSources.kt$RecipeSources$"Yemula N, Sheikh R. Gut microbiota in axial spondyloarthritis: genetics, medications and future treatments. ARP Rheumatology 2024;3:216-225."</ID>
+    <ID>MaxLineLength:ReminderCheckScreen.kt$if (state.fullScreenOk) stringResource(R.string.reminder_fullscreen_ok) else stringResource(R.string.reminder_fullscreen_no)</ID>
+    <ID>MaxLineLength:ReportImport.kt$ReportImportParser$raw.contains("X线") || raw.contains("X光") || raw.contains("X线") || s.contains("XR") || raw.contains("DR") || raw.contains("放射") || raw.contains("平片") -&gt; "XRAY"</ID>
+    <ID>MaxLineLength:ReportPdfWriter.kt$ReportPdfWriter$"｜${if (m.route == "injection") context.getString(R.string.pdf_route_injection) else context.getString(R.string.pdf_route_oral)}"</ID>
+    <ID>MaxLineLength:ReportScreen.kt$MiniSeries("basdai", stringResource(R.string.report_basdai_trend), "", basdaiPoints, ClinicalThresholds.BASDAI_HIGH, cs.primary, noDataText)</ID>
+    <ID>MaxLineLength:ReportScreen.kt$MiniSeries("pain", stringResource(R.string.symptom_pain_score), stringResource(R.string.exercise_minute_suffix), painPoints, null, cs.secondary, noDataText)</ID>
+    <ID>MaxLineLength:ReportScreen.kt$MiniSeries("stiff", stringResource(R.string.symptom_morning_stiffness), stringResource(R.string.exercise_minute_space_suffix), stiffPoints, null, cs.secondary, noDataText)</ID>
+    <ID>MaxLineLength:ReportScreen.kt$StatCell(stringResource(R.string.report_avg_pain), o.symptom.avgPain?.let { "%.1f/10".format(it) } ?: "—", Modifier.weight(1f))</ID>
+    <ID>MaxLineLength:ReportScreen.kt$StatCell(stringResource(R.string.report_avg_stiffness), o.symptom.avgStiffnessMin?.let { "%.0f 分".format(it) } ?: "—", Modifier.weight(1f))</ID>
+    <ID>MaxLineLength:ReportScreen.kt$StatCell(stringResource(R.string.report_flare_count), "${o.flareCount}" + if (o.flareActive) stringResource(R.string.stage_active_paren) else "", Modifier.weight(1f))</ID>
+    <ID>MaxLineLength:ReportScreen.kt$StatCell(stringResource(R.string.report_total_duration), stringResource(R.string.report_exercise_minutes, o.exercise.totalMinutes), Modifier.weight(1f))</ID>
+    <ID>MaxLineLength:ReportScreen.kt$StatCell(stringResource(R.string.symptom_eye_symptoms), stringResource(R.string.report_eye_days, o.symptom.eyeDays), Modifier.weight(1f))</ID>
+    <ID>MaxLineLength:ReportScreen.kt$StatCell(stringResource(R.string.trend_vs_last), o.weightDelta?.let { "%+.1f kg".format(it) } ?: "—", Modifier.weight(1f))</ID>
+    <ID>MaxLineLength:ReportScreen.kt$StatCell(stringResource(R.string.wellness_latest_weight), o.weightLatest?.let { "${it.weightKg} kg" } ?: "—", Modifier.weight(1f))</ID>
+    <ID>MaxLineLength:ReportScreen.kt$stringResource(R.string.report_adherence_breakdown, o.adherence.medDone, o.adherence.medPartial, o.adherence.medSkipped)</ID>
+    <ID>MaxLineLength:SymptomCards.kt$"Q1 ${r.q1Fatigue} · Q2 ${r.q2SpinePain} · Q3 ${r.q3PeripheralPain} · Q4 ${r.q4TenderPoints} · Q5 ${r.q5StiffnessDegree} · Q6 ${r.q6StiffnessDuration}"</ID>
+    <ID>MaxLineLength:SymptomCards.kt$Text(r.date + if (r.backfill) stringResource(R.string.report_supplement_tag) else "", style = MaterialTheme.typography.bodySmall)</ID>
+    <ID>MaxLineLength:SymptomCards.kt$text = if (days != null) stringResource(R.string.symptom_flare_day_n, days) else stringResource(R.string.symptom_flare_active)</ID>
+    <ID>MaxLineLength:SymptomCards.kt$text = if (f.status == "active") stringResource(R.string.symptom_flare_ongoing) else stringResource(R.string.symptom_status_remitted)</ID>
+    <ID>MaxLineLength:SymptomDialogs.kt$confirmButton = { TextButton(onClick = { onConfirm(note.ifBlank { null }) }) { Text(stringResource(R.string.symptom_confirm_remission)) } }</ID>
+    <ID>MaxLineLength:SymptomDialogs.kt$confirmButton = { TextButton(onClick = { onConfirm(trigger, actions.toList(), peak, note.ifBlank { null }) }) { Text(stringResource(R.string.emergency_record_action)) } }</ID>
+    <ID>MaxLineLength:SymptomForm.kt$SectionCard</ID>
+    <ID>MaxLineLength:SymptomForm.kt$SwitchRow(stringResource(R.string.symptom_fever), feverish, stringResource(R.string.emergency_fever_threshold_note)) { feverish = it }</ID>
+    <ID>MaxLineLength:SymptomForm.kt$Text(stringResource(R.string.symptom_optional_qol), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:SymptomForm.kt$}</ID>
+    <ID>MaxLineLength:SymptomScreen.kt$Text(stringResource(R.string.common_no_records_yet), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:SymptomScreen.kt$onSave = { f -&gt; vm.saveSymptom(f.morningStiffnessMin, f.nightPain, f.painScore, f.feverish, f.feverTemp, f.eyeSymptom, f.neuroRedFlag, f.mood, f.sleep, f.fatigue, f.notes) }</ID>
+    <ID>MaxLineLength:TodayScreen.kt$confirmButton = { TextButton(onClick = { onConfirm(reason.name, note.ifBlank { null }) }) { Text(stringResource(R.string.med_record_skip)) } }</ID>
+    <ID>MaxLineLength:TodayScreen.kt$dateText = todayDate.format(DateTimeFormatter.ofPattern(stringResource(R.string.date_pattern_month_day_week), Locale.CHINESE))</ID>
+    <ID>MaxLineLength:TodayScreen.kt$status = if (exerciseDone &gt; 0) stringResource(R.string.today_exercise_done, exerciseDone) else stringResource(R.string.exercise_by_stage)</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$"allergy" to stringResource(R.string.profile_allergy_short)</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$"mixed" to stringResource(R.string.nutrition_diet_omnivore)</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$"never" to stringResource(R.string.nutrition_fish_never)</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$"personal_experience" to stringResource(R.string.knowledge_personal_experience_tag)</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$"vegan" to stringResource(R.string.nutrition_diet_vegan)</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$"yes" to stringResource(R.string.nutrition_tolerance_tag)</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$KeyValueRow(stringResource(R.string.vitals_height_short), bm!!.heightCm?.let { "%.0f cm".format(it) } ?: stringResource(R.string.common_unfilled))</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$KeyValueRow(stringResource(R.string.vitals_hip), bm!!.hipCm?.let { "%.0f cm".format(it) } ?: stringResource(R.string.common_unfilled))</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$KeyValueRow(stringResource(R.string.vitals_waist), bm!!.waistCm?.let { "%.0f cm".format(it) } ?: stringResource(R.string.common_unfilled))</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$OutlinedTextField(dailyMax, { dailyMax = it }, label = { Text(stringResource(R.string.supp_daily_max_label)) }, singleLine = true)</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$OutlinedTextField(doseAmount, { doseAmount = it }, label = { Text(stringResource(R.string.supp_dose_amount_label)) }, singleLine = true)</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$OutlinedTextField(doseUnit, { doseUnit = it }, label = { Text(stringResource(R.string.supp_dose_unit_label)) }, singleLine = true)</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$StatusChip(text = stringResource(R.string.med_status_taken_short), tone = StatusTone.Success, icon = Icons.Rounded.CheckCircle)</ID>
+    <ID>MaxLineLength:WellnessScreen.kt$options = listOf("high" to stringResource(R.string.severity_high), "medium" to stringResource(R.string.severity_moderate), "low" to stringResource(R.string.severity_low))</ID>
+    <ID>MemberNameEqualsClassName:ReportPdfWriter.kt$ReportPdfWriter.Doc$val doc = PdfDocument()</ID>
+    <ID>NestedBlockDepth:BackupEngine.kt$BackupEngine$fun verifyAgainst(db: SupportSQLiteDatabase, manifest: JSONObject, tablesJson: JSONObject? = null): VerifyResult</ID>
+    <ID>NestedBlockDepth:BackupEngine.kt$BackupEngine$private fun readTable(db: SupportSQLiteDatabase, table: String): List&lt;JSONObject&gt;</ID>
+    <ID>NestedBlockDepth:ExercisePlanTemplates.kt$ExercisePlanTemplates$private fun indexOfObjectEnd(s: String, open: Int): Int</ID>
+    <ID>NestedBlockDepth:RegexLiteralGuardTest.kt$internal fun extractRegexLiterals(src: String): List&lt;String&gt;</ID>
+    <ID>NestedBlockDepth:ReminderScheduler.kt$ReminderScheduler$fun cancelAllFuture(context: Context, meds: List&lt;Medication&gt;, today: LocalDate = LocalDate.now())</ID>
+    <ID>NestedBlockDepth:ReminderScheduler.kt$ReminderScheduler$fun rescheduleAll( context: Context, meds: List&lt;Medication&gt;, doneSlotRefs: Set&lt;String&gt;, now: LocalDateTime = LocalDateTime.now(), )</ID>
+    <ID>NestedBlockDepth:SupplementTiming.kt$SupplementTiming$fun conflicts(supplements: List&lt;Supplement&gt;, medications: List&lt;Medication&gt;): List&lt;Conflict&gt;</ID>
+    <ID>NestedBlockDepth:VaultCipher.kt$VaultCipher$private fun decryptSlotted(magic: String, secret: CharArray, header: JSONObject, headerBytes: ByteArray, ct: ByteArray): Decrypted</ID>
+    <ID>NewLineAtEndOfFile:MorningWarmup.kt$com.ashkb.app.domain.MorningWarmup.kt</ID>
+    <ID>NewLineAtEndOfFile:MorningWarmupTest.kt$com.ashkb.app.domain.MorningWarmupTest.kt</ID>
+    <ID>SpreadOperator:AppDatabase.kt$AppDatabase.Companion$(*ALL_MIGRATIONS)</ID>
+    <ID>ThrowsCount:BackupEngine.kt$BackupEngine$fun restore( db: SupportSQLiteDatabase, payload: String, mode: RestoreMode = RestoreMode.MERGE_TABLES, ): VerifyResult</ID>
+    <ID>ThrowsCount:VaultCipher.kt$VaultCipher$fun decrypt(secret: CharArray, file: ByteArray): Decrypted</ID>
+    <ID>ThrowsCount:VaultCipher.kt$VaultCipher$fun decryptBlob(vaultKey: ByteArray, blob: ByteArray, attachmentId: String): ByteArray</ID>
+    <ID>ThrowsCount:VaultCipher.kt$VaultCipher$private fun decryptSlotted(magic: String, secret: CharArray, header: JSONObject, headerBytes: ByteArray, ct: ByteArray): Decrypted</ID>
+    <ID>ThrowsCount:VaultCipher.kt$VaultCipher$private fun decryptV1(secret: CharArray, header: JSONObject, headerBytes: ByteArray, ct: ByteArray): Decrypted</ID>
+    <ID>ThrowsCount:WebDavClient.kt$WebDavClient$fun probe(): String</ID>
+    <ID>TooGenericExceptionCaught:BackupEngine.kt$BackupEngine$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:BackupRepository.kt$BackupRepository$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:BackupViewModel.kt$BackupViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:EmergencyViewModel.kt$EmergencyViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ReportViewModel.kt$ReportViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:VaultCipher.kt$VaultCipher$e: Exception</ID>
+    <ID>TooManyFunctions:HealthRepository.kt$HealthRepository</ID>
+    <ID>TopLevelPropertyNaming:Type.kt$/** * 中文排版四条现实： * 1. M3 默认字号按西文定，对中文偏小一档 —— 整体上调一档； * 2. 行高给到 1.5–1.7（中文方块字需要更多呼吸）； * 3. 系统 CJK 字体通常只有 Regular / Bold —— 标题优先"加大字号 + Bold"； * 4. 不用全角空格或手动双空格排版。 */ private const val Tabular = "tnum"</ID>
+    <ID>UnusedParameter:CheckupForms.kt$items: List&lt;CheckupItem&gt;</ID>
+    <ID>UnusedParameter:MedsScreen.kt$medRoute: String</ID>
+    <ID>UnusedPrivateProperty:BasdaiReminderReceiver.kt$BasdaiReminderReceiver$val app = context.applicationContext as? AshkbApplication ?: return</ID>
+    <ID>UnusedPrivateProperty:ExerciseReminderReceiver.kt$ExerciseReminderReceiver$val app = context.applicationContext as? AshkbApplication ?: return</ID>
+  </CurrentIssues>
+</SmellBaseline>

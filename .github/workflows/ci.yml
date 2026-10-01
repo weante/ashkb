@@ -1,9 +1,17 @@
-# D1: CI -- build + unit tests on every push to main and every PR.
-# Repo has no gradlew scripts (local builds use a pinned Gradle 8.7 install,
-# same version as gradle/wrapper/gradle-wrapper.properties), so we provision
-# Gradle via gradle/actions/setup-gradle instead.
-# assembleRelease runs the R8 pipeline (debug-signing fallback without
-# local.properties keystore) to catch keep-rule regressions early.
+# CI：构建 + 单测 + 静态分析 + 三道工程门（批次 2 起）
+#
+# 本仓库没有 gradlew（本地用固定版 Gradle 8.7），故用 gradle/actions/setup-gradle 提供。
+#
+# 门（gate）说明：
+#   1. `testDebugUnitTest` —— 含迁移链完整性、schema 导出一致性等新增单测
+#   2. `detekt`            —— 静态分析（基线见 config/detekt/baseline.xml，新问题会失败）
+#   3. `lint`              —— Android Lint（错误即失败）
+#   4. `verifySpecSync`    —— 版本号 / 单测条数在代码与 README、HANDOFF、HANDOFF-STATUS 四处必须一致
+#   5. `git diff app/schemas` —— 改了实体就必须提交导出的 schema（否则库结构变更无人评审）
+#   6. 验签               —— 打印签名摘要；配置 ASHKB_EXPECTED_CERT_SHA256 后严格比对
+#
+# ⚠️ CI 无正式 keystore：app/build.gradle.kts 从 v1.0.75 起在「产出 release 包但缺签名」时
+# 会**直接失败**，故这里显式设置 ASHKB_ALLOW_DEBUG_SIGNING=1（仅 CI 冒烟，产物不得发布）。
 name: CI
 
 on:
@@ -15,6 +23,8 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      ASHKB_ALLOW_DEBUG_SIGNING: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,5 +40,31 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build and test
-        run: gradle assembleDebug assembleRelease testDebugUnitTest --console=plain
+      - name: Build + unit tests + detekt + lint
+        run: gradle assembleDebug assembleRelease testDebugUnitTest detekt lint --console=plain
+
+      - name: Spec sync gate (version + test count across docs)
+        run: gradle verifySpecSync --console=plain
+
+      - name: Schema drift gate (commit app/schemas when entities change)
+        run: |
+          if ! git diff --exit-code -- app/schemas; then
+            echo "::error::app/schemas 下的导出 schema 与代码不一致——请提交该 diff（库结构变更必须入库）"
+            exit 1
+          fi
+          echo "app/schemas 无漂移。"
+
+      - name: Verify APK signature
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -f "$APK" || { echo "::error::release APK 未产出"; exit 1; }
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          echo "build-tools: $BT"
+          "$BT/apksigner" verify --print-certs "$APK" | grep -i 'SHA-256 digest' || true
+          DIGEST=$("$BT/apksigner" verify --print-certs "$APK" | grep -i 'SHA-256 digest' | head -1 | sed 's/.*digest: *//' | tr 'A-Z' 'a-z')
+          if [ -z "$DIGEST" ]; then echo "::error::读不到签名摘要（APK 未签名？）"; exit 1; fi
+          if [ -n "$ASHKB_EXPECTED_CERT_SHA256" ] && [ "$DIGEST" != "$(echo "$ASHKB_EXPECTED_CERT_SHA256" | tr 'A-Z' 'a-z')" ]; then
+            echo "::error::签名摘要与 ASHKB_EXPECTED_CERT_SHA256 不一致"
+            exit 1
+          fi
+          echo "签名摘要：$DIGEST"

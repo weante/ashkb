@@ -1,0 +1,68 @@
+# detekt 配置（批次 2 起）
+#
+# 策略：**继承官方默认规则集**（buildUponDefaultConfig = true），只对本项目的既有风格做少量让步，
+# 其余历史问题一律进基线（config/detekt/baseline.xml）——基线里的问题不再报，**新代码引入同类问题会失败**。
+# 这样既能立刻在 CI 生效，又不必为了「零告警」而做一次大规模重构。
+#
+# 重新生成基线：gradle detektBaseline（改完请人工看一眼 diff，别把新问题也一起塞进基线）
+
+config:
+  validation: true
+  warningsAsErrors: false
+  # 基线之外的任何问题都让构建失败（新代码的守门员）
+  checkExhaustiveness: false
+
+complexity:
+  active: true
+  LongParameterList:
+    # 项目里有若干 Compose 组件与仓库方法天然参数较多（表单透传）
+    functionThreshold: 8
+    constructorThreshold: 10
+    ignoreDefaultParameters: true
+  TooManyFunctions:
+    # 大屏 Screen / ViewModel 天然函数多（项目约定单文件 ≤500 行，不再叠加函数数限制）
+    thresholdInFiles: 40
+    thresholdInClasses: 40
+    thresholdInInterfaces: 40
+    thresholdInObjects: 40
+  LongMethod:
+    # 已有基线兜住历史长函数；阈值放宽到 80 行，避免把 Compose 的声明式大块误报
+    threshold: 80
+
+style:
+  active: true
+  MagicNumber:
+    # 临床阈值应进 ClinicalThresholds，但 UI 尺寸/数量等常量在 Compose 里很常见
+    ignoreNumbers: ['-1', '0', '1', '2', '3', '4', '5', '10', '100', '1000']
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreAnnotated: ['Composable']
+  MaxLineLength:
+    maxLineLength: 140
+    excludeCommentStatements: true
+  UnusedPrivateMember:
+    # Compose 预览 / 预留组件
+    ignoreAnnotated: ['Preview']
+  ReturnCount:
+    max: 6
+
+naming:
+  FunctionNaming:
+    # Compose 组件与测试名用中文/大驼峰
+    ignoreAnnotated: ['Composable', 'Test']
+  MatchingDeclarationName:
+    active: false
+
+comments:
+  active: true
+  UndocumentedPublicClass:
+    active: false
+  UndocumentedPublicFunction:
+    active: false
+  UndocumentedPublicProperty:
+    active: false
+
+empty-blocks:
+  EmptyCatchBlock:
+    # 项目约定用 runCatching{}.getOrNull() 吞异常，空 catch 不视为问题
+    allowedExceptionNameRegex: '_|(ignore|expected|Unused).*'

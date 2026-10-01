@@ -35,6 +35,14 @@ import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.entity.WeightLog
 
+/**
+ * 批次 2（测试安全网）：**数据库版本号的唯一来源**。
+ *
+ * 放在顶层是为了能在 `@Database(version = ...)` 注解里引用（注解需要编译期常量）。
+ * 迁移测试按它逐级校验迁移清单无缺口——此前版本号只出现在注解里，测试无从校验。
+ */
+internal const val ASHKB_DB_VERSION = 17
+
 @Database(
     entities = [
         Profile::class, Medication::class, MedicationLog::class, KbEntry::class, MedicationChange::class,
@@ -44,7 +52,7 @@ import com.ashkb.app.data.entity.WeightLog
         ImagingRecord::class, VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class, BackupLedger::class,
         CheckupAttachment::class, Recipe::class, ExercisePlan::class,
     ],
-    version = 17,
+    version = ASHKB_DB_VERSION,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -449,15 +457,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * 批次 2（测试安全网）：**迁移清单的唯一来源**。
+         *
+         * 由 [get] 与迁移测试共用。此前清单直接内联在 `addMigrations(...)` 里，测试看不到，
+         * 于是「版本号加了、迁移忘了写/忘了注册」只能等用户升级时崩才发现——
+         * 现在有单测按 [DB_VERSION] 逐级校验无缺口（见 `MigrationCoverageTest`）。
+         */
+        internal val ALL_MIGRATIONS: Array<Migration> = arrayOf(
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+            MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
+        )
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext, AppDatabase::class.java, "ashkb.db"
-                ).addMigrations(
-                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-                    MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-                    MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17
-                ).build().also { instance = it }
+                ).addMigrations(*ALL_MIGRATIONS).build().also { instance = it }
             }
     }
 }

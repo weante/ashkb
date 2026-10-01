@@ -6,6 +6,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
+    // 批次 2（测试安全网）：静态分析（配置见 config/detekt/detekt.yml，历史问题进基线）
+    id("io.gitlab.arturbosch.detekt")
 }
 
 // 正式签名：凭据读自 local.properties（gitignore 排除，不入库）；
@@ -26,8 +28,10 @@ android {
         applicationId = "com.ashkb.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 79
-        versionName = "1.0.74"
+        versionCode = 80
+        versionName = "1.0.75"
+        // 批次 2（测试安全网）：instrumented 测试（Room schema 漂移校验）需要 runner
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -43,12 +47,13 @@ android {
 
     buildTypes {
         release {
-            // v1.0.6 起：release 切换正式签名（P0 安全项）；无 keystore 环境回退 debug
+            // v1.0.6 起：release 切换正式签名（P0 安全项）
             // v1.0.16（C1）：开 R8 混淆 + 资源压缩——医疗类 App 上架前必做；
             // keep 规则见 proguard-rules.pro（实体 / kotlinx-serialization 导航路由），
             // Room / Compose / Navigation 由各自 consumer rules 自带覆盖
             isMinifyEnabled = true
             isShrinkResources = true
+            // v1.0.75（S-13）：**不再静默回退 debug 签名**（见下方 taskGraph 校验）
             signingConfig = if (hasReleaseKeystore) signingConfigs.getByName("release")
                 else signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -71,6 +76,84 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    sourceSets {
+        // 批次 2：把导出的 Room schema 挂成 androidTest 的 assets——schema 漂移校验要读它
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+}
+
+/**
+ * 批次 2（测试安全网）：**导出 Room schema 并入库**（`app/schemas/`）。
+ *
+ * 为什么必须有：`AppDatabase` 的 version 已到 17，而此前**一个 schema 文件都没有**——
+ * 「迁移是否真的把库结构改对了」在仓库里无从比对，只能等用户升级时崩。
+ * 导出后：① 每次改实体都会在 git 里留下 diff（评审能看见结构变更）；
+ * ② 后续新增的迁移可被 `MigrationTestHelper` 验证；③ 本批新增的 schema 漂移测试拿它当基准。
+ */
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+/**
+ * 批次 2（测试安全网）：detekt 静态分析。
+ *
+ * 策略：继承官方默认规则集 + 项目化让步（config/detekt/detekt.yml），
+ * **历史问题一律进基线**（config/detekt/baseline.xml），基线之外的新问题让构建失败。
+ * 这样 CI 立刻有守门员，又不需要为「零告警」做一次大重构。
+ *
+ * 重新生成基线：`gradle :app:detektBaseline`（生成后请人工看 diff，别把新问题一起塞进去）
+ */
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.file("config/detekt/detekt.yml"))
+    baseline = rootProject.file("config/detekt/baseline.xml")
+    parallel = true
+    source.setFrom(
+        "src/main/java",
+        "src/test/java",
+        "src/androidTest/java",
+    )
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    jvmTarget = "17"
+    reports {
+        html.required.set(true)
+        xml.required.set(true)
+        txt.required.set(false)
+        sarif.required.set(false)
+        md.required.set(false)
+    }
+}
+
+/**
+ * v1.0.75（S-13）：**产出正式包时，缺少正式签名必须失败，而不是安静地用 debug 签名。**
+ *
+ * 旧行为：`local.properties` 里没有 keystore 时，`assembleRelease` 会静默产出一个
+ * debug 签名的「正式包」。风险是实打实的——它**无法覆盖安装**已发布的正式版，
+ * 用户只能卸载重装（丢数据），而交付者若不逐字节验签根本发现不了。
+ *
+ * 刻意放在 taskGraph 回调里而不是配置期：配置期抛异常会把 debug 构建与单元测试一起挡掉。
+ * CI 无密钥，故显式设置 `ASHKB_ALLOW_DEBUG_SIGNING=1` 放行（并打印醒目告警）。
+ */
+gradle.taskGraph.whenReady {
+    val buildingReleaseApk = allTasks.any {
+        (it.name.startsWith("assemble") || it.name.startsWith("bundle") || it.name.startsWith("package")) &&
+            it.name.contains("Release")
+    }
+    if (buildingReleaseApk && !hasReleaseKeystore) {
+        if (System.getenv("ASHKB_ALLOW_DEBUG_SIGNING") == "1") {
+            logger.warn(
+                "⚠️ ASHKB_ALLOW_DEBUG_SIGNING=1：本次产出的 release 包使用 **debug 签名**，" +
+                    "仅限 CI / 本地冒烟，**不得对外发布**。"
+            )
+        } else {
+            throw GradleException(
+                "缺少正式签名配置：local.properties 需要 ashkb.store.file 指向存在的 keystore。" +
+                    "若确实要产出 debug 签名的测试包，请设置环境变量 ASHKB_ALLOW_DEBUG_SIGNING=1。"
+            )
+        }
     }
 }
 
@@ -106,6 +189,13 @@ dependencies {
     // ⚠️ 不可用于检测 ICU 正则差异（已实测证伪，见 HANDOFF §7）。
     // 4.13 + instrumented android-all(API 34) 已在本机 Gradle / Maven 缓存中，可离线跑。
     testImplementation("org.robolectric:robolectric:4.13")
+
+    // 批次 2（测试安全网）：instrumented 测试。
+    // 目的：把「迁移是否真的把库结构改对」变成机器可判——schema 漂移校验要在真机上开一次库。
+    // 版本选择：androidx.test.* 用本机缓存里已有的版本（离线可解析）；room-testing 与 Room 同版本。
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test:runner:1.5.0")
+    androidTestImplementation("androidx.room:room-testing:2.6.1")
 
     // S1b（手势回归）**已实测证伪、不予落地**（v1.0.53）：本环境能注入触摸事件
     // （最小 pointerInput 盒子能收到 down），但**驱动不了 M3 Slider 的拖动**——
