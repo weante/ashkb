@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.0.75（versionCode 80）· 2026-10-01 · 批次 2 进行中（基线提交 `f2c5eb8`）**。
+> **时点快照**：截至 **v1.0.75（versionCode 80）· 2026-10-01 · 批次 2 已完成并发布（提交 `3bc2167`，GitHub Latest）**。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号与测试条数以 `app/build.gradle.kts` 与 `app/build/test-results/testDebugUnitTest/*.xml` 为准。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -16,7 +16,7 @@
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
 | APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 80 / versionName 1.0.75**（批次 2 产物） |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
-| GitHub 正式版（Latest） | **v1.0.74**（2026-10-01 发布即正式版；两资产 `gh api …/assets` 摘要与本地 `Get-FileHash` **逐字节一致**；v1.0.73 已加取代横幅） |
+| GitHub 正式版（Latest） | **v1.0.75**（2026-10-01 发布即正式版；两资产摘要与本地 `Get-FileHash` **逐字节一致**；v1.0.74 已加取代横幅） |
 | GitHub 预发布 | **v1.0.61 ~ v1.0.70**（历史预发布，各页已带「已被取代」横幅）；v1.0.72 已加「已被 v1.0.73 取代」横幅 |
 
 > **最关键的一句话**：真机走查（Xiaomi 15 Pro / Android 16，被测制品 = v1.0.70 发布资产，SHA-256 逐字节一致）已完成：
@@ -292,3 +292,13 @@ gh release edit v1.0.70 --prerelease=false --latest
 - 修 v1.0.73 引入的回归：cancelAllFuture 扫 	oday-1 后，昨天跨零点的追问链会被重排清空且不重建 → escheduleAll 新增第 3 步重建「昨天尚未到点的升级重查」
 - 设备现状：versionCode **79** / versionName 1.0.74，APK shkb-1.0.74-release.apk（sha256 9a62e73…）；GitHub Latest 仍是 v1.0.73
 - 待验：今晚 23:55 测试药 → 00:10 打开应用 → 00:25 / 00:55 仍应追问；打卡记录应落在 09-30
+### 批次 2 完成（v1.0.75，2026-10-01）
+
+- **Room schema 导出并入库**：pp/schemas/com.ashkb.app.data.db.AppDatabase/17.json（90 KB）；AppDatabase 早有 xportSchema = true 却从未配 oom.schemaLocation
+- **迁移链单一来源**：顶层 ASHKB_DB_VERSION + AppDatabase.ALL_MIGRATIONS
+- **两条机器可判检查**：MigrationCoverageTest（4 条，链完整/无缺口/schema 存在/版本一致）、SchemaDriftTest（Robolectric，28 张表 DDL 与导出 schema 逐字一致 + 反向查多余表）
+- **androidTest 源集落地**：首个用例 RealDatabaseSchemaTest（生产工厂 + 真实库文件）；基础设施 runner / room-testing / schemas 挂 assets 均已就位
+- **CI 四道门**：erifySpecSync（版本号与条数四处一致）、schema 漂移（git diff app/schemas）、验签、detekt（312 条历史问题进基线）+ Android Lint
+- **缺正式签名不再静默产包**：ssembleRelease 无 keystore 直接失败，CI 用 ASHKB_ALLOW_DEBUG_SIGNING=1 放行并告警；配套 elease-tooling/verify-release.ps1
+- **本机绕行**：官方 Maven 不可达 → 用户级 ~/.gradle/init.gradle 指向国内镜像（项目文件保持官方地址）
+- 待办（诚实边界）：历史 16 个版本的 schema 需按 git 历史逐版本导出补录，之后才能真正测试「从旧版本升级」路径
