@@ -34,7 +34,16 @@ object ExerciseEngine {
             (0 until a.length()).map { a.optString(it) }
         } ?: emptyList() else emptyList()
 
-    fun parse(entry: KbEntry): JSONObject = runCatching { JSONObject(entry.payload) }.getOrDefault(JSONObject())
+    fun parse(entry: KbEntry): JSONObject = parseOrNull(entry) ?: JSONObject()
+
+    /**
+     * v1.0.77（批次 4）：解析失败返回 **null**——调用方必须能区分「JSON 坏了」与「JSON 正常但缺键」。
+     *
+     * 此前两者都退化成空 `JSONObject`：红榜拿到默认 `allow`（**禁忌动作反而被推荐**）、
+     * 黑榜虽默认 block 但提示语为空。第三份审查报告把这条列为 fail-open（P1-14）。
+     */
+    private fun parseOrNull(entry: KbEntry): JSONObject? =
+        runCatching { JSONObject(entry.payload) }.getOrNull()
 
     /**
      * 矩阵判定核心。stage 取 profile.disease_stage（R1 三态：stable / controlled / flare；
@@ -45,7 +54,20 @@ object ExerciseEngine {
         diseaseStage: String?,
         spineMobility: String?,
     ): ExerciseCard {
-        val p = parse(entry)
+        val p = parseOrNull(entry)
+        if (p == null) {
+            // v1.0.77（批次 4）：**fail-closed**。数据读不出来就不给处方，且让问题**可见**
+            // （进黑榜拦截区，而不是静默消失）——「拼错种子即把禁忌动作变推荐」正是从这里来的。
+            return ExerciseCard(
+                entry = entry,
+                verdict = "block",
+                hint = "该条目的数据无法解析，已按「禁止」保守处理；请更新知识库种子（数据异常不应静默放行）。",
+                grade = "L3",
+                listType = "black",
+                movements = emptyList(),
+                dose = null,
+            )
+        }
         val listType = p.optStr("list_type") ?: "red"
         val grade = p.optStr("grade") ?: "L2"
         val matrix = p.optJSONObject("grade_matrix")
@@ -57,8 +79,11 @@ object ExerciseEngine {
         val raw = matrix?.optStr(stage)
             ?: matrix?.optStr("active")
             ?: when (listType) {
+                // v1.0.77（批次 4）：矩阵缺失时红榜**不再默认 allow**。
+                // 种子里 15 条运动条目**全部**带 grade_matrix，缺失只可能是数据损坏或非预期格式；
+                // 此时按「降级执行」而非「可以做」——安全默认值方向（维护者 2026-09-29 裁决）。
                 "black" -> "block"
-                else -> "allow"
+                else -> "downgrade"
             }
         val cervical = cervicalInvolved(spineMobility)
         val cervicalCondition = p.optStr("cervical_condition") ?: "none"
@@ -76,10 +101,19 @@ object ExerciseEngine {
         // R27 §3 蛙泳 / 倒立条目：颈椎受累（cervical_only）全期拦截，不看 stage
         val cervicalBlock = listType == "black" && cervical && cervicalCondition == "cervical_only"
 
+        // v1.0.77（批次 4）：种子里用到、而引擎此前**静默忽略**的两个键（第三份审查报告 P1-15）：
+        //  · "always"        —— 颈椎受累者**一律**拦截（与 stage 无关）；种子把它挂在黑榜高强度动作上
+        //  · "amplitude_half"—— 颈椎受累者至多**幅度减半**执行（不得 recommend / allow）
+        // 忽略它们的后果：本该拦截的高风险动作被放行、本该减半的动作按原幅度给出。
+        val cervicalAlways = cervical && cervicalCondition == "always"
+        val cervicalHalf = cervical && cervicalCondition == "amplitude_half"
+
         val verdict = when {
             blackIntercepted || cervicalBlock -> "block"
+            cervicalAlways -> if (listType == "black") "block" else "pause"
             // R1 发作期：红榜 L2/L3 一律 pause（当日只出 L1 轻柔项）——矩阵之外的引擎级兜底
             stage == "flare" && listType == "red" && grade != "L1" -> "pause"
+            cervicalHalf && (raw == "recommend" || raw == "allow") -> "downgrade"
             else -> raw
         }
 
@@ -93,7 +127,7 @@ object ExerciseEngine {
                 "advise_against" -> append("不建议：骨折与应力风险随强度上升。")
                 else -> append("已拦截：${p.optStr("risk") ?: "高强度高风险动作"}")
             }
-            if (cervical && (cervicalCondition == "cervical_only" || cervicalCondition == "breaststroke_block" || cervicalCondition == "pose_filter")) {
+            if (cervical && cervicalCondition in CERVICAL_HINT_CONDITIONS) {
                 append("\n颈椎受累提示：${p.optStr("risk") ?: "该类动作颈椎风险高"}")
             }
             if (verdict == "block" || verdict == "advise_against") {
@@ -126,6 +160,17 @@ object ExerciseEngine {
     }
 
     private fun gradeOrder(g: String) = when (g) { "L1" -> 0; "L2" -> 1; else -> 2 }
+
+    /**
+     * 需要在提示里点明「颈椎受累」的条件键。
+     *
+     * v1.0.77（批次 4）：补上种子实际在用的 `always` / `amplitude_half`（此前被静默忽略）；
+     * 写成集合而不是一串 `||`，是为了让判定可读、也避免触发 detekt 的 ComplexCondition。
+     */
+    private val CERVICAL_HINT_CONDITIONS = setOf(
+        "cervical_only", "breaststroke_block", "pose_filter",
+        "always", "amplitude_half", // v1.0.77：种子在用、此前被静默忽略的两个键
+    )
 
     /** R21 / exc-010 判读：worse → 建议下次减量；区分肌肉酸痛与炎症加重 */
     fun interpretFeedback(

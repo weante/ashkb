@@ -54,8 +54,19 @@ object ClinicalThresholds {
     const val HR_LOW = 60
     const val HR_HIGH = 100
 
-    /** BASDAI 高活动度判定（0–10 总分）。 */
+    /** BASDAI 高活动度判定（0–10 总分，整数口径）。 */
     fun basdaiHigh(total: Int): Boolean = total >= BASDAI_HIGH
+
+    /**
+     * v1.0.77（批次 4）：**Double 口径重载**。
+     *
+     * BASDAI 自评总分在实体里是浮点（`(Q1+Q2+Q3+Q4+(Q5+Q6)/2)/5` 带 .5 的可能），
+     * 而散落各处的硬编码比较（`total >= 4.0`）本来就是 Double 比较。
+     * 收敛到本函数时若只有 Int 版本，调用点就得各自写 `toInt()`——那会**悄悄截断**
+     * （4.5 → 4 仍在阈值上，但 3.9 → 3 就会把「接近阈值」判成「正常」），
+     * 所以这里补一个 Double 重载，让调用点原样传值、不做有损转换。
+     */
+    fun basdaiHigh(total: Double): Boolean = total >= BASDAI_HIGH
 
     /** 疼痛三档标签。 */
     fun painLabel(score: Int): String = when {

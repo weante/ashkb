@@ -120,14 +120,14 @@ object ReportImportParser {
         }
     }
 
-    /** AI 常输出 2026/7/31 或 2026.07.31，统一成 YYYY-MM-DD */
-    private fun normalizeDate(raw: String?): String? {
-        if (raw.isNullOrBlank()) return null
-        val s = raw.trim().replace(".", "-").replace("/", "-").replace("年", "-").replace("月", "-").replace("日", "")
-        val m = Regex("^(\\d{4})-(\\d{1,2})-(\\d{1,2})").find(s) ?: return null
-        val (y, mo, d) = m.destructured
-        return "%s-%02d-%02d".format(y, mo.toInt(), d.toInt())
-    }
+    /**
+     * AI 常输出 2026/7/31 或 2026.07.31，统一成 YYYY-MM-DD。
+     *
+     * v1.0.77（批次 4）：改为走 [DateInput]——原实现正则取到年月日后直接 `%02d` 拼接，
+     * **`2026-13-45` / `2026-02-31` 会被原样写库**（第三份审查报告 §六）。
+     * 校验不过返回 null，由调用方决定如何提示（不静默接受）。
+     */
+    private fun normalizeDate(raw: String?): String? = DateInput.normalizeOrNull(raw)
 
     private val IMAGING_KEYS = listOf("类型", "日期", "医院", "部位", "所见", "结论", "对比", "备注")
 

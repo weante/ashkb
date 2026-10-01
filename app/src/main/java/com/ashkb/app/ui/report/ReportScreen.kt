@@ -58,6 +58,7 @@ import com.ashkb.app.R
 import com.ashkb.app.ui.components.KeyValueRow
 import com.ashkb.app.ui.components.LoadingBlock
 import com.ashkb.app.ui.components.NavRow
+import com.ashkb.app.ui.components.DoseCompletionBlock
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.sharedWindow
 import com.ashkb.app.ui.components.SmallTrendChart
@@ -152,56 +153,12 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
         item { Spacer(Modifier.height(12.dp)) }
 
         item {
-            SectionCard(title = stringResource(R.string.report_adherence_days, o.adherence.days)) {
+            // v1.0.77（批次 3b）：这张卡片的主指标改为**计划剂量口径**（分母 = 已到点的计划剂量数）——
+            // 它才是「真正吃了多少剂」；「记录内完成度」降为块内的次级说明行（它覆盖更早的历史，
+            // 因为计划快照只有 v1.0.77 起的数据）。两套口径的差别与覆盖起点由 DoseCompletionBlock 统一解释。
+            SectionCard(title = stringResource(R.string.dose_completion_plan_title, o.adherence.days)) {
                 val med = o.adherence
-                if (med.medTotal == 0) {
-                    // v1.0.76（批次 3a）：零分母不给百分比也不给判定——「0%」会被读成「一条都没完成」，
-                    // 「达标 / 需干预」更是从「没有数据」里编出来的结论（旧实现正是给 0% + 红标）
-                    Text(
-                        stringResource(R.string.report_completion_empty),
-                        style = DataLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        stringResource(R.string.report_completion_empty_note),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    // 阈值 90/70（原为 80/50），且数字与进度条必须同 tone（修此前的矛盾）
-                    val rate = med.medRatePct
-                    val tone = when {
-                        rate >= ClinicalThresholds.ADHERENCE_GOOD -> StatusTone.Success
-                        rate >= ClinicalThresholds.ADHERENCE_FAIR -> StatusTone.Warning
-                        else -> StatusTone.Danger
-                    }
-                    val accent = tone.accent()
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("$rate%", style = DataLarge, color = accent)
-                        Spacer(Modifier.padding(start = Spacing.lg))
-                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-                            Text(
-                                stringResource(R.string.report_adherence_breakdown, med.medDone, med.medPartial, med.medSkipped),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            Text(
-                                stringResource(R.string.report_adherence_total, med.medTotal),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Spacer(Modifier.weight(1f))
-                        // 有记录才有判定：completionLabel 对 null 恒为 null（零分母上面已拦掉）
-                        ClinicalThresholds.completionLabel(rate)?.let { StatusChip(it, tone) }
-                    }
-                    Spacer(Modifier.height(Spacing.sm))
-                    LinearProgressIndicator(
-                        progress = { rate / 100f },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = accent,
-                        trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    )
-                }
+                DoseCompletionBlock(dose = med.plan, record = med.record, days = med.days)
                 if (med.medPrnCount > 0) {
                     // 按需（PRN）记录被移出了完成度，必须在卡片上说出它们的去处与条数
                     Spacer(Modifier.height(Spacing.xs))

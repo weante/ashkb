@@ -23,6 +23,8 @@ import com.ashkb.app.domain.SedentaryReminder
  *  Receiver 触发时实时读配置，开关/时间变更只写 prefs。
  *
  * 用药提醒不在此处——用药提醒由「药单本身」驱动，没有总开关（停药即归档，不再提醒）。
+ * 唯一的例外是 v1.0.77（批次 3b）的**漏服补发去重标记**（[missedDoseAlertedDate]）：
+ * 它不是开关，而是「今天这条通知发过没有」的一次性状态，与提醒层同处一个 prefs 最省事。
  */
 class ReminderConfigRepository(context: Context) {
 
@@ -52,7 +54,6 @@ class ReminderConfigRepository(context: Context) {
     /** 默认 **关闭**——一天最多十几次提醒，必须由用户显式开启。 */
     fun sedentaryEnabled(): Boolean = prefs.getBoolean(KEY_SEDENTARY_ENABLED, false)
     fun setSedentaryEnabled(on: Boolean) = prefs.edit().putBoolean(KEY_SEDENTARY_ENABLED, on).apply()
-
     fun sedentaryIntervalMin(): Int =
         prefs.getInt(KEY_SEDENTARY_INTERVAL, SedentaryReminder.DEFAULT_INTERVAL_MIN)
     fun setSedentaryIntervalMin(min: Int) = prefs.edit().putInt(KEY_SEDENTARY_INTERVAL, min).apply()
@@ -64,6 +65,26 @@ class ReminderConfigRepository(context: Context) {
     fun sedentaryEndHour(): Int =
         prefs.getInt(KEY_SEDENTARY_END, SedentaryReminder.DEFAULT_END_HOUR)
     fun setSedentaryEndHour(hour: Int) = prefs.edit().putInt(KEY_SEDENTARY_END, hour).apply()
+
+    // ---- v1.0.77（批次 3b）：漏服补发的「已提醒过的日期」----
+
+    /**
+     * 漏服补发通知**已投递过的归属日**（null = 还没投递过）。
+     *
+     * 为什么放在这里、而不是新建一个 store：这个标记天然是「提醒层的一次性状态」，
+     * 与 dnd / 各源开关同属一个关注点（都是「怎么提醒」），而 `reminder_config` 这份 prefs
+     * 已经承担了这件事；为**一个 key** 再开一份 prefs 只会多一个「换机后要重新理解」的文件。
+     * 与既有取舍一致：不跨备份恢复——换机后顶多多收到一条昨天的提醒，无损。
+     *
+     * 语义：记录**昨天那个日期**（而不是「今天提醒过了」）。于是：
+     *  · 同一天内多次触发（冷启动、开机、改时钟）只会命中同一条通知；
+     *  · 跨到第二天后，比较值自然是新日期，无需任何清理逻辑。
+     */
+    fun missedDoseAlertedDate(): String? = prefs.getString(KEY_MISSED_ALERT_DATE, null)
+
+    /** 记下「[date] 这一天的漏服已经提醒过了」。 */
+    fun setMissedDoseAlertedDate(date: String) =
+        prefs.edit().putString(KEY_MISSED_ALERT_DATE, date).apply()
 
     companion object {
         const val PREFS_NAME = "reminder_config"
@@ -85,6 +106,9 @@ class ReminderConfigRepository(context: Context) {
         const val KEY_SEDENTARY_INTERVAL = "sedentary_interval_min"
         const val KEY_SEDENTARY_START = "sedentary_start_hour"
         const val KEY_SEDENTARY_END = "sedentary_end_hour"
+
+        // v1.0.77（批次 3b）：漏服补发的去重标记（存「已提醒过的归属日」）
+        const val KEY_MISSED_ALERT_DATE = "missed_dose_alert_date"
 
         /** 候选周期清单（天）：周 / 双周 / 月 / 双月 / 季。 */
         val CYCLE_CHOICES = listOf(7L, 14L, 28L, 56L, 84L)

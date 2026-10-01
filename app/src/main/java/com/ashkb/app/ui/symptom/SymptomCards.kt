@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 
+import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.Alert
 import com.ashkb.app.data.entity.BasdaiRecord
@@ -176,7 +177,7 @@ internal fun BasdaiList(records: List<BasdaiRecord>) {
         Text(
             "%.1f".format(r.total),
             style = MaterialTheme.typography.titleMedium,
-            color = if (r.total >= 4.0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+            color = if (ClinicalThresholds.basdaiHigh(r.total)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
         )
     }
 }

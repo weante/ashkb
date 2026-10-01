@@ -26,6 +26,7 @@ import com.ashkb.app.data.entity.LabResult
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.MedicationChange
 import com.ashkb.app.data.entity.MedicationLog
+import com.ashkb.app.data.entity.PlannedSlot
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.entity.Recipe
 import com.ashkb.app.data.entity.Supplement
@@ -130,6 +131,16 @@ interface MedicationLogDao {
     /** v1.0.71：某条药名下的打卡记录条数——删除确认框要如实报出条数（不可逆操作不能含糊）。 */
     @Query("SELECT COUNT(*) FROM medication_logs WHERE med_id = :medId")
     suspend fun countOfMed(medId: String): Int
+
+    /**
+     * v1.0.77（批次 3b）：区间内的全部用药记录（含 PRN）。
+     *
+     * 为什么需要「整行」而不只是计数：计划剂量口径的完成度要按 `(date, med_id, slot_key)`
+     * 与 `planned_slots` 里的计划槽位**逐条配对**——计数版本（[countScheduledBetweenStatus]）
+     * 只有三态条数，无法知道「哪一剂没记录」，也就分不出「未记录（missed）」。
+     */
+    @Query("SELECT * FROM medication_logs WHERE date BETWEEN :from AND :to")
+    suspend fun listBetween(from: String, to: String): List<MedicationLog>
 
     /**
      * v1.0.71：随药档一并**物理删除**该药的全部打卡记录。
@@ -756,4 +767,78 @@ interface ExercisePlanDao {
 
     @Query("DELETE FROM exercise_plans WHERE id = :id")
     suspend fun delete(id: String)
+}
+
+// ===========================================================================
+// v1.0.77（批次 3b）：计划槽位快照（planned_slots）
+// ===========================================================================
+
+/**
+ * 计划槽位快照的读写。
+ *
+ * 只做四件事：**幂等批量写入**、**按日期区间取**、**判定某槽位是否已存在**、**随药档清理**。
+ * 这里刻意**不**提供任何「更新计划」的方法——快照是当时计划的留痕，
+ * 药档改了应该由物化例程写入**新日期**的行，而不是回头改写历史。
+ */
+@Dao
+interface PlannedSlotDao {
+    /**
+     * 幂等批量写入（与其它「快照表」同策略）。
+     *
+     * `IGNORE` + `(date, med_id, slot_key)` 唯一索引 = 物化例程**可以每天反复跑**：
+     * 已写过的槽位被忽略，不会重复插入、也不会覆盖已有行。
+     */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(slots: List<PlannedSlot>)
+
+    /** 某药在区间内的计划槽位（药单「用药记录」弹层的计划口径完成度用） */
+    @Query(
+        "SELECT * FROM planned_slots WHERE med_id = :medId AND date BETWEEN :from AND :to " +
+            "ORDER BY date, slot_time",
+    )
+    suspend fun betweenForMed(medId: String, from: String, to: String): List<PlannedSlot>
+
+    /**
+     * 日期区间内的全部计划槽位（闭区间，报表用）。
+     * 排序固定为「日期 + 计划时刻」，与日志列表的时间线口径一致。
+     */
+    @Query("SELECT * FROM planned_slots WHERE date BETWEEN :from AND :to ORDER BY date, slot_time")
+    suspend fun between(from: String, to: String): List<PlannedSlot>
+
+    /**
+     * 该槽位是否已存在（幂等判定 / 自检用）。
+     *
+     * ⚠️ `slot_key` 用 `=` 比较，**NULL 永不相等**——与 `medication_logs` 的
+     * `find(...)` 同款语义。计划槽位的 slotKey 恒来自 `ScheduleCalc`（"HH:mm" 或 "inj"，
+     * 从不为 null），故这一限制不影响实际使用；真要按 NULL 查请自行用 `IS NULL` 的查询。
+     */
+    @Query("SELECT COUNT(*) FROM planned_slots WHERE date = :date AND med_id = :medId AND slot_key = :slotKey")
+    suspend fun countAt(date: String, medId: String, slotKey: String?): Int
+
+    /** [countAt] 的布尔形态：某日某槽位是否已物化。 */
+    suspend fun exists(date: String, medId: String, slotKey: String?): Boolean =
+        countAt(date, medId, slotKey) > 0
+
+    /**
+     * 删除某药的全部计划快照。
+     *
+     * 用在两处（语义不同，都是「这些行不该再参与统计」）：
+     *  · **物理删除药档**（`MedicationRepository.deleteArchivedMedication`）——与日志 / 变更一起清；
+     *    否则删掉「测试用药」后，计划口径的完成度仍会把它的计划剂量算进分母（用户清不干净痕迹）。
+     *  · **停药**（`MedicationRepository.stopMedication`）——只删**今天起**的行（见 [deleteOfMedFrom]），
+     *    保留停药前的历史：停药不是删除，历史计划剂量仍该留在统计里。
+     */
+    @Query("DELETE FROM planned_slots WHERE med_id = :medId")
+    suspend fun deleteOfMed(medId: String)
+
+    /**
+     * 删除某药从 [fromDate]（含）起的计划快照——停药专用。
+     *
+     * 为什么必须删「停药后」的行：物化窗口是滚动 8 天，用户今天停药时，
+     * **未来 7 天的行已经写进表里**了。若留着，此后每天的报表窗口都会把它们算成「未记录」，
+     * 用户会看到一个自己已经停掉的药在不断产生漏服——比不删更糟。
+     * 而 `date < fromDate` 的行必须保留：那是真实发生过的计划（停药前确实该吃）。
+     */
+    @Query("DELETE FROM planned_slots WHERE med_id = :medId AND date >= :fromDate")
+    suspend fun deleteOfMedFrom(medId: String, fromDate: String)
 }

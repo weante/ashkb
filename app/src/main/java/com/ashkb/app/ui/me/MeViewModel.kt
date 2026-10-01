@@ -8,10 +8,13 @@ import com.ashkb.app.AshkbApplication
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.MedicationLog
+import com.ashkb.app.data.entity.PlannedSlot
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.repo.MedicationRepository
+import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.reminder.ReminderScheduler
 import java.time.LocalDate
+import java.time.LocalDateTime
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -51,7 +54,12 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
         // （约 8 天窗口），在保存药物/停药这条热路径上会造成可感知卡顿。
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val list = com.ashkb.app.data.db.AppDatabase.get(context).medicationDao().listActive()
-            ReminderScheduler.rescheduleAll(context, list, repo.doneSlotRefs(LocalDate.now()))
+            val today = LocalDate.now()
+            ReminderScheduler.rescheduleAll(context, list, repo.doneSlotRefs(today))
+            // v1.0.77（批次 3b）：与提醒同批物化计划槽位快照。改药单（改时刻 / 换频次 / 新增）与
+            // 停药都走这里，新的计划从今天起就能被计划口径的完成度看见（停药时另有清理，见 repo）。
+            val win = repo.plannedSlotWindow(today)
+            repo.materializePlannedSlots(list, win.from, win.to)
         }
     }
 
@@ -60,6 +68,22 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
 
     /** v1.0.48：某条药的用药记录流（近 90 天），药单点开查看流水 */
     fun observeLogsForMed(medId: String): Flow<List<MedicationLog>> = repo.observeLogsForMed(medId)
+
+    /**
+     * v1.0.77（批次 3b）：某条药近 [days] 天的**计划槽位快照**（弹层里与日志配对算计划口径完成度）。
+     *
+     * 与 [observeLogsForMed] 同为 90 天窗口、**同一个闭区间**（`[今天-(days-1), 今天]`）——
+     * 两个列表窗口若不重合，算出来的「未记录」会凭空多出几天。
+     *
+     * 已滤掉**今天还没到点**的槽位（[AdherenceCalc.isDue]）：否则每天上午的完成度都会因为
+     * 「晚上那剂还没到点」而假性掉一截，随当天陆续打卡再爬回来——那是噪声，不是依从率。
+     */
+    suspend fun plannedSlotsForMed(medId: String, days: Int): List<PlannedSlot> {
+        val to = LocalDate.now()
+        val now = LocalDateTime.now()
+        return repo.plannedSlotsForMed(medId, to.minusDays((days - 1).toLong()), to)
+            .filter { AdherenceCalc.isDue(it, now) }
+    }
 
     /** v1.0.49：手动修正某条用药记录（药单「用药记录」弹层里改） */
     fun updateLog(log: MedicationLog, status: String, reason: String?, injSite: String?, notes: String?) =

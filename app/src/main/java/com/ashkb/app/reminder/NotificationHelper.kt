@@ -39,6 +39,8 @@ object NotificationHelper {
     private const val NOTIF_ID_EMERGENCY_CARD = 100003
     /** v1.0.68 C8a：久坐提示 ID（固定单条，覆盖而非堆积）。 */
     private const val NOTIF_ID_SEDENTARY = 100004
+    /** v1.0.77（批次 3b）：漏服补发 ID（固定单条——同一天重复调用只更新同一条）。 */
+    private const val NOTIF_ID_MISSED_DOSES = 100005
 
     fun ensureChannels(context: Context) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -442,6 +444,42 @@ object NotificationHelper {
             .setContentIntent(open)
             .build()
         runCatching { NotificationManagerCompat.from(context).notify(NOTIF_ID_SEDENTARY, n) }
+    }
+
+    /**
+     * v1.0.77（批次 3b）：**漏服补发**——昨天有 N 剂未记录的汇总提醒（一条，不逐剂发）。
+     *
+     * 通道**复用现有的**，不新建：新建通道在系统里等于又让用户授权 / 重新调一遍重要性，
+     * 而这条通知本来就是用药提醒的一种（未记录 = 没打卡）。
+     *  · 正常时段 → [CHANNEL_MED]（用户已有的「用药提醒」，重要级别高、有声音）；
+     *  · 免打扰时段 → [CHANNEL_REMINDER_SILENT]（v1.0.60 B8 的静默通道：不响不震、通知栏仍可见）。
+     * 与用药提醒同样归入 [GROUP_REMINDERS]，多条提醒会被折叠统计（不会各自刷屏）。
+     *
+     * 通知 id **固定**（[NOTIF_ID_MISSED_DOSES]）：同一天重复调用只更新同一条。
+     * 点击只进应用（MainActivity 落到首页）——补记入口在今日页的「昨天未记录」卡上，
+     * 刻意不做 intent 路由（同三源提醒的取舍：不给 MainActivity 加状态机）。
+     *
+     * @return 是否真的投递了（未授予通知权限时为 false——调用方据此决定要不要记「今天已提醒」，
+     *   免得权限补授之后这条提醒被那次失败静默吃掉）
+     */
+    fun postMissedDoses(context: Context, count: Int, medNames: List<String>): Boolean {
+        if (!canPost(context)) return false
+        val silent = isInDndNow(context)
+        val channel = if (silent) CHANNEL_REMINDER_SILENT else CHANNEL_MED
+        val names = medNames.joinToString("、")
+        val n = NotificationCompat.Builder(context, channel)
+            .setSmallIcon(R.drawable.ic_stat_pill)
+            .setContentTitle(context.getString(R.string.notif_missed_doses_title, count))
+            .setContentText(context.getString(R.string.notif_missed_doses_text, names))
+            .setPriority(if (silent) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(openMainActivity(context, "missed_doses"))
+            .setGroup(GROUP_REMINDERS)
+            .build()
+        runCatching { NotificationManagerCompat.from(context).notify(NOTIF_ID_MISSED_DOSES, n) }
+        updateGroupSummary(context)
+        return true
     }
 
     private fun openMainActivity(context: Context, key: String): PendingIntent =

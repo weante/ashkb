@@ -27,6 +27,7 @@ import com.ashkb.app.data.entity.SymptomDaily
 import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.entity.WeightLog
+import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.LabImport
@@ -68,7 +69,8 @@ class HealthRepository(private val context: Context) {
 
     companion object {
         const val FEVER_THRESHOLD = 38.5
-        const val BASDAI_THRESHOLD = 4.0
+        // v1.0.77（批次 4）：原 `BASDAI_THRESHOLD = 4.0` 已删除——与 `ClinicalThresholds.BASDAI_HIGH` 是同一个值，
+    // 两个常量并存会让「改了一处忘了另一处」成为必然（第三份审查报告 §六）。一律走 `ClinicalThresholds.basdaiHigh()`。
         const val BASDAI_WINDOW_DAYS = 14L
         const val FLARE_ALERT_DAY = 7L
     }
@@ -162,9 +164,9 @@ class HealthRepository(private val context: Context) {
 
     /** edu-th-002：14 天内 ≥2 次记录均 ≥4.0 → basdai_high 警报（提示性非诊断性） */
     private suspend fun evaluateBasdaiAlert(record: BasdaiRecord) {
-        if (record.total < BASDAI_THRESHOLD) return
+        if (!ClinicalThresholds.basdaiHigh(record.total)) return
         val from = LocalDate.parse(record.date).minusDays(BASDAI_WINDOW_DAYS).toString()
-        val recent = basdaiDao.between(from, record.date).filter { it.total >= BASDAI_THRESHOLD }
+        val recent = basdaiDao.between(from, record.date).filter { ClinicalThresholds.basdaiHigh(it.total) }
         if (recent.size >= 2) {
             insertAlertOnce(
                 type = "basdai_high", severity = "medium", refDate = record.date,
@@ -481,15 +483,22 @@ class HealthRepository(private val context: Context) {
         labResultDao.observeTrend(testName, limit)
 
     suspend fun saveLabResult(result: LabResult) {
-        // 自动判读异常
-        val withAbnormal = if (result.abnormal == null && result.value != null) {
-            val abn = when {
+        // v1.0.77（批次 4）：**本地参考范围判定优先**（维护者 2026-09-29 裁决）。
+        //
+        // 旧行为：只有 `abnormal == null` 才做本地判读——而 AI 导入路径会把 AI 的标记写进**同一列**
+        // （包括「正常」）。于是 **AI 说正常，本地就再也不判读**：真实超出参考范围的数值被静默标成
+        // 正常，从趋势图与 PDF 里消失（第三份审查报告 S-12「AI 幻觉能遮盖真实异常值」）。
+        // 现在：只要**有参考范围**就一律本地判读；AI 标记仅在本地**无法判读**（没有参考范围）时兜底。
+        // （「AI 标记与本地判定并列展示」需要新增一列，随库 v19 落地，见 HANDOFF §8b 第 4 条。）
+        val localAbnormal = if (result.value != null) {
+            when {
                 result.refHigh != null && result.value > result.refHigh -> "high"
                 result.refLow != null && result.value < result.refLow -> "low"
-                else -> "normal"
+                result.refHigh != null || result.refLow != null -> "normal"
+                else -> null // 没有参考范围：本地判不了，保留 AI 标记兜底
             }
-            result.copy(abnormal = abn)
-        } else result
+        } else null
+        val withAbnormal = if (localAbnormal != null) result.copy(abnormal = localAbnormal) else result
         val toSave = if (withAbnormal.id.isBlank()) withAbnormal.copy(id = Ids.new("lab")) else withAbnormal
         labResultDao.upsert(toSave)
     }

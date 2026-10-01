@@ -8,6 +8,7 @@ import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.MedicationChange
 import com.ashkb.app.data.entity.MedicationLog
+import com.ashkb.app.data.entity.PlannedSlot
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.entity.Reaction
 import com.ashkb.app.data.entity.StopReason
@@ -50,6 +51,7 @@ class MedicationRepository(private val context: Context) {
     private val profileDao = db.profileDao()
     private val kbDao = db.kbEntryDao()
     private val changeDao = db.medicationChangeDao()
+    private val slotDao = db.plannedSlotDao()
 
     // ---- 档案 ----
     fun observeProfile(): Flow<Profile?> = profileDao.observe()
@@ -64,6 +66,11 @@ class MedicationRepository(private val context: Context) {
     suspend fun stopMedication(med: Medication, reason: String, note: String?) {
         val now = nowIso()
         medDao.archive(med.id, now)
+        // v1.0.77（批次 3b）：清掉**今天起**的计划槽位快照（停药生效日 = 今天）。
+        // 物化窗口是滚动的 8 天，此刻未来 7 天的行已经在表里；留着它们，此后每天的报表都会
+        // 把「已经停掉的药」算成未记录——那是用户无法理解的假漏服。
+        // 停药前的历史行**保留**：停药不是删除，那段时间确实有过这些计划剂量。
+        slotDao.deleteOfMedFrom(med.id, LocalDate.now().toString())
         changeDao.insert(
             MedicationChange(
                 id = Ids.new("mchg"),
@@ -269,6 +276,9 @@ class MedicationRepository(private val context: Context) {
         val logs = logDao.countOfMed(medId)
         logDao.deleteOfMed(medId)
         changeDao.deleteOfMed(medId)
+        // v1.0.77（批次 3b）：计划快照一并物理删除——否则删掉「测试用药」后，
+        // 计划剂量口径的完成度仍会把它的计划算进分母 / 漏服，用户的痕迹清不干净（与日志同理）。
+        slotDao.deleteOfMed(medId)
         medDao.deleteArchived(medId)
         logs
     }
@@ -304,12 +314,110 @@ class MedicationRepository(private val context: Context) {
      * 用户主动跳过的槽位在 v1.0.73 之后也不该重建，故新代码一律用本方法）。
      * 今日页的「昨天还有 N 剂未记录」卡必须用**已结算**口径，否则用户昨天明确跳过（写了原因）的
      * 剂量会天天挂在卡片上催他补记。
+     *
+     * v1.0.77（批次 3b）：状态集合改为 [AdherenceCalc.SETTLED_STATUSES]（done / partial / skipped），
+     * 与漏服补发通知（`MissedDoses.unsettled`）**共用同一份定义**。
+     * 此前这里只认 done / skipped，于是「部分完成」的剂量会同时出现在补记卡上（说漏了）
+     * 与漏服判定里（说没漏）——同一剂药两个结论。改为一处定义后两者不可能再分叉。
      */
     suspend fun settledSlotRefs(date: LocalDate): Set<String> =
         logsForDate(date)
-            .filter { it.status == AdherenceCalc.DONE || it.status == AdherenceCalc.SKIPPED }
+            .filter { it.status in AdherenceCalc.SETTLED_STATUSES }
             .map { ReminderScheduler.slotRef(it.medId, it.slotKey) }
             .toSet()
+
+    // ---- v1.0.77（批次 3b）：计划槽位快照 ----
+
+    /**
+     * 物化计划槽位快照：把 [from]..[to] 每天的计划用 `ScheduleCalc.slotsFor` 展开成行写库。
+     *
+     * **幂等**：`(date, med_id, slot_key)` 唯一索引 + `INSERT OR IGNORE`，同一天反复调用只会
+     * 补上缺的行。因此这个例程挂在每次「重排提醒」的同一批调用点上（启动 / 开机 / 打卡后 /
+     * 改药单后）——窗口滚过去一天，就补进来一天，不需要额外的定时任务。
+     *
+     * 按需（PRN）天然没有槽位（`slotsFor` 返回空），无需特判。
+     *
+     * **只物化未开始的药**：`startDate` 晚于某天的药在该日没有计划——否则今天新建一支药，
+     * 昨天会被凭空算出一剂未记录（`PendingDoses` 的 startDate 判定同款理由，假阳性回归锁见
+     * `PendingDosesTest`）。日期解析不出来时按「不过滤」处理（宁可多记一剂，也不静默藏掉计划）。
+     *
+     * ⚠️ 快照是**当时计划**的留痕：同一药事后改了时刻 / 剂量，已写入的行不会跟着变
+     * （历史窗口因此不会随编辑操作漂移）。若某天本不该有计划而表里已有行，请用
+     * `PlannedSlotDao.deleteOfMedFrom` 清掉，而不是改写既有行。
+     */
+    suspend fun materializePlannedSlots(meds: List<Medication>, from: LocalDate, to: LocalDate) {
+        if (meds.isEmpty()) return
+        val createdAt = nowIso()
+        val rows = mutableListOf<PlannedSlot>()
+        // 本批已用过的主键。为什么要自己去重：[Ids.new] 是「毫秒时间基 + 3 位随机尾」，
+        // 而一次物化会一口气生成几十行（8 天 × 每天几剂，全在同一两毫秒内）——
+        // 同毫秒撞尾的概率到百分之几量级，撞上会被 `INSERT OR IGNORE` **静默丢掉一行计划**
+        // （那天分母少一剂，还没有任何报错）。故同一批内保证主键互不相同。
+        val usedIds = mutableSetOf<String>()
+        var date = from
+        while (!date.isAfter(to)) {
+            for (med in meds) {
+                val started = runCatching { LocalDate.parse(med.startDate) }.getOrNull()
+                if (started != null && date.isBefore(started)) continue
+                for (slot in ScheduleCalc.slotsFor(med, date)) {
+                    // 时刻为空的槽位不物化：没有时刻就算不出「是否已到点」，也无法用于判定漏服
+                    val time = slot.time ?: continue
+                    rows.add(
+                        PlannedSlot(
+                            id = freshSlotId(usedIds),
+                            date = date.toString(),
+                            medId = med.id,
+                            medKey = med.nameKey,
+                            medName = med.name,
+                            slotKey = slot.key,
+                            slotTime = time,
+                            doseSnapshot = med.dose,
+                            createdAt = createdAt,
+                        )
+                    )
+                }
+            }
+            date = date.plusDays(1)
+        }
+        if (rows.isNotEmpty()) slotDao.insertAll(rows)
+    }
+
+    /**
+     * 取一个本批内唯一的主键（理由见 [materializePlannedSlots]）。
+     *
+     * 撞尾时加计数后缀而不是重摇随机数：重摇仍是随机过程（理论上可以一直撞），
+     * 加后缀是确定性的——前缀保持 `pslot-` 的标准形态，主键只要求本地唯一。
+     */
+    private fun freshSlotId(used: MutableSet<String>): String = uniqueSlotId(Ids.new("pslot"), used)
+
+    /** 某药在区间内的计划槽位（药单「用药记录」弹层的计划口径完成度用） */
+    suspend fun plannedSlotsForMed(medId: String, from: LocalDate, to: LocalDate): List<PlannedSlot> =
+        slotDao.betweenForMed(medId, from.toString(), to.toString())
+
+    /** 区间内全部计划槽位（报表用） */
+    suspend fun plannedSlotsBetween(from: LocalDate, to: LocalDate): List<PlannedSlot> =
+        slotDao.between(from.toString(), to.toString())
+
+    /** 区间内全部用药记录（计划口径完成度要按槽位逐条配对，计数不够用） */
+    suspend fun logsBetween(from: LocalDate, to: LocalDate): List<MedicationLog> =
+        logDao.listBetween(from.toString(), to.toString())
+
+    /**
+     * 计划槽位快照的**滚动物化窗口**（今天-1 .. 今天+7）。
+     *
+     * 为什么是这一头一尾：起点取**昨天**（跨零点补记与「昨天漏了几剂」的补发都要看昨天），
+     * 长度与提醒的 [ReminderScheduler.HORIZON_DAYS] **对齐**——提醒排到哪天，计划快照就记到哪天，
+     * 这样永远不会出现「有提醒可发、却没有计划可评判」的错位。
+     *
+     * 收成一个方法（而不是在四个调用点各写一遍 `minusDays(1) / plusDays(7)`）的理由与
+     * [doneSlotRefs] 同款：多写几遍必然会漏改一处，而窗口错一天没有任何症状——
+     * 只是某天的完成度悄悄算不出来。
+     */
+    fun plannedSlotWindow(today: LocalDate = LocalDate.now()): PlannedSlotWindow =
+        PlannedSlotWindow(
+            from = today.minusDays(PLANNED_SLOT_BACK_DAYS),
+            to = today.plusDays(ReminderScheduler.HORIZON_DAYS),
+        )
 
     /** R17 注射顺延：锚点移至新日期，周期从新日期起算重排；实际注射发生时才写日志（未记录=无行） */
     suspend fun postponeInjection(med: Medication, toDate: LocalDate) {
@@ -325,4 +433,38 @@ class MedicationRepository(private val context: Context) {
         checkIn(med, slotKey, slotTime, date = slotDate ?: LocalDate.now())
         return true
     }
+
+    private companion object {
+        /**
+         * 计划槽位物化窗口往回几天（1 = 昨天）。
+         *
+         * 昨天必须在窗口里：跨零点补记卡与「昨天有几剂没记录」的补发通知都依赖它的行。
+         */
+        const val PLANNED_SLOT_BACK_DAYS = 1L
+    }
+}
+
+/**
+ * v1.0.77（批次 3b）：计划槽位物化窗口（闭区间）。
+ *
+ * 用数据类而不是 `Pair<LocalDate, LocalDate>`：`first / second` 在这种「两个都是日期」的
+ * 场景里极易写反，而写反不会有编译错误——只会把昨天和下周的窗口调个头。
+ */
+data class PlannedSlotWindow(val from: LocalDate, val to: LocalDate)
+
+/**
+ * v1.0.77（批次 3b）：**一批插入内的主键去重**（纯函数，可单测）。
+ *
+ * [Ids.new] 的主键 = 毫秒时间基 + 3 位随机尾；一次物化在同一两毫秒内生成几十行时，
+ * 撞尾概率到百分之几量级——而 `INSERT OR IGNORE` 遇到主键冲突是**静默丢弃**，
+ * 表现为「某天的计划凭空少一剂」，没有任何日志。故同一批内自己去重。
+ *
+ * 撞了就加计数后缀（`xxx-2`、`xxx-3`…）而不是重摇随机数：重摇仍是随机过程，理论上可以一直撞；
+ * 后缀是确定性的，且主键只要求本地唯一。
+ */
+internal fun uniqueSlotId(base: String, used: MutableSet<String>): String {
+    if (used.add(base)) return base
+    var n = 2
+    while (!used.add("$base-$n")) n++
+    return "$base-$n"
 }

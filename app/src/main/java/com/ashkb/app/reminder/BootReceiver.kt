@@ -43,8 +43,18 @@ class BootReceiver : BroadcastReceiver() {
                 // v1.0.44（N1）：开机 / 改时钟 / 换时区 / 权限回授也要带上「今日已打卡槽位」。
                 // 此前漏传 → 重启发生在「已打卡槽位的 +30/+60 未到点」窗口内时，会给已服药的
                 // 槽位重建升级重查，用户明明吃过药却收到「未服药」提醒。
-                val doneRefs = MedicationRepository(context).doneSlotRefs(LocalDate.now())
+                val repo = MedicationRepository(context)
+                val doneRefs = repo.doneSlotRefs(LocalDate.now())
                 ReminderScheduler.rescheduleAll(context, meds, doneRefs)
+
+                // v1.0.77（批次 3b）：与启动路径对称——开机也要物化计划槽位快照，
+                // 否则重启后当天（乃至昨天）的计划口径完成度与漏服补发都无据可依。
+                // 单独 runCatching：这里失败不该连带后面三条提醒链一起停摆。
+                runCatching {
+                    val win = repo.plannedSlotWindow()
+                    repo.materializePlannedSlots(meds, win.from, win.to)
+                    MissedDoseReminder.checkAndNotify(context)
+                }
 
                 // v1.0.59 B5：三源提醒——各自 runCatching 兜底，互不影响
                 NotificationHelper.ensureChannels(context)

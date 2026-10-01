@@ -89,9 +89,55 @@ class ExerciseEngineTest {
     }
 
     @Test
-    fun `矩阵缺失时红榜默认 allow`() {
+    fun `矩阵缺失时红榜降级而不是放行（批次 4 起 fail-safe）`() {
+        // 旧行为：矩阵缺失 → 默认 allow（**放行**）。第三份审查报告把它列为 fail-open：
+        // 种子里 15 条运动条目全部带 grade_matrix，缺失只可能是数据损坏或非预期格式，
+        // 此时按「可以做」等于把一条读不懂的数据当成安全信号。现改为降级执行。
         val e = entry("""{"list_type":"red","grade":"L2"}""")
+        assertEquals("downgrade", ExerciseEngine.evaluate(e, "stable", null).verdict)
+    }
+
+    // ======================= v1.0.77 批次 4：fail-closed 与两个此前被忽略的颈椎键 =======================
+
+    @Test
+    fun `payload 无法解析时按禁止处理并让问题可见（fail-closed）`() {
+        val e = entry("""{"list_type":"red","grade":"L1" 这后面是坏掉的 JSON""")
+        val c = ExerciseEngine.evaluate(e, "stable", null)
+        assertEquals("block", c.verdict)
+        assertEquals("black", c.listType)
+        assertTrue("提示语要说明是数据问题", c.hint.contains("无法解析"))
+    }
+
+    @Test
+    fun `payload 为空字符串同样按禁止处理`() {
+        assertEquals("block", ExerciseEngine.evaluate(entry(""), "stable", null).verdict)
+    }
+
+    @Test
+    fun `cervical_condition 为 always 时颈椎受累者一律拦截（与 stage 无关）`() {
+        val e = entry("""{"list_type":"black","grade":"L3","risk":"对抗性冲撞",
+            "cervical_condition":"always","grade_matrix":{"stable":"allow"}}""")
+        // 未标记颈椎受累：按矩阵走（allow，出现在黑榜但未被额外拦截）
         assertEquals("allow", ExerciseEngine.evaluate(e, "stable", null).verdict)
+        // 颈椎受累：无论 stage 一律 block
+        assertEquals("block", ExerciseEngine.evaluate(e, "stable", "moderate").verdict)
+    }
+
+    @Test
+    fun `cervical_condition 为 amplitude_half 时颈椎受累者至多降级`() {
+        val e = entry("""{"list_type":"red","grade":"L1","dose":"每日 10 分钟",
+            "cervical_condition":"amplitude_half","grade_matrix":{"stable":"recommend"}}""")
+        assertEquals("recommend", ExerciseEngine.evaluate(e, "stable", null).verdict)
+        val c = ExerciseEngine.evaluate(e, "stable", "moderate")
+        assertEquals("downgrade", c.verdict)
+        assertTrue("提示语要提到颈椎", c.hint.contains("颈椎受累提示"))
+    }
+
+    @Test
+    fun `amplitude_half 不会把已经更保守的判定改宽`() {
+        val e = entry("""{"list_type":"red","grade":"L3","cervical_condition":"amplitude_half",
+            "grade_matrix":{"stable":"pause"}}""")
+        assertEquals("pause", ExerciseEngine.evaluate(e, "stable", "moderate").verdict)
     }
 
     // ======================= 黑榜拦截 =======================
@@ -218,10 +264,10 @@ class ExerciseEngineTest {
     }
 
     @Test
-    fun `非法 payload JSON 安全降级为 allow（不崩溃）`() {
+    fun `非法 payload JSON 按禁止处理（fail-closed，不崩溃）`() {
         val e = entry("not-json")
         val c = ExerciseEngine.evaluate(e, "stable", null)
-        assertEquals("allow", c.verdict)
+        assertEquals("block", c.verdict)
     }
 
     // ======================= R21 反馈判读（exc-010） =======================

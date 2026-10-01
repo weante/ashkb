@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 
+import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.BasdaiRecord
 import com.ashkb.app.data.entity.FlareAction
@@ -160,9 +161,11 @@ internal fun BasdaiDialog(
                 }
                 Spacer(Modifier.height(Spacing.sm))
                 Text(
-                    "总分：%.1f".format(total) + if (total >= 4.0) stringResource(R.string.basdai_high_note_paren) else "",
+                    "总分：%.1f".format(total) +
+                    if (ClinicalThresholds.basdaiHigh(total)) stringResource(R.string.basdai_high_note_paren) else "",
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (total >= 4.0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    color = if (ClinicalThresholds.basdaiHigh(total)) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.primary,
                 )
             }
         },

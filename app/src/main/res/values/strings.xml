@@ -721,6 +721,15 @@
     <string name="report_completion_empty_note">没有已记录的用药打卡，暂无法计算完成度</string>
     <string name="report_completion_breakdown">完成 %1$d · 部分 %2$d · 跳过 %3$d（共 %4$d 条记录）</string>
     <string name="report_completion_prn_note">另有按需用药记录 %1$d 次，不计入完成度</string>
+    <!-- v1.0.77（批次 3b）：计划剂量口径的用药完成度。与「记录内完成度」并列展示——
+         两者分母不同（计划剂量数 vs 已记录条数），界面必须把差别写清楚，否则用户会以为数字在打架。 -->
+    <string name="dose_completion_plan_title">用药完成度（计划剂量口径 · 近 %1$s 天）</string>
+    <string name="dose_completion_no_plan">—（暂无计划快照）</string>
+    <string name="dose_completion_no_plan_note">计划快照自 v1.0.77（批次 3b）起才有；此前没有可比的计划剂量，故不给百分比、也不给达标判定</string>
+    <string name="dose_completion_plan_breakdown">完成 %1$d · 部分 %2$d · 跳过 %3$d · 未记录 %4$d（共 %5$d 剂计划）</string>
+    <string name="dose_completion_coverage_note">覆盖起点：自 v1.0.77（批次 3b）起有计划快照，更早的历史不含计划剂量</string>
+    <string name="dose_completion_scope_note">两个口径的分母不同：计划口径 = 已到点的计划剂量数（完全漏记也算「未记录」；今天还没到点的剂量不计入），记录口径 = 已记录条数（漏记不进分母，它覆盖更早的历史）</string>
+
     <string name="report_exercise_minutes">%1$s 分</string>
     <string name="report_eye_days">%1$s 天</string>
     <string name="report_eye_days_warning">眼部症状 %1$s 天：AS 合并葡萄膜炎需眼科评估（emr-001）</string>
@@ -1224,6 +1233,9 @@
     <string name="notif_channel_sedentary_desc">活动时段内按固定间隔提醒起身活动</string>
     <string name="notif_sedentary_title">该起身活动一下了</string>
     <string name="notif_sedentary_text">站起来走动 2–3 分钟，比一次性长时间运动更有效对抗僵硬</string>
+    <!-- v1.0.77（批次 3b）：漏服补发——昨天有 N 剂未记录时的一条汇总通知（不逐剂发、每天最多一条） -->
+    <string name="notif_missed_doses_title">昨天有 %1$d 剂未记录，点开补记</string>
+    <string name="notif_missed_doses_text">未记录：%1$s（可在今日页「昨天未记录」卡上补记，或说明跳过原因）</string>
     <string name="reminder_sedentary_switch">久坐起身提醒</string>
     <string name="reminder_sedentary_note">活动时段内按间隔提醒起身走动 2–3 分钟。默认关闭。</string>
     <string name="reminder_sedentary_interval_label">提醒间隔</string>

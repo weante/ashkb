@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 /**
  * P4 报表仓库（M9）：30 天依从统计 / 趋势序列 / 复诊报告快照。
@@ -40,6 +41,14 @@ class ReportRepository(private val context: Context) {
          * 界面据此说明「另有 N 次按需用药」，否则 PRN 用户的记录会在这张卡片上凭空消失。
          */
         val medPrnCount: Int,
+        /** v1.0.77（批次 3b）：记录内完成度对象（次级说明行用；与上面四个扁平字段同一份数据）。 */
+        val record: AdherenceCalc.Completion,
+        /**
+         * v1.0.77（批次 3b）：**计划剂量口径**的完成度（主指标）——分母是计划剂量数，
+         * 完全漏记会算进「未记录」。计划快照缺失时 `plan.hasPlan == false`，
+         * 界面必须显示「—（暂无计划快照）」而不给百分比。
+         */
+        val plan: AdherenceCalc.DoseCompletion,
     )
 
     /** C2（v1.0.37）：补剂（营养）依从统计——与用药同口径（部分完成计 0.5）。 */
@@ -107,6 +116,12 @@ class ReportRepository(private val context: Context) {
         // v1.0.48：公式收拢到 AdherenceCalc（此前本文件内联 4 遍，必然漂移）
         val rate = AdherenceCalc.ratePct(done, partial, total)
 
+        // v1.0.77（批次 3b）：**计划剂量口径**——与计划槽位快照逐条配对（键 date+med_id+slot_key）。
+        // 先滤掉「今天还没到点」的槽位：否则每天早上的完成度都会因为今日未到点的剂量假性掉一截。
+        val planNow = LocalDateTime.now()
+        val planned = db.plannedSlotDao().between(f, t).filter { AdherenceCalc.isDue(it, planNow) }
+        val planDose = AdherenceCalc.doseCompletion(planned, logDao.listBetween(f, t))
+
         // C2（v1.0.37）：补剂（营养）依从——与用药同口径（部分完成计 0.5）
         val supDao = db.supplementLogDao()
         val supDone = supDao.countBetweenStatus(f, t, "done")
@@ -145,6 +160,8 @@ class ReportRepository(private val context: Context) {
                 medDone = done, medPartial = partial, medSkipped = skipped,
                 medTotal = total, medRatePct = rate,
                 medPrnCount = prnCount,
+                record = AdherenceCalc.Completion(done, partial, skipped, total),
+                plan = planDose,
             ),
             supplement = SupplementAdherence(supDone, supPartial, supSkipped, supTotal, supRate),
             exercise = ExerciseStat(exDone, exSkipped, exMin),

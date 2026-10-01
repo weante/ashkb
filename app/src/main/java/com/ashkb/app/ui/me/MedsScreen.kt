@@ -40,6 +40,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,26 +57,25 @@ import com.ashkb.app.data.entity.InjSite
 import com.ashkb.app.data.entity.MedFrequency
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.MedicationLog
+import com.ashkb.app.data.entity.PlannedSlot
 import com.ashkb.app.data.entity.SkipReason
 import com.ashkb.app.data.entity.StopReason
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.domain.AdherenceCalc
-import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.MedDeletion
 import com.ashkb.app.domain.MedLogEdit
 import com.ashkb.app.domain.StopWarning
 import com.ashkb.app.ui.checkup.SheetColumn
 import com.ashkb.app.ui.components.DestructiveAction
 import com.ashkb.app.ui.components.DividerList
+import com.ashkb.app.ui.components.DoseCompletionBlock
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.StatusChip
-import com.ashkb.app.ui.theme.DataLarge
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
-import com.ashkb.app.ui.theme.accent
 
 /** 药单管理（route `meds`）：从「我的」页拆出的独立二级页。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -458,6 +458,11 @@ private fun MedicationHistorySheet(vm: MeViewModel, med: Medication, onDismiss: 
     val prnCount = remember(logs) { AdherenceCalc.prnCount(logs) }
     // 按需药没有「计划剂量」这个概念（频次键与存库值同为 "PRN"，走枚举避免拼写漂移）
     val isPrnMed = MedFrequency.fromKey(med.frequency) == MedFrequency.PRN
+    // v1.0.77（批次 3b）：计划槽位快照（与日志同为近 90 天、同一个闭区间），与日志配对算**计划口径**完成度。
+    // 快照缺失时（更早版本的历史 / 刚升级的设备）列表为空 → 指标显示「—（暂无计划快照）」，不给百分比。
+    var plannedSlots by remember(med.id) { mutableStateOf<List<PlannedSlot>>(emptyList()) }
+    LaunchedEffect(med.id, logs) { plannedSlots = vm.plannedSlotsForMed(med.id, MED_HISTORY_DAYS) }
+    val dose = remember(logs, plannedSlots) { AdherenceCalc.doseCompletion(plannedSlots, logs) }
     // v1.0.49：正在修正的记录（null = 未打开修正弹层）
     var editTarget by remember(med.id) { mutableStateOf<MedicationLog?>(null) }
 
@@ -467,14 +472,17 @@ private fun MedicationHistorySheet(vm: MeViewModel, med: Medication, onDismiss: 
                 stringResource(R.string.med_history_title, "${med.name} ${med.dose}"),
                 style = MaterialTheme.typography.titleLarge,
             )
+            // v1.0.77（批次 3b）：指标位**始终**渲染——计划口径正是要让「一剂都没记录」这种情况可见，
+            // 原先「无记录就整块不显示」会让最该被看见的漏记状态变成一片空白。
+            MedicationMetricBlock(
+                completion = completion, dose = dose, prnCount = prnCount, isPrnMed = isPrnMed,
+            )
             if (logs.isEmpty()) {
                 Text(
                     stringResource(R.string.med_history_empty, med.name),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            } else {
-                MedicationMetricBlock(completion = completion, prnCount = prnCount, isPrnMed = isPrnMed)
             }
             // 修正入口的可发现性：只放一个铅笔图标不够，用一行小字说明
             Text(
@@ -507,20 +515,23 @@ private fun MedicationHistorySheet(vm: MeViewModel, med: Medication, onDismiss: 
 private const val MED_HISTORY_DAYS = 90
 
 /**
- * v1.0.76（批次 3a）：用药记录弹层顶部的**指标位**——一个位置，两种口径。
+ * 用药记录弹层顶部的**指标位**——一个位置，两套口径。
  *
- * 抽成独立组件的理由有两个：① 让 [MedicationHistorySheet] 保持在 detekt 的 `LongMethod`
- * 阈值之内（弹层还要管修正入口与流水列表）；② 把「零分母不给判定」这条口径收在一处，
- * 免得日后有人在别处又顺手 `adherenceLabel(0)` 给出一枚红标。
+ * v1.0.76（批次 3a）抽成独立组件：让 [MedicationHistorySheet] 保持在 detekt 的 `LongMethod`
+ * 阈值之内，并把「零分母不给判定」这条口径收在一处。
+ * v1.0.77（批次 3b）：主指标换成**计划剂量口径**（分母 = 已到点的计划剂量数），
+ * 「记录内完成度」降为次级说明行——渲染与文案全部交给 [DoseCompletionBlock]（报表卡片共用同一实现，
+ * 免得两处各写一段百分比 + 拆分文案，日后改一处忘另一处）。
  *
  * - 按需药（[isPrnMed]）：只报次数。按需用药一天可以打卡多次，没有「计划剂量」可比，
- *   算成完成度百分比只会骗人。
- * - 普通药：给「记录内完成度」+ 分母；`rate == null`（该药只有按需记录 / 一条计划打卡都没有）
- *   时显示「—（暂无记录）」，**不显示 0% / 100%，也不给达标判定**。
+ *   算成完成度百分比只会骗人（[DoseCompletionBlock] 因此完全不参与）。
+ * - 普通药：计划口径为主 + 记录口径为次；计划快照缺失时显示「—（暂无计划快照）」，
+ *   **不显示 0% / 100%，也不给达标判定**。
  */
 @Composable
 private fun MedicationMetricBlock(
     completion: AdherenceCalc.Completion,
+    dose: AdherenceCalc.DoseCompletion,
     prnCount: Int,
     isPrnMed: Boolean,
 ) {
@@ -539,48 +550,7 @@ private fun MedicationMetricBlock(
         }
         return
     }
-    Text(
-        stringResource(R.string.report_adherence_days, MED_HISTORY_DAYS),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    val rate = completion.ratePct
-    if (rate == null) {
-        // v1.0.76（批次 3a）：零分母不给百分比也不给判定——「0%」会被读成
-        // 「一条都没完成」，「达标 / 需干预」更是从「没有数据」里编出来的结论
-        Text(
-            stringResource(R.string.report_completion_empty),
-            style = DataLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            stringResource(R.string.report_completion_empty_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    } else {
-        // 阈值与配色沿用报表同一套（90 / 70），避免同一指标在两处显示不同等级
-        val tone = when {
-            rate >= ClinicalThresholds.ADHERENCE_GOOD -> StatusTone.Success
-            rate >= ClinicalThresholds.ADHERENCE_FAIR -> StatusTone.Warning
-            else -> StatusTone.Danger
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("$rate%", style = DataLarge, color = tone.accent())
-            Spacer(Modifier.width(Spacing.lg))
-            // 分母写在括号里：口径自明（分母 = 记录条数，不是计划剂量数）
-            Text(
-                stringResource(
-                    R.string.report_completion_breakdown,
-                    completion.done, completion.partial, completion.skipped, completion.total,
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Spacer(Modifier.weight(1f))
-            // 有记录才有判定：completionLabel 对 null 恒为 null（零分母上面已拦掉）
-            ClinicalThresholds.completionLabel(rate)?.let { StatusChip(it, tone) }
-        }
-    }
+    DoseCompletionBlock(dose = dose, record = completion, days = MED_HISTORY_DAYS)
     if (prnCount > 0) {
         // 按需记录被移出了完成度，必须在这里说明去处，否则用户以为记录丢了
         Text(

@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
+import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.R
 import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.domain.Labels
@@ -263,7 +264,7 @@ object ReportPdfWriter {
             if (bas.size > 1) {
                 bas.takeLast(8).forEach {
                     d.line("  ${it.date}  ${"%.1f".format(it.total)}" +
-                        if (it.total >= 4.0) "  " + context.getString(R.string.pdf_basdai_high) else "")
+                        if (ClinicalThresholds.basdaiHigh(it.total)) "  " + context.getString(R.string.pdf_basdai_high) else "")
                 }
             }
         }

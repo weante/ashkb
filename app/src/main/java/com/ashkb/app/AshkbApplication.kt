@@ -18,6 +18,7 @@ import com.ashkb.app.reminder.BasdaiReminderScheduler
 import com.ashkb.app.reminder.CheckupReminderScheduler
 import com.ashkb.app.reminder.EmergencyLockscreenPublisher
 import com.ashkb.app.reminder.ExerciseReminderScheduler
+import com.ashkb.app.reminder.MissedDoseReminder
 import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
 import com.ashkb.app.reminder.SedentaryReminderScheduler
@@ -75,6 +76,18 @@ class AshkbApplication : Application() {
                 ReminderScheduler.rescheduleAll(
                     this@AshkbApplication, meds, medicationRepository.doneSlotRefs(today),
                 )
+                // v1.0.77（批次 3b）：**与提醒同批**物化计划槽位快照（今天-1 .. 今天+7）。
+                // 挂在这个位置而不是 ReminderScheduler 里：那是提醒层，不该反向依赖 DAO；
+                // 而窗口与提醒一致，是为了让「有提醒可发」与「有计划可评判」永远同时成立。
+                // 单独 runCatching：物化失败不该连带下面的提醒链与补发通知一起停摆。
+                runCatching {
+                    val win = medicationRepository.plannedSlotWindow(today)
+                    medicationRepository.materializePlannedSlots(meds, win.from, win.to)
+                    // 昨天有未记录的剂量 → 一条汇总通知（每天最多一条，判定与去重见 MissedDoseReminder）
+                    MissedDoseReminder.checkAndNotify(this@AshkbApplication, today)
+                }.onFailure {
+                    Log.w("ASHKB", "materialize planned slots failed", it)
+                }
                 // v1.0.59 B5：三源提醒——各自 runCatching 兜底，互不影响（与 BootReceiver 对称）
                 val cfg = ReminderConfigRepository(this@AshkbApplication)
                 if (cfg.checkupEnabled()) {

@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.0.76（versionCode 81）· 2026-10-01 · 批次 3a 进行中（批次 2 已发布，提交 `3bc2167`）**。
+> **时点快照**：截至 **v1.0.77（versionCode 82）· 2026-10-01 · 批次 3b + 批次 4（逻辑部分）已完成（批次 3a 已发布，提交 `65f3086`）**。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号与测试条数以 `app/build.gradle.kts` 与 `app/build/test-results/testDebugUnitTest/*.xml` 为准。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -12,9 +12,9 @@
 | 项 | 结果 |
 |---|---|
 | 工作树 | 提交 `022892e`（v1.0.74）已推送；工作树干净（`HANDOFF-STATUS.md` 已纳入版本管理） |
-| 全量单测 | **540 条，0 失败 / 0 错误 / 0 跳过**（54 个测试文件）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
+| 全量单测 | **585 条，0 失败 / 0 错误 / 0 跳过**（59 个测试文件）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
-| APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 81 / versionName 1.0.76**（批次 3a 产物） |
+| APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 82 / versionName 1.0.77**（批次 3b + 4 产物） |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
 | GitHub 正式版（Latest） | **v1.0.75**（2026-10-01 发布即正式版；两资产摘要与本地 `Get-FileHash` **逐字节一致**；v1.0.74 已加取代横幅） |
 | GitHub 预发布 | **v1.0.61 ~ v1.0.70**（历史预发布，各页已带「已被取代」横幅）；v1.0.72 已加「已被 v1.0.73 取代」横幅 |

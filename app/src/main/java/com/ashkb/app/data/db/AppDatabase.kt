@@ -26,6 +26,7 @@ import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.MedicationChange
 import com.ashkb.app.data.entity.MedicationLog
 import com.ashkb.app.data.entity.ExercisePlan
+import com.ashkb.app.data.entity.PlannedSlot
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.entity.Recipe
 import com.ashkb.app.data.entity.Supplement
@@ -40,8 +41,10 @@ import com.ashkb.app.data.entity.WeightLog
  *
  * 放在顶层是为了能在 `@Database(version = ...)` 注解里引用（注解需要编译期常量）。
  * 迁移测试按它逐级校验迁移清单无缺口——此前版本号只出现在注解里，测试无从校验。
+ *
+ * v1.0.77（批次 3b）：17 → 18，新增 `planned_slots`（计划槽位快照）。
  */
-internal const val ASHKB_DB_VERSION = 17
+internal const val ASHKB_DB_VERSION = 18
 
 @Database(
     entities = [
@@ -50,7 +53,7 @@ internal const val ASHKB_DB_VERSION = 17
         Supplement::class, SupplementLog::class, Vitals::class, WeightLog::class, BodyMeasure::class,
         DietProfile::class, FoodAvoidItem::class, CheckupItem::class, CheckupRecord::class, LabResult::class,
         ImagingRecord::class, VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class, BackupLedger::class,
-        CheckupAttachment::class, Recipe::class, ExercisePlan::class,
+        CheckupAttachment::class, Recipe::class, ExercisePlan::class, PlannedSlot::class,
     ],
     version = ASHKB_DB_VERSION,
     exportSchema = true,
@@ -84,6 +87,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun checkupAttachmentDao(): CheckupAttachmentDao
     abstract fun recipeDao(): RecipeDao
     abstract fun exercisePlanDao(): ExercisePlanDao
+
+    /** v1.0.77（批次 3b）：计划槽位快照——计划剂量口径的完成度与漏服补发共用 */
+    abstract fun plannedSlotDao(): PlannedSlotDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
@@ -458,6 +464,35 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
+         * v1.0.77（批次 3b）：18 版新增 `planned_slots`（计划槽位快照）。
+         *
+         * 建表语句与两个索引**必须与 Room 导出的
+         * `app/schemas/com.ashkb.app.data.db.AppDatabase/18.json` 里的 createSql 逐字一致**——
+         * 升级路径（走本迁移）与全新安装（走 Room 建表）会因此得到完全相同的表结构，
+         * 否则「老用户升级」与「新装用户」的库会长得不一样，且只在升级用户身上出问题。
+         * 本次已逐表逐索引比对（见 `MigrationTableParityTest`，它把本迁移的建表结果与导出 schema 对齐）。
+         *
+         * 新表无需数据回填：旧库 / 旧备份里没有计划快照（= 该口径暂无覆盖），
+         * 由物化例程在应用启动时按「今天-1 .. 今天+7」逐日填充。
+         */
+        private val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `planned_slots` (" +
+                        "`id` TEXT NOT NULL, `date` TEXT NOT NULL, `med_id` TEXT NOT NULL, " +
+                        "`med_key` TEXT NOT NULL, `med_name` TEXT NOT NULL, `slot_key` TEXT, " +
+                        "`slot_time` TEXT NOT NULL, `dose_snapshot` TEXT, `created_at` TEXT NOT NULL, " +
+                        "PRIMARY KEY(`id`))"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_planned_slots_date` ON `planned_slots` (`date`)")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_planned_slots_date_med_id_slot_key` " +
+                        "ON `planned_slots` (`date`, `med_id`, `slot_key`)"
+                )
+            }
+        }
+
+        /**
          * 批次 2（测试安全网）：**迁移清单的唯一来源**。
          *
          * 由 [get] 与迁移测试共用。此前清单直接内联在 `addMigrations(...)` 里，测试看不到，
@@ -468,6 +503,7 @@ abstract class AppDatabase : RoomDatabase() {
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
             MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
             MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
+            MIGRATION_17_18,
         )
 
         fun get(context: Context): AppDatabase =

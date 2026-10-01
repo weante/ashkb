@@ -797,3 +797,42 @@ data class ExercisePlan(
     @ColumnInfo(name = "created_at") val createdAt: String,
     @ColumnInfo(name = "updated_at") val updatedAt: String,
 )
+
+// ===========================================================================
+// v1.0.77（批次 3b）：计划槽位快照（planned_slots）
+// ===========================================================================
+
+/**
+ * v1.0.77（批次 3b）：**计划槽位快照**（planned_slots）——把「某天该用哪几剂」落库留痕。
+ *
+ * 为什么必须落库、而不是每次从 `medications` 现算：
+ *  · 「用药完成度（计划剂量口径）」的分母是**当时的计划剂量数**。药档随时会改（改时刻 / 改频次 /
+ *    改剂量 / 停药），现算等于**用今天的方案评判过去一个月的用药**——同一段历史会随药档变动而变，
+ *    报表数字跟着编辑操作漂移，用户无从解释；
+ *  · 漏服补发要在**应用启动 / 开机广播**里判断「昨天该用几剂」。那是提醒层，不该为了历史计划
+ *    反向依赖药品表单的当前状态。
+ * 因此本表是**当时计划**的留痕：同一药事后改了时刻，已写入的行不随之改变（有意为之）。
+ *
+ * 幂等：`(date, med_id, slot_key)` 唯一索引 + `INSERT OR IGNORE`，物化例程可反复调用而不重复。
+ * 按需（PRN）天然没有槽位（`ScheduleCalc.slotsFor` 返回空），本表不会有它的行。
+ */
+@Entity(
+    tableName = "planned_slots",
+    indices = [Index("date"), Index(value = ["date", "med_id", "slot_key"], unique = true)]
+)
+data class PlannedSlot(
+    @PrimaryKey val id: String, // pslot-xxxx
+    /** 槽位**所属日**（YYYY-MM-DD）——统计与补记都以它为准，不是「现在」那天 */
+    @ColumnInfo(name = "date") val date: String,
+    @ColumnInfo(name = "med_id") val medId: String,
+    /** 药品名键快照（与 `medication_logs.med_key` 同口径） */
+    @ColumnInfo(name = "med_key") val medKey: String,
+    @ColumnInfo(name = "med_name") val medName: String,
+    /** 槽位键：口服 = "HH:mm"，注射日 = "inj"（口径见 `domain/ScheduleCalc`）；PRN 无 */
+    @ColumnInfo(name = "slot_key") val slotKey: String?,
+    /** 计划时刻 "HH:mm"——「是否已到点」的判定依据（还没到点的剂量不算漏服） */
+    @ColumnInfo(name = "slot_time") val slotTime: String,
+    /** 计划当时的剂量快照（药档后续改剂量不影响已成行的历史） */
+    @ColumnInfo(name = "dose_snapshot") val doseSnapshot: String? = null,
+    @ColumnInfo(name = "created_at") val createdAt: String,
+)

@@ -153,8 +153,13 @@ class TodayViewModel(
      */
     private suspend fun rescheduleInternal() = withContext(Dispatchers.IO) {
         val meds = AppDatabase.get(app).medicationDao().listActive()
+        val today = LocalDate.now()
 
-        ReminderScheduler.rescheduleAll(app, meds, repo.doneSlotRefs(LocalDate.now()))
+        ReminderScheduler.rescheduleAll(app, meds, repo.doneSlotRefs(today))
+        // v1.0.77（批次 3b）：与提醒同批补物化——打卡 / 跳过 / 顺延之后计划可能变（注射顺延会挪槽位），
+        // 窗口里缺的行在这里补齐；已有行由唯一索引 + IGNORE 挡住，重复调用不会重复插入。
+        val win = repo.plannedSlotWindow(today)
+        repo.materializePlannedSlots(meds, win.from, win.to)
     }
 
     // ---- v1.0.74：跨零点补记（「昨天还有 N 剂未记录」） ----
