@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.0.77（versionCode 82）· 2026-10-01 · 批次 3b + 批次 4（逻辑部分）已完成（批次 3a 已发布，提交 `65f3086`）**。
+> **时点快照**：截至 **v1.0.77（versionCode 82）· 2026-10-01 · 批次 3b + 批次 4（逻辑部分）已发布（提交 `9d23cc5`，GitHub Latest）**。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号与测试条数以 `app/build.gradle.kts` 与 `app/build/test-results/testDebugUnitTest/*.xml` 为准。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -302,3 +302,12 @@ gh release edit v1.0.70 --prerelease=false --latest
 - **缺正式签名不再静默产包**：ssembleRelease 无 keystore 直接失败，CI 用 ASHKB_ALLOW_DEBUG_SIGNING=1 放行并告警；配套 elease-tooling/verify-release.ps1
 - **本机绕行**：官方 Maven 不可达 → 用户级 ~/.gradle/init.gradle 指向国内镜像（项目文件保持官方地址）
 - 待办（诚实边界）：历史 16 个版本的 schema 需按 git 历史逐版本导出补录，之后才能真正测试「从旧版本升级」路径
+### 批次 3b + 批次 4（逻辑部分）完成并发布（v1.0.77，2026-10-01）
+
+- **库 v17 → v18**：新表 planned_slots（唯一索引 (date,med_id,slot_key) 保幂等）；迁移 SQL 与导出的 18.json 逐字一致，由新增 MigrationTableParityTest 在真实 SQLite 上比对锁定；物化窗口「昨天..+7」来自单一来源，调用点 4 处
+- **「用药完成度（计划剂量口径）」**：漏记现在计为「未记录」；与记录口径并列并明写分母差异；无快照时「—（暂无计划快照）」
+- **漏服补发**：启动/开机各查一次，每天最多一条（按归属日去重）、静默投递、复用既有通道；「已结算」定义与今日页补记卡统一为 done/partial/skipped
+- **运动引擎 fail-closed**：解析失败不再默认放行；矩阵缺失改降级；实现种子在用的 lways / mplitude_half 两个颈椎键
+- **AI 异常值不再压制本地判读**；**BASDAI 4.0 收敛**到 ClinicalThresholds.basdaiHigh()（含 Double 重载，避免 	oInt() 截断）；新增 DateInput 拒绝不存在的日期
+- 单测 **540 → 585 条全绿**（59 个测试类）
+- **待做（v1.0.78）**：非法日期的表单提示文案；i_abnormal 列（库 v19）以实现「AI 标记与本地判定并列展示」；周月报/PDF 是否也显示计划口径
