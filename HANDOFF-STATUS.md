@@ -373,3 +373,9 @@ AI 标记：正常；本地参考范围判读：偏高             ← v1.0.78 �
 
 **执行顺序**：等批次 6（改删能力）子代理收工后再动——lint 修复主要落在 `strings.xml`，与批次 6 重叠，并行会互相覆盖。
 修完跑 `testDebugUnitTest :app:detekt :app:lintDebug` 全绿 → CI 变绿（失败邮件自然停止）→ 随 v1.0.80 发布。
+### CI 首次通过（2026-10-01，v1.0.80）
+
+- **事实订正**：CI 自建立起**从未通过**——此前文档把它当"门"来描述是**不准确的**。失败点一直是 `:app:lintDebug`（40 个 error：31 `StringFormatMatches` + 9 `MissingPermission`），每次 push 都会因此发一封失败邮件。
+- v1.0.80 真修（**未冻结 baseline**）后：`gh run list` → **`completed success`**（run `36878380610`，5m27s）。
+- 前置的 lint 修复由子代理在**独立 `git worktree`** 里单独验证过（只有它的两个文件时全绿），并用真实 JVM `String.format` 跑过全部 21 个改动字符串确认不会抛 `IllegalFormatConversionException`。
+- ⚠️ 记一个**承重细节**：`NotificationHelper` 的权限检查必须有 `SDK_INT >= 33` 判断——API 26–32 上 `POST_NOTIFICATIONS` 未定义、`checkSelfPermission` 恒为 DENIED，无条件检查会让这三个大版本的**所有提醒静默失效**。
