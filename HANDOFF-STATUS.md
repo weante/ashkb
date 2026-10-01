@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.0.73（versionCode 78）· 2026-09-29 · 基线提交 `adb296b`（已推送，GitHub Latest）**。
+> **时点快照**：截至 **v1.0.74（versionCode 79）· 2026-10-01 · 基线提交 `022892e`（已推送，GitHub Latest）**。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号与测试条数以 `app/build.gradle.kts` 与 `app/build/test-results/testDebugUnitTest/*.xml` 为准。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -11,12 +11,12 @@
 
 | 项 | 结果 |
 |---|---|
-| 工作树 | 提交 `adb296b`（v1.0.73 批次 1）已推送；本地仅 `HANDOFF-STATUS.md` 未跟踪 |
-| 全量单测 | **519 条，0 失败 / 0 错误 / 0 跳过**（51 个测试文件） |
+| 工作树 | 提交 `022892e`（v1.0.74）已推送；工作树干净（`HANDOFF-STATUS.md` 已纳入版本管理） |
+| 全量单测 | **527 条，0 失败 / 0 错误 / 0 跳过**（52 个测试文件） |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
-| APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 78 / versionName 1.0.73** |
+| APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 79 / versionName 1.0.74** |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
-| GitHub 正式版（Latest） | **v1.0.73**（2026-09-29 发布即正式版；两资产 `gh api …/assets` 摘要与本地 `Get-FileHash` **逐字节一致**） |
+| GitHub 正式版（Latest） | **v1.0.74**（2026-10-01 发布即正式版；两资产 `gh api …/assets` 摘要与本地 `Get-FileHash` **逐字节一致**；v1.0.73 已加取代横幅） |
 | GitHub 预发布 | **v1.0.61 ~ v1.0.70**（历史预发布，各页已带「已被取代」横幅）；v1.0.72 已加「已被 v1.0.73 取代」横幅 |
 
 > **最关键的一句话**：真机走查（Xiaomi 15 Pro / Android 16，被测制品 = v1.0.70 发布资产，SHA-256 逐字节一致）已完成：
@@ -282,7 +282,7 @@ gh release edit v1.0.70 --prerelease=false --latest
 | 5 | 点一次「测试提醒」 | 10 秒后正常收到（回归确认通知链未被本批改动破坏） |
 | 6 | 临时加 **23:55** 测试药（验完删） | 次日 00:25 / 00:55 两个跨零点升级闹钟在册，且锚在**当天**槽位日（P1-4 主验收点） |
 | 7 | 若出现末级全屏，点「稍后」 | 真排 **+15 分钟** snooze 闹钟（改前该按钮无任何副作用） |
-### v1.0.74（2026-09-30，**已构建 + 已装机，尚未发布**）
+### v1.0.74（2026-10-01，**已发布为 GitHub 正式版 / Latest**）
 
 > **含四项**：① 跨零点追问链重建（v1.0.73 引入的回归，**已由维护者真机实证**：时钟跳到 00:24 触发
 > TIME_SET 全量重排后，00:25 的追问仍准时弹出）；② 「关于」卡不再缓存版本号；③ **新增今日页
