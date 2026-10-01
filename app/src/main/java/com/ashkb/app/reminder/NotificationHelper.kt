@@ -8,8 +8,11 @@ import android.content.Context
 import android.content.Intent
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.ashkb.app.MainActivity
 import com.ashkb.app.R
 import com.ashkb.app.ReminderFullScreenActivity
@@ -41,6 +44,13 @@ object NotificationHelper {
     private const val NOTIF_ID_SEDENTARY = 100004
     /** v1.0.77（批次 3b）：漏服补发 ID（固定单条——同一天重复调用只更新同一条）。 */
     private const val NOTIF_ID_MISSED_DOSES = 100005
+
+    /**
+     * `POST_NOTIFICATIONS` 成为**运行时权限**的起始 API（Android 13）。
+     * 该版本以下这个权限根本不存在，`checkSelfPermission` 恒为 DENIED——
+     * 所以判断权限前必须先判版本，否则会把 13 以下的机器全部误判成「不能发通知」。
+     */
+    private const val API_POST_NOTIFICATIONS = 33
 
     fun ensureChannels(context: Context) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -127,7 +137,7 @@ object NotificationHelper {
                 .setContentText(context.getString(R.string.notif_group_summary_text, count))
                 .setAutoCancel(true)
                 .build()
-            runCatching { nm.notify(SUMMARY_ID, summary) }
+            postNotification(context, SUMMARY_ID, summary)
         } else {
             runCatching { nm.cancel(SUMMARY_ID) }
         }
@@ -137,6 +147,59 @@ object NotificationHelper {
         androidx.core.content.ContextCompat.checkSelfPermission(
             context, Manifest.permission.POST_NOTIFICATIONS
         ) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * 投递前的能力闸门：**现在真的能发出通知吗**。
+     *
+     * 为什么必须有：`notify()` 在没有权限时是**静默失败**——不抛异常、不返回错误，
+     * 所以包在 `runCatching` 里只能兜住崩溃，兜不住「悄悄没发出去」。真机上表现为
+     * 「提醒没响」，用户只会理解成「没到点」，把漏服归咎于自己。
+     *
+     * 两个条件都要查，查一个都会漏判：
+     *  1. API 33+ 需要 POST_NOTIFICATIONS 运行时权限（未授予 → 系统直接丢弃通知）；
+     *  2. 任何版本上用户都可能在系统设置里关掉本应用通知（[NotificationManagerCompat.areNotificationsEnabled]
+     *     为 false）——此时权限是授过的，只查权限会误判成「能发」。
+     */
+    private fun canNotify(context: Context): Boolean {
+        val allowed = NotificationManagerCompat.from(context).areNotificationsEnabled() &&
+            (Build.VERSION.SDK_INT < API_POST_NOTIFICATIONS ||
+                ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED)
+        // 发不出去时留一条可诊断的日志：否则「提醒没响」在日志里查无实据。
+        if (!allowed) Log.w("ASHKB", "通知未投递：通知被关闭或未授予 POST_NOTIFICATIONS")
+        return allowed
+    }
+
+    /**
+     * **所有通知的唯一投递出口**——每一次 `notify()` 都必须经过这里。
+     *
+     * 为什么收成一个出口：`MissingPermission` 只认**与 `notify()` 写在同一个方法体内**的
+     * `checkSelfPermission` 判断；把它封装进 [canPost] / [canNotify] 这类跨方法调用里，静态
+     * 分析看不见（实测那 9 个调用点即使顶部已有 `if (!canPost(context)) return` 也照样全报）。
+     * 同样的判断在 9 个调用点各抄一份既重复、又容易在后续改动里漏掉一处。
+     *
+     * 两道闸门缺一不可：运行时权限（33+ 可被用户拒绝）与「用户是否在系统里关掉了本应用通知」
+     * ——后者静态分析不管，但对用户同样是「提醒悄悄没响」。
+     *
+     * 提醒是核心功能：这里**绝不抛异常**，发不出去只返回 false，由调用方决定后续语义。
+     *
+     * @return 是否真的投递了
+     */
+    private fun postNotification(context: Context, id: Int, notification: Notification): Boolean {
+        // ⚠️ 下面这段判断**必须留在本方法内**，不能挪进 canNotify()——静态分析只认同方法内的检查。
+        // 33 以下 POST_NOTIFICATIONS 尚未定义、checkSelfPermission 恒为 DENIED，故必须先判版本。
+        if (Build.VERSION.SDK_INT >= API_POST_NOTIFICATIONS) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) return false
+        }
+        if (!canNotify(context)) return false
+        return runCatching {
+            NotificationManagerCompat.from(context).notify(id, notification)
+            true
+        }.getOrDefault(false)
+    }
 
     /**
      * v1.0.60 B8：当前时刻是否在免打扰时段内。
@@ -235,7 +298,7 @@ object NotificationHelper {
             builder.setContentText(context.getString(R.string.notif_med_strong_degraded_text))
         }
         val n = builder.build()
-        runCatching { NotificationManagerCompat.from(context).notify(notifId(medId, slotKey), n) }
+        postNotification(context, notifId(medId, slotKey), n)
         updateGroupSummary(context)
     }
 
@@ -293,7 +356,7 @@ object NotificationHelper {
             .setContentIntent(open)
             .setGroup(GROUP_REMINDERS)
             .build()
-        runCatching { NotificationManagerCompat.from(context).notify(notifIdCheckup(nextDate, phase), n) }
+        postNotification(context, notifIdCheckup(nextDate, phase), n)
         updateGroupSummary(context)
     }
 
@@ -323,7 +386,7 @@ object NotificationHelper {
             .setContentIntent(open)
             .setGroup(GROUP_REMINDERS)
             .build()
-        runCatching { NotificationManagerCompat.from(context).notify(notifIdBasdai(dueDate, escalation), n) }
+        postNotification(context, notifIdBasdai(dueDate, escalation), n)
         updateGroupSummary(context)
     }
 
@@ -353,7 +416,7 @@ object NotificationHelper {
             .setContentIntent(open)
             .setGroup(GROUP_REMINDERS)
             .build()
-        runCatching { NotificationManagerCompat.from(context).notify(notifIdExercise(date, escalation), n) }
+        postNotification(context, notifIdExercise(date, escalation), n)
         updateGroupSummary(context)
     }
 
@@ -390,7 +453,7 @@ object NotificationHelper {
             .setAutoCancel(true)
             .setContentIntent(open)
             .build()
-        runCatching { NotificationManagerCompat.from(context).notify(NOTIF_ID_TEST, n) }
+        postNotification(context, NOTIF_ID_TEST, n)
     }
 
     /**
@@ -417,7 +480,7 @@ object NotificationHelper {
             .setOnlyAlertOnce(true)
             .setContentIntent(open)
             .build()
-        runCatching { NotificationManagerCompat.from(context).notify(NOTIF_ID_EMERGENCY_CARD, n) }
+        postNotification(context, NOTIF_ID_EMERGENCY_CARD, n)
     }
 
     fun cancelLockscreenEmergencyCard(context: Context) {
@@ -443,7 +506,7 @@ object NotificationHelper {
             .setAutoCancel(true)
             .setContentIntent(open)
             .build()
-        runCatching { NotificationManagerCompat.from(context).notify(NOTIF_ID_SEDENTARY, n) }
+        postNotification(context, NOTIF_ID_SEDENTARY, n)
     }
 
     /**
@@ -477,7 +540,8 @@ object NotificationHelper {
             .setContentIntent(openMainActivity(context, "missed_doses"))
             .setGroup(GROUP_REMINDERS)
             .build()
-        runCatching { NotificationManagerCompat.from(context).notify(NOTIF_ID_MISSED_DOSES, n) }
+        // 真发不出去（权限/开关）时返回 false——调用方据此不记「今天已提醒」
+        if (!postNotification(context, NOTIF_ID_MISSED_DOSES, n)) return false
         updateGroupSummary(context)
         return true
     }

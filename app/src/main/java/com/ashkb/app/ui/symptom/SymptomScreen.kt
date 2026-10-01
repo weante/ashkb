@@ -31,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
+import com.ashkb.app.data.entity.FlareEvent
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.components.SectionCard
@@ -54,6 +55,8 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
     var showFlareStart by remember { mutableStateOf(false) }
     var showResolve by remember { mutableStateOf(false) }
     var showBasdai by remember { mutableStateOf(false) }
+    // v1.0.80（批次 6）：发作记录的修改目标（null = 未打开）
+    var editFlare by remember { mutableStateOf<FlareEvent?>(null) }
     var kbDetail by remember { mutableStateOf<KbEntry?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -92,7 +95,14 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
             }
 
             // ---- 发作状态 ----
-            item { FlareStatusCard(activeFlare, vm.flareDays(), onResolve = { showResolve = true }, onStart = { showFlareStart = true }) }
+            item {
+                FlareStatusCard(
+                    activeFlare, vm.flareDays(),
+                    onResolve = { showResolve = true },
+                    onStart = { showFlareStart = true },
+                    onEdit = { editFlare = it },
+                )
+            }
 
             // ---- 自评记录日期（今天 / 昨天补写） ----
             item {
@@ -129,6 +139,8 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
                     dateLabel = if (isToday) stringResource(R.string.today_tab) else stringResource(R.string.common_yesterday),
                     dateKey = selectedDate,
                     onSave = { f -> vm.saveSymptom(f.morningStiffnessMin, f.nightPain, f.painScore, f.feverish, f.feverTemp, f.eyeSymptom, f.neuroRedFlag, f.mood, f.sleep, f.fatigue, f.notes) },
+                    // v1.0.80（批次 6）：删除该日症状记录（连带撤销它派生出来的红旗警报）
+                    onDelete = if (symptom != null) ({ vm.deleteSymptom() }) else null,
                 )
             }
 
@@ -164,7 +176,7 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
                     if (basdaiHistory.isEmpty()) {
                         Text(stringResource(R.string.common_no_records_yet), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
-                        BasdaiList(basdaiHistory.take(8))
+                        BasdaiList(basdaiHistory.take(8), onDelete = { vm.deleteBasdai(it.id) })
                     }
                 }
             }
@@ -173,7 +185,11 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
             if (flareHistory.isNotEmpty()) {
                 item {
                     SectionCard(title = stringResource(R.string.symptom_flare_history)) {
-                        FlareHistoryList(flareHistory.take(10))
+                        FlareHistoryList(
+                            flareHistory.take(10),
+                            onEdit = { editFlare = it },
+                            onDelete = { vm.deleteFlare(it.id) },
+                        )
                     }
                 }
             }
@@ -208,6 +224,15 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
                 showBasdai = false
             },
             onDismiss = { showBasdai = false },
+        )
+    }
+    // v1.0.80（批次 6）：修改 / 删除发作记录（表单内可删）
+    editFlare?.let { flare ->
+        FlareEditSheet(
+            existing = flare,
+            onSave = { vm.saveFlare(it); editFlare = null },
+            onDelete = { vm.deleteFlare(it.id) },
+            onDismiss = { editFlare = null },
         )
     }
     kbDetail?.let { card ->

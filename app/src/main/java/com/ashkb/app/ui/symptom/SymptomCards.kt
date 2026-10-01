@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -31,9 +32,11 @@ import com.ashkb.app.data.entity.BasdaiRecord
 import com.ashkb.app.data.entity.FlareAction
 import com.ashkb.app.data.entity.FlareEvent
 import com.ashkb.app.data.entity.FlareTrigger
+import com.ashkb.app.ui.components.DestructiveAction
 import com.ashkb.app.ui.components.DividerList
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.StatusChip
+import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
 import com.ashkb.app.ui.theme.colors
@@ -93,8 +96,20 @@ internal fun AlertCard(alert: Alert, onView: () -> Unit, onAck: () -> Unit) {
     }
 }
 
+/**
+ * 发作登记卡（无活跃发作时给「登记发作」，有则显示天数 / 诱因 / 已采取措施 + 「标记缓解」）。
+ *
+ * v1.0.80（批次 6）：活跃发作也能**修改**——记错诱因 / 峰值是常事，此前只能标记缓解再重记
+ * （而重记会丢掉真实开始日期，把「已第几天」算错）。
+ */
 @Composable
-internal fun FlareStatusCard(flare: FlareEvent?, days: Long?, onResolve: () -> Unit, onStart: () -> Unit) {
+internal fun FlareStatusCard(
+    flare: FlareEvent?,
+    days: Long?,
+    onResolve: () -> Unit,
+    onStart: () -> Unit,
+    onEdit: (FlareEvent) -> Unit,
+) {
     SectionCard(title = stringResource(R.string.symptom_flare_register)) {
         if (flare == null) {
             Text(
@@ -131,7 +146,10 @@ internal fun FlareStatusCard(flare: FlareEvent?, days: Long?, onResolve: () -> U
                 }
             }
             Spacer(Modifier.height(Spacing.sm))
-            Button(onClick = onResolve) { Text(stringResource(R.string.symptom_mark_remission)) }
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Button(onClick = onResolve) { Text(stringResource(R.string.symptom_mark_remission)) }
+                OutlinedButton(onClick = { onEdit(flare) }) { Text(stringResource(R.string.common_edit)) }
+            }
             Text(
                 stringResource(R.string.symptom_self_care_note),
                 style = MaterialTheme.typography.labelSmall,
@@ -142,8 +160,18 @@ internal fun FlareStatusCard(flare: FlareEvent?, days: Long?, onResolve: () -> U
     }
 }
 
+/**
+ * 发作历史列表。
+ *
+ * v1.0.80（批次 6）：每行给「修改 / 删除」——历史发作此前只能看，记错一条就只能一直错着。
+ * 删除会连带清掉该次发作派生出来的「已第 7 天」警报（仓库层按日期窗口判定归属）。
+ */
 @Composable
-internal fun FlareHistoryList(events: List<FlareEvent>) {
+internal fun FlareHistoryList(
+    events: List<FlareEvent>,
+    onEdit: (FlareEvent) -> Unit,
+    onDelete: (FlareEvent) -> Unit,
+) {
     DividerList(items = events, key = { it.id }) { f ->
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
             Text(
@@ -155,6 +183,16 @@ internal fun FlareHistoryList(events: List<FlareEvent>) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                TextButton(
+                    onClick = { onEdit(f) },
+                    modifier = Modifier.heightIn(min = Size.touchMin),
+                ) { Text(stringResource(R.string.common_edit)) }
+                TextButton(
+                    onClick = { onDelete(f) },
+                    modifier = Modifier.heightIn(min = Size.touchMin),
+                ) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
+            }
         }
         StatusChip(
             text = if (f.status == "active") stringResource(R.string.symptom_flare_ongoing) else stringResource(R.string.symptom_status_remitted),
@@ -163,8 +201,14 @@ internal fun FlareHistoryList(events: List<FlareEvent>) {
     }
 }
 
+/**
+ * BASDAI 历史列表。
+ *
+ * v1.0.80（批次 6）：每行给删除入口（改由「编辑今日 / 昨日自评」那条路径负责，见 SymptomScreen）。
+ * 删除按 **id** 走，不碰「同日只保留一条」的既有语义——那条不变量由写入侧维护。
+ */
 @Composable
-internal fun BasdaiList(records: List<BasdaiRecord>) {
+internal fun BasdaiList(records: List<BasdaiRecord>, onDelete: (BasdaiRecord) -> Unit) {
     DividerList(items = records, key = { it.id }) { r ->
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
             Text(r.date + if (r.backfill) stringResource(R.string.report_supplement_tag) else "", style = MaterialTheme.typography.bodySmall)
@@ -172,6 +216,13 @@ internal fun BasdaiList(records: List<BasdaiRecord>) {
                 "Q1 ${r.q1Fatigue} · Q2 ${r.q2SpinePain} · Q3 ${r.q3PeripheralPain} · Q4 ${r.q4TenderPoints} · Q5 ${r.q5StiffnessDegree} · Q6 ${r.q6StiffnessDuration}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            DestructiveAction(
+                label = stringResource(R.string.common_delete),
+                confirmTitle = stringResource(R.string.basdai_delete_confirm, r.date),
+                confirmBody = stringResource(R.string.basdai_delete_note, "%.1f".format(r.total)) + "\n" +
+                    stringResource(R.string.common_delete_irreversible),
+                onConfirm = { onDelete(r) },
             )
         }
         Text(

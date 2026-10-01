@@ -13,6 +13,7 @@ import com.ashkb.app.data.entity.LabResult
 import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.ReminderConfigRepository
+import com.ashkb.app.domain.CheckupDeletion
 import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.LabImport
 import com.ashkb.app.reminder.CheckupReminderScheduler
@@ -101,18 +102,42 @@ class CheckupViewModel(
     fun saveCheckupRecord(record: CheckupRecord) {
         viewModelScope.launch {
             repo.saveCheckupRecord(record)
-            // v1.0.59 B5：复诊记录变更后即时重排提醒（nextDate 可能改）
-            val cfg = ReminderConfigRepository(app)
-            val all = com.ashkb.app.data.db.AppDatabase.get(app).checkupRecordDao().listAll()
-            if (cfg.checkupEnabled()) {
-                runCatching {
-                    CheckupReminderScheduler.rescheduleAll(
-                        app, all, LocalDate.now(), LocalDateTime.now(),
-                    )
-                }
-            } else {
-                CheckupReminderScheduler.cancelAllFuture(app, all)
+            rescheduleCheckupReminders()
+        }
+    }
+
+    /**
+     * v1.0.80（批次 6）：删除复诊记录（**级联**删掉名下化验 / 影像 / 附件）。
+     *
+     * 删完必须重排提醒：复诊提醒是由记录的 `nextDate` 推出来的（见 [CheckupReminderScheduler]），
+     * 记录没了而闹钟还在，用户会在「下次复诊日」收到一条指向已删记录的提醒——典型的派生数据没跟着重算。
+     */
+    fun deleteCheckupRecord(id: String) {
+        viewModelScope.launch {
+            repo.deleteCheckupRecord(id)
+            rescheduleCheckupReminders()
+        }
+    }
+
+    /** 删除确认框要报出的级联条数（打开确认框时查一次；失败返回 null，UI 保持确认按钮禁用）。 */
+    suspend fun checkupDeletionCounts(id: String): CheckupDeletion.Counts? =
+        runCatching { repo.checkupDeletionCounts(id) }.getOrNull()
+
+    /**
+     * 复诊提醒重排：增 / 改 / 删复诊记录后都要走这里。
+     * 三条路径各写一遍必然漏改一处，而漏改的症状是「提醒与记录不一致」——从界面上看不出来。
+     */
+    private suspend fun rescheduleCheckupReminders() {
+        val cfg = ReminderConfigRepository(app)
+        val all = com.ashkb.app.data.db.AppDatabase.get(app).checkupRecordDao().listAll()
+        if (cfg.checkupEnabled()) {
+            runCatching {
+                CheckupReminderScheduler.rescheduleAll(
+                    app, all, LocalDate.now(), LocalDateTime.now(),
+                )
             }
+        } else {
+            CheckupReminderScheduler.cancelAllFuture(app, all)
         }
     }
 
@@ -125,6 +150,14 @@ class CheckupViewModel(
 
     fun saveLabResult(result: LabResult) {
         viewModelScope.launch { repo.saveLabResult(result) }
+    }
+
+    /**
+     * v1.0.80（批次 6）：删除单条化验结果。
+     * 无派生数据（`abnormal` 是这一行自己的字段、化验不产生警报），故不需要任何重算。
+     */
+    fun deleteLabResult(id: String) {
+        viewModelScope.launch { repo.deleteLabResult(id) }
     }
 
     fun loadMoreLabs() {
@@ -140,6 +173,11 @@ class CheckupViewModel(
         viewModelScope.launch { repo.saveImagingRecord(record) }
     }
 
+    /** v1.0.80（批次 6）：删除单条影像记录（附件挂复诊记录，不挂影像，故无级联）。 */
+    fun deleteImagingRecord(id: String) {
+        viewModelScope.launch { repo.deleteImagingRecord(id) }
+    }
+
     fun importImagingReport(import: ImagingImport) {
         viewModelScope.launch { repo.importImagingReport(import) }
     }
@@ -147,6 +185,15 @@ class CheckupViewModel(
     // ---- 疫苗记录 ----
     fun saveVaccineRecord(record: VaccineRecord) {
         viewModelScope.launch { repo.saveVaccineRecord(record) }
+    }
+
+    /**
+     * v1.0.80（批次 6）：删除疫苗记录。
+     * 仓库层会**重算**该接种日的活疫苗安全警报（当天还有别的活疫苗待确认时保留，见 repo 注释），
+     * 故这里不需要额外处理。
+     */
+    fun deleteVaccineRecord(id: String) {
+        viewModelScope.launch { repo.deleteVaccineRecord(id) }
     }
 
     // ---- v10（B10）复诊附件归档：拍照 / 相册 / PDF ----

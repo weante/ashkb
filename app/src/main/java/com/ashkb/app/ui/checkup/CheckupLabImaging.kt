@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.TrendingDown
@@ -29,6 +30,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -54,7 +56,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.data.entity.ImagingRecord
 import com.ashkb.app.data.entity.LabResult
-import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.ImportTemplates
 import com.ashkb.app.domain.LabImport
@@ -92,9 +93,10 @@ private fun LabResult.isAbnormal() = abnormal == "high" || abnormal == "low"
 /**
  * v1.0.78（批次 4 收尾）：异常标记 key（`high` / `low` / `normal` / …）→ 展示文案。
  * key 绝不出现在 UI，文案一律走 strings.xml（改版方案 §11）。
+ * v1.0.80（批次 6）：由 private 放开为 internal——化验编辑表单（CheckupLabForms.kt）也要用它标注只读的 AI 标记。
  */
 @Composable
-private fun labMarkLabel(key: String?): String = when (key) {
+internal fun labMarkLabel(key: String?): String = when (key) {
     "high" -> stringResource(R.string.lab_mark_high)
     "low" -> stringResource(R.string.lab_mark_low)
     "normal" -> stringResource(R.string.lab_mark_normal)
@@ -132,7 +134,7 @@ private fun refRangeText(lab: LabResult): String {
 
 /** X1：点击偏高/偏低胶囊展开该指标的参考范围——复诊沟通时「正常值是多少」张口就来。 */
 @Composable
-private fun RowScope.LabRow(lab: LabResult) {
+private fun RowScope.LabRow(lab: LabResult, onEdit: ((LabResult) -> Unit)?) {
     var showRef by remember { mutableStateOf(false) }
     Column(Modifier.weight(1f)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -155,6 +157,18 @@ private fun RowScope.LabRow(lab: LabResult) {
             )
         }
     }
+    // v1.0.80（批次 6）：每行一个「修改」入口——改数值必然重跑本地判读，故不能只做删除。
+    // 用图标而不是文字按钮：一行已经要放指标名 + 数值胶囊，再挤一个文字按钮会在窄屏截断指标名。
+    if (onEdit != null) {
+        IconButton(onClick = { onEdit(lab) }, modifier = Modifier.size(Size.touchMin)) {
+            Icon(
+                Icons.Rounded.Edit,
+                contentDescription = stringResource(R.string.lab_edit_action),
+                modifier = Modifier.size(Size.iconSm),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 /**
@@ -162,7 +176,7 @@ private fun RowScope.LabRow(lab: LabResult) {
  * 不会被误当成同一列数值直接比较。组头用 R.string.lab_unit_label 标注单位（unit 为空则不占行）。
  */
 @Composable
-private fun LabUnitGroups(rows: List<LabResult>) {
+private fun LabUnitGroups(rows: List<LabResult>, onEdit: ((LabResult) -> Unit)? = null) {
     val groups = remember(rows) { LabUnits.groupByUnit(rows) }
     // 只有「同一项目存在多个单位」时才需要标出单位——否则行内已带单位，再挂一行会白白把列表拉长一倍
     val mixed = remember(rows) { LabUnits.mixedUnitTests(rows).toSet() }
@@ -181,7 +195,7 @@ private fun LabUnitGroups(rows: List<LabResult>) {
                         )
                     }
                 }
-                DividerList(items = group.results, key = { lab -> lab.id }) { lab -> LabRow(lab) }
+                DividerList(items = group.results, key = { lab -> lab.id }) { lab -> LabRow(lab, onEdit) }
             }
         }
     }
@@ -190,13 +204,14 @@ private fun LabUnitGroups(rows: List<LabResult>) {
 /**
  * 化验分组：异常项置顶，正常项默认折叠——复诊沟通先看要紧的。
  * C3：段内再按「项目名 + 单位」分组，异常 / 正常两段的划分与折叠开关保持不变（折叠状态不退化）。
+ * v1.0.80（批次 6）：[onEdit] 一路透传到行内图标（化验详情弹窗里也给入口，两处行为一致）。
  */
 @Composable
-private fun LabGroup(rows: List<LabResult>) {
+private fun LabGroup(rows: List<LabResult>, onEdit: ((LabResult) -> Unit)? = null) {
     val (abnormal, normal) = remember(rows) { rows.partition { it.isAbnormal() } }
     var showNormal by remember { mutableStateOf(false) }
     if (abnormal.isNotEmpty()) {
-        LabUnitGroups(abnormal)
+        LabUnitGroups(abnormal, onEdit)
     }
     if (normal.isNotEmpty()) {
         if (abnormal.isNotEmpty()) {
@@ -206,7 +221,7 @@ private fun LabGroup(rows: List<LabResult>) {
             )
         }
         if (showNormal) {
-            LabUnitGroups(normal)
+            LabUnitGroups(normal, onEdit)
         }
         TextButton(
             onClick = { showNormal = !showNormal },
@@ -218,11 +233,18 @@ private fun LabGroup(rows: List<LabResult>) {
 }
 
 // ===== 化验详情弹窗 =====
+/**
+ * 某次复诊记录下的化验明细。
+ *
+ * v1.0.80（批次 6）：行内给「修改」入口（图标），表单里同时能删除——
+ * 从记录卡进来时看到的化验与此处完全同源，两处的改 / 删行为也必须一致。
+ */
 @Composable
 internal fun LabDetailDialog(record: CheckupRecord, vm: CheckupViewModel, onDismiss: () -> Unit) {
     val labFlow = remember(record.id) { vm.labResultsFor(record.id) }
     val labs by labFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     var showAdd by remember { mutableStateOf(false) }
+    var editTarget by remember { mutableStateOf<LabResult?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -232,7 +254,7 @@ internal fun LabDetailDialog(record: CheckupRecord, vm: CheckupViewModel, onDism
                 if (labs.isEmpty()) {
                     Text(stringResource(R.string.lab_indicators_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    LabGroup(labs)
+                    LabGroup(labs, onEdit = { editTarget = it })
                 }
                 Spacer(Modifier.height(Spacing.sm))
                 OutlinedButton(onClick = { showAdd = true }) { Text(stringResource(R.string.lab_add_indicator)) }
@@ -242,7 +264,19 @@ internal fun LabDetailDialog(record: CheckupRecord, vm: CheckupViewModel, onDism
     )
 
     if (showAdd) {
-        AddLabSheet(record = record, vm = vm, onDismiss = { showAdd = false })
+        LabResultFormSheet(
+            existing = null, date = record.date, checkupId = record.id,
+            onSave = { vm.saveLabResult(it) }, onDelete = null,
+            onDismiss = { showAdd = false },
+        )
+    }
+    editTarget?.let { lab ->
+        LabResultFormSheet(
+            existing = lab, date = lab.date, checkupId = lab.checkupId,
+            onSave = { vm.saveLabResult(it) },
+            onDelete = { vm.deleteLabResult(it.id) },
+            onDismiss = { editTarget = null },
+        )
     }
 }
 
@@ -250,6 +284,7 @@ internal fun LabDetailDialog(record: CheckupRecord, vm: CheckupViewModel, onDism
 /**
  * @param onAttachDate 归档该日期的附件（附件本身也属于这次抽血）
  * @param onLinkDate   把该日期的整组化验归属到某条复诊记录
+ * @param onEditLab    v1.0.80（批次 6）修改单条化验（表单内可删除）：改数值 / 参考范围会重跑本地判读
  */
 @Composable
 internal fun LabsList(
@@ -259,6 +294,7 @@ internal fun LabsList(
     onImport: () -> Unit,
     onAttachDate: (String) -> Unit,
     onLinkDate: (String) -> Unit,
+    onEditLab: (LabResult) -> Unit,
 ) {
     // 派生计算上提到 LazyColumn 之外并 remember：LazyListScope 不是 @Composable 作用域，
     // 写在 item/forEach 内会随每次重组重跑 groupBy / maxOfOrNull（数十条化验 × 每次重组）
@@ -309,51 +345,10 @@ internal fun LabsList(
             // 默认展开规则贴合复诊沟通导向：有异常的日期或最近一次化验展开，其余收起
             grouped.forEach { (date, rows) ->
                 item(key = "lab-$date") {
-                    val abnormalCount = rows.count { it.isAbnormal() }
-                    // 整组化验共用一条归属：同一天的一次抽血属于同一次复诊，逐项设置只会变成负担
-                    val linkedId = rows.firstOrNull { it.checkupId != null }?.checkupId
-                    // item key 稳定 + rememberSaveable：翻页加载更早记录、滚动回收、旋转屏均保持折叠状态
-                    var expanded by rememberSaveable {
-                        mutableStateOf(abnormalCount > 0 || date == latestDate)
-                    }
-                    SectionCard(
-                        title = date,
-                        subtitle = if (abnormalCount > 0) stringResource(R.string.lab_count_abnormal, rows.size, abnormalCount) else stringResource(R.string.lab_count_plain, rows.size),
-                        action = {
-                            TextButton(
-                                onClick = { expanded = !expanded },
-                                modifier = Modifier.heightIn(min = Size.touchMin),
-                            ) {
-                                Icon(
-                                    if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                                    contentDescription = null, // 语义由文字承载
-                                    modifier = Modifier.size(Size.iconSm),
-                                )
-                                Text(stringResource(if (expanded) R.string.lab_group_collapse else R.string.lab_group_expand))
-                            }
-                        },
-                    ) {
-                        // 归属/附件动作放在折叠开关之外：折叠状态下也要能直接归档，
-                        // 否则"这天有没有归属"得先展开才能查、才能改
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        ) {
-                            if (linkedId != null) {
-                                // 只有"已归属"才给胶囊：未归属是常态，不额外占用视觉噪音
-                                StatusChip(text = stringResource(R.string.attach_link_title), tone = StatusTone.Success)
-                            }
-                            TextButton(
-                                onClick = { onLinkDate(date) },
-                                modifier = Modifier.heightIn(min = Size.touchMin),
-                            ) { Text(stringResource(R.string.lab_link_action)) }
-                            TextButton(
-                                onClick = { onAttachDate(date) },
-                                modifier = Modifier.heightIn(min = Size.touchMin),
-                            ) { Text(stringResource(R.string.attach_title)) }
-                        }
-                        if (expanded) LabGroup(rows)
-                    }
+                    LabDateGroup(
+                        date = date, rows = rows, isLatest = date == latestDate,
+                        onEditLab = onEditLab, onLinkDate = onLinkDate, onAttachDate = onAttachDate,
+                    )
                 }
             }
             if (canLoadMore) {
@@ -369,10 +364,71 @@ internal fun LabsList(
     }
 }
 
+/**
+ * 化验列表里「一个日期分组」的卡片（从 [LabsList] 抽出来：列表函数本身已接近 detekt 的
+ * `LongMethod` 上限，而这一组的折叠状态、归属胶囊、三个动作都是独立可读的一件事）。
+ *
+ * item key 稳定 + `rememberSaveable`：翻页加载更早记录、滚动回收、旋转屏均保持折叠状态。
+ */
+@Composable
+private fun LabDateGroup(
+    date: String,
+    rows: List<LabResult>,
+    isLatest: Boolean,
+    onEditLab: (LabResult) -> Unit,
+    onLinkDate: (String) -> Unit,
+    onAttachDate: (String) -> Unit,
+) {
+    val abnormalCount = rows.count { it.isAbnormal() }
+    // 整组化验共用一条归属：同一天的一次抽血属于同一次复诊，逐项设置只会变成负担
+    val linkedId = rows.firstOrNull { it.checkupId != null }?.checkupId
+    var expanded by rememberSaveable { mutableStateOf(abnormalCount > 0 || isLatest) }
+    SectionCard(
+        title = date,
+        subtitle = if (abnormalCount > 0) stringResource(R.string.lab_count_abnormal, rows.size, abnormalCount)
+        else stringResource(R.string.lab_count_plain, rows.size),
+        action = {
+            TextButton(
+                onClick = { expanded = !expanded },
+                modifier = Modifier.heightIn(min = Size.touchMin),
+            ) {
+                Icon(
+                    if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    contentDescription = null, // 语义由文字承载
+                    modifier = Modifier.size(Size.iconSm),
+                )
+                Text(stringResource(if (expanded) R.string.lab_group_collapse else R.string.lab_group_expand))
+            }
+        },
+    ) {
+        // 归属/附件动作放在折叠开关之外：折叠状态下也要能直接归档，
+        // 否则"这天有没有归属"得先展开才能查、才能改
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            if (linkedId != null) {
+                // 只有"已归属"才给胶囊：未归属是常态，不额外占用视觉噪音
+                StatusChip(text = stringResource(R.string.attach_link_title), tone = StatusTone.Success)
+            }
+            TextButton(
+                onClick = { onLinkDate(date) },
+                modifier = Modifier.heightIn(min = Size.touchMin),
+            ) { Text(stringResource(R.string.lab_link_action)) }
+            TextButton(
+                onClick = { onAttachDate(date) },
+                modifier = Modifier.heightIn(min = Size.touchMin),
+            ) { Text(stringResource(R.string.attach_title)) }
+        }
+        if (expanded) LabGroup(rows, onEdit = onEditLab)
+    }
+}
+
 // ===== 影像列表（MRI/CT/X线，支持 AI 导入） =====
 /**
  * @param onAttach 归档该条影像的附件（报告 PDF / 片子照片）
  * @param onLink   把该条影像归属到某条复诊记录
+ * @param onEdit   v1.0.80（批次 6）修改该条影像（表单内可删除）——影像此前只能导入、不能改一个字
  */
 @Composable
 internal fun ImagingList(
@@ -381,6 +437,7 @@ internal fun ImagingList(
     onView: (ImagingRecord) -> Unit,
     onAttach: (ImagingRecord) -> Unit,
     onLink: (ImagingRecord) -> Unit,
+    onEdit: (ImagingRecord) -> Unit,
 ) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
@@ -409,69 +466,89 @@ internal fun ImagingList(
                 ) { Text(stringResource(R.string.imaging_ai_import_title)) }
             }
             items(records, key = { it.id }) { rec ->
-                Surface(
-                    onClick = { onView(rec) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                ) {
-                    Column(
-                        Modifier.fillMaxWidth().padding(Spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                        ) {
-                            Text(rec.examDate, style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                ImagingRecord.modalityLabel(rec.modality),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.weight(1f))
-                            if (rec.backfill) {
-                                StatusChip(text = stringResource(R.string.today_supplement_log), tone = StatusTone.Warning)
-                            }
-                        }
-                        Text(rec.bodyPart, style = MaterialTheme.typography.bodyMedium)
-                        rec.hospital?.let {
-                            Text(
-                                stringResource(R.string.checkup_hospital_line, it),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        rec.conclusion?.let { c ->
-                            Text(
-                                "结论：${c.lineSequence().firstOrNull { it.isNotBlank() } ?: ""}",
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 2,
-                            )
-                        }
-                        // 归属/附件排在结论之后：先读结论（这才是这张片子的价值），再决定它算哪次复诊。
-                        // 外层 Surface 有点击（打开详情），Compose 里子节点优先消费点击，按钮不会被吞
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        ) {
-                            if (rec.checkupId != null) {
-                                // 只有"已归属"才给胶囊：未归属是常态，不额外占用视觉噪音
-                                StatusChip(text = stringResource(R.string.attach_link_title), tone = StatusTone.Success)
-                            }
-                            TextButton(
-                                onClick = { onLink(rec) },
-                                modifier = Modifier.heightIn(min = Size.touchMin),
-                            ) { Text(stringResource(R.string.imaging_link_action)) }
-                            TextButton(
-                                onClick = { onAttach(rec) },
-                                modifier = Modifier.heightIn(min = Size.touchMin),
-                            ) { Text(stringResource(R.string.attach_title)) }
-                        }
-                    }
-                }
+                ImagingRow(rec = rec, onView = onView, onEdit = onEdit, onLink = onLink, onAttach = onAttach)
             }
             item { Spacer(Modifier.height(Spacing.xxl)) }
+        }
+    }
+}
+
+/**
+ * 单条影像卡片（从 [ImagingList] 抽出来：列表函数本身要控制长度，而这一张卡片的排版
+ * ——日期 / 类型 / 部位 / 医院 / 结论摘要 / 三个动作——是独立可读的一件事）。
+ */
+@Composable
+private fun ImagingRow(
+    rec: ImagingRecord,
+    onView: (ImagingRecord) -> Unit,
+    onEdit: (ImagingRecord) -> Unit,
+    onLink: (ImagingRecord) -> Unit,
+    onAttach: (ImagingRecord) -> Unit,
+) {
+    Surface(
+        onClick = { onView(rec) },
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                Text(rec.examDate, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    ImagingRecord.modalityLabel(rec.modality),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.weight(1f))
+                if (rec.backfill) {
+                    StatusChip(text = stringResource(R.string.today_supplement_log), tone = StatusTone.Warning)
+                }
+            }
+            Text(rec.bodyPart, style = MaterialTheme.typography.bodyMedium)
+            rec.hospital?.let {
+                Text(
+                    stringResource(R.string.checkup_hospital_line, it),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            rec.conclusion?.let { c ->
+                Text(
+                    "结论：${c.lineSequence().firstOrNull { it.isNotBlank() } ?: ""}",
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                )
+            }
+            // 归属/附件排在结论之后：先读结论（这才是这张片子的价值），再决定它算哪次复诊。
+            // 外层 Surface 有点击（打开详情），Compose 里子节点优先消费点击，按钮不会被吞
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                if (rec.checkupId != null) {
+                    // 只有"已归属"才给胶囊：未归属是常态，不额外占用视觉噪音
+                    StatusChip(text = stringResource(R.string.attach_link_title), tone = StatusTone.Success)
+                }
+                // v1.0.80（批次 6）：修改入口与归属/附件同排——「这条记错了」是最常见的诉求
+                TextButton(
+                    onClick = { onEdit(rec) },
+                    modifier = Modifier.heightIn(min = Size.touchMin),
+                ) { Text(stringResource(R.string.common_edit)) }
+                TextButton(
+                    onClick = { onLink(rec) },
+                    modifier = Modifier.heightIn(min = Size.touchMin),
+                ) { Text(stringResource(R.string.imaging_link_action)) }
+                TextButton(
+                    onClick = { onAttach(rec) },
+                    modifier = Modifier.heightIn(min = Size.touchMin),
+                ) { Text(stringResource(R.string.attach_title)) }
+            }
         }
     }
 }
@@ -706,52 +783,10 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
     }
 }
 
-// ===== 添加化验指标（多字段表单，ModalBottomSheet） =====
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AddLabSheet(record: CheckupRecord, vm: CheckupViewModel, onDismiss: () -> Unit) {
-    var testName by remember { mutableStateOf("") }
-    var value by remember { mutableStateOf("") }
-    var unit by remember { mutableStateOf("") }
-    var refLow by remember { mutableStateOf("") }
-    var refHigh by remember { mutableStateOf("") }
-
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        SheetColumn {
-            Text(stringResource(R.string.lab_add_indicator_action), style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(testName, { testName = it }, label = { Text(stringResource(R.string.lab_indicator_name)) }, singleLine = true)
-            OutlinedTextField(value, { value = it }, label = { Text(stringResource(R.string.lab_value)) }, singleLine = true)
-            OutlinedTextField(unit, { unit = it }, label = { Text(stringResource(R.string.common_unit)) }, singleLine = true)
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OutlinedTextField(refLow, { refLow = it },
-                    label = { Text(stringResource(R.string.lab_ref_lower)) }, singleLine = true,
-                    modifier = Modifier.weight(1f))
-                OutlinedTextField(refHigh, { refHigh = it },
-                    label = { Text(stringResource(R.string.lab_ref_upper)) }, singleLine = true,
-                    modifier = Modifier.weight(1f))
-            }
-            SheetSaveButton(
-                text = stringResource(R.string.common_add),
-                enabled = testName.isNotBlank(),
-                onClick = {
-                    if (testName.isNotBlank()) {
-                        vm.saveLabResult(
-                            LabResult(
-                                id = "", date = record.date, recordedAt = nowIso(),
-                                checkupId = record.id, testName = testName.trim(),
-                                value = value.toDoubleOrNull(),
-                                unit = unit.ifBlank { null },
-                                refLow = refLow.toDoubleOrNull(),
-                                refHigh = refHigh.toDoubleOrNull(),
-                            )
-                        )
-                        onDismiss()
-                    }
-                },
-            )
-        }
-    }
-}
+// ===== 添加 / 修改化验指标 =====
+// v1.0.80（批次 6）：原先这个文件里私有的 AddLabSheet 已由 CheckupLabForms.kt 的
+// LabResultFormSheet 取代——新增与修改共用同一张表单（回填原值、沿用主键、表单内可删除），
+// 分成两份实现必然漂移（典型：改了新增的校验忘了改编辑的）。
 
 // ===== sheet 内部布局（与 WellnessScreen 同款惯例） =====
 

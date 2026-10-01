@@ -27,7 +27,9 @@ import com.ashkb.app.data.entity.SymptomDaily
 import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.entity.WeightLog
+import com.ashkb.app.domain.CheckupDeletion
 import com.ashkb.app.domain.ClinicalThresholds
+import com.ashkb.app.domain.DerivedAlerts
 import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.LabImport
@@ -43,6 +45,11 @@ import org.json.JSONArray
  */
 class HealthRepository(private val context: Context) {
     private val db = AppDatabase.get(context)
+    /**
+     * v1.0.80（批次 6）：删除复诊记录要连带清掉它名下附件的**磁盘文件**，
+     * 故这里复用附件仓储（同一个库、同一份同步开关）——文件在哪、远端怎么收尾只有它知道。
+     */
+    private val attachmentRepo = AttachmentRepository(context)
     private val symptomDao = db.symptomDailyDao()
     private val basdaiDao = db.basdaiDao()
     private val flareDao = db.flareDao()
@@ -116,6 +123,23 @@ class HealthRepository(private val context: Context) {
         evaluateSymptomAlerts(log)
     }
 
+    /**
+     * v1.0.80（批次 6）：删除某天的症状记录（误录）。
+     *
+     * **为什么必须连带清警报**：症状记录是红旗警报（发热 / 眼 / 神经）的唯一依据，
+     * 警报又按 `(type, ref_date=记录日)` 去重、写记录时自动生成。只删记录不清警报，
+     * 症状页顶部就会一直挂着一条 high 级提示，点进去指向一个已经不存在的记录——
+     * 用户既消不掉它（重存一条同样的记录也只会被去重逻辑忽略），也无从判断它是否还成立。
+     *
+     * 按「记录日」清是有意的：`ref_date` 就是派生它的那条记录的日期，一一对应，不会误伤别的日期。
+     * 已被用户确认（ack）的警报保留——那是「他确实看过」的留痕，且不出现在未读列表里。
+     */
+    suspend fun deleteSymptom(date: String) = db.withTransaction {
+        val row = symptomDao.byDate(date) ?: return@withTransaction
+        symptomDao.delete(row.id)
+        DerivedAlerts.SYMPTOM_TYPES.forEach { alertDao.deleteUnackedByRef(it, row.date) }
+    }
+
     /** 红旗三通道：发热→emr-002 / 眼→emr-001 / 神经→emr-004（edu-th-001 阈值联动） */
     private suspend fun evaluateSymptomAlerts(log: SymptomDaily) {
         if (log.feverish && (log.feverTemp ?: 0.0) >= FEVER_THRESHOLD) {
@@ -176,6 +200,23 @@ class HealthRepository(private val context: Context) {
         }
     }
 
+    /**
+     * v1.0.80（批次 6）：删除一条 BASDAI 自评（误录）。
+     *
+     * 三个连带动作，一个都不能少：
+     * ① 按 **id** 删——`deleteOtherRowsForDate` 是「同日只留一条」的覆盖语义，
+     *    拿它当删除入口会顺手抹掉同日的其它行；同日不变量由写入侧维护，删除侧不碰它。
+     * ② 清掉**该记录日**派生出来的 `basdai_high` 警报（未确认的）——警报按 ref_date 一一对应，
+     *    删掉记录后它就成了无依据的幽灵，而且重存一条也不会再生成（去重键相同）。
+     * ③ 调用方（SymptomViewModel）还要重排 BASDAI 提醒——`dueDate` 由 `latest()` 推算，
+     *    删掉最近一条会让下次评估日期整体前移（提醒层的事，不在数据层做）。
+     */
+    suspend fun deleteBasdai(id: String) = db.withTransaction {
+        val row = basdaiDao.byId(id) ?: return@withTransaction
+        basdaiDao.delete(id)
+        alertDao.deleteUnackedByRef(DerivedAlerts.BASDAI_HIGH, row.date)
+    }
+
     // ---- M5 发作登记（R18）：开始 / 缓解，第 7 天警报（edu-002） ----
     suspend fun startFlare(
         startDate: String,
@@ -216,8 +257,71 @@ class HealthRepository(private val context: Context) {
         }
     }
 
+    /**
+     * v1.0.80（批次 6）：**编辑**一次发作登记（记错了改：诱因 / 采取的措施 / 峰值 / 备注 / 起止日期）。
+     *
+     * 为什么改日期也要重算警报：「第 7 天」警报只与 `startDate` 有关，而它的 `ref_date` 是**报警当日**。
+     * 把开始日往后挪 5 天，那条已经报出来的「已第 8 天」就凭空多算了——所以先把**旧窗口内**、
+     * 且**新窗口覆盖不到**的未确认警报清掉，再按新窗口重判一次（`insertAlertOnce` 幂等，仍成立会补回来）。
+     *
+     * [FlareEvent.endDate] / `status` 也可在此改：把窗口右端一起纳入判定，
+     * 否则「提前结束发作」后，那条针对「仍在发作」的警报会继续挂着。
+     */
+    suspend fun saveFlare(event: FlareEvent, today: LocalDate = LocalDate.now()) = db.withTransaction {
+        val before = flareDao.byId(event.id)
+        flareDao.upsert(event)
+        if (before != null) {
+            dropUncoveredFlareAlerts(
+                orphan = DerivedAlerts.FlareWindow(before.startDate, before.endDate),
+                today = today,
+            )
+        }
+        // 窗口变了就重判：仍满足「≥7 天未缓解」时补回一条（按 (type, today) 去重，不会重复）
+        checkFlareDayAlert(today)
+    }
+
+    /**
+     * v1.0.80（批次 6）：删除一次发作登记。
+     *
+     * 与编辑同理——「第 7 天」警报的 `ref_date` 落在这次发作的窗口内就说明它由这次发作派生，
+     * 删掉发作后必须把它清掉（否则症状页挂着一条指向不存在发作的 medium 警报）。
+     * 若别的发作窗口也覆盖同一个报警日（历史数据里可能重叠），则保留。
+     */
+    suspend fun deleteFlare(id: String, today: LocalDate = LocalDate.now()) = db.withTransaction {
+        val row = flareDao.byId(id) ?: return@withTransaction
+        flareDao.delete(id)
+        dropUncoveredFlareAlerts(DerivedAlerts.FlareWindow(row.startDate, row.endDate), today)
+    }
+
+    /**
+     * 清掉「已不在任何现存发作窗口内」的未确认 `flare_day7` 警报。
+     *
+     * [orphan] 是刚被删 / 刚被改窗口的那次发作的**旧**窗口：只有落在这个窗口里的报警日才可能是它派生的，
+     * 再去掉仍被现存发作覆盖的那些——剩下的才是真孤儿。范围收窄到这一步是必要的：
+     * 无差别清空该类型警报会顺手删掉别次发作的、用户还没看到的提醒。
+     */
+    private suspend fun dropUncoveredFlareAlerts(orphan: DerivedAlerts.FlareWindow, today: LocalDate) {
+        val todayStr = today.toString()
+        val candidates = alertDao.listUnackedByType(DerivedAlerts.FLARE_DAY7)
+            .filter { DerivedAlerts.flareWindowCovers(orphan.startDate, orphan.endDate, it.refDate, todayStr) }
+        if (candidates.isEmpty()) return
+        val remaining = flareDao.listAll().map { DerivedAlerts.FlareWindow(it.startDate, it.endDate) }
+        val stillCovered = DerivedAlerts.stillCoveredByOthers(candidates.map { it.refDate }, remaining, todayStr)
+        candidates.filter { it.refDate !in stillCovered }.forEach {
+            alertDao.deleteUnackedByRef(DerivedAlerts.FLARE_DAY7, it.refDate ?: return@forEach)
+        }
+    }
+
     // ---- M4 运动打卡 ----
     suspend fun checkInExercise(log: ExerciseLog) = exerciseDao.upsert(log)
+
+    /**
+     * v1.0.80（批次 6）：删除一条运动打卡（误录）。
+     *
+     * ⚠️ 调用方删完必须重排运动提醒：打卡状态直接决定提醒排程（「今天已打卡」时今日的升级重查不再重建），
+     * 删掉今天唯一一条打卡后，今日提醒应当重新出现——这是删除的**派生重算**，不在数据层做。
+     */
+    suspend fun deleteExerciseLog(id: String) = exerciseDao.delete(id)
 
     /** R21 次日反馈：更新打卡行 + 返回 exc-010 判读建议 */
     suspend fun saveExerciseFeedback(
@@ -362,6 +466,14 @@ class HealthRepository(private val context: Context) {
         supplementLogDao.upsert(toSave)
     }
 
+    /**
+     * v1.0.80（批次 6）：撤销一次补剂打卡（误点）。
+     *
+     * 无派生数据：补剂打卡不参与任何提醒排程，也不产生警报（与用药打卡不同——
+     * 那边会牵动「今天这剂吃没吃」的提醒重建，见 `ExerciseViewModel.deleteLog` 的同款说明）。
+     */
+    suspend fun deleteSupplementLog(id: String) = supplementLogDao.delete(id)
+
     // ---- M3 体征 ----
     fun observeVitals(date: String): Flow<Vitals?> = vitalsDao.observeLatestByDate(date)
     fun observeVitalsBetween(from: String, to: String): Flow<List<Vitals>> = vitalsDao.observeBetween(from, to)
@@ -395,8 +507,17 @@ class HealthRepository(private val context: Context) {
     fun observeBodyMeasureLatest(): Flow<BodyMeasure?> = bodyMeasureDao.observeLatest()
     fun observeBodyMeasureRecent(limit: Int = 10): Flow<List<BodyMeasure>> = bodyMeasureDao.observeRecent(limit)
 
-    suspend fun saveBodyMeasure(input: BodyMeasure) {
-        val toSave = if (input.id.isBlank()) input.copy(id = Ids.new("bm")) else input
+    suspend fun saveBodyMeasure(input: BodyMeasure) = db.withTransaction {
+        // v1.0.80（批次 6）：「改」必须**覆盖当天那一行**，而不是再插一行。
+        // 旧实现无论有无 id 都 upsert 传入值（表单新增时 id 恒为空），于是同一天改一次就多一行——
+        // 「最近记录」里堆着一串同一天的重复值，用户只能一条条删；而体征 / 体重早就是同日覆盖语义。
+        // 表单带 id 回来（真编辑）时按 id 覆盖；否则复用当天已有行的主键。
+        val existing = if (input.id.isBlank()) bodyMeasureDao.byDate(input.date) else null
+        val toSave = when {
+            !input.id.isBlank() -> input
+            existing != null -> input.copy(id = existing.id)
+            else -> input.copy(id = Ids.new("bm"))
+        }
         bodyMeasureDao.upsert(toSave)
     }
 
@@ -476,6 +597,67 @@ class HealthRepository(private val context: Context) {
         val toSave = if (record.id.isBlank()) record.copy(id = Ids.new("crec")) else record
         checkupRecordDao.upsert(toSave)
     }
+
+    // ---- v1.0.80（批次 6）：复诊记录 / 化验 / 影像的修改与删除 ----
+
+    /**
+     * 删除前的**级联条数**（打开确认框时取一次，不再写库）。
+     *
+     * 为什么单独一个方法：计数要跑三条查询，而记录列表里可能有几十条卡片——
+     * 在列表里为每条都挂一次计数查询是白烧 IO（用户点删除的只是其中一条）。
+     */
+    suspend fun checkupDeletionCounts(id: String): CheckupDeletion.Counts = CheckupDeletion.Counts(
+        labs = labResultDao.countByCheckup(id),
+        imaging = imagingDao.countByCheckup(id),
+        attachments = attachmentRepo.listByCheckup(id).size,
+    )
+
+    /**
+     * v1.0.80（批次 6）：**级联删除**一条复诊记录。
+     *
+     * 化验 / 影像 / 附件都靠 `checkup_id` 归属到这次就诊，只删记录本身会留下三张表里的孤儿行
+     * （界面上还在，却再也看不出属于哪次就诊）。故一并删除，且附件要连**磁盘文件**一起删——
+     * 否则内部存储里会永久留着一份用户以为已经删掉的化验单照片（隐私问题，不只是空间问题）。
+     *
+     * **顺序是有意的**：附件先走 [AttachmentRepository.delete]（删文件 + 有远端副本时留墓碑等同步收尾），
+     * 再在一个事务里删三张表的行。附件删除跨了文件系统与远端，本就塞不进 Room 事务；
+     * 而「先附件、后记录」保证中途失败时留下的是**记录本身**——用户还能再点一次删除；
+     * 反过来先删记录再删附件，失败就会留下指向不存在记录的附件行，用户无从清理。
+     *
+     * @return 实际连带删除的条数；`null` = 该记录不存在（**零写入**）
+     */
+    suspend fun deleteCheckupRecord(id: String): CheckupDeletion.Counts? {
+        checkupRecordDao.byId(id) ?: return null
+        val attachments = attachmentRepo.listByCheckup(id)
+        attachments.forEach { attachmentRepo.delete(it) }
+        return db.withTransaction {
+            val counts = CheckupDeletion.Counts(
+                labs = labResultDao.countByCheckup(id),
+                imaging = imagingDao.countByCheckup(id),
+                attachments = attachments.size,
+            )
+            labResultDao.deleteByCheckup(id)
+            imagingDao.deleteByCheckup(id)
+            checkupRecordDao.delete(id)
+            counts
+        }
+    }
+
+    /**
+     * v1.0.80（批次 6）：删除单条化验结果。
+     *
+     * 无派生数据——`abnormal` 是这一行**自己的字段**（无参考范围时才是 AI 标记的兜底值），
+     * 化验不产生任何警报、也不被别的表引用，故只删行。
+     */
+    suspend fun deleteLabResult(id: String) = labResultDao.delete(id)
+
+    /**
+     * v1.0.80（批次 6）：删除单条影像记录。
+     *
+     * 无派生数据：附件挂的是**复诊记录**（`checkup_attachments.checkup_id`），从不挂影像 id，
+     * 故删影像不会产生孤儿附件（用户从影像卡片归档的附件仍归属同一次复诊，行为与预期一致）。
+     */
+    suspend fun deleteImagingRecord(id: String) = imagingDao.delete(id)
 
     // ---- 化验结果 ----
     fun observeLabByCheckup(checkupId: String): Flow<List<LabResult>> = labResultDao.observeByCheckup(checkupId)
@@ -584,11 +766,38 @@ class HealthRepository(private val context: Context) {
         // 修掉「实体默认值小写 "pending" vs 此处大写比较」+「表单默认 CONFIRMED」两处安全默认值反转。
         if (VaccineSafety.needsLiveVaccineAlert(record.vaccineType, record.doctorConfirm)) {
             insertAlertOnce(
-                type = "vaccine_live_pending", severity = "high", refDate = record.date,
+                type = DerivedAlerts.VACCINE_LIVE_PENDING, severity = "high", refDate = record.date,
                 message = "记录了活疫苗（${record.vaccineName}）但医生确认状态为「待确认」——AS 患者使用生物制剂 / DMARD 期间接种活疫苗有严重感染风险，请务必先与风湿科医生确认（itx-010/012）。",
                 kbRef = "itx-010",
             )
         }
+        // v1.0.80（批次 6）：**编辑的反向情形**——把「活疫苗 + 待确认」改成灭活或「医生同意」后，
+        // 原来那条 high 级警报就失去了依据（记录已经不再声称「有一针活疫苗待确认」）。
+        // 与新增走同一条重算路径，避免「新增会报警、修改却不会消警」这种单向逻辑。
+        refreshVaccineLiveAlert(record.date)
+    }
+
+    /**
+     * v1.0.80（批次 6）：删除一条疫苗记录，并重算它派生出来的活疫苗安全警报。
+     *
+     * **重算而不是直接删**：警报按 `(type, ref_date=接种日)` 去重，而同一天可能记了多针
+     * （例如同时打了流感 + 带状疱疹）。删掉其中「活疫苗待确认」那一针时警报该消；
+     * 但若当天还有**另一针**同样满足活疫苗 × 未确认，警报必须留下——一刀切删掉就是漏报。
+     */
+    suspend fun deleteVaccineRecord(id: String) = db.withTransaction {
+        val row = vaccineDao.byId(id) ?: return@withTransaction
+        vaccineDao.delete(id)
+        refreshVaccineLiveAlert(row.date)
+    }
+
+    /**
+     * 按**库里当天的实际记录**重算活疫苗警报：已无任何一条满足「活疫苗 × 未确认」时，
+     * 清掉该日未被确认的警报（已确认的保留——那是用户看过的留痕，见 [AlertDao.deleteUnackedByRef]）。
+     */
+    private suspend fun refreshVaccineLiveAlert(date: String) {
+        val stillNeeded = vaccineDao.byDate(date)
+            .any { VaccineSafety.needsLiveVaccineAlert(it.vaccineType, it.doctorConfirm) }
+        if (!stillNeeded) alertDao.deleteUnackedByRef(DerivedAlerts.VACCINE_LIVE_PENDING, date)
     }
 
     // =========================================================================
@@ -603,6 +812,12 @@ class HealthRepository(private val context: Context) {
         val toSave = if (event.id.isBlank()) event.copy(id = Ids.new("eev")) else event
         emergencyDao.upsert(toSave)
     }
+
+    /**
+     * v1.0.80（批次 6）：删除一条紧急事件记录（误录）。
+     * 无派生数据：事件记录不产生警报、不参与任何提醒排程，也不被别的表引用。
+     */
+    suspend fun deleteEmergencyEvent(id: String) = emergencyDao.delete(id)
 
     // ---- 紧急联系人 ----
     fun observeEmergencyContacts(): Flow<List<EmergencyContact>> = contactDao.observeEmergency()

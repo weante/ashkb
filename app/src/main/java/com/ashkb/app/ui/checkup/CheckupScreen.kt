@@ -33,8 +33,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 
 import com.ashkb.app.R
+import com.ashkb.app.data.entity.CheckupItem
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.data.entity.ImagingRecord
+import com.ashkb.app.data.entity.LabResult
+import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.ui.components.ScreenTopBar
 
 enum class CheckupTab { ITEMS, RECORDS, LABS, IMAGING, VACCINES }
@@ -73,6 +76,16 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
     var showItemForm by remember { mutableStateOf(false) }
     var showRecordForm by remember { mutableStateOf(false) }
     var showVaccineForm by remember { mutableStateOf(false) }
+    // v1.0.80（批次 6）：编辑目标（null = 新增）。三个表单共用「新增 / 编辑」两态，
+    // 于是「回填原值」这件事只在一处实现，不会出现「新增能校验、编辑漏了校验」的分叉。
+    var editItem by remember { mutableStateOf<CheckupItem?>(null) }
+    var editRecord by remember { mutableStateOf<CheckupRecord?>(null) }
+    var editVaccine by remember { mutableStateOf<VaccineRecord?>(null) }
+    // 级联删除确认框的目标（条数在框内异步取，见 CheckupDeleteDialogs）
+    var deleteRecord by remember { mutableStateOf<CheckupRecord?>(null) }
+    // 化验 / 影像的修改目标：表单里既能保存也能删除
+    var editLab by remember { mutableStateOf<LabResult?>(null) }
+    var editImaging by remember { mutableStateOf<ImagingRecord?>(null) }
     var showLabDetail by remember { mutableStateOf<CheckupRecord?>(null) }
     var showLabImport by remember { mutableStateOf(false) }
     var showImagingImport by remember { mutableStateOf(false) }
@@ -115,6 +128,7 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
                     onDeactivate = { vm.deactivateCheckupItem(it) },
                     seedResult = seedResult,
                     onSeed = { vm.seedBiologicScreening() },
+                    onEdit = { editItem = it },
                 )
                 CheckupTab.RECORDS -> CheckupRecordsList(
                     records = records,
@@ -122,6 +136,8 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
                     onViewLab = { showLabDetail = it },
                     onAttach = { attachTarget = it },
                     onOpenAllAttachments = { showAllAttachments = true },
+                    onEdit = { editRecord = it },
+                    onDelete = { deleteRecord = it },
                     // 准备清单排在最前：复诊管理的首要问题是"下次该做什么"，其次才是翻历史
                     prepHeader = { CheckupPrepCard(items, records, vm.date) },
                 )
@@ -132,6 +148,7 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
                     onImport = { showLabImport = true },
                     onAttachDate = { attachLabDate = it },
                     onLinkDate = { pickLabsDate = it },
+                    onEditLab = { editLab = it },
                 )
                 CheckupTab.IMAGING -> ImagingList(
                     records = imagingRecords,
@@ -139,10 +156,12 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
                     onView = { imagingDetail = it },
                     onAttach = { attachImaging = it },
                     onLink = { pickImaging = it },
+                    onEdit = { editImaging = it },
                 )
                 CheckupTab.VACCINES -> VaccineList(
                     vaccines = vaccines,
                     onAdd = { showVaccineForm = true },
+                    onEdit = { editVaccine = it },
                 )
             }
         }
@@ -161,6 +180,50 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
         onSave = { vm.saveVaccineRecord(it); showVaccineForm = false },
         onDismiss = { showVaccineForm = false },
     )
+    // v1.0.80（批次 6）：编辑三态——复用同一张表单，回填原值并沿用主键
+    editItem?.let { item ->
+        CheckupItemFormSheet(
+            existing = item,
+            onSave = { vm.saveCheckupItem(it); editItem = null },
+            onDismiss = { editItem = null },
+        )
+    }
+    editRecord?.let { rec ->
+        CheckupRecordFormSheet(
+            items = items,
+            existing = rec,
+            onSave = { vm.saveCheckupRecord(it); editRecord = null },
+            onDismiss = { editRecord = null },
+        )
+    }
+    editVaccine?.let { vac ->
+        VaccineFormSheet(
+            existing = vac,
+            onSave = { vm.saveVaccineRecord(it); editVaccine = null },
+            onDelete = { vm.deleteVaccineRecord(it.id) },
+            onDismiss = { editVaccine = null },
+        )
+    }
+    // 级联删除确认：条数在对话框内异步取，逐类报出将一并删除的化验 / 影像 / 附件
+    deleteRecord?.let { rec ->
+        CheckupRecordDeleteDialog(record = rec, vm = vm, onDismiss = { deleteRecord = null })
+    }
+    editLab?.let { lab ->
+        LabResultFormSheet(
+            existing = lab, date = lab.date, checkupId = lab.checkupId,
+            onSave = { vm.saveLabResult(it); editLab = null },
+            onDelete = { vm.deleteLabResult(it.id) },
+            onDismiss = { editLab = null },
+        )
+    }
+    editImaging?.let { img ->
+        ImagingFormSheet(
+            existing = img,
+            onSave = { vm.saveImagingRecord(it); editImaging = null },
+            onDelete = { vm.deleteImagingRecord(it.id) },
+            onDismiss = { editImaging = null },
+        )
+    }
     showLabDetail?.let { rec ->
         LabDetailDialog(
             record = rec,

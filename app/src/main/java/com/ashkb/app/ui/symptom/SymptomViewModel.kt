@@ -123,16 +123,46 @@ class SymptomViewModel(
     fun saveBasdai(q1: Int, q2: Int, q3: Int, q4: Int, q5: Int, q6: Int, note: String?) {
         viewModelScope.launch {
             repo.saveBasdai(dateStr, q1, q2, q3, q4, q5, q6, note, backfill = _selectedDate.value != today)
-            // v1.0.59 B5：评估记录写入后即时重排 BASDAI 提醒（dueDate 推算依赖 latest）
-            val cfg = ReminderConfigRepository(app)
-            val db = com.ashkb.app.data.db.AppDatabase.get(app)
-            runCatching {
-                BasdaiReminderScheduler.rescheduleAll(
-                    app, db.basdaiDao().latest(), cfg.basdaiCycleDays(),
-                    LocalDate.now(), LocalDateTime.now(),
-                )
-            }
+            rescheduleBasdaiReminder()
         }
+    }
+
+    /**
+     * v1.0.80（批次 6）：删除一条 BASDAI 自评（误录）。
+     *
+     * 删完必须重排提醒：下次评估日期由**最近一条**记录推算（`BasdaiReminderScheduler` 取 `latest()`），
+     * 删掉最近一条会让 dueDate 整体前移——不重排就会在一次「已删除的评估」之后才提醒。
+     */
+    fun deleteBasdai(id: String) {
+        viewModelScope.launch {
+            repo.deleteBasdai(id)
+            rescheduleBasdaiReminder()
+        }
+    }
+
+    /**
+     * v1.0.59 B5：评估记录写入 / 删除后即时重排 BASDAI 提醒（dueDate 推算依赖 `latest()`）。
+     * 抽成一处：写入与删除各写一遍必然漏改一处，而漏改的症状是「提醒日期与记录对不上」。
+     */
+    private suspend fun rescheduleBasdaiReminder() {
+        val cfg = ReminderConfigRepository(app)
+        val db = com.ashkb.app.data.db.AppDatabase.get(app)
+        runCatching {
+            BasdaiReminderScheduler.rescheduleAll(
+                app, db.basdaiDao().latest(), cfg.basdaiCycleDays(),
+                LocalDate.now(), LocalDateTime.now(),
+            )
+        }
+    }
+
+    /**
+     * v1.0.80（批次 6）：删除**当天（或所选日期）**的症状记录（误录）。
+     *
+     * 仓库层会连带清掉该日派生出来的红旗警报（发热 / 眼 / 神经）——
+     * 否则症状页顶部会一直挂着一条指向已删记录的 high 级提示。
+     */
+    fun deleteSymptom() {
+        viewModelScope.launch { repo.deleteSymptom(dateStr) }
     }
 
     fun startFlare(trigger: FlareTrigger, actions: List<FlareAction>, severityPeak: Int?, notes: String?) {
@@ -145,6 +175,22 @@ class SymptomViewModel(
 
     fun resolveFlare(notes: String?) {
         viewModelScope.launch { repo.resolveFlare(today.toString(), notes) }
+    }
+
+    /**
+     * v1.0.80（批次 6）：保存（编辑）一次发作登记。
+     *
+     * 只改内容、不改 `status`：`status` 的迁移由「登记发作 / 标记缓解」两个动作负责，
+     * 允许在编辑表单里切换状态，会让「同时只有一次活跃发作」这条不变量出现第二个入口
+     * （症状页的发作卡只按 `status='active'` 取最近一条，多出来的那条会永远看不见）。
+     */
+    fun saveFlare(event: FlareEvent) {
+        viewModelScope.launch { repo.saveFlare(event, today) }
+    }
+
+    /** v1.0.80（批次 6）：删除一次发作登记（连带清掉它派生的「第 7 天」警报）。 */
+    fun deleteFlare(id: String) {
+        viewModelScope.launch { repo.deleteFlare(id, today) }
     }
 
     fun ackAlert(id: String) {

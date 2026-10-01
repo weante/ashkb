@@ -82,6 +82,14 @@ class EmergencyViewModel(
         viewModelScope.launch { repo.saveEmergencyEvent(event) }
     }
 
+    /**
+     * v1.0.80（批次 6）：删除一条紧急事件记录（误录）。
+     * 无派生数据（事件不产生警报 / 提醒），也不需要重排任何排程。
+     */
+    fun deleteEmergencyEvent(id: String) {
+        viewModelScope.launch { repo.deleteEmergencyEvent(id) }
+    }
+
     suspend fun emergencyCards(): List<KbEntry> = repo.kbByCategory("emergency")
 
     /** M7 紧急卡打印版 PDF（供急救人员参考，白底打印友好）。 */

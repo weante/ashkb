@@ -814,7 +814,7 @@
     <!-- ViewModel · 备份与数据（BackupViewModel） -->
     <string name="vm_backup_password_min">备份口令至少 6 位</string>
     <string name="vm_backup_password_min_note">备份口令至少 6 位——恢复时唯一解密依据，请牢记</string>
-    <string name="vm_backup_local_done">本机备份完成：%1$s（%2$s 表 %3$s 行，SHA-256 %4$s…）。文件已存 app 私有目录，可通过分享另存。</string>
+    <string name="vm_backup_local_done">本机备份完成：%1$s（%2$d 表 %3$d 行，SHA-256 %4$s…）。文件已存 app 私有目录，可通过分享另存。</string>
     <string name="vm_backup_failed">备份失败：%1$s</string>
     <string name="vm_dav_need_url_user">请填写 WebDAV 服务器地址与用户名</string>
     <string name="vm_dav_connect_failed">连接失败：%1$s</string>
@@ -822,22 +822,22 @@
     <string name="vm_dav_backup_failed">WebDAV 备份失败：%1$s</string>
     <string name="vm_dav_list_failed">拉取远程备份列表失败：%1$s</string>
     <string name="vm_dav_downloading">正在从 WebDAV 下载 %1$s…</string>
-    <string name="vm_dav_downloaded">已下载 %1$s（%2$s 字节）——请输入该备份的口令做旁路解密与校验</string>
+    <string name="vm_dav_downloaded">已下载 %1$s（%2$d 字节）——请输入该备份的口令做旁路解密与校验</string>
     <string name="vm_dav_download_failed">下载远程备份失败：%1$s</string>
-    <string name="vm_restore_verify_ok">解密与文件自校验通过（schema v%1$s，备份于 %2$s，约 %3$s 行）。下一步将先做 pre-restore 快照再覆盖写入。</string>
+    <string name="vm_restore_verify_ok">解密与文件自校验通过（schema v%1$d，备份于 %2$s，约 %3$d 行）。下一步将先做 pre-restore 快照再覆盖写入。</string>
     <string name="vm_restore_verify_failed">备份文件校验失败</string>
     <string name="vm_restore_password_expired">恢复口令已失效，请重新选择备份文件并输入口令</string>
     <string name="vm_restore_mode_full">完整回滚（回到备份时点）</string>
     <string name="vm_restore_mode_merge">按表合并</string>
-    <string name="vm_restore_done">恢复完成（%1$s）：双校验（行数 + SHA-256）全部通过，共 %2$s 行。误恢复退路快照已留存（口令与本次备份口令相同）。请重启应用以刷新界面数据。</string>
+    <string name="vm_restore_done">恢复完成（%1$s）：双校验（行数 + SHA-256）全部通过，共 %2$d 行。误恢复退路快照已留存（口令与本次备份口令相同）。请重启应用以刷新界面数据。</string>
     <string name="vm_restore_incomplete">恢复未完成：双校验未通过，已整体回滚——库保持恢复前状态（%1$s）。</string>
     <string name="vm_restore_failed">恢复失败：%1$s</string>
     <string name="vm_drill_pass">恢复演练通过：%1$s。备份→加密→解密→恢复→双校验全链路可用。</string>
     <string name="vm_drill_incomplete">演练未完全通过：%1$s</string>
     <string name="vm_drill_failed">恢复演练失败：%1$s</string>
-    <string name="vm_profile_export_done">档案 JSON 已导出（%1$s 字节，明文）——用于换机建档，不含打卡日志。</string>
+    <string name="vm_profile_export_done">档案 JSON 已导出（%1$d 字节，明文）——用于换机建档，不含打卡日志。</string>
     <string name="vm_profile_export_failed">导出失败：%1$s</string>
-    <string name="vm_profile_import_done">档案导入完成：%1$s（%2$s 种在用药）。已导入项与现有数据并存，请检查重复。</string>
+    <string name="vm_profile_import_done">档案导入完成：%1$s（%2$d 种在用药）。已导入项与现有数据并存，请检查重复。</string>
     <string name="vm_profile_import_failed">导入失败：%1$s</string>
 
     <!-- ViewModel · 报表 / 紧急（vm_emergency_pdf_failed 由两处复用） -->
@@ -854,8 +854,8 @@
     <string name="vm_kb_category_edu">教育</string>
 
     <!-- PDF · 公共（页眉 / 页脚） -->
-    <string name="pdf_page_no">第 %1$s 页</string>
-    <string name="pdf_page_footer">第 %1$s 页 · %2$s</string>
+    <string name="pdf_page_no">第 %1$d 页</string>
+    <string name="pdf_page_footer">第 %1$d 页 · %2$s</string>
 
     <!-- PDF · 复诊报告（M9） -->
     <string name="pdf_checkup_title">AS 复诊报告（患者自备摘要）</string>
@@ -869,19 +869,19 @@
     <string name="pdf_label_disease_stage">病情分期</string>
     <string name="pdf_label_allergies">过敏史</string>
     <string name="pdf_label_blood_type">血型</string>
-    <string name="pdf_section_meds">当前用药（%1$s 种）</string>
+    <string name="pdf_section_meds">当前用药（%1$d 种）</string>
     <string name="pdf_no_meds">（无在用药物记录）</string>
     <string name="pdf_route_injection">注射</string>
     <string name="pdf_route_oral">口服</string>
-    <string name="pdf_med_inj_cycle">每 %1$s 天</string>
+    <string name="pdf_med_inj_cycle">每 %1$d 天</string>
     <string name="pdf_section_adherence">近 30 天依从与症状</string>
     <string name="pdf_label_med_checkin">服药打卡</string>
-    <string name="pdf_value_med_checkin">%1$s 完成 / %2$s 部分 / %3$s 跳过（共 %4$s 条记录）</string>
+    <string name="pdf_value_med_checkin">%1$d 完成 / %2$d 部分 / %3$d 跳过（共 %4$d 条记录）</string>
     <string name="pdf_label_adherence_rate">记录内完成度</string>
     <string name="pdf_label_prn">按需用药</string>
-    <string name="pdf_value_prn">近 %1$s 天记录 %2$s 次（不计入完成度）</string>
+    <string name="pdf_value_prn">近 %1$d 天记录 %2$d 次（不计入完成度）</string>
     <string name="pdf_label_exercise">运动</string>
-    <string name="pdf_value_exercise">%1$s 次完成，共 %2$s 分钟（跳过 %3$s）</string>
+    <string name="pdf_value_exercise">%1$d 次完成，共 %2$d 分钟（跳过 %3$d）</string>
     <string name="pdf_label_symptom_days">症状记录天数</string>
     <string name="pdf_label_avg_pain">平均疼痛</string>
     <string name="pdf_value_not_recorded">未记录</string>
@@ -890,30 +890,30 @@
     <string name="pdf_label_night_pain_days">夜间痛天数</string>
     <string name="pdf_label_avg_fatigue">疲乏均值</string>
     <string name="pdf_label_eye_days">眼部症状天数</string>
-    <string name="pdf_value_eye_days">%1$s（&gt;0 需眼科评估）</string>
+    <string name="pdf_value_eye_days">%1$d（&gt;0 需眼科评估）</string>
     <string name="pdf_label_fever_days">发热天数</string>
     <string name="pdf_label_flare_count">发作次数</string>
     <string name="pdf_value_flare_active">（目前处于发作期）</string>
-    <string name="pdf_section_basdai">BASDAI 走势（近 90 天 %1$s 次）</string>
+    <string name="pdf_section_basdai">BASDAI 走势（近 90 天 %1$d 次）</string>
     <string name="pdf_no_basdai">（期间无 BASDAI 自评记录）</string>
     <string name="pdf_label_latest">最新</string>
     <string name="pdf_value_latest">%1$s：%2$s / 10</string>
     <string name="pdf_label_average">均值</string>
     <string name="pdf_label_change">环比变化</string>
     <string name="pdf_basdai_high">⚠ ≥4.0 活动度高</string>
-    <string name="pdf_section_labs">近 180 天化验异常项（%1$s / %2$s 项）</string>
+    <string name="pdf_section_labs">近 180 天化验异常项（%1$d / %2$d 项）</string>
     <string name="pdf_no_labs">（无化验记录）</string>
     <string name="pdf_labs_all_normal">（期间化验均在参考范围内——仅列异常项，正常项略）</string>
     <string name="pdf_lab_flag_high">↑ 高</string>
     <string name="pdf_lab_flag_low">↓ 低</string>
     <string name="pdf_lab_flag_abnormal">⚠ 异常</string>
-    <string name="pdf_lab_ref_range">（参考 %1$s–%2$s）</string>
-    <string name="pdf_labs_more">…另有 %1$s 项异常未列出</string>
-    <string name="pdf_section_checkups">近 180 天复诊记录（%1$s 次）</string>
+    <string name="pdf_lab_ref_range">（参考 %1$.2f–%2$.2f）</string>
+    <string name="pdf_labs_more">…另有 %1$d 项异常未列出</string>
+    <string name="pdf_section_checkups">近 180 天复诊记录（%1$d 次）</string>
     <string name="pdf_no_checkups">（无复诊记录）</string>
     <string name="pdf_section_next_checkups">下次复诊</string>
     <string name="pdf_no_next_checkups">（暂无登记的下次复诊日期）</string>
-    <string name="pdf_section_vaccines">疫苗记录（%1$s 条）</string>
+    <string name="pdf_section_vaccines">疫苗记录（%1$d 条）</string>
     <string name="pdf_none">（无）</string>
     <string name="pdf_vaccine_next">（下次 %1$s）</string>
     <string name="pdf_checkup_disclaimer">说明：本报告由患者个人健康工具 ASHKB 汇总自记录数据，供复诊沟通参考。所有诊疗以主治医师医嘱为准。</string>
@@ -923,7 +923,7 @@
     <string name="pdf_emergency_footer">ASHKB 生成于 %1$s · 急救人员参考 · 明文展示为设计例外（协议 §1）</string>
     <string name="pdf_section_patient_info">患者信息</string>
     <string name="pdf_no_profile">（未建档）</string>
-    <string name="pdf_section_contacts">紧急联系人（%1$s）</string>
+    <string name="pdf_section_contacts">紧急联系人（%1$d）</string>
     <string name="pdf_no_contacts">（未添加）</string>
     <string name="pdf_marker_doctor">[主治医生]</string>
     <string name="pdf_section_emergency_cards">应急处理卡（五场景）</string>
@@ -1258,5 +1258,53 @@
     <string name="exercise_posture_daily">日常姿势</string>
     <string name="exercise_posture_sleep">睡姿 / 卧具</string>
     <string name="exercise_posture_source">依据：NASS axSpA 体位教育（知识库 edu-005）</string>
+    <!-- ===== v1.0.80（批次 6）：录入记录的修改与删除 ===== -->
+    <string name="common_delete_irreversible">删除后无法恢复（可从备份中还原）。</string>
+    <string name="checkup_edit_record_title">修改复诊记录</string>
+    <string name="checkup_delete_record_confirm">删除复诊记录「%1$s」？</string>
+    <string name="checkup_delete_counting">正在统计将一并删除的内容…</string>
+    <string name="checkup_delete_cascade_intro">该记录名下还有以下内容，将一并删除：</string>
+    <string name="checkup_delete_cascade_labs">%1$d 条化验结果</string>
+    <string name="checkup_delete_cascade_imaging">%1$d 条影像记录</string>
+    <string name="checkup_delete_cascade_attachments">%1$d 个附件（连磁盘文件一起删除）</string>
+    <string name="checkup_delete_none">该记录名下没有化验 / 影像 / 附件。</string>
+    <string name="checkup_edit_item_title">修改复诊项目</string>
+    <string name="lab_edit_indicator_action">修改化验结果</string>
+    <string name="lab_edit_action">修改这项化验</string>
+    <string name="lab_edit_date_hint">日期 %1$s（随原记录，不可修改）</string>
+    <string name="lab_edit_ai_mark_note">AI 原始标记「%1$s」只读留档，不参与本地判读，修改数值不会改写它。</string>
+    <string name="lab_delete_confirm">删除化验结果「%1$s」？</string>
+    <string name="lab_delete_note">删除后无法恢复；趋势图与报表中不再包含这一次数值。</string>
+    <string name="imaging_edit_title">修改影像记录</string>
+    <string name="imaging_body_part_field">检查部位</string>
+    <string name="imaging_delete_confirm">删除影像记录「%1$s」？</string>
+    <string name="imaging_delete_note">删除后无法恢复。附件按复诊记录归档，不受影响。</string>
+    <string name="vaccine_edit_title">修改疫苗记录</string>
+    <string name="vaccine_delete_confirm">删除疫苗记录「%1$s」？</string>
+    <string name="vaccine_delete_note">删除后无法恢复；由它触发的「活疫苗待确认」安全提醒也会一并撤销。</string>
+    <string name="symptom_delete_confirm">删除 %1$s 的症状记录？</string>
+    <string name="symptom_delete_note">删除后无法恢复；由它触发的红旗提醒（发热 / 眼部 / 神经）也会一并撤销。</string>
+    <string name="basdai_delete_confirm">删除 %1$s 的 BASDAI 自评？</string>
+    <string name="basdai_delete_note">总分 %1$s。删除后无法恢复；由它触发的活动度提醒也会一并撤销。</string>
+    <string name="flare_edit_title">修改发作记录</string>
+    <string name="flare_start_date_field">开始日期</string>
+    <string name="flare_end_date_field">结束日期（未缓解留空）</string>
+    <string name="flare_delete_confirm">删除 %1$s 开始的这次发作记录？</string>
+    <string name="flare_delete_note">删除后无法恢复；由它触发的「已第 7 天」提醒也会一并撤销。</string>
+    <string name="exercise_edit_log_title">修改打卡记录</string>
+    <string name="exercise_delete_confirm">删除打卡「%1$s」？</string>
+    <string name="exercise_delete_note">删除后无法恢复；今日打卡状态与运动提醒会随之重算。</string>
+    <string name="emergency_edit_contact_title">修改联系人</string>
+    <string name="emergency_delete_contact_confirm">删除联系人「%1$s」？</string>
+    <string name="emergency_delete_contact_note">删除后无法恢复；紧急卡与锁屏信息中将不再出现该联系人。</string>
+    <string name="lab_value_text_field">文字结果（如阴性 / 阳性，可留空）</string>
+    <string name="emergency_edit_event_title">修改事件记录</string>
+    <string name="emergency_delete_event_confirm">删除 %1$s 的这次事件记录？</string>
+    <string name="emergency_delete_event_note">删除后无法恢复；紧急卡与报表中不再包含这次事件。</string>
+    <string name="recipes_delete_confirm">删除食谱「%1$s」？</string>
+    <string name="recipes_delete_note">自建食谱删除后无法恢复；种子食谱会在下次启动时重新种入。</string>
+    <string name="nutrition_supplement_undo">撤销打卡</string>
+    <string name="nutrition_supplement_undo_confirm">撤销「%1$s」今天的打卡？</string>
+    <string name="nutrition_supplement_undo_note">撤销后回到「今天还没服用」的未记录状态；补剂本身与其历史记录不受影响。</string>
 </resources>
 

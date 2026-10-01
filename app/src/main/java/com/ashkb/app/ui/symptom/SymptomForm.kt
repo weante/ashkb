@@ -21,6 +21,7 @@ import androidx.compose.material3.TextButton
 
 import com.ashkb.app.R
 import com.ashkb.app.domain.ClinicalThresholds
+import com.ashkb.app.ui.components.DestructiveAction
 import com.ashkb.app.ui.components.ScoreInput
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.theme.Spacing
@@ -53,12 +54,18 @@ internal data class SymptomFormState(
     val notes: String? = null,
 )
 
+/**
+ * @param onDelete v1.0.80（批次 6）：删除这一天的症状记录。非空且 [existing] 非空时渲染删除入口——
+ *                 症状是红旗警报的唯一依据，删了它就得连带把警报一起撤掉（仓库层做），
+ *                 故确认文案必须点明这一点，见 `symptom_delete_note`。
+ */
 @Composable
 internal fun SymptomFormCard(
     existing: com.ashkb.app.data.entity.SymptomDaily?,
     dateLabel: String,
     dateKey: LocalDate,
     onSave: (SymptomFormState) -> Unit,
+    onDelete: (() -> Unit)? = null,
 ) {
     // 编辑已有记录时回显（有值才回显；无行则全空——不预填 0）；dateKey 让切换记录日期时重置草稿
     var stiffnessMin by remember(existing?.id, dateKey) { mutableStateOf(existing?.morningStiffnessMin?.toString() ?: "") }
@@ -127,6 +134,18 @@ internal fun SymptomFormCard(
                     )
                 )
             }) { Text(if (existing == null) stringResource(R.string.symptom_form_save, dateLabel) else stringResource(R.string.symptom_form_update, dateLabel)) }
+        }
+        // 删除入口只在已记录时出现：没有记录就没有可删的东西（避免给「未记录」的日子一个危险按钮）
+        if (existing != null && onDelete != null) {
+            Spacer(Modifier.height(Spacing.xs))
+            DestructiveAction(
+                label = stringResource(R.string.common_delete),
+                confirmTitle = stringResource(R.string.symptom_delete_confirm, dateLabel),
+                confirmBody = stringResource(R.string.symptom_delete_note) + "\n" +
+                    stringResource(R.string.common_delete_irreversible),
+                onConfirm = onDelete,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

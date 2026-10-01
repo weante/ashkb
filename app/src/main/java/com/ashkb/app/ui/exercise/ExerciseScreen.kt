@@ -80,6 +80,8 @@ fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -> Unit, onBack: () ->
 
     var checkInTarget by remember { mutableStateOf<ExerciseEngine.ExerciseCard?>(null) }
     var feedbackTarget by remember { mutableStateOf<ExerciseLog?>(null) }
+    // v1.0.80（批次 6）：待修改的打卡（null = 未打开）
+    var logEdit by remember { mutableStateOf<ExerciseLog?>(null) }
     var kbDetail by remember { mutableStateOf<com.ashkb.app.data.entity.KbEntry?>(null) }
 
     Column(Modifier.fillMaxSize()) {
@@ -154,6 +156,12 @@ fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -> Unit, onBack: () ->
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.weight(1f),
                             )
+                            // v1.0.80（批次 6）：误录的打卡要能改 / 能删（表单内删除）。
+                            // 放在打卡行内而不是别处：用户看到错的那一条时，改它的入口就在这里。
+                            TextButton(
+                                onClick = { logEdit = log },
+                                modifier = Modifier.heightIn(min = Size.touchMin),
+                            ) { Text(stringResource(R.string.common_edit)) }
                             Icon(
                                 imageVector = Icons.Rounded.CheckCircle,
                                 contentDescription = stringResource(R.string.common_completed),
@@ -216,6 +224,16 @@ fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -> Unit, onBack: () ->
                 feedbackTarget = null
             },
             onDismiss = { feedbackTarget = null },
+        )
+    }
+
+    // v1.0.80（批次 6）：修改 / 删除打卡（表单内可删；删除会重排提醒，见 ExerciseViewModel.deleteLog）
+    logEdit?.let { log ->
+        ExerciseLogEditSheet(
+            log = log,
+            onSave = { duration, intensity, note -> vm.updateLog(log, duration, intensity, note) },
+            onDelete = { vm.deleteLog(it) },
+            onDismiss = { logEdit = null },
         )
     }
 

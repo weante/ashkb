@@ -166,6 +166,21 @@ class WellnessViewModel(
         }
     }
 
+    /**
+     * v1.0.80（批次 6）：撤销今天的补剂打卡（误点）。
+     *
+     * 删**当天该补剂的全部**打卡行而不是只删第一条：`supplement_logs` 的唯一索引含 `slot_key`，
+     * 而补剂打卡的 slot_key 恒为 NULL（SQLite 里 NULL 互不相等），所以连点几次就会留下几行——
+     * 只删一行的话，卡片上的「已服用」胶囊不会消失，用户会以为撤销没生效。
+     */
+    fun undoSupplementCheckIn(supp: Supplement) {
+        viewModelScope.launch {
+            supplementLogsToday.value
+                .filter { it.supId == supp.id }
+                .forEach { repo.deleteSupplementLog(it.id) }
+        }
+    }
+
     // ---- 饮食画像 ----
     fun saveDietProfile(profile: DietProfile) {
         viewModelScope.launch { repo.saveDietProfile(profile) }

@@ -49,6 +49,7 @@ import com.ashkb.app.R
 import com.ashkb.app.data.repo.RecipeRepository.RecipeView
 import com.ashkb.app.domain.RecipeSeeds
 import com.ashkb.app.domain.RecipeSources
+import com.ashkb.app.ui.components.DestructiveAction
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.components.SectionCard
@@ -340,10 +341,17 @@ private fun RecipeDetailSheet(
                     Text(stringResource(R.string.recipes_edit))
                 }
                 Spacer(Modifier.weight(1f))
-                // 破坏性动作：用 error 色与「编辑」拉开距离，避免并排时误触
-                TextButton(onClick = onDelete, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
-                }
+                // 破坏性动作：用 error 色与「编辑」拉开距离，避免并排时误触。
+                // v1.0.80（批次 6）：补上**二次确认**——此前这一下直接删库，
+                // 而食谱详情是半屏 sheet，误触概率并不低（与全仓其它删除入口的口径也不一致）。
+                DestructiveAction(
+                    label = stringResource(R.string.common_delete),
+                    confirmTitle = stringResource(R.string.recipes_delete_confirm, recipe.title),
+                    confirmBody = stringResource(R.string.recipes_delete_note) + "\n" +
+                        stringResource(R.string.common_delete_irreversible),
+                    onConfirm = onDelete,
+                    modifier = Modifier.heightIn(min = Size.touchMin),
+                )
             }
         }
     }

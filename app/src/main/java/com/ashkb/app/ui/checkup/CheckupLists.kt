@@ -1,6 +1,7 @@
 package com.ashkb.app.ui.checkup
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +18,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 
@@ -40,6 +42,7 @@ import com.ashkb.app.ui.theme.StatusTone
  *                   由调用方从 VM 采集后传入，文案在本列表内用 stringResource 组装
  *                   （VM 无 Context，不负责取词）。
  * @param onSeed     触发种入结核 / 乙肝 / 丙肝筛查 + 生物制剂续方节点。
+ * @param onEdit     v1.0.80（批次 6）修改复诊项目（周期 / 类型 / 备注）——此前只能新建，写错了只能停用重建。
  */
 @Composable
 internal fun CheckupItemsList(
@@ -48,6 +51,7 @@ internal fun CheckupItemsList(
     onDeactivate: (String) -> Unit,
     seedResult: Int?,
     onSeed: () -> Unit,
+    onEdit: (CheckupItem) -> Unit,
 ) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
@@ -78,6 +82,12 @@ internal fun CheckupItemsList(
                         else append(stringResource(R.string.med_prn_suffix))
                     },
                     action = {
+                        // 改（编辑）与删（停用）并排：复诊项目没有物理删除入口，
+                        // 「停用」即它的生命周期终点（历史记录靠 item_name 快照自持，见 README 口径）
+                        TextButton(
+                            onClick = { onEdit(item) },
+                            modifier = Modifier.heightIn(min = Size.touchMin),
+                        ) { Text(stringResource(R.string.common_edit)) }
                         DestructiveAction(
                             label = stringResource(R.string.med_deactivate),
                             confirmTitle = stringResource(R.string.checkup_deactivate_title),
@@ -128,6 +138,8 @@ internal fun CheckupItemsList(
 /**
  * @param onAttach   打开某条记录的附件归档 sheet（附件入口在卡片正文里，与右上角动作槽区分开）
  * @param onOpenAllAttachments 打开全部附件总览：未归属复诊的附件（从化验/影像侧导入）只在这里可见
+ * @param onEdit     v1.0.80（批次 6）修改该条复诊记录（回填原值、沿用主键）
+ * @param onDelete   v1.0.80（批次 6）删除该条复诊记录——走**级联确认框**（列明将一并删除的化验 / 影像 / 附件条数）
  * @param prepHeader 列表顶部插槽（复诊准备清单）。做成插槽而非固定内容：
  *                   卡片需要 items/records/today 三路数据，由调用方组装，本列表不必知道 C4。
  */
@@ -138,6 +150,8 @@ internal fun CheckupRecordsList(
     onViewLab: (CheckupRecord) -> Unit,
     onAttach: (CheckupRecord) -> Unit,
     onOpenAllAttachments: () -> Unit,
+    onEdit: (CheckupRecord) -> Unit,
+    onDelete: (CheckupRecord) -> Unit,
     prepHeader: (@Composable () -> Unit)? = null,
 ) {
     LazyColumn(
@@ -173,42 +187,7 @@ internal fun CheckupRecordsList(
             }
         } else {
             items(records, key = { it.id }) { rec ->
-                SectionCard(
-                    title = rec.date,
-                    subtitle = CheckupType.fromKey(rec.checkType).label,
-                    action = if (rec.checkType == "LAB") {
-                        {
-                            TextButton(onClick = { onViewLab(rec) }) { Text(stringResource(R.string.lab_detail_title)) }
-                        }
-                    } else {
-                        null
-                    },
-                ) {
-                    Text(rec.itemName, style = MaterialTheme.typography.bodyMedium)
-                    rec.hospital?.let {
-                        Text(
-                            stringResource(R.string.checkup_hospital_line, it),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    rec.conclusion?.let {
-                        Text(stringResource(R.string.checkup_conclusion_line, it), style = MaterialTheme.typography.bodySmall)
-                    }
-                    rec.nextDate?.let {
-                        Text(
-                            stringResource(R.string.checkup_next_visit_line, it),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    // 附件入口放正文末尾：化验记录右上角已被"化验详情"占用，
-                    // 两条操作挤在动作槽里在窄屏会互相截断
-                    TextButton(
-                        onClick = { onAttach(rec) },
-                        modifier = Modifier.heightIn(min = Size.touchMin),
-                    ) { Text(stringResource(R.string.attach_title)) }
-                }
+                CheckupRecordCard(rec = rec, onViewLab = onViewLab, onAttach = onAttach, onEdit = onEdit, onDelete = onDelete)
             }
             item {
                 OutlinedButton(
@@ -221,9 +200,78 @@ internal fun CheckupRecordsList(
     }
 }
 
-// ===== 疫苗列表 =====
+/**
+ * 单条复诊记录卡片（从 [CheckupRecordsList] 抽出来：列表函数要控制长度，
+ * 而这张卡片承载了三件事——右上角的「化验详情」动作槽、正文里的编辑 / 附件 / 删除）。
+ *
+ * 删除刻意放在最右且用 error 色：与「编辑 / 附件」拉开距离，避免并排时误触
+ * （这是不可逆的级联删除）。
+ */
 @Composable
-internal fun VaccineList(vaccines: List<VaccineRecord>, onAdd: () -> Unit) {
+private fun CheckupRecordCard(
+    rec: CheckupRecord,
+    onViewLab: (CheckupRecord) -> Unit,
+    onAttach: (CheckupRecord) -> Unit,
+    onEdit: (CheckupRecord) -> Unit,
+    onDelete: (CheckupRecord) -> Unit,
+) {
+    SectionCard(
+        title = rec.date,
+        subtitle = CheckupType.fromKey(rec.checkType).label,
+        action = if (rec.checkType == "LAB") {
+            {
+                TextButton(onClick = { onViewLab(rec) }) { Text(stringResource(R.string.lab_detail_title)) }
+            }
+        } else {
+            null
+        },
+    ) {
+        Text(rec.itemName, style = MaterialTheme.typography.bodyMedium)
+        rec.hospital?.let {
+            Text(
+                stringResource(R.string.checkup_hospital_line, it),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        rec.conclusion?.let {
+            Text(stringResource(R.string.checkup_conclusion_line, it), style = MaterialTheme.typography.bodySmall)
+        }
+        rec.nextDate?.let {
+            Text(
+                stringResource(R.string.checkup_next_visit_line, it),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        // 附件入口放正文末尾：化验记录右上角已被"化验详情"占用，
+        // 多条操作挤在动作槽里在窄屏会互相截断
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            TextButton(
+                onClick = { onEdit(rec) },
+                modifier = Modifier.heightIn(min = Size.touchMin),
+            ) { Text(stringResource(R.string.common_edit)) }
+            TextButton(
+                onClick = { onAttach(rec) },
+                modifier = Modifier.heightIn(min = Size.touchMin),
+            ) { Text(stringResource(R.string.attach_title)) }
+            TextButton(
+                onClick = { onDelete(rec) },
+                modifier = Modifier.heightIn(min = Size.touchMin),
+            ) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
+        }
+    }
+}
+
+// ===== 疫苗列表 =====
+/**
+ * @param onEdit v1.0.80（批次 6）修改该条疫苗记录——表单内可删除（含派生安全警报的重算）
+ */
+@Composable
+internal fun VaccineList(vaccines: List<VaccineRecord>, onAdd: () -> Unit, onEdit: (VaccineRecord) -> Unit) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -270,6 +318,10 @@ internal fun VaccineList(vaccines: List<VaccineRecord>, onAdd: () -> Unit) {
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
+                    TextButton(
+                        onClick = { onEdit(vac) },
+                        modifier = Modifier.heightIn(min = Size.touchMin),
+                    ) { Text(stringResource(R.string.common_edit)) }
                 }
             }
             item {

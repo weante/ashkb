@@ -44,6 +44,14 @@ class AttachmentRepository(private val context: Context) {
 
     suspend fun byId(id: String): CheckupAttachment? = dao.byId(id)
 
+    /**
+     * v1.0.80（批次 6）：某条复诊记录名下的**可见**附件（整行，不只是条数）。
+     *
+     * 级联删除必须拿到整行：磁盘文件名只在行里（`file_name`），SQL 删完行就再也找不到那个文件了。
+     */
+    suspend fun listByCheckup(checkupId: String): List<CheckupAttachment> =
+        withContext(Dispatchers.IO) { dao.listByCheckup(checkupId) }
+
     /** 附件目录（懒创建）。 */
     private fun dir(): File = File(context.filesDir, DIR).apply { if (!exists()) mkdirs() }
 

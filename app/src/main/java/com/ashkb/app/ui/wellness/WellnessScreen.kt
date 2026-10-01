@@ -244,6 +244,14 @@ fun WellnessScreen(vm: WellnessViewModel, onOpenRecipes: () -> Unit, onBack: () 
                             }
                             if (sup.id in doneIds) {
                                 StatusChip(text = stringResource(R.string.med_status_taken_short), tone = StatusTone.Success, icon = Icons.Rounded.CheckCircle)
+                                // v1.0.80（批次 6）：撤销误点的打卡——此前点错了就再也回不到「今天还没吃」，
+                                // 「已服用」胶囊会一直挂着（而它与补剂本身的删除入口长得一样危险）
+                                DestructiveAction(
+                                    label = stringResource(R.string.nutrition_supplement_undo),
+                                    confirmTitle = stringResource(R.string.nutrition_supplement_undo_confirm, sup.name),
+                                    confirmBody = stringResource(R.string.nutrition_supplement_undo_note),
+                                    onConfirm = { vm.undoSupplementCheckIn(sup) },
+                                )
                             } else {
                                 TextButton(onClick = {
                                     vm.checkInSupplement(sup, "done", null, null)
@@ -898,15 +906,23 @@ private fun DietSheet(vm: WellnessViewModel, current: DietProfile?, onDismiss: (
 private fun AvoidManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
     val items by vm.foodAvoidItems.collectAsStateWithLifecycle()
     var adding by remember { mutableStateOf(false) }
+    // v1.0.80（批次 6）：编辑目标（非空时列表切到表单并回填原值）
+    var editing by remember { mutableStateOf<FoodAvoidItem?>(null) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        if (adding) {
+        val target = editing
+        if (adding || target != null) {
             AvoidAddStep(
+                current = target,
                 onSave = { item ->
                     vm.saveFoodAvoid(item)
                     adding = false
+                    editing = null
                 },
-                onBack = { adding = false },
+                onBack = {
+                    adding = false
+                    editing = null
+                },
             )
         } else {
             SheetColumn {
@@ -935,6 +951,11 @@ private fun AvoidManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                        // v1.0.80（批次 6）：改（回填原值）与删并排——忌口条目记错分类是常事
+                        TextButton(
+                            onClick = { editing = item },
+                            modifier = Modifier.heightIn(min = Size.touchMin),
+                        ) { Text(stringResource(R.string.common_edit)) }
                         DestructiveAction(
                             label = stringResource(R.string.common_delete),
                             confirmTitle = stringResource(R.string.wellness_delete_confirm, item.name),
@@ -952,14 +973,23 @@ private fun AvoidManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
     }
 }
 
+/**
+ * 忌口条目表单（新增 / **编辑**共用）。
+ *
+ * v1.0.80（批次 6）：[current] 非空 = 编辑——回填原值并沿用主键，
+ * 否则「改个分类」会变成「多一条同名忌口」。
+ */
 @Composable
-private fun AvoidAddStep(onSave: (FoodAvoidItem) -> Unit, onBack: () -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("allergy") }
-    var severity by remember { mutableStateOf("medium") }
+private fun AvoidAddStep(current: FoodAvoidItem? = null, onSave: (FoodAvoidItem) -> Unit, onBack: () -> Unit) {
+    var name by remember(current?.id) { mutableStateOf(current?.name ?: "") }
+    var category by remember(current?.id) { mutableStateOf(current?.category ?: "allergy") }
+    var severity by remember(current?.id) { mutableStateOf(current?.severity ?: "medium") }
 
     SheetColumn {
-        Text(stringResource(R.string.nutrition_add_avoid_item), style = MaterialTheme.typography.titleLarge)
+        Text(
+            stringResource(if (current == null) R.string.nutrition_add_avoid_item else R.string.common_edit),
+            style = MaterialTheme.typography.titleLarge,
+        )
         OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.nutrition_food_name)) }, singleLine = true)
         Text(stringResource(R.string.common_category), style = MaterialTheme.typography.labelMedium)
         ChipGroup(
@@ -977,15 +1007,15 @@ private fun AvoidAddStep(onSave: (FoodAvoidItem) -> Unit, onBack: () -> Unit) {
             onSelect = { severity = it },
         )
         SheetSaveButton(
-            text = stringResource(R.string.common_add),
+            text = stringResource(if (current == null) R.string.common_add else R.string.common_save),
             enabled = name.isNotBlank(),
             onClick = {
                 if (name.isNotBlank()) {
                     onSave(
                         FoodAvoidItem(
-                            id = "", name = name.trim(), category = category,
-                            severity = severity, notes = null,
-                            createdAt = nowIso(), updatedAt = nowIso(),
+                            id = current?.id ?: "", name = name.trim(), category = category,
+                            severity = severity, notes = current?.notes,
+                            createdAt = current?.createdAt ?: nowIso(), updatedAt = nowIso(),
                         )
                     )
                 }

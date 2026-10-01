@@ -59,7 +59,23 @@ class MedicationRepository(private val context: Context) {
 
     // ---- 药单 ----
     fun observeMedications(): Flow<List<Medication>> = medDao.observeActive()
-    suspend fun saveMedication(med: Medication) = medDao.upsert(med.copy(updatedAt = nowIso()))
+
+    /**
+     * v1.0.80（批次 6）：保存药品（新增 / **编辑**）。
+     *
+     * 编辑时**先清掉今天起的计划槽位快照**，再交给调用方的重排流程重新物化：
+     * `planned_slots` 是 `INSERT OR IGNORE` 幂等写入的，滚动窗口（今天-1 .. 今天+7）里的行
+     * **早就写好了**——把 08:00 改成 20:00 之后，那些行仍是 08:00，于是「提醒在 20:00 响、
+     * 完成度却拿 08:00 算」，用户会看到一剂自己从没被告知过的漏服（幽灵计划）。
+     *
+     * 只删**今天起**的行：停药用的是同一个 DAO 方法（[PlannedSlotDao.deleteOfMedFrom]），
+     * 口径一致——历史不该被今天的编辑改写，今天的计划必须跟着新用法走。
+     */
+    suspend fun saveMedication(med: Medication) = db.withTransaction {
+        medDao.upsert(med.copy(updatedAt = nowIso()))
+        slotDao.deleteOfMedFrom(med.id, LocalDate.now().toString())
+    }
+
     suspend fun medicationById(id: String): Medication? = medDao.byId(id)
 
     /** R17 停药：归档 + medication_changes 登记（裁决 A 快照，self_stopped 供警示联动） */
@@ -341,9 +357,9 @@ class MedicationRepository(private val context: Context) {
      * 昨天会被凭空算出一剂未记录（`PendingDoses` 的 startDate 判定同款理由，假阳性回归锁见
      * `PendingDosesTest`）。日期解析不出来时按「不过滤」处理（宁可多记一剂，也不静默藏掉计划）。
      *
-     * ⚠️ 快照是**当时计划**的留痕：同一药事后改了时刻 / 剂量，已写入的行不会跟着变
-     * （历史窗口因此不会随编辑操作漂移）。若某天本不该有计划而表里已有行，请用
-     * `PlannedSlotDao.deleteOfMedFrom` 清掉，而不是改写既有行。
+     * ⚠️ 快照是**当时计划**的留痕：同一药事后改了时刻 / 剂量，已写入的历史行不会跟着变。
+     * v1.0.80（批次 6）起，「今天起」的行由 [saveMedication] 主动清掉后按新定义重物化——
+     * 改完时刻若还留着旧行，提醒与完成度就会按两个不同的时刻各算一套（见那里的注释）。
      */
     suspend fun materializePlannedSlots(meds: List<Medication>, from: LocalDate, to: LocalDate) {
         if (meds.isEmpty()) return
@@ -357,29 +373,58 @@ class MedicationRepository(private val context: Context) {
         var date = from
         while (!date.isAfter(to)) {
             for (med in meds) {
-                val started = runCatching { LocalDate.parse(med.startDate) }.getOrNull()
-                if (started != null && date.isBefore(started)) continue
-                for (slot in ScheduleCalc.slotsFor(med, date)) {
-                    // 时刻为空的槽位不物化：没有时刻就算不出「是否已到点」，也无法用于判定漏服
-                    val time = slot.time ?: continue
-                    rows.add(
-                        PlannedSlot(
-                            id = freshSlotId(usedIds),
-                            date = date.toString(),
-                            medId = med.id,
-                            medKey = med.nameKey,
-                            medName = med.name,
-                            slotKey = slot.key,
-                            slotTime = time,
-                            doseSnapshot = med.dose,
-                            createdAt = createdAt,
-                        )
-                    )
-                }
+                rows.addAll(slotRowsFor(med, date, usedIds, createdAt))
             }
             date = date.plusDays(1)
         }
         if (rows.isNotEmpty()) slotDao.insertAll(rows)
+    }
+
+    /**
+     * 某药在某一天的应物化槽位行（空列表 = 这一天不该有计划）。
+     *
+     * 抽成独立函数有两个理由：① 物化主循环里的 `continue` 一多（startDate / updatedAt / 空时刻三处）
+     * 就触发 detekt 的 `LoopWithTooManyJumpStatements`；② 「这一天该不该有计划」本身是一条业务规则，
+     * 值得单独读、单独改。
+     */
+    private fun slotRowsFor(
+        med: Medication,
+        date: LocalDate,
+        usedIds: MutableSet<String>,
+        createdAt: String,
+    ): List<PlannedSlot> {
+        // **只物化未开始的药**：`startDate` 晚于某天的药在该日没有计划——否则今天新建一支药，
+        // 昨天会被凭空算出一剂未记录（`PendingDoses` 的 startDate 判定同款理由，
+        // 假阳性回归锁见 `PendingDosesTest`）。日期解析不出来时按「不过滤」处理。
+        val started = runCatching { LocalDate.parse(med.startDate) }.getOrNull()
+        if (started != null && date.isBefore(started)) return emptyList()
+        // v1.0.80（批次 6）：**不物化「药档最后一次修改」之前的日期**。
+        //
+        // 为什么必须有这一条：窗口的回看端是「昨天」，而改过服药时刻之后，昨天会被按**新**定义
+        // 补出一行——`INSERT OR IGNORE` 只挡同键，挡不住 08:00 → 20:00 这种换键。
+        // 于是昨天凭空多出一剂「20:00 的计划」，当晚的完成度把它算成未记录，
+        // 今早还会收到「昨天还有 1 剂未记录」的补发通知：用户从没被告知过那一剂。
+        //
+        // 代价：若某台设备昨天没开过应用、当天又改了药档，昨天那一剂不会补进计划
+        // （补发通知少算一剂）。宁可少催一次，也不要凭空多出一剂——误报会直接摧毁
+        // 用户对「漏服提醒」的信任。药档没改过的药不受影响（updatedAt 仍是创建/上次修改日）。
+        val editedOn = runCatching { LocalDate.parse(med.updatedAt.take(10)) }.getOrNull()
+        if (editedOn != null && date.isBefore(editedOn)) return emptyList()
+        // 时刻为空的槽位不物化：没有时刻就算不出「是否已到点」，也无法用于判定漏服
+        return ScheduleCalc.slotsFor(med, date).mapNotNull { slot ->
+            val time = slot.time ?: return@mapNotNull null
+            PlannedSlot(
+                id = freshSlotId(usedIds),
+                date = date.toString(),
+                medId = med.id,
+                medKey = med.nameKey,
+                medName = med.name,
+                slotKey = slot.key,
+                slotTime = time,
+                doseSnapshot = med.dose,
+                createdAt = createdAt,
+            )
+        }
     }
 
     /**

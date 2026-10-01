@@ -31,7 +31,20 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
 
     fun saveProfile(p: Profile) = viewModelScope.launch { repo.saveProfile(p) }
 
+    /**
+     * 保存药品（新增 / 编辑）并重排提醒。
+     *
+     * v1.0.80（批次 6）：**先按改动前的药单取消一次**再保存。
+     *
+     * 为什么非有这一步不可：闹钟的 request code 由「槽位（medId + slotKey + 槽位日期）+ 级数」派生，
+     * 而槽位键就是服药时刻（`08:00` / `20:00`）。把时刻从 08:00 改成 20:00 之后，
+     * 再用**新**药单去 `cancelAllFuture` 只能算出 20:00 那套码——**08:00 的旧闹钟谁也没取消**，
+     * 它会继续在每天早上 8 点响，而那条药已经改成晚上了（幽灵提醒，且用户完全无从解释）。
+     * 与 `stopMedication` 同款做法（那里也是先单独取消该药全部闹钟再重排）。
+     */
     fun saveMedication(context: android.content.Context, med: Medication) = viewModelScope.launch {
+        val before = repo.medicationById(med.id)
+        if (before != null) ReminderScheduler.cancelAllFuture(context, listOf(before))
         repo.saveMedication(med)
         rescheduleReminders(context)
     }

@@ -264,6 +264,16 @@ interface SymptomDailyDao {
 
     @Upsert
     suspend fun upsert(log: SymptomDaily)
+
+    /**
+     * v1.0.80（批次 6）：删除某天的症状记录（误录）。
+     *
+     * 按 **id** 删而不是按 date：`date` 上有唯一索引，按 id 删把「哪天」这件事交给调用方，
+     * DAO 不承担日期解析（仓库层已经从行里拿到 id 了）。
+     * 它派生出来的红旗警报（发热 / 眼 / 神经）由仓库层一并清理，见 `HealthRepository.deleteSymptom`。
+     */
+    @Query("DELETE FROM symptom_daily WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao
@@ -287,6 +297,19 @@ interface BasdaiDao {
     /** 同日仅保留一条（覆盖语义下清理历史遗留的重复行） */
     @Query("DELETE FROM basdai_records WHERE date = :date AND id != :keepId")
     suspend fun deleteOtherRowsForDate(date: String, keepId: String)
+
+    /** v1.0.80（批次 6）：按主键取一条（编辑 / 删除前取原值）。 */
+    @Query("SELECT * FROM basdai_records WHERE id = :id")
+    suspend fun byId(id: String): BasdaiRecord?
+
+    /**
+     * v1.0.80（批次 6）：删除一条自评记录（误录）。
+     *
+     * 按 id 删是**必须**的：`deleteOtherRowsForDate` 是「同日只留一条」的覆盖语义，
+     * 拿它当删除入口会把同日的其它行也抹掉——而自评记录的价值恰恰在于逐条留痕。
+     */
+    @Query("DELETE FROM basdai_records WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao
@@ -309,6 +332,23 @@ interface FlareDao {
 
     @Upsert
     suspend fun upsert(event: FlareEvent)
+
+    /** v1.0.80（批次 6）：按主键取一条（编辑预填 / 删除前取原窗口算派生警报）。 */
+    @Query("SELECT * FROM flare_events WHERE id = :id")
+    suspend fun byId(id: String): FlareEvent?
+
+    /** v1.0.80（批次 6）：全部发作记录——删除 / 编辑后重算「第 7 天」警报时，要看**其余**发作的窗口。 */
+    @Query("SELECT * FROM flare_events ORDER BY start_date DESC")
+    suspend fun listAll(): List<FlareEvent>
+
+    /**
+     * v1.0.80（批次 6）：删除一次发作登记（误录）。
+     *
+     * 它派生出来的 `flare_day7` 警报由仓库层按窗口重算后清理——那个警报的 refDate 是**报警当日**
+     * （不是发作开始日），是否属于这次发作只能靠窗口判定，故不放在这里做。
+     */
+    @Query("DELETE FROM flare_events WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao
@@ -332,6 +372,15 @@ interface ExerciseLogDao {
     /** P4 M9：区间运动打卡（依从统计） */
     @Query("SELECT * FROM exercise_logs WHERE date BETWEEN :from AND :to ORDER BY date")
     suspend fun between(from: String, to: String): List<ExerciseLog>
+
+    /**
+     * v1.0.80（批次 6）：删除一条运动打卡（误录）。
+     *
+     * ⚠️ 打卡会**改变运动提醒的排程**（「今天已打卡」时今日升级重查不再重建，见 ExerciseViewModel），
+     * 故调用方删完必须重排提醒——仓库侧做不到（提醒层依赖 AlarmManager，不是数据层的事）。
+     */
+    @Query("DELETE FROM exercise_logs WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao
@@ -347,6 +396,22 @@ interface AlertDao {
 
     @Query("SELECT COUNT(*) FROM alerts WHERE alert_type = :type AND ref_date = :refDate")
     suspend fun countByRef(type: String, refDate: String): Int
+
+    /**
+     * v1.0.80（批次 6）：清掉某条记录**派生**出来的警报（删除记录时的「不留幽灵」）。
+     *
+     * 只删 `ack_at IS NULL` 的：用户已经点过「知道了」的警报是「他确实看过这条提醒」的留痕，
+     * 不在未读列表里出现，也就不构成幽灵；把它删掉反而是销毁用户已确认过的信息。
+     */
+    @Query("DELETE FROM alerts WHERE alert_type = :type AND ref_date = :refDate AND ack_at IS NULL")
+    suspend fun deleteUnackedByRef(type: String, refDate: String)
+
+    /**
+     * v1.0.80（批次 6）：按类型取全部**未确认**警报——发作第 7 天警报的 refDate 是报警当日，
+     * 要判断它是否由某次发作派生，只能拿它与各次发作的日期窗口比对（见 `DerivedAlerts`）。
+     */
+    @Query("SELECT * FROM alerts WHERE alert_type = :type AND ack_at IS NULL")
+    suspend fun listUnackedByType(type: String): List<Alert>
 }
 
 // ===========================================================================
@@ -397,6 +462,15 @@ interface SupplementLogDao {
     /** C2（v1.0.37）：补剂依从统计——按状态计数（与 medication_logs 同口径）。 */
     @Query("SELECT COUNT(*) FROM supplement_logs WHERE date BETWEEN :from AND :to AND status = :status")
     suspend fun countBetweenStatus(from: String, to: String, status: String): Int
+
+    /**
+     * v1.0.80（批次 6）：撤销一次补剂打卡（误点）。
+     *
+     * 删掉行 = 回到「今天还没服用」的**未记录**态——这正是误点后想要的结果；
+     * 改成 `skipped` 是另一回事（那是在声称「我今天决定不吃」，用户并没有这个意思）。
+     */
+    @Query("DELETE FROM supplement_logs WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao
@@ -455,6 +529,16 @@ interface BodyMeasureDao {
 
     @Query("SELECT * FROM body_measures ORDER BY date DESC LIMIT :limit")
     fun observeRecent(limit: Int = 10): Flow<List<BodyMeasure>>
+
+    /**
+     * v1.0.80（批次 6）：某日的身体围度记录。
+     *
+     * 为「改」而加：此前 `saveBodyMeasure` 对空白 id 一律新建行，于是**同一天改一次就多一行**，
+     * 「最近记录」列表里堆着一串同一天的重复值，用户只能靠删除键一条条清。体征 / 体重早就是
+     * 「同日覆盖」语义（见 `saveVitals` / `saveWeight`），围度没有理由不一样。
+     */
+    @Query("SELECT * FROM body_measures WHERE date = :date ORDER BY recorded_at DESC LIMIT 1")
+    suspend fun byDate(date: String): BodyMeasure?
 
     /** U4 误录删除 */
     @Query("DELETE FROM body_measures WHERE id = :id")
@@ -530,6 +614,19 @@ interface CheckupRecordDao {
     /** v1.0.59 B5：列出全部复诊记录（CheckupReminderScheduler.rescheduleAll / Receiver 验真用）。 */
     @Query("SELECT * FROM checkup_records ORDER BY date DESC")
     suspend fun listAll(): List<CheckupRecord>
+
+    /** v1.0.80（批次 6）：按主键取一条（编辑预填 / 删除前确认存在）。 */
+    @Query("SELECT * FROM checkup_records WHERE id = :id")
+    suspend fun byId(id: String): CheckupRecord?
+
+    /**
+     * v1.0.80（批次 6）：删除一条复诊记录。
+     *
+     * ⚠️ 只删记录本身——它名下的化验 / 影像 / 附件由 `HealthRepository.deleteCheckupRecord`
+     * **在一个事务里级联处理**。任何绕过仓库直接调本方法的写法都会留下孤儿行。
+     */
+    @Query("DELETE FROM checkup_records WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao
@@ -564,6 +661,21 @@ interface LabResultDao {
 
     @Upsert
     suspend fun upsert(result: LabResult)
+
+    /**
+     * v1.0.80（批次 6）：某条复诊记录名下的化验条数——级联删除的确认框要**如实报数**
+     * （用户看不见「这次就诊挂了多少项化验」，不报就是在让他盲删一份化验单）。
+     */
+    @Query("SELECT COUNT(*) FROM lab_results WHERE checkup_id = :checkupId")
+    suspend fun countByCheckup(checkupId: String): Int
+
+    /** v1.0.80（批次 6）：随复诊记录一并级联删除其名下化验（避免 checkup_id 指向已删记录的孤儿行）。 */
+    @Query("DELETE FROM lab_results WHERE checkup_id = :checkupId")
+    suspend fun deleteByCheckup(checkupId: String)
+
+    /** v1.0.80（批次 6）：单条化验删除（误录 / 重复导入）。化验的 `abnormal` 是自身字段，无派生数据。 */
+    @Query("DELETE FROM lab_results WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao
@@ -581,6 +693,18 @@ interface ImagingDao {
 
     @Upsert
     suspend fun upsert(record: ImagingRecord)
+
+    /** v1.0.80（批次 6）：某条复诊记录名下的影像条数（级联删除确认框报数用）。 */
+    @Query("SELECT COUNT(*) FROM imaging_records WHERE checkup_id = :checkupId")
+    suspend fun countByCheckup(checkupId: String): Int
+
+    /** v1.0.80（批次 6）：随复诊记录一并级联删除其名下影像。 */
+    @Query("DELETE FROM imaging_records WHERE checkup_id = :checkupId")
+    suspend fun deleteByCheckup(checkupId: String)
+
+    /** v1.0.80（批次 6）：单条影像删除。附件按复诊记录归属（不挂影像 id），故此处无级联。 */
+    @Query("DELETE FROM imaging_records WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao
@@ -593,6 +717,23 @@ interface VaccineRecordDao {
 
     @Upsert
     suspend fun upsert(record: VaccineRecord)
+
+    @Query("SELECT * FROM vaccine_records WHERE id = :id")
+    suspend fun byId(id: String): VaccineRecord?
+
+    /**
+     * v1.0.80（批次 6）：某一天的全部接种记录。
+     *
+     * 用于**重算活疫苗安全警报**：警报按 `(type, ref_date=接种日)` 去重（见 HealthRepository），
+     * 同一天可能记了多针，删掉 / 改掉其中一针时不能想当然地把警报一起删——必须看当天**其余**
+     * 记录是否仍然成立。
+     */
+    @Query("SELECT * FROM vaccine_records WHERE date = :date")
+    suspend fun byDate(date: String): List<VaccineRecord>
+
+    /** v1.0.80（批次 6）：单条疫苗记录删除（误录）。派生警报由仓库层重算，不在这里处理。 */
+    @Query("DELETE FROM vaccine_records WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao
@@ -608,6 +749,13 @@ interface EmergencyEventDao {
 
     @Upsert
     suspend fun upsert(event: EmergencyEvent)
+
+    @Query("SELECT * FROM emergency_events WHERE id = :id")
+    suspend fun byId(id: String): EmergencyEvent?
+
+    /** v1.0.80（批次 6）：删除一条紧急事件记录（误录）。无派生数据——它不产生任何警报或提醒。 */
+    @Query("DELETE FROM emergency_events WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao
@@ -657,6 +805,16 @@ interface CheckupAttachmentDao {
 
     @Query("SELECT * FROM checkup_attachments WHERE deleted_at IS NULL ORDER BY created_at DESC")
     suspend fun listAll(): List<CheckupAttachment>
+
+    /**
+     * v1.0.80（批次 6）：某条复诊记录名下的可见附件。
+     *
+     * 级联删除时**必须先拿到整行**（不只是条数）：删除要把磁盘文件一起清掉，
+     * 而文件名只在这一行里（`file_name`），先 SQL 删行就再也找不到那个文件了。
+     * 墓碑行（`deleted_at` 非空）不在其中：它们对用户不可见，且远端清理流程还在用。
+     */
+    @Query("SELECT * FROM checkup_attachments WHERE checkup_id = :checkupId AND deleted_at IS NULL ORDER BY created_at DESC")
+    suspend fun listByCheckup(checkupId: String): List<CheckupAttachment>
 
     @Query("SELECT * FROM checkup_attachments WHERE id = :id")
     suspend fun byId(id: String): CheckupAttachment?

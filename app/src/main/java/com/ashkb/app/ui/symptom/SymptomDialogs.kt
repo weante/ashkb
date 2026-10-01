@@ -6,12 +6,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -29,9 +32,17 @@ import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.BasdaiRecord
 import com.ashkb.app.data.entity.FlareAction
+import com.ashkb.app.data.entity.FlareEvent
 import com.ashkb.app.data.entity.FlareTrigger
+import com.ashkb.app.ui.checkup.SheetColumn
+import com.ashkb.app.ui.checkup.SheetSaveButton
+import com.ashkb.app.ui.components.DateFieldRules
+import com.ashkb.app.ui.components.DateTextField
+import com.ashkb.app.ui.components.DestructiveAction
+import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import java.time.LocalDate
+import org.json.JSONArray
 
 // ---------------------------------------------------------------------------
 // 弹窗：发作开始 / 缓解 / BASDAI 自评
@@ -83,6 +94,136 @@ internal fun FlareStartDialog(
         confirmButton = { TextButton(onClick = { onConfirm(trigger, actions.toList(), peak, note.ifBlank { null }) }) { Text(stringResource(R.string.emergency_record_action)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
     )
+}
+
+/**
+ * v1.0.80（批次 6）：**修改**一次发作登记（ModalBottomSheet，与全仓表单约定一致）。
+ *
+ * 可改：开始日期 / 结束日期 / 诱因 / 已采取的措施 / 峰值疼痛 / 备注。
+ *
+ * **不可改 `status`**（活跃 ⇄ 已缓解）：那条迁移由「登记发作 / 标记缓解」两个动作负责，
+ * 编辑表单再开一个入口，就可能出现两条 `status='active'` 的记录——
+ * 而症状页的发作卡只取最近一条，多出来的那条会永远看不见（幽灵活跃发作）。
+ *
+ * 改开始 / 结束日期会**重算派生警报**：「已第 7 天」警报按发作窗口判定归属，
+ * 窗口一挪，旧窗口里那条就不再成立（见 `HealthRepository.saveFlare`）。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun FlareEditSheet(
+    existing: FlareEvent,
+    onSave: (FlareEvent) -> Unit,
+    onDelete: (FlareEvent) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var startDate by remember(existing.id) { mutableStateOf(existing.startDate) }
+    var endDate by remember(existing.id) { mutableStateOf(existing.endDate ?: "") }
+    var trigger by remember(existing.id) { mutableStateOf(FlareTrigger.fromKey(existing.trigger)) }
+    var actions by remember(existing.id) { mutableStateOf(parseActions(existing.actionsTaken)) }
+    var peak by remember(existing.id) { mutableStateOf(existing.severityPeak) }
+    var note by remember(existing.id) { mutableStateOf(existing.notes ?: "") }
+
+    val startOk = DateFieldRules.requiredOk(startDate)
+    val endOk = DateFieldRules.optionalOk(endDate)
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        SheetColumn {
+            Text(stringResource(R.string.flare_edit_title), style = MaterialTheme.typography.titleLarge)
+            DateTextField(
+                value = startDate, onValueChange = { startDate = it },
+                label = stringResource(R.string.flare_start_date_field),
+            )
+            DateTextField(
+                value = endDate, onValueChange = { endDate = it },
+                label = stringResource(R.string.flare_end_date_field), required = false,
+            )
+            Text(stringResource(R.string.symptom_trigger), style = MaterialTheme.typography.labelLarge)
+            FlareTriggerPicker(selected = trigger, onSelect = { trigger = it })
+            Text(stringResource(R.string.emergency_actions_multi), style = MaterialTheme.typography.labelLarge)
+            FlareActionPicker(selected = actions, onToggle = { a, checked ->
+                actions = if (checked) actions + a else actions - a
+            })
+            ScoreRow(stringResource(R.string.symptom_peak_pain), peak) { peak = it }
+            OutlinedTextField(
+                value = note, onValueChange = { note = it },
+                label = { Text(stringResource(R.string.common_notes_optional)) }, modifier = Modifier.fillMaxWidth(),
+            )
+            SheetSaveButton(
+                text = stringResource(R.string.common_save),
+                enabled = startOk && endOk,
+                onClick = {
+                    val start = DateFieldRules.toIsoOrNull(startDate) ?: return@SheetSaveButton
+                    onSave(
+                        existing.copy(
+                            startDate = start,
+                            endDate = DateFieldRules.toIsoOrNull(endDate),
+                            // 结束日期填了却仍是 active 会让「已第几天」一直涨：填了结束日就一并落成 resolved
+                            status = if (endDate.isBlank()) existing.status else "resolved",
+                            trigger = trigger.name,
+                            actionsTaken = JSONArray(actions.map { it.name }).toString(),
+                            severityPeak = peak,
+                            notes = note.ifBlank { null },
+                        )
+                    )
+                    onDismiss()
+                },
+            )
+            DestructiveAction(
+                label = stringResource(R.string.common_delete),
+                confirmTitle = stringResource(R.string.flare_delete_confirm, existing.startDate),
+                confirmBody = stringResource(R.string.flare_delete_note) + "\n" +
+                    stringResource(R.string.common_delete_irreversible),
+                onConfirm = {
+                    onDelete(existing)
+                    onDismiss()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** 诱因单选（从 [FlareEditSheet] 抽出：表单本身要控制长度，这一组是独立可读的一件事）。 */
+@Composable
+private fun FlareTriggerPicker(selected: FlareTrigger, onSelect: (FlareTrigger) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+        FlareTrigger.entries.forEach { t ->
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = selected == t, onClick = { onSelect(t) })
+                Text(t.label, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+/** 已采取措施多选（同上，抽出理由一致）。 */
+@Composable
+private fun FlareActionPicker(selected: Set<FlareAction>, onToggle: (FlareAction, Boolean) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+        FlareAction.entries.forEach { a ->
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = a in selected, onCheckedChange = { checked -> onToggle(a, checked) })
+                Text(a.label, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+/** `actions_taken` 的 JSON 数组 → 枚举集合；脏值（非 JSON / 未知名）一律忽略，不抛异常。 */
+private fun parseActions(json: String?): Set<FlareAction> {
+    if (json.isNullOrBlank()) return emptySet()
+    val names = runCatching {
+        JSONArray(json).let { arr -> (0 until arr.length()).map { arr.optString(it) } }
+    }.getOrDefault(emptyList())
+    return names.mapNotNullTo(mutableSetOf()) { n ->
+        FlareAction.entries.firstOrNull { it.name == n }
+    }
 }
 
 @Composable

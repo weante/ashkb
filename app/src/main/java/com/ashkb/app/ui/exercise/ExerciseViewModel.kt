@@ -143,6 +143,35 @@ class ExerciseViewModel(
         }
     }
 
+    /**
+     * v1.0.80（批次 6）：修改一条运动打卡（时长 / 强度 / 备注）。
+     *
+     * 只改内容，不动日期与动作快照（理由见 `ExerciseLogEditSheet`）。
+     * 改完仍走一次提醒重排：完成度口径与提醒同源，保持在同一条收尾路径上（幂等，代价只有几条闹钟读写）。
+     */
+    fun updateLog(log: ExerciseLog, durationMin: Int?, intensity: String?, notes: String?) {
+        viewModelScope.launch {
+            repo.checkInExercise(
+                log.copy(durationMin = durationMin, intensity = intensity, notes = notes)
+            )
+            rescheduleExerciseReminders()
+        }
+    }
+
+    /**
+     * v1.0.80（批次 6）：删除一条运动打卡（误录）。
+     *
+     * **必须重排提醒**：运动提醒的排程直接以「今天有没有打卡」为输入（`ExerciseReminderScheduler`
+     * 的 `hasLogged`）——删掉今天唯一一条打卡后，今日提醒应当重新出现；不重排的话，
+     * 用户今天再也收不到提醒，而他刚刚才把那条误录的打卡删掉。
+     */
+    fun deleteLog(log: ExerciseLog) {
+        viewModelScope.launch {
+            repo.deleteExerciseLog(log.id)
+            rescheduleExerciseReminders()
+        }
+    }
+
     fun saveFeedback(
         logId: String,
         painChange: String?,
