@@ -354,3 +354,22 @@ AI 标记：正常；本地参考范围判读：偏高             ← v1.0.78 �
 - **② `ai_abnormal` 真的写入并渲染**：AI 原始标记「正常」被保留并与本地判读并列显示
 - **③ v18 → v19 迁移后的新数据路径正常**；异常计数按**本地口径**（1 项异常）
 - 注：v1.0.78 之前导入的历史记录 `ai_abnormal` 为 NULL（**按设计不回填**），故老记录不会出现该行小字——这是正确行为，不是缺陷
+### CI 从未通过：Lint 40 error（**待修，方案已定**）
+
+`gh run list` 显示 CI 自建立起**每次都是 failure**（最近 6 次全红）——失败在 `:app:lintDebug`，不是签名守卫。
+根因两类，维护者 2026-10-01 裁定「真修（方案 A）」，不冻结 baseline：
+
+**① `StringFormatMatches` 31 处（统一模式）**：字符串把**数字**声明成 `%N$s`，调用点传 Int/Long。
+- 例：`vm_backup_local_done`「…%2$s 表 %3$s 行…」← `BackupViewModel.kt:115` 传 `out.tableCount` / `out.rowTotal`
+- 例：`vm_restore_verify_ok`「schema v%1$s…约 %3$s 行」、`vm_profile_export_done`「%1$s 字节」、`vm_dav_downloaded`「%2$s 字节」
+- 例：`ReportPdfWriter.kt` 侧 23 处（`pdf_value_*` / `pdf_section_*` / `pdf_page_no` / `pdf_labs_more` / `pdf_med_inj_cycle` …）
+- 修法：把接收数字的占位符改 `%N$d`（**声明侧**，调用点多数不动）。⚠️ **逐个核对**——同一字符串若有多个调用点传不同类型，改声明会让 `%d` 收到 String 而抛 `IllegalFormatConversionException`。
+- 涉及字符串名（lint 报告）：`pdf_value_med_checkin` `pdf_value_exercise` `pdf_lab_ref_range` `vm_backup_local_done` `pdf_value_prn` `pdf_section_labs` `vm_restore_verify_ok` `pdf_section_contacts` `pdf_section_basdai` `pdf_section_meds` `vm_restore_done` `pdf_page_no` `pdf_value_eye_days` `pdf_page_footer` `pdf_med_inj_cycle` `pdf_labs_more` `vm_dav_downloaded` `vm_profile_export_done` `vm_profile_import_done` `pdf_section_checkups` `pdf_section_vaccines`
+
+**② `MissingPermission` 9 处**：`reminder/NotificationHelper.kt` 的 `runCatching { nm.notify(…) }`（含 130 / 238 / 296 …）。
+`runCatching` 只兜住崩溃，**没做显式权限检查**——Android 13+ 未授 `POST_NOTIFICATIONS` 时 `notify` 静默失败，
+「提醒没响」会被误当成「没到点」。修法：加一个 `canNotify(context)`（`checkSelfPermission` + `areNotificationsEnabled`）
+并在每个 notify 前显式判断（未授权时跳过并留可诊断的痕迹），保留 `runCatching` 作双保险。
+
+**执行顺序**：等批次 6（改删能力）子代理收工后再动——lint 修复主要落在 `strings.xml`，与批次 6 重叠，并行会互相覆盖。
+修完跑 `testDebugUnitTest :app:detekt :app:lintDebug` 全绿 → CI 变绿（失败邮件自然停止）→ 随 v1.0.80 发布。
