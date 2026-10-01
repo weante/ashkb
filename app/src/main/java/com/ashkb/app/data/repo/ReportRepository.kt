@@ -24,6 +24,9 @@ import java.time.LocalDate
 /**
  * P4 报表仓库（M9）：30 天依从统计 / 趋势序列 / 复诊报告快照。
  * 统计口径与 P2 红线一致：打卡状态 done/partial/skipped；症状字段 null=未记录不计入均值。
+ *
+ * v1.0.76（批次 3a）：用药指标改称「记录内完成度」——分母是**已记录条数**（计划打卡），
+ * 按需（PRN）记录全部移出并单独计数（[Adherence.medPrnCount]）。补剂口径不变。
  */
 class ReportRepository(private val context: Context) {
     private val db = AppDatabase.get(context)
@@ -32,6 +35,11 @@ class ReportRepository(private val context: Context) {
         val days: Int,
         val medDone: Int, val medPartial: Int, val medSkipped: Int,
         val medTotal: Int, val medRatePct: Int,
+        /**
+         * v1.0.76（批次 3a）：区间内**按需（PRN）**打卡条数——单独统计，不进 [medTotal] 分母。
+         * 界面据此说明「另有 N 次按需用药」，否则 PRN 用户的记录会在这张卡片上凭空消失。
+         */
+        val medPrnCount: Int,
     )
 
     /** C2（v1.0.37）：补剂（营养）依从统计——与用药同口径（部分完成计 0.5）。 */
@@ -90,10 +98,12 @@ class ReportRepository(private val context: Context) {
         val f = from.toString(); val t = to.toString()
 
         val logDao = db.medicationLogDao()
-        val done = logDao.countBetweenStatus(f, t, "done")
-        val partial = logDao.countBetweenStatus(f, t, "partial")
-        val skipped = logDao.countBetweenStatus(f, t, "skipped")
+        // v1.0.76（批次 3a）：完成度的分母只算计划打卡；按需（PRN）另计，不混进这个比率
+        val done = logDao.countScheduledBetweenStatus(f, t, "done")
+        val partial = logDao.countScheduledBetweenStatus(f, t, "partial")
+        val skipped = logDao.countScheduledBetweenStatus(f, t, "skipped")
         val total = done + partial + skipped
+        val prnCount = logDao.countPrnBetween(f, t)
         // v1.0.48：公式收拢到 AdherenceCalc（此前本文件内联 4 遍，必然漂移）
         val rate = AdherenceCalc.ratePct(done, partial, total)
 
@@ -130,7 +140,12 @@ class ReportRepository(private val context: Context) {
         val wDelta = if (weights.size >= 2) weights[0].weightKg - weights[1].weightKg else null
 
         Overview(
-            adherence = Adherence(days, done, partial, skipped, total, rate),
+            adherence = Adherence(
+                days = days,
+                medDone = done, medPartial = partial, medSkipped = skipped,
+                medTotal = total, medRatePct = rate,
+                medPrnCount = prnCount,
+            ),
             supplement = SupplementAdherence(supDone, supPartial, supSkipped, supTotal, supRate),
             exercise = ExerciseStat(exDone, exSkipped, exMin),
             symptom = SymptomStat(
@@ -156,6 +171,8 @@ class ReportRepository(private val context: Context) {
     data class PeriodicReport(
         val days: Int,
         val medDone: Int, val medPartial: Int, val medSkipped: Int, val medTotal: Int, val medRatePct: Int,
+        /** v1.0.76（批次 3a）：本期按需（PRN）打卡条数——单独报，不进 [medTotal] 分母。 */
+        val medPrnCount: Int,
         val suppDone: Int, val suppPartial: Int, val suppSkipped: Int, val suppTotal: Int, val suppRatePct: Int,
         val exDoneDays: Int, val exMinutes: Int,
         val symptomDays: Int, val avgPain: Double?, val avgStiffnessMin: Double?,
@@ -171,10 +188,12 @@ class ReportRepository(private val context: Context) {
         val f = from.toString(); val t = to.toString()
 
         val logDao = db.medicationLogDao()
-        val md = logDao.countBetweenStatus(f, t, "done")
-        val mp = logDao.countBetweenStatus(f, t, "partial")
-        val ms = logDao.countBetweenStatus(f, t, "skipped")
+        // v1.0.76（批次 3a）：同 overview()——完成度只含计划打卡，按需（PRN）单独报数
+        val md = logDao.countScheduledBetweenStatus(f, t, "done")
+        val mp = logDao.countScheduledBetweenStatus(f, t, "partial")
+        val ms = logDao.countScheduledBetweenStatus(f, t, "skipped")
         val mt = md + mp + ms
+        val mPrn = logDao.countPrnBetween(f, t)
         val mr = AdherenceCalc.ratePct(md, mp, mt)
 
         val supDao = db.supplementLogDao()
@@ -203,6 +222,7 @@ class ReportRepository(private val context: Context) {
         PeriodicReport(
             days = days,
             medDone = md, medPartial = mp, medSkipped = ms, medTotal = mt, medRatePct = mr,
+            medPrnCount = mPrn,
             suppDone = sd, suppPartial = sp, suppSkipped = ss, suppTotal = st, suppRatePct = sr,
             exDoneDays = exDone.map { it.date }.distinct().size,
             exMinutes = exDone.sumOf { it.durationMin ?: 0 },

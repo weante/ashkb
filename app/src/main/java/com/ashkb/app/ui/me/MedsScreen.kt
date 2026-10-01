@@ -439,16 +439,25 @@ private fun RowScope.ArchivedRow(
  *
  * 补剂早就有「服用历史」（WellnessScreen 的 SupplementHistorySheet），药品却只能看报表汇总——
  * 看不到「哪天哪一针打了没有、跳过的原因是什么」。本弹层与补剂那套同款，顶部给出该药
- * 90 天依从率，口径与报表**完全同源**（见 [AdherenceCalc]）。
+ * 近 90 天的「记录内完成度」，口径与报表**完全同源**（见 [AdherenceCalc]）。
  *
  * v1.0.49：每条记录可**手动修正**（记错了改），修正弹层见 [MedicationLogEditDialog]。
+ *
+ * v1.0.76（批次 3a）：顶部这个指标位按药的性质分三种显示——普通药给完成度（必须带分母，
+ * 零分母显示「—（暂无记录）」且不给判定）；**按需药（PRN）不给完成度**，只报近 90 天记录次数
+ * （一天多次打卡是正常的，算成百分比只会骗人）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MedicationHistorySheet(vm: MeViewModel, med: Medication, onDismiss: () -> Unit) {
     val logs by remember(med.id) { vm.observeLogsForMed(med.id) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
-    val summary = remember(logs) { AdherenceCalc.summarize(logs.map { it.status }) }
+    // v1.0.76（批次 3a）：完成度只统计计划打卡，按需（PRN）记录单独报数。
+    // 零分母由 Completion.ratePct == null 表达，界面因此不能再顺手给出 0% / 达标判定。
+    val completion = remember(logs) { AdherenceCalc.completion(logs) }
+    val prnCount = remember(logs) { AdherenceCalc.prnCount(logs) }
+    // 按需药没有「计划剂量」这个概念（频次键与存库值同为 "PRN"，走枚举避免拼写漂移）
+    val isPrnMed = MedFrequency.fromKey(med.frequency) == MedFrequency.PRN
     // v1.0.49：正在修正的记录（null = 未打开修正弹层）
     var editTarget by remember(med.id) { mutableStateOf<MedicationLog?>(null) }
 
@@ -465,40 +474,17 @@ private fun MedicationHistorySheet(vm: MeViewModel, med: Medication, onDismiss: 
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                Text(
-                    stringResource(R.string.report_adherence_days, MED_HISTORY_DAYS),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                // 阈值与配色沿用报表同一套（90 / 70），避免同一指标在两处显示不同等级
-                val tone = when {
-                    summary.ratePct >= ClinicalThresholds.ADHERENCE_GOOD -> StatusTone.Success
-                    summary.ratePct >= ClinicalThresholds.ADHERENCE_FAIR -> StatusTone.Warning
-                    else -> StatusTone.Danger
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("${summary.ratePct}%", style = DataLarge, color = tone.accent())
-                    Spacer(Modifier.width(Spacing.lg))
-                    Text(
-                        stringResource(
-                            R.string.report_adherence_breakdown,
-                            summary.done, summary.partial, summary.skipped,
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Spacer(Modifier.weight(1f))
-                    StatusChip(ClinicalThresholds.adherenceLabel(summary.ratePct), tone)
-                }
-                // 修正入口的可发现性：只放一个铅笔图标不够，用一行小字说明
-                Text(
-                    stringResource(R.string.med_history_edit_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(Spacing.sm))
-                DividerList(logs, key = { it.id }) { log ->
-                    MedicationLogRow(log, medRoute = med.route, onEdit = { editTarget = log })
-                }
+                MedicationMetricBlock(completion = completion, prnCount = prnCount, isPrnMed = isPrnMed)
+            }
+            // 修正入口的可发现性：只放一个铅笔图标不够，用一行小字说明
+            Text(
+                stringResource(R.string.med_history_edit_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(Spacing.sm))
+            DividerList(logs, key = { it.id }) { log ->
+                MedicationLogRow(log, medRoute = med.route, onEdit = { editTarget = log })
             }
         }
     }
@@ -519,6 +505,91 @@ private fun MedicationHistorySheet(vm: MeViewModel, med: Medication, onDismiss: 
 
 /** 用药记录窗口（天）。与 [MedicationRepository.observeLogsForMed] 默认值一致。 */
 private const val MED_HISTORY_DAYS = 90
+
+/**
+ * v1.0.76（批次 3a）：用药记录弹层顶部的**指标位**——一个位置，两种口径。
+ *
+ * 抽成独立组件的理由有两个：① 让 [MedicationHistorySheet] 保持在 detekt 的 `LongMethod`
+ * 阈值之内（弹层还要管修正入口与流水列表）；② 把「零分母不给判定」这条口径收在一处，
+ * 免得日后有人在别处又顺手 `adherenceLabel(0)` 给出一枚红标。
+ *
+ * - 按需药（[isPrnMed]）：只报次数。按需用药一天可以打卡多次，没有「计划剂量」可比，
+ *   算成完成度百分比只会骗人。
+ * - 普通药：给「记录内完成度」+ 分母；`rate == null`（该药只有按需记录 / 一条计划打卡都没有）
+ *   时显示「—（暂无记录）」，**不显示 0% / 100%，也不给达标判定**。
+ */
+@Composable
+private fun MedicationMetricBlock(
+    completion: AdherenceCalc.Completion,
+    prnCount: Int,
+    isPrnMed: Boolean,
+) {
+    if (isPrnMed) {
+        Text(
+            stringResource(R.string.med_history_prn_metric, MED_HISTORY_DAYS, prnCount),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        if (completion.total > 0) {
+            // 改过频次的药（曾按计划打卡）：那些记录也要有交代，但不与上面的次数混算
+            Text(
+                stringResource(R.string.med_history_prn_legacy, completion.total),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+    Text(
+        stringResource(R.string.report_adherence_days, MED_HISTORY_DAYS),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    val rate = completion.ratePct
+    if (rate == null) {
+        // v1.0.76（批次 3a）：零分母不给百分比也不给判定——「0%」会被读成
+        // 「一条都没完成」，「达标 / 需干预」更是从「没有数据」里编出来的结论
+        Text(
+            stringResource(R.string.report_completion_empty),
+            style = DataLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            stringResource(R.string.report_completion_empty_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else {
+        // 阈值与配色沿用报表同一套（90 / 70），避免同一指标在两处显示不同等级
+        val tone = when {
+            rate >= ClinicalThresholds.ADHERENCE_GOOD -> StatusTone.Success
+            rate >= ClinicalThresholds.ADHERENCE_FAIR -> StatusTone.Warning
+            else -> StatusTone.Danger
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("$rate%", style = DataLarge, color = tone.accent())
+            Spacer(Modifier.width(Spacing.lg))
+            // 分母写在括号里：口径自明（分母 = 记录条数，不是计划剂量数）
+            Text(
+                stringResource(
+                    R.string.report_completion_breakdown,
+                    completion.done, completion.partial, completion.skipped, completion.total,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.weight(1f))
+            // 有记录才有判定：completionLabel 对 null 恒为 null（零分母上面已拦掉）
+            ClinicalThresholds.completionLabel(rate)?.let { StatusChip(it, tone) }
+        }
+    }
+    if (prnCount > 0) {
+        // 按需记录被移出了完成度，必须在这里说明去处，否则用户以为记录丢了
+        Text(
+            stringResource(R.string.report_completion_prn_note, prnCount),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
 
 @Composable
 private fun RowScope.MedicationLogRow(log: MedicationLog, medRoute: String, onEdit: () -> Unit) {

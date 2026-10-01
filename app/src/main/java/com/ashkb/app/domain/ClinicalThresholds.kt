@@ -16,7 +16,12 @@ object ClinicalThresholds {
     const val PAIN_SEVERE = 7
     const val PAIN_MODERATE = 4
 
-    /** 30 天依从率（%）：≥90 达标；70–89 待改善；<70 需干预。 */
+    /**
+     * 「记录内完成度」（v1.0.76（批次 3a）前的名字是「服药依从」）三档界值（%）：
+     * ≥90 达标；70–89 待改善；<70 需干预。
+     *
+     * ⚠️ 只对**有记录**的区间有意义：零分母下没有任何可判定的东西，见 [completionLabel]。
+     */
     const val ADHERENCE_GOOD = 90
     const val ADHERENCE_FAIR = 70
 
@@ -59,10 +64,19 @@ object ClinicalThresholds {
         else -> "轻度"
     }
 
-    /** 依从率三档标签。 */
+    /** 依从率三档标签（补剂仍用这条：它有记录才显示，无记录由界面走「暂无」分支）。 */
     fun adherenceLabel(rate: Int): String = when {
         rate >= ADHERENCE_GOOD -> "达标"
         rate >= ADHERENCE_FAIR -> "待改善"
         else -> "需干预"
     }
+
+    /**
+     * v1.0.76（批次 3a）：「记录内完成度」的三档标签；**无记录（`ratePct == null`）返回 `null`**。
+     *
+     * 为什么用可空入参而不是让调用方自己判空：零分母时旧实现把 `0` 送进 [adherenceLabel]，
+     * 于是「一条记录都没有」被标成「需干预」；把「无数据」编码进类型，调用方**无法**顺手给出
+     * 达标 / 需关注这类判定，只能显式去显示「—（暂无记录）」。
+     */
+    fun completionLabel(ratePct: Int?): String? = ratePct?.let { adherenceLabel(it) }
 }

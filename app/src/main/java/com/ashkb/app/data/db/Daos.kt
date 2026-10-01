@@ -96,9 +96,22 @@ interface MedicationLogDao {
     @Query("SELECT COUNT(*) FROM medication_logs WHERE date BETWEEN :from AND :to")
     suspend fun countBetween(from: String, to: String): Int
 
-    /** P4 M9 依从统计：区间内指定状态的打卡数（done / partial / skipped） */
-    @Query("SELECT COUNT(*) FROM medication_logs WHERE date BETWEEN :from AND :to AND status = :status")
-    suspend fun countBetweenStatus(from: String, to: String, status: String): Int
+    /**
+     * P4 M9「记录内完成度」（v1.0.76（批次 3a）改名，原「服药依从」）的取数：
+     * 区间内**计划打卡**（`prn_flag = 0`）的指定状态条数。
+     *
+     * 为什么排除 PRN：按需药的打卡次数由疼痛 / 发作决定，既没有计划剂量也没有「漏服」，
+     * 混进分母只会抬高或稀释完成度——它由 [countPrnBetween] 单独报数（原实现两者混算，指标虚高）。
+     */
+    @Query(
+        "SELECT COUNT(*) FROM medication_logs WHERE date BETWEEN :from AND :to " +
+            "AND status = :status AND prn_flag = 0",
+    )
+    suspend fun countScheduledBetweenStatus(from: String, to: String, status: String): Int
+
+    /** v1.0.76（批次 3a）：区间内按需（PRN）打卡条数——单独统计，不参与完成度。 */
+    @Query("SELECT COUNT(*) FROM medication_logs WHERE date BETWEEN :from AND :to AND prn_flag = 1")
+    suspend fun countPrnBetween(from: String, to: String): Int
 
     /**
      * v1.0.48：某条药的用药记录（区间内倒序），供药单点开查看流水。

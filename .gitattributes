@@ -1,0 +1,30 @@
+# 批次 5（工程化）：换行与二进制的存储策略。
+#
+# 为什么需要：本仓库历史上存在**混合换行**（典型是 `app/src/main/res/values/strings.xml`，
+# CRLF 与 LF 混排）。此前每次用脚本改这个文件都必须做「读字节 → 替换 → 按原字节写回」，
+# 否则整文件换行会被改写，git diff 变成数千行噪声（甚至真的弄坏过归档文档，见 HANDOFF §7）。
+#
+# `* -text` 关闭全局换行归一化：git 原样存储、原样检出，**字节不变**。
+# 下面几条只对确实需要固定换行的脚本类型开口子。
+
+* -text
+
+# 脚本：按各自平台的惯例固定换行
+*.ps1  text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.sh   text eol=lf
+
+# 明确标记二进制（`* -text` 已足够，这里只是让 git 在 diff 时直接说"二进制文件"）
+*.apk     binary
+*.jar     binary
+*.keystore binary
+*.jks     binary
+*.png     binary
+*.jpg     binary
+*.webp    binary
+*.ttf     binary
+
+# 导出产物与文档：保持原样
+app/schemas/** -text
+*.md -text

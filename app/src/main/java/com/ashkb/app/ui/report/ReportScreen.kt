@@ -153,38 +153,64 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
 
         item {
             SectionCard(title = stringResource(R.string.report_adherence_days, o.adherence.days)) {
-                // 阈值 90/70（原为 80/50），且数字与进度条必须同 tone（修此前的矛盾）
-                val rate = o.adherence.medRatePct
-                val tone = when {
-                    rate >= ClinicalThresholds.ADHERENCE_GOOD -> StatusTone.Success
-                    rate >= ClinicalThresholds.ADHERENCE_FAIR -> StatusTone.Warning
-                    else -> StatusTone.Danger
-                }
-                val accent = tone.accent()
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("$rate%", style = DataLarge, color = accent)
-                    Spacer(Modifier.padding(start = Spacing.lg))
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-                        Text(
-                            stringResource(R.string.report_adherence_breakdown, o.adherence.medDone, o.adherence.medPartial, o.adherence.medSkipped),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Text(
-                            stringResource(R.string.report_adherence_total, o.adherence.medTotal),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                val med = o.adherence
+                if (med.medTotal == 0) {
+                    // v1.0.76（批次 3a）：零分母不给百分比也不给判定——「0%」会被读成「一条都没完成」，
+                    // 「达标 / 需干预」更是从「没有数据」里编出来的结论（旧实现正是给 0% + 红标）
+                    Text(
+                        stringResource(R.string.report_completion_empty),
+                        style = DataLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        stringResource(R.string.report_completion_empty_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    // 阈值 90/70（原为 80/50），且数字与进度条必须同 tone（修此前的矛盾）
+                    val rate = med.medRatePct
+                    val tone = when {
+                        rate >= ClinicalThresholds.ADHERENCE_GOOD -> StatusTone.Success
+                        rate >= ClinicalThresholds.ADHERENCE_FAIR -> StatusTone.Warning
+                        else -> StatusTone.Danger
                     }
-                    Spacer(Modifier.weight(1f))
-                    StatusChip(ClinicalThresholds.adherenceLabel(rate), tone)
+                    val accent = tone.accent()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("$rate%", style = DataLarge, color = accent)
+                        Spacer(Modifier.padding(start = Spacing.lg))
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                            Text(
+                                stringResource(R.string.report_adherence_breakdown, med.medDone, med.medPartial, med.medSkipped),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                stringResource(R.string.report_adherence_total, med.medTotal),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.weight(1f))
+                        // 有记录才有判定：completionLabel 对 null 恒为 null（零分母上面已拦掉）
+                        ClinicalThresholds.completionLabel(rate)?.let { StatusChip(it, tone) }
+                    }
+                    Spacer(Modifier.height(Spacing.sm))
+                    LinearProgressIndicator(
+                        progress = { rate / 100f },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = accent,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    )
                 }
-                Spacer(Modifier.height(Spacing.sm))
-                LinearProgressIndicator(
-                    progress = { rate / 100f },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = accent,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                )
+                if (med.medPrnCount > 0) {
+                    // 按需（PRN）记录被移出了完成度，必须在卡片上说出它们的去处与条数
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        stringResource(R.string.report_completion_prn_note, med.medPrnCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
 
@@ -631,18 +657,25 @@ private fun PeriodicPage(
                         if (p.days == 7) R.string.report_periodic_week else R.string.report_periodic_month,
                     ),
                 ) {
-                    // 用药依从：无打卡记录就不摆 0%（假数据），直接说"暂无"
+                    // v1.0.76（批次 3a）：记录内完成度——零分母不给百分比（「暂无」而不是 0%），
+                    // 分母（共 N 条记录）写进同一行的括号里；按需（PRN）另起一行单独报数
                     KeyValueRow(
                         label = stringResource(R.string.report_periodic_med_adherence),
                         value = if (p.medTotal == 0) {
-                            stringResource(R.string.report_periodic_none)
+                            stringResource(R.string.report_completion_empty)
                         } else {
                             stringResource(
                                 R.string.report_periodic_value_adherence,
-                                p.medRatePct, p.medDone, p.medPartial, p.medSkipped,
+                                p.medRatePct, p.medDone, p.medPartial, p.medSkipped, p.medTotal,
                             )
                         },
                     )
+                    if (p.medPrnCount > 0) {
+                        KeyValueRow(
+                            label = stringResource(R.string.report_periodic_med_prn),
+                            value = stringResource(R.string.report_periodic_value_prn, p.days, p.medPrnCount),
+                        )
+                    }
 
                     // 补剂依从：字段与阈值口径同用药（部分完成计 0.5）
                     KeyValueRow(
@@ -652,7 +685,7 @@ private fun PeriodicPage(
                         } else {
                             stringResource(
                                 R.string.report_periodic_value_adherence,
-                                p.suppRatePct, p.suppDone, p.suppPartial, p.suppSkipped,
+                                p.suppRatePct, p.suppDone, p.suppPartial, p.suppSkipped, p.suppTotal,
                             )
                         },
                     )

@@ -687,7 +687,7 @@
     <string name="meds_stop_reason_none">停用原因无记录</string>
     <string name="meds_stop_note_line">备注：%1$s</string>
     <string name="meds_delete_confirm">删除「%1$s」？</string>
-    <string name="meds_delete_note_with_logs">将永久删除该药品档案，并连带删除其 %1$d 条打卡记录（含注射部位 / 跳过原因 / 备注）。此操作不可恢复，历史依从率会随之变化。</string>
+    <string name="meds_delete_note_with_logs">将永久删除该药品档案，并连带删除其 %1$d 条打卡记录（含注射部位 / 跳过原因 / 备注）。此操作不可恢复，历史完成度统计会随之变化。</string>
     <string name="meds_delete_note_no_logs">将永久删除该药品档案。该药没有打卡记录；此操作不可恢复。</string>
     <string name="med_view_history">查看用药记录</string>
     <string name="med_history_title">%1$s · 用药记录</string>
@@ -696,6 +696,8 @@
     <string name="med_history_inj_site_line">注射部位 %1$s</string>
     <string name="med_history_reason_line">原因 %1$s</string>
     <string name="med_history_prn">按需</string>
+    <string name="med_history_prn_metric">按需用药 · 近 %1$d 天记录 %2$d 次</string>
+    <string name="med_history_prn_legacy">另有 %1$d 条计划打卡记录（未计入上面的按需次数）</string>
     <string name="med_history_status_done">已服</string>
     <string name="med_history_status_partial">部分</string>
     <string name="med_history_status_skipped">跳过</string>
@@ -713,8 +715,12 @@
     <string name="med_postpone_title">顺延 %1$s 注射</string>
     <string name="med_skip_title">跳过 %1$s</string>
     <string name="report_adherence_breakdown">完成 %1$s · 部分 %2$s · 跳过 %3$s</string>
-    <string name="report_adherence_days">服药依从（%1$s 天）</string>
-    <string name="report_adherence_total">共 %1$s 次打卡（部分完成按 0.5 计）</string>
+    <string name="report_adherence_days">记录内完成度（%1$s 天）</string>
+    <string name="report_adherence_total">共 %1$s 条记录 · 部分完成按 0.5 计</string>
+    <string name="report_completion_empty">—（暂无记录）</string>
+    <string name="report_completion_empty_note">没有已记录的用药打卡，暂无法计算完成度</string>
+    <string name="report_completion_breakdown">完成 %1$d · 部分 %2$d · 跳过 %3$d（共 %4$d 条记录）</string>
+    <string name="report_completion_prn_note">另有按需用药记录 %1$d 次，不计入完成度</string>
     <string name="report_exercise_minutes">%1$s 分</string>
     <string name="report_eye_days">%1$s 天</string>
     <string name="report_eye_days_warning">眼部症状 %1$s 天：AS 合并葡萄膜炎需眼科评估（emr-001）</string>
@@ -853,8 +859,10 @@
     <string name="pdf_med_inj_cycle">每 %1$s 天</string>
     <string name="pdf_section_adherence">近 30 天依从与症状</string>
     <string name="pdf_label_med_checkin">服药打卡</string>
-    <string name="pdf_value_med_checkin">%1$s 完成 / %2$s 部分 / %3$s 跳过</string>
-    <string name="pdf_label_adherence_rate">依从率</string>
+    <string name="pdf_value_med_checkin">%1$s 完成 / %2$s 部分 / %3$s 跳过（共 %4$s 条记录）</string>
+    <string name="pdf_label_adherence_rate">记录内完成度</string>
+    <string name="pdf_label_prn">按需用药</string>
+    <string name="pdf_value_prn">近 %1$s 天记录 %2$s 次（不计入完成度）</string>
     <string name="pdf_label_exercise">运动</string>
     <string name="pdf_value_exercise">%1$s 次完成，共 %2$s 分钟（跳过 %3$s）</string>
     <string name="pdf_label_symptom_days">症状记录天数</string>
@@ -1036,7 +1044,8 @@
     <string name="report_range_90d">近 90 天</string>
     <string name="report_periodic_week">近 7 天</string>
     <string name="report_periodic_month">近 30 天</string>
-    <string name="report_periodic_med_adherence">用药依从</string>
+    <string name="report_periodic_med_adherence">记录内完成度</string>
+    <string name="report_periodic_med_prn">按需用药</string>
     <string name="report_periodic_supp_adherence">补剂依从</string>
     <string name="report_periodic_exercise">运动</string>
     <string name="report_periodic_symptom">症状</string>
@@ -1044,7 +1053,8 @@
     <string name="report_periodic_weight">体重</string>
     <string name="report_periodic_flare">发作</string>
     <string name="report_periodic_checkup">复诊 / 检查</string>
-    <string name="report_periodic_value_adherence">%1$d%%（完成 %2$d · 部分 %3$d · 跳过 %4$d）</string>
+    <string name="report_periodic_value_adherence">%1$d%%（完成 %2$d · 部分 %3$d · 跳过 %4$d，共 %5$d 条记录）</string>
+    <string name="report_periodic_value_prn">近 %1$d 天记录 %2$d 次</string>
     <string name="report_periodic_value_exercise">%1$d 天 · 累计 %2$d 分钟</string>
     <string name="report_periodic_value_symptom">记录 %1$d 天</string>
     <string name="report_periodic_value_symptom_pain">记录 %1$d 天 · 平均疼痛 %2$s · 平均晨僵 %3$s 分钟</string>

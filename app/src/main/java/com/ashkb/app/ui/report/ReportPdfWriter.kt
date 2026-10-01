@@ -191,10 +191,28 @@ object ReportPdfWriter {
             context.getString(R.string.pdf_label_med_checkin),
             context.getString(
                 R.string.pdf_value_med_checkin,
-                o.adherence.medDone, o.adherence.medPartial, o.adherence.medSkipped
+                o.adherence.medDone, o.adherence.medPartial, o.adherence.medSkipped, o.adherence.medTotal
             )
         )
-        d.kv(context.getString(R.string.pdf_label_adherence_rate), "${o.adherence.medRatePct}%")
+        // v1.0.76（批次 3a）：指标改称「记录内完成度」，且零分母不给百分比——「0%」会让
+        // 医生读成「一条都没完成」，实际是「这段时间没有任何记录」（按需用药也不进这个口径）
+        d.kv(
+            context.getString(R.string.pdf_label_adherence_rate),
+            if (o.adherence.medTotal == 0) {
+                context.getString(R.string.report_completion_empty)
+            } else {
+                "${o.adherence.medRatePct}%"
+            }
+        )
+        if (o.adherence.medPrnCount > 0) {
+            d.kv(
+                context.getString(R.string.pdf_label_prn),
+                context.getString(
+                    R.string.pdf_value_prn,
+                    o.adherence.days, o.adherence.medPrnCount
+                )
+            )
+        }
         d.kv(
             context.getString(R.string.pdf_label_exercise),
             context.getString(
