@@ -25,9 +25,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -55,8 +54,12 @@ import com.ashkb.app.ui.theme.accent
 @Composable
 fun ExercisePlansScreen(vm: ExercisePlansViewModel, onBack: () -> Unit) {
     val ui by vm.uiState.collectAsStateWithLifecycle()
-    // 每周结构展开态：多张卡可同时展开（记 id 集合，卡片复用不串状态）
-    var expandedIds by remember { mutableStateOf(emptySet<String>()) }
+    // 每周结构展开态：多张卡可同时展开（记 id 集合，卡片复用不串状态）。
+    // v1.0.84（批次 9）：改用 SnapshotStateMap 就地增删（`mutableStateMapOf`，值为 Unit 即集合语义），
+    // 不再每次点击都整份复制出一个新 Set。
+    // ⚠️ 本项目的 BOM（2024.09.03 → compose-runtime 1.7.3）**没有** `mutableStateSetOf`
+    // （该 API 1.8 才提供），故按等价方案用 map 实现——升级 BOM 后可一行换回。
+    val expandedIds = remember { mutableStateMapOf<String, Unit>() }
 
     Column(Modifier.fillMaxSize()) {
         ScreenTopBar(title = stringResource(R.string.plans_title), onBack = onBack)
@@ -107,8 +110,8 @@ fun ExercisePlansScreen(vm: ExercisePlansViewModel, onBack: () -> Unit) {
                     progress = if (plan.isActive) ui.progress else null,
                     expanded = plan.id in expandedIds,
                     onToggle = {
-                        expandedIds = if (plan.id in expandedIds) expandedIds - plan.id
-                        else expandedIds + plan.id
+                        if (plan.id in expandedIds) expandedIds.remove(plan.id)
+                        else expandedIds[plan.id] = Unit
                     },
                     onActivate = { vm.activate(plan.id) },
                     onDeactivate = { vm.deactivate(plan.id) },

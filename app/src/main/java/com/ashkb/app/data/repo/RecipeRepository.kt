@@ -1,6 +1,7 @@
 package com.ashkb.app.data.repo
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.db.Ids
 import com.ashkb.app.data.entity.Recipe
@@ -22,7 +23,15 @@ class RecipeRepository(private val context: Context) {
     private val db = AppDatabase.get(context)
     private val dao = db.recipeDao()
 
-    /** 视图模型：已解析的标签与出处编号。 */
+    /**
+     * 视图模型：已解析的标签与出处编号。
+     *
+     * v1.0.84（批次 9）：加 `@Immutable` 让食谱卡片在列表里可 skip。该断言**为真**：
+     * [Recipe] 是全部字段 `val` 的 Room 实体（String / String? / Boolean），本类的两个
+     * `List<String>` 由 [parseArray] 每次新建、构建后全项目只读（表单改标签走 `list + tag`
+     * 生成新列表，不就地改）。Compose 无法自行证明 `List` 接口不可变，故需开发者断言。
+     */
+    @Immutable
     data class RecipeView(
         val recipe: Recipe,
         val tags: List<String>,

@@ -43,6 +43,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +56,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
@@ -97,7 +101,23 @@ fun TodayScreen(
     val minimalPrompt by vm.minimalPrompt.collectAsStateWithLifecycle()
     // v1.0.74：昨天未记录的剂量（跨零点补记入口）
     val yesterdayPending by vm.yesterdayPending.collectAsStateWithLifecycle()
-    val yesterdayDate = remember { java.time.LocalDate.now().minusDays(1).toString() }
+    // v1.0.84（批次 9）：日期改为**订阅 VM 的日期流**。原实现是 `remember { LocalDate.now()… }`
+    // （无 key）→ 首次组合后永不重算，跨零点后标题里的「昨天」比卡里的剂量还早一天；
+    // 而且它与 Hero 上的今天日期各读一次系统时钟，两处可能分属不同的「今天」。
+    val todayDate by vm.todayDate.collectAsStateWithLifecycle()
+    val yesterdayDate = remember(todayDate) { yesterdayIso(todayDate) }
+    // v1.0.84（批次 9）：进页 / 回前台各跟系统时钟对一次日期。深睡会暂停 Handler 的 `postDelayed`
+    // 计时（见 TodayViewModel.refreshDateIfStale），只靠 VM 的跨零点 ticker 在「夜里手机睡着」
+    // 这个最常见的情形下会晚点，届时日期标题与昨日待补卡都会落后一天。
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        vm.refreshDateIfStale()
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) vm.refreshDateIfStale()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val isMinimal = profile?.uiMode == MinimalMode.MODE_MINIMAL
     // v1.0.73：不再需要 context——打卡 / 跳过 / 顺延后的重排已折进 TodayViewModel（写入后同协程 + IO）
     var skipTarget by remember { mutableStateOf<TodayItem?>(null) }
@@ -105,7 +125,6 @@ fun TodayScreen(
     var postponeTarget by remember { mutableStateOf<TodayItem?>(null) }
     var missedGuideTarget by remember { mutableStateOf<TodayItem?>(null) }
 
-    val todayDate = vm.date
     val scheduled = items.count { !it.isPrn }
     val pending = items.count { !it.done && !it.skipped && !it.isPrn }
 
@@ -330,6 +349,16 @@ private fun minimalReasonLabel(reason: String) = when (reason) {
     MinimalMode.REASON_HOSPITAL -> R.string.minimal_reason_hospital
     else -> R.string.minimal_reason_other
 }
+
+/**
+ * 「昨日待补」卡上显示的日期 = 今天 − 1 天。
+ *
+ * v1.0.84（批次 9）：必须是**入参「今天」的纯函数**。原实现在组合期直接
+ * `remember { LocalDate.now().minusDays(1) }`——既绕开了 VM 的日期流（跨零点不重算，
+ * 标题比卡里重算过的剂量早一天），又多出一份「读系统时钟」的真相。抽成纯函数后
+ * 该口径可被单测锁住（`ui/today` 的单测）。
+ */
+internal fun yesterdayIso(today: LocalDate): String = today.minusDays(1).toString()
 
 /** 今日页主角：一眼看清"今天还剩什么"。 */
 @Composable

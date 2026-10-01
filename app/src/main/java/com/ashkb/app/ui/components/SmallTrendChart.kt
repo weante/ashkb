@@ -135,6 +135,18 @@ fun SmallTrendChart(
         }
         val vMin = scale.first
         val vMax = scale.second
+        val range = (vMax - vMin).coerceAtLeast(MIN_RANGE)
+
+        // v1.0.84（批次 9）：坐标换算整个搬到组合期。原先在 Canvas 的 draw lambda 里做——
+        // 趋势页有 10+ 个 mini cell 同时重绘，于是**每帧**都要：对每个点做 3 次 LocalDate.parse、
+        // 新建一个 List（mapNotNull）、new 2 个 Path。现在只在数据 / 窗口 / 量程变化时算一次，
+        // draw 里只剩「相对坐标 × 画布尺寸」的乘加。
+        val miniPoints = remember(points, fromDate, toDate, vMin, vMax) {
+            miniPointsOf(points, fromDate, toDate, vMin, vMax)
+        }
+        // Path 复用（照搬 [TrendChart] 的 linePath / fillPath）：draw 里 reset() 重填，不再每帧新建
+        val linePath = remember { Path() }
+        val fillPath = remember { Path() }
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             // 左侧刻度槽：只标「上界 / 下界」，让量程可见（小多图不标全刻度）
@@ -155,13 +167,10 @@ fun SmallTrendChart(
                 val h = size.height
                 val padY = Spacing.xs.toPx()
                 val plotH = (h - padY * 2f).coerceAtLeast(1f)
-                val range = (vMax - vMin).coerceAtLeast(1e-3f)
-
-                fun yOf(v: Float): Float = padY + (1f - (v - vMin) / range) * plotH
 
                 // 阈值虚线（超出量程则不画，避免贴边误导）
                 if (threshold != null && threshold in vMin..vMax) {
-                    val ty = yOf(threshold)
+                    val ty = padY + (1f - (threshold - vMin) / range) * plotH
                     drawLine(
                         color = warning,
                         start = Offset(0f, ty),
@@ -171,27 +180,36 @@ fun SmallTrendChart(
                     )
                 }
 
-                // 用**共享窗口**换算横坐标；日期解析不了的点跳过（不让一行脏数据把整图搞没）
-                val coords = points.mapNotNull { p ->
-                    xFraction(p.date, fromDate, toDate)?.let { Offset(it * w, yOf(p.value)) }
-                }
-
-                if (coords.size >= 2) {
-                    val line = Path().apply {
-                        moveTo(coords.first().x, coords.first().y)
-                        for (i in 1 until coords.size) lineTo(coords[i].x, coords[i].y)
+                // 折线 + 渐变填充：点位在组合期已算好（日期只解析一次），
+                // 这里只把「窗口内相对坐标」映射到画布尺寸；Path 复用，不掉点也不改变落点。
+                if (miniPoints.size >= 2) {
+                    linePath.reset()
+                    fillPath.reset()
+                    val first = miniPoints.first()
+                    val fx = first.xFraction * w
+                    val fy = padY + first.yFraction * plotH
+                    linePath.moveTo(fx, fy)
+                    fillPath.moveTo(fx, h)
+                    fillPath.lineTo(fx, fy)
+                    for (i in 1 until miniPoints.size) {
+                        val p = miniPoints[i]
+                        val x = p.xFraction * w
+                        val y = padY + p.yFraction * plotH
+                        linePath.lineTo(x, y)
+                        fillPath.lineTo(x, y)
                     }
-                    val fill = Path().apply {
-                        moveTo(coords.first().x, h)
-                        lineTo(coords.first().x, coords.first().y)
-                        for (i in 1 until coords.size) lineTo(coords[i].x, coords[i].y)
-                        lineTo(coords.last().x, h)
-                        close()
-                    }
-                    drawPath(fill, brush = fillBrush)
-                    drawPath(line, color = accent, style = stroke)
+                    fillPath.lineTo(miniPoints.last().xFraction * w, h)
+                    fillPath.close()
+                    drawPath(fillPath, brush = fillBrush)
+                    drawPath(linePath, color = accent, style = stroke)
                 }
-                coords.forEach { drawCircle(color = accent, radius = dotPx, center = it) }
+                miniPoints.forEach { p ->
+                    drawCircle(
+                        color = accent,
+                        radius = dotPx,
+                        center = Offset(p.xFraction * w, padY + p.yFraction * plotH),
+                    )
+                }
             }
         }
 
@@ -202,8 +220,47 @@ fun SmallTrendChart(
 /** 小多图左侧刻度槽宽度（容纳 4 位数字 + 1 位小数）。 */
 private val MINI_AXIS_WIDTH = 40.dp
 
+/** 量程下限（与 [niceScale] 同口径）：`vMax == vMin` 时避免除零。 */
+private const val MIN_RANGE = 1e-3f
+
 private fun fmtMini(v: Float): String =
     if (v == v.roundToInt().toFloat()) v.roundToInt().toString() else "%.1f".format(v)
+
+/**
+ * 一个数据点在画布上的**相对**位置，两轴都已归一化到 0..1（y 轴 0 在顶部）。
+ *
+ * v1.0.84（批次 9）：存在的意义是让「日期解析 + 量程归一化」能在**组合期**做完一次，
+ * draw lambda 里只留乘加——见 [miniPointsOf]。
+ */
+internal data class MiniChartPoint(val xFraction: Float, val yFraction: Float)
+
+/**
+ * 把数据点换算成相对坐标（组合期调用一次，[SmallTrendChart] 用 `remember` 缓存）。
+ *
+ * 口径与改动前的逐帧实现**逐点等价**（有单测比对）：
+ * - 横轴走**共享窗口** [xFraction]；(date − 窗口起) / 窗口长度，窗口外夹到边界；
+ * - 起点 / 终点日期解析不了 → 整条序列都拿不到横坐标，返回空表（原实现是每个点都得到 null）；
+ * - 单点日期解析不了 → **跳过该点**，不让一行脏数据把整图搞没；
+ * - 纵轴 = 1 − (v − vMin) / range，与原来的 `yOf` 同一表达式、同一运算顺序。
+ */
+internal fun miniPointsOf(
+    points: List<TrendPoint>,
+    fromDate: String,
+    toDate: String,
+    vMin: Float,
+    vMax: Float,
+): List<MiniChartPoint> {
+    val from = parseIsoDate(fromDate) ?: return emptyList()
+    val to = parseIsoDate(toDate) ?: return emptyList()
+    val range = (vMax - vMin).coerceAtLeast(MIN_RANGE)
+    return points.mapNotNull { p ->
+        val f = xFraction(parseIsoDate(p.date), from, to) ?: return@mapNotNull null
+        MiniChartPoint(f, 1f - (p.value - vMin) / range)
+    }
+}
+
+/** ISO 日期解析：解析不了返回 null（调用方负责「跳过该点」而不是画到假位置）。 */
+internal fun parseIsoDate(text: String): LocalDate? = runCatching { LocalDate.parse(text) }.getOrNull()
 
 /**
  * 全部序列日期的并集 → [最早, 最晚]。日期解析不了的忽略；整体无可用日期返回 `null`。
@@ -212,7 +269,7 @@ private fun fmtMini(v: Float): String =
  * 好处是横向不留大片空白、且天然包含只有化验（平时不打卡）的时段。
  */
 internal fun sharedWindow(seriesDates: List<List<String>>): Pair<String, String>? {
-    val parsed = seriesDates.flatten().mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }
+    val parsed = seriesDates.flatten().mapNotNull { parseIsoDate(it) }
     if (parsed.isEmpty()) return null
     return parsed.min().toString() to parsed.max().toString()
 }
@@ -224,10 +281,20 @@ internal fun sharedWindow(seriesDates: List<List<String>>): Pair<String, String>
  * - 任一日解析不了返回 `null`（调用方跳过该点，而不是画到 0 或 1 这种「假位置」上）。
  */
 internal fun xFraction(date: String, fromDate: String, toDate: String): Float? {
-    val d = runCatching { LocalDate.parse(date) }.getOrNull() ?: return null
-    val f = runCatching { LocalDate.parse(fromDate) }.getOrNull() ?: return null
-    val t = runCatching { LocalDate.parse(toDate) }.getOrNull() ?: return null
-    val span = ChronoUnit.DAYS.between(f, t)
+    val f = parseIsoDate(fromDate) ?: return null
+    val t = parseIsoDate(toDate) ?: return null
+    return xFraction(parseIsoDate(date), f, t)
+}
+
+/**
+ * 已解析日期版重载（v1.0.84，批次 9）。
+ *
+ * 原实现每次调用都要把 `fromDate` / `toDate` 各解析一遍——Chart 里按点循环就是 **3N 次解析**。
+ * 解析结果由调用方复用（组合期一次），语义与字符串版完全一致。
+ */
+internal fun xFraction(date: LocalDate?, from: LocalDate, to: LocalDate): Float? {
+    if (date == null) return null
+    val span = ChronoUnit.DAYS.between(from, to)
     if (span <= 0L) return 0.5f
-    return (ChronoUnit.DAYS.between(f, d).toFloat() / span.toFloat()).coerceIn(0f, 1f)
+    return (ChronoUnit.DAYS.between(from, date).toFloat() / span.toFloat()).coerceIn(0f, 1f)
 }

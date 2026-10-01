@@ -100,7 +100,9 @@ fun ReminderCheckScreen(onBack: () -> Unit) {
                 )
                 // v1.0.73（P0-1）：**闹钟注册实证行**——这是全页唯一能证明「提醒真的排上了」的一项。
                 // 权限可以全绿而闹钟一个都没注册成功（小米 MIUIOP(10014) 默认 ignore），故必须显示。
-                val health = remember(state.alarmsOk) { ReminderHealth.snapshot(context) }
+                // v1.0.84（批次 9）：快照随 state 一起带回（原本在渲染这里**再读一次**——同一帧
+                // 两次同步读 SharedPreferences，且都在主线程）。
+                val health = state.health
                 CheckRow(
                     stringResource(R.string.reminder_alarm_registration),
                     when {
@@ -251,6 +253,14 @@ internal data class ReminderCheckState(
     val batteryOk: Boolean,
     /** v1.0.73（P0-1）：最近一次闹钟重排是否出现过注册失败——「权限显示已授权」也可能一条都没排上。 */
     val alarmsOk: Boolean,
+    /**
+     * v1.0.84（批次 9）：闹钟台账**快照本体**，随状态一起带回。
+     *
+     * 原先 `alarmsOk` 在这里只留了一个布尔（由 `snapshot` 算出），页面渲染「闹钟注册实证行」
+     * 时又单独调了一次 `ReminderHealth.snapshot(context)` 取 attempted / failed / lastError——
+     * 同一帧两次同步读（SharedPreferences + AlarmManager binder），全在主线程。
+     */
+    val health: ReminderHealth.Snapshot,
 ) {
     val passed: Int get() = listOf(notifOk, exactOk, fullScreenOk, batteryOk, alarmsOk).count { it }
     val total: Int get() = 5
@@ -274,10 +284,13 @@ internal fun rememberReminderCheckState(): ReminderCheckState {
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    return remember(refreshTick) { readReminderCheckState(context) }
+    // v1.0.84（批次 9）：台账快照**只读一次**，与四项状态共用同一份（页面渲染实证行不再重复读）。
+    // 同步磁盘 / binder 调用留在组合期是既有事实，但一次组合只应发生一次。
+    val health = remember(refreshTick) { ReminderHealth.snapshot(context) }
+    return remember(refreshTick, health) { readReminderCheckState(context, health) }
 }
 
-private fun readReminderCheckState(context: Context): ReminderCheckState {
+private fun readReminderCheckState(context: Context, health: ReminderHealth.Snapshot): ReminderCheckState {
     val notifOk = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
         PackageManager.PERMISSION_GRANTED
     val exactOk = run {
@@ -292,8 +305,8 @@ private fun readReminderCheckState(context: Context): ReminderCheckState {
     // v1.0.62 C11：电池白名单（有官方查询接口，故可显示真实状态）
     val batteryOk = SystemSetupGuides.isIgnoringBatteryOptimizations(context)
     // v1.0.73（P0-1）：闹钟注册台账——权限全绿也可能「一条都没排上」（小米 MIUIOP(10014) 默认 ignore）
-    val alarmsOk = !ReminderHealth.snapshot(context).hasFailure
-    return ReminderCheckState(notifOk, exactOk, fullScreenOk, batteryOk, alarmsOk)
+    val alarmsOk = !health.hasFailure
+    return ReminderCheckState(notifOk, exactOk, fullScreenOk, batteryOk, alarmsOk, health)
 }
 
 /** 状态三重编码：图标 + 文字 + 颜色（此前是裸 `"✓"` / `"!"`）。 */

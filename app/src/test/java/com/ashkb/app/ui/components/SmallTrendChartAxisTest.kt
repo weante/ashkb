@@ -1,7 +1,9 @@
 package com.ashkb.app.ui.components
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -81,5 +83,85 @@ class SmallTrendChartAxisTest {
         assertNull(xFraction("?", "2026-06-01", "2026-06-11"))
         assertNull(xFraction("2026-06-05", "?", "2026-06-11"))
         assertNull(xFraction("2026-06-05", "2026-06-01", ""))
+    }
+
+    // ============ v1.0.84（批次 9）：坐标换算提到组合期，口径必须逐点等价 ============
+
+    @Test
+    fun `组合期坐标与旧的逐帧 xFraction 逐点一致（视觉等价的回归线）`() {
+        val pts = listOf(
+            TrendPoint("2026-06-01", 2f),
+            TrendPoint("2026-06-04", 8f),
+            TrendPoint("?", 5f), // 脏数据：跳过该点，不让一行脏数据把整图搞没
+            TrendPoint("2026-06-11", 0f),
+        )
+        // 量程取 0..10（远大于量程下限，coerce 不生效）：yFraction = 1 - (v - 0) / 10
+        val got = miniPointsOf(pts, "2026-06-01", "2026-06-11", 0f, 10f)
+        // 旧实现（draw lambda 内）：coords = points.mapNotNull { xFraction(it.date, from, to)?.let { f -> Offset(f*w, padY + (1-(v-vMin)/range)*plotH) } }
+        val old = pts.mapNotNull { p ->
+            xFraction(p.date, "2026-06-01", "2026-06-11")?.let { it to (1f - p.value / 10f) }
+        }
+
+        assertEquals(old.size, got.size)
+        old.forEachIndexed { i, (fx, fy) ->
+            assertEquals(fx, got[i].xFraction, 1e-6f)
+            assertEquals(fy, got[i].yFraction, 1e-6f)
+        }
+        // 具体落点（画布映射 x = fraction * w、y = padY + fraction * plotH 与旧实现同式）
+        assertEquals(0f, got[0].xFraction, 1e-6f)
+        assertEquals(0.3f, got[1].xFraction, 1e-6f)
+        assertEquals(1f, got[2].xFraction, 1e-6f)
+        assertEquals(0.8f, got[0].yFraction, 1e-6f)
+        assertEquals(0.2f, got[1].yFraction, 1e-6f)
+        assertEquals(1f, got[2].yFraction, 1e-6f)
+    }
+
+    @Test
+    fun `起点或终点日期解析不了时整条序列都没有横坐标（与旧实现一致）`() {
+        val pts = listOf(TrendPoint("2026-06-01", 1f), TrendPoint("2026-06-04", 2f))
+        assertTrue(miniPointsOf(pts, "?", "2026-06-11", 0f, 10f).isEmpty())
+        assertTrue(miniPointsOf(pts, "2026-06-01", "", 0f, 10f).isEmpty())
+    }
+
+    @Test
+    fun `只有单点日期脏时只跳过该点、顺序不变`() {
+        val got = miniPointsOf(
+            listOf(TrendPoint("×", 1f), TrendPoint("2026-06-11", 5f)),
+            "2026-06-01", "2026-06-11", 0f, 10f,
+        )
+        assertEquals(1, got.size)
+        assertEquals(1f, got[0].xFraction, 1e-6f)
+        assertEquals(0.5f, got[0].yFraction, 1e-6f)
+    }
+
+    @Test
+    fun `窗口外的点夹到边界而不是画出界`() {
+        val got = miniPointsOf(
+            listOf(TrendPoint("2026-05-01", 5f), TrendPoint("2026-07-01", 5f)),
+            "2026-06-01", "2026-06-11", 0f, 10f,
+        )
+        assertEquals(0f, got[0].xFraction, 1e-6f)
+        assertEquals(1f, got[1].xFraction, 1e-6f)
+    }
+
+    @Test
+    fun `y 轴 0 在顶部（值越大越靠上）`() {
+        val got = miniPointsOf(
+            listOf(TrendPoint("2026-06-01", 10f), TrendPoint("2026-06-11", 0f)),
+            "2026-06-01", "2026-06-11", 0f, 10f,
+        )
+        assertEquals(0f, got[0].yFraction, 1e-6f)
+        assertEquals(1f, got[1].yFraction, 1e-6f)
+    }
+
+    @Test
+    fun `量程退化为 0（单点或全同值）也不产生 NaN`() {
+        val got = miniPointsOf(
+            listOf(TrendPoint("2026-06-01", 5f)),
+            "2026-06-01", "2026-06-11", 5f, 5f,
+        )
+        assertEquals(1, got.size)
+        assertFalse(got[0].yFraction.isNaN())
+        assertEquals(1f, got[0].yFraction, 1e-6f)
     }
 }

@@ -4,6 +4,53 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.84] — 2026-10-02
+
+**批次 9：Compose 性能第一批（第四轮性能审查报告的前 5 项 ROI）。** 无库结构变更，可覆盖安装。
+
+### ① 修掉一个真实的跨零点错误（正确性，不只是性能）
+
+`TodayScreen.kt:100` 的 `yesterdayDate = remember { LocalDate.now().minusDays(1)… }` **无 key → 永不重算**：跨零点后「昨日待补」指向的是**前天**。v1.0.74 修过 ViewModel 的日期 ticker，Screen 层这行漏了。
+
+- 改用 VM 既有 ticker 驱动的日期流（**没有新起 ticker**——那正是报告 #12 批评的「7 份重复 ticker」），并新增可单测的纯函数 `yesterdayIso(today)`
+- **额外加固（超出报告，已采纳）**：VM 的跨零点 ticker 是协程 `delay` → Android 上落 `Handler.postDelayed`，按 **uptimeMillis** 计时、**深睡不计时**——夜里手机睡着（本应用常态）时跨零点不会触发，可能早上才补跑。故加 `refreshDateIfStale()` + `ON_RESUME` 刷新（复用既有写法，非新 ticker）
+
+### ② 消除组合期重复磁盘 IO
+
+`ReminderCheckScreen` 里 `readReminderCheckState(context)` 内部已调过 `ReminderHealth.snapshot(context)`（SharedPreferences + AlarmManager），渲染时**又单独调一次** → 每次组合两次**主线程同步 IO**。改为随状态带回快照、`remember(refreshTick)` 只读一次。
+
+### ③ `SmallTrendChart` 每帧解析日期 + 分配 Path
+
+`ReportScreen` 趋势网格有 10+ 个 mini cell，滚动时每帧 10×(每个点 3 次 `LocalDate.parse` + 2 个 `Path` + 1 个 List)。照搬 `TrendChart` 既有的零分配模式：坐标与 Path 提到 Canvas 外 `remember`，draw 里只剩乘加 + `reset()` 重填。
+
+**视觉等价用「逐点数学对拍」保证**（本模块无 Compose UI 测试依赖）：新函数与**旧的逐帧公式**在同一运算顺序下逐点比对，另加 6 条单测（含脏点跳过、窗口夹边、y 轴朝向、量程退化不产 NaN）。
+
+### ④ 两个小项
+
+- `RecipeView` 加 `@Immutable`：字段逐一核对为不可变类型（编译器报告确认 `RecipeCard` 的参数从 unstable view 变为 stable view）。**收益边界要说清**：因为 Strong Skipping 本就开着，改前改后都可 skip；真实收益是参数变 stable 后**用 `equals` 而非实例相等比较**，于是 Room 重发整个列表时内容未变的卡片能真正 skip
+- `ExercisePlansScreen` 的 `expandedIds`：**`mutableStateSetOf` 在 compose-runtime 1.7.3 不存在**（BOM 2024.09.03 锁 1.7.3，该 API 是 1.8 才有，已用 javap 核实）→ 按 fallback 用 `mutableStateMapOf`。**诚实说明**：实际收益是「每次点击不再整份复制 Set」（省分配），**不是**重组范围的改变——不要当成重组优化
+
+### ⑤ 核实结论：审查报告的 ROI 第 1 条（开启 Strong Skipping）**无效**
+
+**Kotlin 2.0.20 的 Compose 编译器已默认开启 Strong Skipping**，无需任何配置：
+- 编译器自己的 metrics 记录 `"featureFlags": { "StrongSkipping": true, … }`——**而我们没有配任何 flag**
+- 带**不稳定参数**的 composable 已被标 skippable（如 `SmallTrendChart(stable title, unstable points: List<TrendPoint>)`）；非 Strong Skipping 下这不可能
+- 旁证：插件里 `enableStrongSkippingMode` 已 `@Deprecated`，而 `ComposeFeatureFlag` 只暴露 `.disabled()`——2.0.20 只能「关」
+
+**因此未加任何 featureFlags 配置**。另外**刻意没做**报告建议的「skippable 计数 CI 门」：metrics 只反映**最后一次**编译，增量编译 81 total / 全量 1210 total（实测差 15 倍），阈值必然抖动——**脆弱门比没有门更糟**。
+
+（`app/build.gradle.kts` 保留了 `composeCompiler { reportsDestination/metricsDestination }` 诊断块，让上述结论可复算；报告写在 build/ 下、不入库。）
+
+### 测试与构建
+
+- 单测 **668 → 678 条全绿**（70 个 suite）；`detekt` 通过；**`:app:lintDebug` 0 error**
+- release / debug 均 versionCode **89 / 1.0.84**
+
+### 未做
+
+- 第 3 项**无像素级比对**（本模块无 compose-ui-test 依赖）；保证来自「公式逐点等价 + 绘制顺序不变 + 单测对拍」
+- 第 1 项跨零点行为**无 UI 层测试**（只覆盖纯函数）；「日期流变化 → 重组」由 remember key 保证，本环境无法断言
+- 审查报告建议的**大文件拆分**（WellnessScreen 1123 行等）留待后续：本项目无 UI 自动化测试，纯重构除了眼睛没有别的验证手段，故**一次一个屏幕、一版一个**
 ## [v1.0.83] — 2026-10-01
 
 **批次 8 补充：化验页提示条与上方元素贴太紧。** 无库结构变更，可覆盖安装。

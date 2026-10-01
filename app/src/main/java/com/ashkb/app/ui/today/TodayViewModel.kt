@@ -27,6 +27,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -43,6 +44,15 @@ class TodayViewModel(
 
     private val _date = MutableStateFlow(LocalDate.now())
     val date: LocalDate get() = _date.value
+
+    /**
+     * 「今天」的**可观察**日期流——由 init 里既有的跨零点 ticker 推进（不新起 ticker）。
+     *
+     * v1.0.84（批次 9）：[date] 只是普通 getter，UI 读它读不到跨零点的变化。`TodayScreen`
+     * 于是自己用 `remember { LocalDate.now()… }`（**无 key**）取了一次日期，首次组合后永不重算：
+     * 卡片里的 N 剂已按新「昨天」重算，标题上的日期却还指着前天。
+     */
+    val todayDate: StateFlow<LocalDate> = _date.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -97,6 +107,22 @@ class TodayViewModel(
                 MinimalMode.shouldPrompt(healthRepo.symptomDatesBetween(from, d.toString()), d)
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    /**
+     * 回到前台时跟系统时钟对一次「今天」——补上深睡期间错过的跨零点。
+     *
+     * v1.0.84（批次 9）：init 里的 ticker 用协程 `delay`，在 Android 上落到主线程 Handler 的
+     * `postDelayed`，而它按 **uptimeMillis** 计时——**深睡不计时**。夜里手机睡着时跨零点那一刻
+     * 不会触发，ticker 可能要到早上醒来才补跑；期间「今天 / 昨天」都会落后一天（本页的
+     * 日期标题、昨日待补卡都读这条流）。这里只做「拉一次」的补齐，**不新起 ticker**；
+     * 日期没变时是空操作（StateFlow 同值不重复发射，也不会多余地重查库）。
+     */
+    fun refreshDateIfStale() {
+        val now = LocalDate.now()
+        if (_date.value == now) return
+        _date.value = now
+        viewModelScope.launch { refreshYesterdayPending() }
+    }
 
     /** 回答询问：无论选什么都记「今天问过」；身体不适 / 住院才切极简。 */
     fun answerMinimalPrompt(reason: String) {
@@ -176,7 +202,9 @@ class TodayViewModel(
      * done 与 skipped 都算结算，避免用户昨天明确跳过（写了原因）的剂量天天挂卡催补。
      */
     suspend fun refreshYesterdayPending() = withContext(Dispatchers.IO) {
-        val yesterday = LocalDate.now().minusDays(1)
+        // v1.0.84（批次 9）：用**与 UI 同一个**日期源（ticker 推进的 date），不再各读一次系统时钟——
+        // 否则卡里的剂量按「系统时钟的昨天」算、卡上标题按「日期流的昨天」显示，跨零点前后会差一天。
+        val yesterday = date.minusDays(1)
         val settled = repo.settledSlotRefs(yesterday)
         val meds = AppDatabase.get(app).medicationDao().listActive()
         _yesterdayPending.value = PendingDoses.unsettledOn(

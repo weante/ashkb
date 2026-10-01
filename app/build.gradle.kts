@@ -28,8 +28,8 @@ android {
         applicationId = "com.ashkb.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 88
-        versionName = "1.0.83"
+        versionCode = 89
+        versionName = "1.0.84"
         // 批次 2（测试安全网）：instrumented 测试（Room schema 漂移校验）需要 runner
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -86,6 +86,19 @@ android {
         // ——维护者 2026-10-01 明确选择用体积换 CI 覆盖。
         getByName("main").assets.srcDir("$projectDir/schemas")
     }
+}
+
+/**
+ * 批次 9：Compose 编译器**诊断报告**（只读产物，不改变任何编译结果）。
+ *
+ * 为什么保留：第四轮 Compose 性能审查称「Kotlin 2.0.20 未开启 Strong Skipping，需显式加
+ * `featureFlags`」。批次 9 用这两个目录里的 `*-composables.txt` / `*-module.json` 做实证判定
+ * （本次结论：**2.0.20 已默认开启**，报告见批次 9 回报）——保留它＝该结论可复算，
+ * 而不是只能靠转述。产物落在 `app/build/` 下（不入库）；若嫌构建变慢，注释掉本块即可。
+ */
+composeCompiler {
+    reportsDestination = layout.buildDirectory.dir("compose-reports")
+    metricsDestination = layout.buildDirectory.dir("compose-metrics")
 }
 
 /**
