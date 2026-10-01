@@ -28,8 +28,8 @@ android {
         applicationId = "com.ashkb.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 83
-        versionName = "1.0.78"
+        versionCode = 84
+        versionName = "1.0.79"
         // 批次 2（测试安全网）：instrumented 测试（Room schema 漂移校验）需要 runner
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -80,6 +80,11 @@ android {
     sourceSets {
         // 批次 2：把导出的 Room schema 挂成 androidTest 的 assets——schema 漂移校验要读它
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
+        // 批次 5：schema 同时挂到 **main** assets。
+        // 理由：MigrationTestHelper 从 assets 读 schema，只有挂 main 才能在 JVM/Robolectric 单测里跑
+        // 「从旧版本升级」的实证（androidTest assets 进不了 CI）。代价是 APK 多约 1.2 MB（4–19 共 16 个 JSON）
+        // ——维护者 2026-10-01 明确选择用体积换 CI 覆盖。
+        getByName("main").assets.srcDir("$projectDir/schemas")
     }
 }
 
@@ -189,6 +194,8 @@ dependencies {
     // ⚠️ 不可用于检测 ICU 正则差异（已实测证伪，见 HANDOFF §7）。
     // 4.13 + instrumented android-all(API 34) 已在本机 Gradle / Maven 缓存中，可离线跑。
     testImplementation(libs.robolectric)
+    // 批次 5：迁移实证用（MigrationTestHelper）；随 schema 进 main assets 后在 JVM 单测里可用
+    testImplementation(libs.room.testing)
 
     // 批次 2（测试安全网）：instrumented 测试。
     // 目的：把「迁移是否真的把库结构改对」变成机器可判——schema 漂移校验要在真机上开一次库。

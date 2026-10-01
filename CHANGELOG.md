@@ -4,6 +4,37 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.79] — 2026-10-01
+
+**批次 5「工程化与文档一致性」收口 + 历史迁移实证进 CI。无运行时行为变化。**
+
+⚠️ **APK 体积增加约 93 KB**（实测 2,581,526 → 2,674,592 B）：16 个 Room schema JSON 作为 assets 打进包里（未压缩合计 1.34 MB，APK 内压缩后约 90 KB）——见下。可覆盖安装，数据保留。
+
+### A. 历史 Room schema 补录（批次 2 遗留的诚实边界）
+
+- 新增 pp/schemas/…/4.json ~ 16.json（13 个），**每个都是在「该版本号存续期最后一个提交」上真实构建导出**，非逆向编造
+- **起点 1/2/3 是永久缺口，不是待办**：根提交就已是 ersion = 4；119 个提交只出现 4–17；本地 bundle、GitHub 远端（最早 tag v1.0.1）、全盘 7 处 AppDatabase.kt 均无 1/2/3。**伪造 schema 会让迁移测试虚假通过，比没有测试更糟**——故记为永久不可覆盖（HANDOFF §9.8b 已改写，避免以后重复尝试）
+
+### B. 迁移实证进 CI
+
+- 新增 MigrationPathProofTest：用真的 MigrationTestHelper 对**起点 4..16 各自** createDatabase(N) → unMigrationsAndValidate(19, …)
+- **13 条升级路径 13/13 通过**，含 Room 按 19.json 的结构校验
+- 为让它在 **JVM 单测**（而非只能真机跑的 androidTest）里可用，schema 同时挂到 **main assets**——这是 **APK +93 KB** 的原因（实测：未压缩 1.34 MB，压缩后 90 KB，JSON 压缩比约 15×）；维护者选择用体积换 CI 覆盖
+- 现在**可测**：起点 4–18 → 19 全覆盖；**不可测**：起点 1/2/3
+
+### C. version catalog（依赖版本单一来源）
+
+- 新增 gradle/libs.versions.toml：根构建脚本 **6/6** 插件、app 构建脚本 **25/25** 依赖全部改走 libs.*，脚本里**硬编码版本号归零**
+- 此前 16 个版本号散落在 plugins/dependencies 两处，"哪个库配哪个版本"只存在于人脑里
+
+### 测试与构建
+
+- 单测 **597 → 610 条全绿**（62 个测试类）；detekt 通过；erifySpecSync 门通过
+- release / debug 均 versionCode **84 / 1.0.79**
+
+### 本批未做
+
+- 起点 1/2/3 的迁移覆盖（**永久不可能**，原因见 A）
 ## [v1.0.78] — 2026-10-01
 
 **批次 4 收尾：AI 标记与本地判读「并列展示」+ 表单日期校验落地。**
