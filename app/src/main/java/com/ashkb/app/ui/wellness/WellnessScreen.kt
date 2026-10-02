@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -25,8 +26,6 @@ import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.NoMeals
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
 import androidx.compose.material.icons.rounded.Restaurant
-import androidx.compose.material.icons.rounded.Straighten
-import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -40,8 +39,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,7 +50,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-
 
 import com.ashkb.app.data.entity.DietProfile
 import com.ashkb.app.data.entity.FoodAvoidItem
@@ -66,7 +65,6 @@ import com.ashkb.app.domain.Labels
 import com.ashkb.app.domain.SupplementLimits
 import com.ashkb.app.domain.SupplementLogStatus
 import com.ashkb.app.domain.SupplementTiming
-import com.ashkb.app.domain.WeightTarget
 import com.ashkb.app.R
 import com.ashkb.app.ui.components.DestructiveAction
 import com.ashkb.app.ui.components.DividerList
@@ -77,288 +75,539 @@ import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.StatTile
 import com.ashkb.app.ui.components.StatusChip
-import com.ashkb.app.ui.components.TrendChart
-import com.ashkb.app.ui.components.TrendPoint
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+/**
+ * 「营养与骨骼」主页（route `wellness`）。
+ *
+ * ### v1.0.91（批次 16）：按分区收口，根级 Flow 由 10 条降到 1 条
+ *
+ * **拆分前**：本屏在根级收集 10 条 Flow（`vitalsToday` / `weightToday` / `weightRecent` /
+ * `profile` / `bodyMeasureLatest` / `supplements` / `supplementLogsToday` / `dietProfile` /
+ * `foodAvoidItems` / `medications`）——**任何一条发射都会重跑整屏**：补一次体重，补剂列表、
+ * 合并时间表、饮食画像、忌口清单全跟着重组；打卡一次补剂同理。这正是批次 12（TodayScreen 9→3）、
+ * 批次 12（BackupScreen 19→3）修掉的同一类问题。
+ *
+ * **拆分后**：每条流的读点落在**渲染它的那个 section** 内（`collectAsStateWithLifecycle` 的
+ * 快照读点在哪，重组就限定在哪）：
+ *  · `vitalsToday` / `weightToday` / `weightRecent` / `bodyMeasureLatest` / `profile`
+ *    → [vitalsSections] 里的三张卡（体征 hero / 体重卡 / 身体成分卡）；
+ *  · `supplements` / `supplementLogsToday` / `medications` → [nutritionSection]（补剂档案卡 +
+ *    合并时间表，两张卡共用同一份补剂/药单，故由同一个 section 收一次，不各收一份）；
+ *  · `dietProfile` → 饮食画像卡与饮食弹层各自收（档案是只读流，各收一份不会出现「两个真相」）；
+ *  · `foodAvoidItems` → 忌口清单卡与忌口管理弹层各自收。
+ *
+ * ### 为什么根级**一条 Flow 都不留**，而 TodayScreen 还留三条
+ * TodayScreen 留 `profile` / `todayDate` / `items` 是因为三处 section 必须共用同一个值，
+ * 尤其 `todayDate`（两处各读一次系统时钟会出现「两个今天」，批次 9 的缺陷）。
+ * 本屏没有这种「必须共用同一份、且各收一份会漂移」的值：
+ *  · 时间相关的判断（今日体征 / 今日体重 / 今日补剂记录）在 `WellnessViewModel` 里就按
+ *    `dateProvider.today` 取好了窗口，UI 层不参与「今天」的判定；
+ *  · `profile` 与 `dateProvider` 无关，是**只读**档案流，各 section 各收一份不存在语义漂移。
+ *
+ * ### 根级为什么**只**留这些 state
+ *  · [WellnessSheetState]——「当前打开哪个弹层」。它是**跨 section 的胶水**：营养卡的开表单、
+ *    体重卡的录入 / 管理、体征 hero 的编辑、饮食卡、忌口卡的入口都要写同一份可见性，
+ *    而弹层本体在 [WellnessOverlays] 里渲染（`ModalBottomSheet` 是独立窗口，不能登记成列表 item——
+ *    那样一旦滚出视口就会被回收、弹层跟着消失）。
+ *  · 三个补剂目标（详情 / 编辑 / 待删）——【必须】留在根级：它们的**写入点是补剂行的回调**，
+ *    而补剂行由 `LazyListScope` 扩展在**列表作用域**里登记。`LazyListScope.item { }` 的 lambda
+ *    本身是组合上下文（`@Composable LazyItemScope.() -> Unit`），但那层作用域里能写的 state
+ *    必须是**父级持有**的——section 里 `remember` 出来的东西，行回调根本拿不到。
+ *    它们不是 Flow（不自己发射），留着只是三个 `MutableState` 槽位。
+ *    三个目标与 [WellnessOverlays] 读的是**同一份引用**：写成两份 state 的话，点击只改一份、
+ *    弹层读另一份，点了没反应（v1.0.81 的缺陷正是这个形状）。
+ *
+ * ### 技术边界（批次 16 实测复现，与批次 12 的记录一致）
+ * 「既自己收 Flow、又往**宿主**列表发 item」的 section **不能**写成 `@Composable LazyListScope.` 扩展：
+ * 在 `LazyColumn` 的内容 lambda 里调用它会报
+ * `@Composable invocations can only happen from the context of a @Composable function`
+ * （批次 16 用一个一次性编译探针把这条报错原样复现了一次；探针已删，结论记在这里）。
+ * 因此本屏的分工是：
+ *  · [vitalsSections] / [nutritionSection] / [dietProfileSection] / [avoidListSection] 都是
+ *    **非** `@Composable` 的 `LazyListScope` 扩展——只登记 item，不碰 state；
+ *  · 真正收 Flow 的是它们 `item { }` 里的**内容 composable**（如 [WeightCard]、[SupplementArchiveCard]），
+ *    item 的内容 lambda 是组合上下文，`remember` / `collectAsStateWithLifecycle` 都能用。
+ * 顺带说明一条**被本批证伪**的旧结论：`item { }` 的内容 lambda 里其实**可以**直接
+ * `remember` / `collectAsStateWithLifecycle`（同一次探针编译通过）。
+ * 但本屏不采用那种写法——它会让「谁收哪条流」散落在列表 lambda 里，与
+ * [WellnessVitalsSections] 这类 section 文件的分工相冲突；批次的约定是
+ * **一条流由渲染它的那个 section 收**，读代码的人在 section 文件里就能看全。
+ *
+ * ### 一条不能动的约束：detekt 基线按「文件 + 完整签名」记账
+ * 本文件里 [VitalsHero] / [VitalsSheet] / [SupplementSheet] 三个函数在
+ * `config/detekt/baseline.xml` 里有历史条目，ID 形如
+ * `CyclomaticComplexMethod:WellnessScreen.kt$@Composable private fun VitalsHero(vitals: Vitals?, onEdit: () -> Unit)`。
+ * 本批**不得新增基线**，所以这三个函数的名字、形参表与所在文件都保持原样——
+ * 取数一律下移，摆放层不动。详见 [VitalsHero] 的注释。
+ */
 @Composable
 fun WellnessScreen(vm: WellnessViewModel, onOpenRecipes: () -> Unit, onBack: () -> Unit) {
-    val vitals by vm.vitalsToday.collectAsStateWithLifecycle()
-    val weight by vm.weightToday.collectAsStateWithLifecycle()
-    val weightList by vm.weightRecent.collectAsStateWithLifecycle()
-    val profile by vm.profile.collectAsStateWithLifecycle()
-    val bm by vm.bodyMeasureLatest.collectAsStateWithLifecycle()
-    val supplements by vm.supplements.collectAsStateWithLifecycle()
-    val supLogs by vm.supplementLogsToday.collectAsStateWithLifecycle()
-    val diet by vm.dietProfile.collectAsStateWithLifecycle()
-    val avoids by vm.foodAvoidItems.collectAsStateWithLifecycle()
-    // v1.0.38（B11）：在用药单——补剂错开提醒与合并时间表的数据源
-    val medications by vm.medications.collectAsStateWithLifecycle()
-
-    var showVitals by remember { mutableStateOf(false) }
-    var showWeight by remember { mutableStateOf(false) }
-    var showWeightManage by remember { mutableStateOf(false) }
-    var showBodyMeasure by remember { mutableStateOf(false) }
-    var showSupplementForm by remember { mutableStateOf(false) }
-    var showDietForm by remember { mutableStateOf(false) }
-    var showAvoidManage by remember { mutableStateOf(false) }
-    var detailSup by remember { mutableStateOf<Supplement?>(null) }
-    // v1.0.38（B11）：编辑补剂时复用同一表单并预填既有值
-    var editSup by remember { mutableStateOf<Supplement?>(null) }
-    // v1.0.81（批次 7）：待删的**整个补剂条目**（与详情里的逐条删除是两回事，文案各说各的）
-    var deletingSup by remember { mutableStateOf<Supplement?>(null) }
+    // ---- 根级**仅存**的 state（无 Flow，理由见类注释）----
+    val sheets = remember { mutableStateOf(WellnessSheetState()) }
+    // 三个补剂目标：写入点在列表作用域里创建的回调上，故必须由根级持有
+    val detailSup = remember { mutableStateOf<Supplement?>(null) }
+    val editSup = remember { mutableStateOf<Supplement?>(null) }
+    val deletingSup = remember { mutableStateOf<Supplement?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         ScreenTopBar(title = stringResource(R.string.nutrition_bone_health_title), onBack = onBack)
 
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = Spacing.lg, end = Spacing.lg,
-                top = Spacing.md, bottom = Spacing.xxl,
-            ),
+        WellnessSections(
+            vm = vm,
+            sheets = sheets,
+            detailSup = detailSup,
+            editSup = editSup,
+            deletingSup = deletingSup,
+            onOpenRecipes = onOpenRecipes,
+        )
+    }
+
+    // ---- 弹层：全部在 `LazyColumn` 之外渲染（与拆分前位置一致）----
+    // 为什么不像其它 section 那样抽成独立文件里的宿主函数：这七张表单 composable 都是本文件的
+    // `private`，而它们的签名又被 `config/detekt/baseline.xml` 按「文件 + 完整签名」钉死
+    // （见 [VitalsHero] 的说明），两边都动不了——所以这 10 行 if 就留在这里，
+    // 它们是**条件组合**，只在开关真正翻转时才执行。
+    val sheetState = sheets.value
+    if (sheetState.vitals) VitalsSheet(vm = vm, onDismiss = { sheets.value = sheetState.copy(vitals = false) })
+    if (sheetState.weight) WeightSheet(vm = vm, onDismiss = { sheets.value = sheetState.copy(weight = false) })
+    if (sheetState.weightManage) WeightManageSheet(vm = vm, onDismiss = { sheets.value = sheetState.copy(weightManage = false) })
+    if (sheetState.bodyMeasure) BodyMeasureSheet(vm = vm, onDismiss = { sheets.value = sheetState.copy(bodyMeasure = false) })
+    if (sheetState.supplementForm) SupplementSheet(vm = vm, onDismiss = { sheets.value = sheetState.copy(supplementForm = false) })
+    if (sheetState.dietForm) DietSheet(vm = vm, onDismiss = { sheets.value = sheetState.copy(dietForm = false) })
+    if (sheetState.avoidManage) AvoidManageSheet(vm = vm, onDismiss = { sheets.value = sheetState.copy(avoidManage = false) })
+    detailSup.value?.let { sup -> SupplementDetailSheet(vm = vm, sup = sup, onDismiss = { detailSup.value = null }) }
+    editSup.value?.let { sup -> SupplementSheet(vm = vm, current = sup, onDismiss = { editSup.value = null }) }
+    deletingSup.value?.let { sup -> SupplementDeleteDialog(vm = vm, sup = sup, onDismiss = { deletingSup.value = null }) }
+}
+
+/**
+ * 本屏的分区骨架：一个 `LazyColumn`，把各 section 登记的 item 串起来。
+ *
+ * v1.0.91（批次 16）从 [WellnessScreen] 抽成独立 composable：根级正文因此只剩
+ * 「顶部栏 + 列表 + 弹层」，各分区的槽位登记与取数都进了对应 section 文件。
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+private fun WellnessSections(
+    vm: WellnessViewModel,
+    sheets: MutableState<WellnessSheetState>,
+    detailSup: MutableState<Supplement?>,
+    editSup: MutableState<Supplement?>,
+    deletingSup: MutableState<Supplement?>,
+    onOpenRecipes: () -> Unit,
+) {
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = Spacing.lg, end = Spacing.lg,
+            top = Spacing.md, bottom = Spacing.xxl,
+        ),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        // ---- 分组一 / 二：体征、身体成分（各自的卡片自己收 Flow，见 WellnessVitalsSections.kt）----
+        vitalsSections(vm = vm, sheets = sheets)
+
+        // ---- 分组三：营养与饮食 ----
+        // stickyHeader（{ }）与批次 14 之前逐字一致：吸附头不是普通 item，不能直调 composable
+        stickyHeader { WellnessGroupHeader(stringResource(R.string.wellness_nutrition_section)) }
+        // B3：推荐食谱库入口——放在饮食分组首位，与下方饮食画像 / 忌口清单同属「吃什么」的决策链
+        item {
+            NavRow(
+                icon = Icons.Rounded.Restaurant,
+                title = stringResource(R.string.recipes_title),
+                subtitle = stringResource(R.string.recipes_entry_sub),
+                onClick = onOpenRecipes,
+            )
+        }
+        // 补剂档案卡 + 合并时间表（两张卡各自收自己渲染的流）
+        nutritionSection(vm = vm, sheets = sheets, detailSup = detailSup, editSup = editSup, deletingSup = deletingSup)
+        dietProfileSection(vm = vm, sheets = sheets)
+        avoidListSection(vm = vm, sheets = sheets)
+    }
+}
+
+/**
+ * 分组头：sticky。吸附时用页面底色融入背景，底边 1dp 分隔。
+ *
+ * v1.0.91（批次 16）：从 `private` 提为 `internal`——体征分组的两个吸附头在
+ * `WellnessVitalsSections.kt` 里，需要一个同包可见的分组头实现（原先它是
+ * `WellnessScreen.kt` 的私有函数，拆文件后就够不着了）。
+ */
+@Composable
+internal fun WellnessGroupHeader(text: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            Text(
+                text,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(vertical = Spacing.xs),
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
+    }
+}
+
+/**
+ * 体征 section 的**取数层**：自己收 `vitalsToday`，再把值交给摆放层 [VitalsHero]。
+ *
+ * 为什么拆成两层（取数 + 摆放）而不是让 [VitalsHero] 自己收：
+ * `VitalsHero` 带 `<ID>CyclomaticComplexMethod:WellnessScreen.kt$@Composable private fun VitalsHero(vitals: Vitals?, onEdit: () -> Unit)</ID>`
+ * 这条基线——ID 里写死了**文件 + 完整签名 + `private`**。本批不得新增基线，所以它的名字、形参表、
+ * 所在文件与可见性都得逐字不变（改 `internal` 也会失配，实测被 detekt 抓过）。
+ * 于是取数放在这里（本 item 的重组作用域内），摆放仍是原来那个函数。
+ */
+@Composable
+internal fun VitalsSection(vm: WellnessViewModel, sheets: MutableState<WellnessSheetState>) {
+    val vitals by vm.vitalsToday.collectAsStateWithLifecycle()
+    VitalsHero(vitals = vitals, onEdit = { sheets.value = sheets.value.copy(vitals = true) })
+}
+
+/**
+ * 今日体征 hero：体温 / 血压 / 心率三格 StatTile，异常格按 ClinicalThresholds 着色。
+ *
+ * v1.0.91（批次 16）：**取数已下移到** [VitalsSection]（体征变化只重组那一块 item）。
+ * 本函数只负责摆放，签名、所在文件与 `private` 与拆分前逐字一致。
+ *
+ * ⚠️ **名字 / 形参表 / 文件 / 可见性都不能动**：`config/detekt/baseline.xml` 里那条
+ * `<ID>CyclomaticComplexMethod:WellnessScreen.kt$@Composable private fun VitalsHero(vitals: Vitals?, onEdit: () -> Unit)</ID>`
+ * 把「文件 + 完整签名」写死在 ID 里（复杂度 24，阈值 15）。加一个 `vm` 形参、搬去别的文件、
+ * 甚至只是把 `private` 改成 `internal`，都会让条目失配、detekt 立刻报新问题——
+ * 而本批的约束是**不得新增基线**。[VitalsSheet] / [SupplementSheet] 同理（它们也必须继续拿 `vm`）。
+ */
+@Composable
+private fun VitalsHero(vitals: Vitals?, onEdit: () -> Unit) {
+    val temp = vitals?.temperature
+    val sys = vitals?.bpSys
+    val dia = vitals?.bpDia
+    val hr = vitals?.heartRate
+
+    val tempTone = when {
+        temp == null -> StatusTone.Neutral
+        temp >= ClinicalThresholds.FEVER_ALERT -> StatusTone.Danger
+        temp >= ClinicalThresholds.FEVER_LOW -> StatusTone.Warning
+        else -> StatusTone.Success
+    }
+    val bpTone = when {
+        sys == null || dia == null -> StatusTone.Neutral
+        sys >= ClinicalThresholds.BP_HIGH_SYS || dia >= ClinicalThresholds.BP_HIGH_DIA -> StatusTone.Danger
+        sys <= ClinicalThresholds.BP_LOW_SYS -> StatusTone.Warning
+        else -> StatusTone.Success
+    }
+    val hrTone = when {
+        hr == null -> StatusTone.Neutral
+        hr > ClinicalThresholds.HR_HIGH || hr < ClinicalThresholds.HR_LOW -> StatusTone.Warning
+        else -> StatusTone.Success
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Size.heroMinHeight)
+                .padding(Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            // ---- 分组一：体征 ----
-            stickyHeader { GroupHeader(stringResource(R.string.vitals_short)) }
-            item { VitalsHero(vitals = vitals, onEdit = { showVitals = true }) }
-
-            // ---- 分组二：身体成分 ----
-            stickyHeader { GroupHeader(stringResource(R.string.vitals_body_composition)) }
-            item {
-                SectionCard(
-                    title = stringResource(R.string.wellness_weight_tracking),
-                    subtitle = if (weightList.isEmpty()) null else stringResource(R.string.wellness_weight_records, weightList.size),
-                    action = {
-                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                            OutlinedButton(onClick = { showWeight = true }) {
-                                Text(if (weight != null) stringResource(R.string.common_edit) else stringResource(R.string.common_record))
-                            }
-                            if (weightList.isNotEmpty()) {
-                                TextButton(onClick = { showWeightManage = true }) {
-                                    Text(stringResource(R.string.common_manage))
-                                }
-                            }
-                        }
-                    },
-                ) {
-                    // DAO 按日期倒序返回，趋势图需要从旧到新。
-                    // 必须 remember：List.map 每次返回新实例，会让 TrendChart 的入场动画（以 points 为 key）
-                    // 在任何一次父级重组时反复从头播放
-                    val points = remember(weightList) {
-                        weightList.asReversed().map { TrendPoint(it.date, it.weightKg.toFloat()) }
-                    }
-                    if (points.isNotEmpty()) {
-                        TrendChart(points = points, unit = "kg", label = stringResource(R.string.vitals_weight))
-                        Spacer(Modifier.height(Spacing.md))
-                    }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.vitals_today_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                FilledTonalButton(onClick = onEdit) {
+                    Text(if (vitals != null) stringResource(R.string.common_edit) else stringResource(R.string.common_record))
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                Box(Modifier.weight(1f)) {
                     StatTile(
-                        label = stringResource(R.string.vitals_today_weight),
-                        value = weight?.weightKg?.let { "%.1f".format(it) } ?: stringResource(R.string.common_not_recorded),
-                        unit = weight?.let { "kg" },
+                        label = stringResource(R.string.vitals_temperature_short),
+                        value = temp?.let { "%.1f".format(it) } ?: stringResource(R.string.common_not_recorded),
+                        unit = temp?.let { "℃" },
+                        tone = tempTone,
                     )
-                    // v10（C9）：体重目标区间提示（区间由档案设定）
-                    WeightTargetHint(weightKg = weight?.weightKg, profile = profile)
+                }
+                Box(Modifier.weight(1f)) {
+                    StatTile(
+                        label = stringResource(R.string.vitals_bp),
+                        value = if (sys != null && dia != null) "$sys/$dia" else stringResource(R.string.common_not_recorded),
+                        tone = bpTone,
+                    )
+                }
+                Box(Modifier.weight(1f)) {
+                    StatTile(
+                        label = stringResource(R.string.vitals_heart_rate),
+                        value = hr?.toString() ?: stringResource(R.string.common_not_recorded),
+                        unit = hr?.let { stringResource(R.string.vitals_bpm_unit) },
+                        tone = hrTone,
+                    )
                 }
             }
-            item {
-                SectionCard(
-                    title = stringResource(R.string.vitals_body_measures),
-                    action = {
-                        OutlinedButton(onClick = { showBodyMeasure = true }) {
-                            Text(if (bm != null) stringResource(R.string.common_update) else stringResource(R.string.common_input_action))
-                        }
-                    },
-                ) {
-                    if (bm != null) {
-                        KeyValueRow(stringResource(R.string.vitals_height_short), bm!!.heightCm?.let { "%.0f cm".format(it) } ?: stringResource(R.string.common_unfilled))
-                        KeyValueRow(stringResource(R.string.vitals_waist), bm!!.waistCm?.let { "%.0f cm".format(it) } ?: stringResource(R.string.common_unfilled))
-                        KeyValueRow(stringResource(R.string.vitals_hip), bm!!.hipCm?.let { "%.0f cm".format(it) } ?: stringResource(R.string.common_unfilled))
-                        KeyValueRow("BMI", bm!!.bmi?.let { "%.1f".format(it) } ?: stringResource(R.string.common_unfilled))
-                    } else {
-                        EmptyState(
-                            icon = Icons.Rounded.Straighten,
-                            title = stringResource(R.string.report_no_baseline),
-                            body = stringResource(R.string.vitals_bmi_hint),
-                        )
-                    }
-                }
+            vitals?.notes?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+    }
+}
 
-            // ---- 分组三：营养与饮食 ----
-            stickyHeader { GroupHeader(stringResource(R.string.wellness_nutrition_section)) }
-            // B3：推荐食谱库入口——放在饮食分组首位，与下方饮食画像 / 忌口清单同属「吃什么」的决策链
-            item {
-                NavRow(
-                    icon = Icons.Rounded.Restaurant,
-                    title = stringResource(R.string.recipes_title),
-                    subtitle = stringResource(R.string.recipes_entry_sub),
-                    onClick = onOpenRecipes,
+/**
+ * 营养分组的**两张内容卡**的槽位登记：补剂档案卡 + 今日服药 / 补剂合并时间表。
+ *
+ * ### 为什么是**两个** item，而不是塞进一个内容 composable
+ * 每张卡必须是宿主 `LazyColumn` 的一个 item：item 之间的 `Spacing.md` 由宿主的
+ * `verticalArrangement` 给，item 也只有各自独立才能被分别虚拟化。把两张卡塞进同一个
+ * `item { Column { … } }` 会同时丢掉这两样（卡片间距要手写、两张卡永远一起组合）。
+ *
+ * ### 为什么 `supplements` 被收了两次（有意为之）
+ * 合并时间表要展平的 `times` 与档案卡渲染的列表**是同一份补剂数据**，理论上可以由一个
+ * `@Composable` 收一次再分给两张卡——但那要求把两张卡放进同一个 item（见上，代价更大）。
+ * 各收一份的后果只是**多一个订阅**：两条都读同一个 `WellnessViewModel.supplements`
+ * （`SharingStarted.WhileSubscribed` 的 `StateFlow`），值必然一致，不存在「两个真相」；
+ * `collectAsStateWithLifecycle` 这种重复订阅在本项目里本来就随处可见（例如 `profile` 在
+ * 本屏被 2 个 section、2 个弹层各收一份）。真正要避免的是「整屏根部收一次」——
+ * 那才是每次发射都重组全屏的原因。
+ *
+ * ### 技术边界（批次 12 / 16 实测）
+ * 本函数**不是** `@Composable`（它是 `LazyListScope` 扩展，只登记 item），
+ * 所以它不能调用 `collectAsStateWithLifecycle`——真正收 Flow 的是两个 item 的**内容 composable**。
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.nutritionSection(
+    vm: WellnessViewModel,
+    sheets: MutableState<WellnessSheetState>,
+    detailSup: MutableState<Supplement?>,
+    editSup: MutableState<Supplement?>,
+    deletingSup: MutableState<Supplement?>,
+) {
+    item {
+        SupplementArchiveCard(
+            vm = vm,
+            onAdd = { sheets.value = sheets.value.copy(supplementForm = true) },
+            onOpenDetail = { detailSup.value = it },
+            onEdit = { editSup.value = it },
+            onDelete = { deletingSup.value = it },
+        )
+    }
+    item { MergedTimelineCard(vm = vm) }
+}
+
+/**
+ * 补剂档案卡：列表 + 空态 + 错开提醒 + 历史提示。
+ *
+ * v1.0.91（批次 16）：`supplements` / `supplementLogsToday` / `medications` 三条流改由本卡自收。
+ * `medications` 在这里只服务「矿物类补剂与螯合类用药错开提醒」，合并时间表另收一份（同款说明见
+ * [nutritionSection]）。打卡一次补剂只会重组这一张卡，不再连带整屏。
+ *
+ * 三个档案类动作按 `(Supplement) -> Unit` 收：卡片**不持有**那三个目标（它们的写入点必须与
+ * 弹层同一份 state，见 [WellnessScreen] 类注释），只把「这一行的 sup」交回根部。
+ */
+@Composable
+private fun SupplementArchiveCard(
+    vm: WellnessViewModel,
+    onAdd: () -> Unit,
+    onOpenDetail: (Supplement) -> Unit,
+    onEdit: (Supplement) -> Unit,
+    onDelete: (Supplement) -> Unit,
+) {
+    val supplements by vm.supplements.collectAsStateWithLifecycle()
+    val supLogs by vm.supplementLogsToday.collectAsStateWithLifecycle()
+    // v1.0.38（B11）：在用药单——补剂错开提醒与合并时间表的数据源
+    val medications by vm.medications.collectAsStateWithLifecycle()
+
+    SectionCard(
+        title = stringResource(R.string.nutrition_supplement_archive),
+        subtitle = stringResource(R.string.wellness_supplements_count, supplements.size),
+        action = {
+            OutlinedButton(onClick = onAdd) { Text(stringResource(R.string.common_add)) }
+        },
+    ) {
+        if (supplements.isEmpty()) {
+            EmptyState(
+                icon = Icons.Rounded.Medication,
+                title = stringResource(R.string.nutrition_no_supplements),
+                body = stringResource(R.string.nutrition_supplement_hint),
+                actionLabel = stringResource(R.string.nutrition_add_supplement),
+                onAction = onAdd,
+            )
+        } else {
+            DividerList(supplements, key = { it.id }) { sup ->
+                SupplementCardRow(
+                    sup = sup,
+                    // 打卡态集合一次性算好：避免每行对全部 supLogs 做 O(N·M) 线性扫描
+                    todayStatus = SupplementLogStatus.loggedToday(supLogs, sup.id),
+                    // 三个「档案类动作」：把这一行的 sup 交回根部持有的目标
+                    // （与拆分前 `SupplementRowActions(onOpenDetail = { detailSup = sup }, …)` 等价）
+                    actions = SupplementRowActions(
+                        onOpenDetail = { onOpenDetail(sup) },
+                        onEdit = { onEdit(sup) },
+                        onDelete = { onDelete(sup) },
+                    ),
+                    onCheckIn = { vm.checkInSupplement(sup, AdherenceCalc.DONE, null, null) },
+                    onSkip = { vm.checkInSupplement(sup, AdherenceCalc.SKIPPED, null, null) },
+                    onUndo = { vm.undoSupplementCheckIn(sup) },
                 )
             }
-            item {
-                SectionCard(
-                    title = stringResource(R.string.nutrition_supplement_archive),
-                    subtitle = stringResource(R.string.wellness_supplements_count, supplements.size),
-                    action = {
-                        OutlinedButton(onClick = { showSupplementForm = true }) { Text(stringResource(R.string.common_add)) }
-                    },
-                ) {
-                    if (supplements.isEmpty()) {
-                        EmptyState(
-                            icon = Icons.Rounded.Medication,
-                            title = stringResource(R.string.nutrition_no_supplements),
-                            body = stringResource(R.string.nutrition_supplement_hint),
-                            actionLabel = stringResource(R.string.nutrition_add_supplement),
-                            onAction = { showSupplementForm = true },
-                        )
-                    } else {
-                        DividerList(supplements, key = { it.id }) { sup ->
-                            SupplementCardRow(
-                                sup = sup,
-                                // 打卡态集合一次性算好：避免每行对全部 supLogs 做 O(N·M) 线性扫描
-                                todayStatus = SupplementLogStatus.loggedToday(supLogs, sup.id),
-                                actions = SupplementRowActions(
-                                    onOpenDetail = { detailSup = sup },
-                                    onEdit = { editSup = sup },
-                                    onDelete = { deletingSup = sup },
-                                ),
-                                onCheckIn = { vm.checkInSupplement(sup, AdherenceCalc.DONE, null, null) },
-                                onSkip = { vm.checkInSupplement(sup, AdherenceCalc.SKIPPED, null, null) },
-                                onUndo = { vm.undoSupplementCheckIn(sup) },
-                            )
-                        }
-                        // B11：矿物类补剂与「螯合类」用药服用时间过近（间隔 < 2 小时）→ 错开提醒
-                        val conflicts = remember(supplements, medications) {
-                            SupplementTiming.conflicts(supplements, medications)
-                        }
-                        if (conflicts.isNotEmpty()) {
-                            Spacer(Modifier.height(Spacing.sm))
-                            conflicts.forEach { c ->
-                                Text(
-                                    stringResource(R.string.supp_timing_conflict, c.medName, c.gapMinutes),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error,
-                                )
-                            }
-                        }
-                        Text(
-                            stringResource(R.string.nutrition_supplement_history_hint),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+            // B11：矿物类补剂与「螯合类」用药服用时间过近（间隔 < 2 小时）→ 错开提醒
+            val conflicts = remember(supplements, medications) {
+                SupplementTiming.conflicts(supplements, medications)
+            }
+            if (conflicts.isNotEmpty()) {
+                Spacer(Modifier.height(Spacing.sm))
+                conflicts.forEach { c ->
+                    Text(
+                        stringResource(R.string.supp_timing_conflict, c.medName, c.gapMinutes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
             }
-            // ---- B11：今日服药 / 补剂合并时间表 ----
-            item {
-                SectionCard(title = stringResource(R.string.supp_merged_title)) {
-                    // 只取当前在用药单（takeTimes）与在补剂（times），按时刻升序合并
-                    val rows = remember(medications, supplements) {
-                        mergedTimeline(medications, supplements)
-                    }
-                    if (rows.isEmpty()) {
-                        Text(
-                            stringResource(R.string.supp_merged_empty),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        DividerList(rows, key = { it.key }) { row ->
-                            Text(row.time, style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                row.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f),
-                            )
-                            StatusChip(
-                                text = stringResource(
-                                    if (row.isMed) R.string.supp_merged_med_tag else R.string.supp_merged_supp_tag
-                                ),
-                                tone = if (row.isMed) StatusTone.Info else StatusTone.Brand,
-                            )
-                        }
-                    }
-                }
+            Text(
+                stringResource(R.string.nutrition_supplement_history_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * B11：今日服药 / 补剂合并时间表。
+ *
+ * v1.0.91（批次 16）：`medications` / `supplements` 改由本卡自收——它只在这张表里被展平，
+ * 不需要根部代收（同一条流被档案卡再收一份的取舍见 [nutritionSection]）。
+ */
+@Composable
+private fun MergedTimelineCard(vm: WellnessViewModel) {
+    val medications by vm.medications.collectAsStateWithLifecycle()
+    val supplements by vm.supplements.collectAsStateWithLifecycle()
+
+    SectionCard(title = stringResource(R.string.supp_merged_title)) {
+        // 只取当前在用药单（takeTimes）与在补剂（times），按时刻升序合并
+        val rows = remember(medications, supplements) {
+            mergedTimeline(medications, supplements)
+        }
+        if (rows.isEmpty()) {
+            Text(
+                stringResource(R.string.supp_merged_empty),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            DividerList(rows, key = { it.key }) { row ->
+                Text(row.time, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    row.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                StatusChip(
+                    text = stringResource(
+                        if (row.isMed) R.string.supp_merged_med_tag else R.string.supp_merged_supp_tag
+                    ),
+                    tone = if (row.isMed) StatusTone.Info else StatusTone.Brand,
+                )
             }
-            item {
-                SectionCard(
-                    title = stringResource(R.string.nutrition_diet_profile),
-                    action = {
-                        if (diet != null) {
-                            OutlinedButton(onClick = { showDietForm = true }) { Text(stringResource(R.string.common_edit)) }
-                        }
-                    },
-                ) {
-                    if (diet != null) {
-                        val d = diet!!
-                        KeyValueRow(stringResource(R.string.nutrition_diet_pattern), Labels.dietPattern(d.dietPattern))
-                        KeyValueRow(stringResource(R.string.nutrition_fish_intake), Labels.seafoodFreq(d.seafoodFreq))
-                        KeyValueRow(stringResource(R.string.nutrition_dairy), Labels.dairyTolerance(d.dairyTolerant))
-                    } else {
-                        EmptyState(
-                            icon = Icons.Rounded.Restaurant,
-                            title = stringResource(R.string.nutrition_profile_empty),
-                            body = stringResource(R.string.nutrition_profile_benefit),
-                            actionLabel = stringResource(R.string.nutrition_set_profile),
-                            onAction = { showDietForm = true },
-                        )
-                    }
-                }
+        }
+    }
+}
+
+/** 饮食画像卡：有画像给三项 KeyValue，无画像给空态与设置入口。 */
+@Composable
+private fun DietProfileCard(vm: WellnessViewModel, onEdit: () -> Unit) {
+    val diet by vm.dietProfile.collectAsStateWithLifecycle()
+
+    SectionCard(
+        title = stringResource(R.string.nutrition_diet_profile),
+        action = {
+            if (diet != null) {
+                OutlinedButton(onClick = onEdit) { Text(stringResource(R.string.common_edit)) }
             }
-            item {
-                SectionCard(
-                    title = stringResource(R.string.nutrition_avoid_list),
-                    subtitle = stringResource(R.string.wellness_avoid_count, avoids.size),
-                    action = {
-                        OutlinedButton(onClick = { showAvoidManage = true }) { Text(stringResource(R.string.common_manage)) }
-                    },
-                ) {
-                    if (avoids.isEmpty()) {
-                        EmptyState(
-                            icon = Icons.Rounded.NoMeals,
-                            title = stringResource(R.string.nutrition_no_avoid_items),
-                            body = stringResource(R.string.nutrition_avoid_hint),
-                            actionLabel = stringResource(R.string.nutrition_add_avoid_item),
-                            onAction = { showAvoidManage = true },
-                        )
-                    } else {
-                        DividerList(avoids.take(5)) { item ->
-                            Text(
-                                item.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                "${Labels.foodAvoidCategory(item.category)} · ${Labels.foodAvoidSeverity(item.severity)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (avoids.size > 5) {
-                            TextButton(onClick = { showAvoidManage = true }) {
-                                Text(stringResource(R.string.wellness_view_all_avoids, avoids.size))
-                            }
-                        }
-                    }
+        },
+    ) {
+        val d = diet
+        if (d != null) {
+            KeyValueRow(stringResource(R.string.nutrition_diet_pattern), Labels.dietPattern(d.dietPattern))
+            KeyValueRow(stringResource(R.string.nutrition_fish_intake), Labels.seafoodFreq(d.seafoodFreq))
+            KeyValueRow(stringResource(R.string.nutrition_dairy), Labels.dairyTolerance(d.dairyTolerant))
+        } else {
+            EmptyState(
+                icon = Icons.Rounded.Restaurant,
+                title = stringResource(R.string.nutrition_profile_empty),
+                body = stringResource(R.string.nutrition_profile_benefit),
+                actionLabel = stringResource(R.string.nutrition_set_profile),
+                onAction = onEdit,
+            )
+        }
+    }
+}
+
+/**
+ * 忌口清单卡：最多展示 5 条，超出给「查看全部」。
+ *
+ * v1.0.91（批次 16）：`foodAvoidItems` 改由本卡自收（原读点在根部）。
+ */
+@Composable
+private fun AvoidListCard(vm: WellnessViewModel, onManage: () -> Unit) {
+    val avoids by vm.foodAvoidItems.collectAsStateWithLifecycle()
+
+    SectionCard(
+        title = stringResource(R.string.nutrition_avoid_list),
+        subtitle = stringResource(R.string.wellness_avoid_count, avoids.size),
+        action = {
+            OutlinedButton(onClick = onManage) { Text(stringResource(R.string.common_manage)) }
+        },
+    ) {
+        if (avoids.isEmpty()) {
+            EmptyState(
+                icon = Icons.Rounded.NoMeals,
+                title = stringResource(R.string.nutrition_no_avoid_items),
+                body = stringResource(R.string.nutrition_avoid_hint),
+                actionLabel = stringResource(R.string.nutrition_add_avoid_item),
+                onAction = onManage,
+            )
+        } else {
+            DividerList(avoids.take(5)) { item ->
+                Text(
+                    item.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    "${Labels.foodAvoidCategory(item.category)} · ${Labels.foodAvoidSeverity(item.severity)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (avoids.size > 5) {
+                TextButton(onClick = onManage) {
+                    Text(stringResource(R.string.wellness_view_all_avoids, avoids.size))
                 }
             }
         }
     }
+}
 
-    if (showVitals) VitalsSheet(vm = vm, onDismiss = { showVitals = false })
-    if (showWeight) WeightSheet(vm = vm, onDismiss = { showWeight = false })
-    if (showWeightManage) WeightManageSheet(vm = vm, onDismiss = { showWeightManage = false })
-    if (showBodyMeasure) BodyMeasureSheet(vm = vm, onDismiss = { showBodyMeasure = false })
-    if (showSupplementForm) SupplementSheet(vm = vm, onDismiss = { showSupplementForm = false })
-    if (showDietForm) DietSheet(vm = vm, current = diet, onDismiss = { showDietForm = false })
-    if (showAvoidManage) AvoidManageSheet(vm = vm, onDismiss = { showAvoidManage = false })
-    detailSup?.let { sup -> SupplementDetailSheet(vm = vm, sup = sup, onDismiss = { detailSup = null }) }
-    editSup?.let { sup -> SupplementSheet(vm = vm, current = sup, onDismiss = { editSup = null }) }
-    deletingSup?.let { sup -> SupplementDeleteDialog(vm = vm, sup = sup, onDismiss = { deletingSup = null }) }
+/** 饮食画像卡的槽位登记（内容见 [DietProfileCard]）。 */
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.dietProfileSection(vm: WellnessViewModel, sheets: MutableState<WellnessSheetState>) {
+    item { DietProfileCard(vm = vm, onEdit = { sheets.value = sheets.value.copy(dietForm = true) }) }
+}
+
+/** 忌口清单卡的槽位登记（内容见 [AvoidListCard]）。 */
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.avoidListSection(vm: WellnessViewModel, sheets: MutableState<WellnessSheetState>) {
+    item { AvoidListCard(vm = vm, onManage = { sheets.value = sheets.value.copy(avoidManage = true) }) }
 }
 
 /**
@@ -523,70 +772,8 @@ private fun SupplementStatusSlot(status: String, icon: ImageVector) {
     }
 }
 
-/**
- * v10（C9）：体重目标区间提示。
- *
- * 判定逻辑在纯函数 `domain/WeightTarget`（可单测）；这里只呈现结论。
- * 未设目标时不打扰用户（只在填了区间后出现）；只填一侧提示补全。
- */
-@Composable
-private fun WeightTargetHint(weightKg: Double?, profile: com.ashkb.app.data.entity.Profile?) {
-    val low = profile?.weightTargetLow
-    val high = profile?.weightTargetHigh
-    val status = WeightTarget.status(weightKg, low, high)
-    if (status == WeightTarget.Status.NO_TARGET) return
-
-    Spacer(Modifier.height(Spacing.sm))
-    val range = WeightTarget.normalize(low, high)
-    when (status) {
-        WeightTarget.Status.INCOMPLETE -> Text(
-            stringResource(R.string.weight_target_incomplete),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        WeightTarget.Status.IN_RANGE -> Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            StatusChip(stringResource(R.string.weight_target_in_range), StatusTone.Success, Icons.Rounded.CheckCircle)
-            range?.let {
-                Text(
-                    stringResource(R.string.weight_target_range_label, fmtKg(it.first), fmtKg(it.second)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        WeightTarget.Status.BELOW, WeightTarget.Status.ABOVE -> {
-            val dev = WeightTarget.deviation(weightKg, low, high) ?: 0.0
-            val text = if (status == WeightTarget.Status.BELOW) {
-                stringResource(R.string.weight_target_below, fmtKg(-dev))
-            } else {
-                stringResource(R.string.weight_target_above, fmtKg(dev))
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                StatusChip(text, StatusTone.Warning, Icons.Rounded.WarningAmber)
-                range?.let {
-                    Text(
-                        stringResource(R.string.weight_target_range_label, fmtKg(it.first), fmtKg(it.second)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-        else -> Unit
-    }
-}
-
-/** 数值显示：整数不带小数点，其余一位小数（体重、补剂剂量共用）。 */
-private fun fmtNum(v: Double): String = if (v == v.toLong().toDouble()) v.toLong().toString() else "%.1f".format(v)
-
-/** 体重数值显示：整数不带小数点，其余一位小数。 */
-private fun fmtKg(v: Double): String = fmtNum(v)
+/** 数值显示：整数不带小数点，其余一位小数（补剂剂量与体重提示共用）。 */
+internal fun fmtNum(v: Double): String = if (v == v.toLong().toDouble()) v.toLong().toString() else "%.1f".format(v)
 
 /**
  * B11 合并时间表的一行：时刻 + 名称 + 类别（药 / 补）。
@@ -617,108 +804,16 @@ private fun mergedTimeline(
     return rows.sortedWith(compareBy({ it.sortKey }, { it.name }))
 }
 
-/** 分组头：sticky。吸附时用页面底色融入背景，底边 1dp 分隔。 */
-@Composable
-private fun GroupHeader(text: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-    ) {
-        Column(Modifier.fillMaxWidth()) {
-            Text(
-                text,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(vertical = Spacing.xs),
-            )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        }
-    }
-}
-
-/** 今日体征 hero：体温 / 血压 / 心率三格 StatTile，异常格按 ClinicalThresholds 着色。 */
-@Composable
-private fun VitalsHero(vitals: Vitals?, onEdit: () -> Unit) {
-    val temp = vitals?.temperature
-    val sys = vitals?.bpSys
-    val dia = vitals?.bpDia
-    val hr = vitals?.heartRate
-
-    val tempTone = when {
-        temp == null -> StatusTone.Neutral
-        temp >= ClinicalThresholds.FEVER_ALERT -> StatusTone.Danger
-        temp >= ClinicalThresholds.FEVER_LOW -> StatusTone.Warning
-        else -> StatusTone.Success
-    }
-    val bpTone = when {
-        sys == null || dia == null -> StatusTone.Neutral
-        sys >= ClinicalThresholds.BP_HIGH_SYS || dia >= ClinicalThresholds.BP_HIGH_DIA -> StatusTone.Danger
-        sys <= ClinicalThresholds.BP_LOW_SYS -> StatusTone.Warning
-        else -> StatusTone.Success
-    }
-    val hrTone = when {
-        hr == null -> StatusTone.Neutral
-        hr > ClinicalThresholds.HR_HIGH || hr < ClinicalThresholds.HR_LOW -> StatusTone.Warning
-        else -> StatusTone.Success
-    }
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = Size.heroMinHeight)
-                .padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.vitals_today_title),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                FilledTonalButton(onClick = onEdit) {
-                    Text(if (vitals != null) stringResource(R.string.common_edit) else stringResource(R.string.common_record))
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                Box(Modifier.weight(1f)) {
-                    StatTile(
-                        label = stringResource(R.string.vitals_temperature_short),
-                        value = temp?.let { "%.1f".format(it) } ?: stringResource(R.string.common_not_recorded),
-                        unit = temp?.let { "℃" },
-                        tone = tempTone,
-                    )
-                }
-                Box(Modifier.weight(1f)) {
-                    StatTile(
-                        label = stringResource(R.string.vitals_bp),
-                        value = if (sys != null && dia != null) "$sys/$dia" else stringResource(R.string.common_not_recorded),
-                        tone = bpTone,
-                    )
-                }
-                Box(Modifier.weight(1f)) {
-                    StatTile(
-                        label = stringResource(R.string.vitals_heart_rate),
-                        value = hr?.toString() ?: stringResource(R.string.common_not_recorded),
-                        unit = hr?.let { stringResource(R.string.vitals_bpm_unit) },
-                        tone = hrTone,
-                    )
-                }
-            }
-            vitals?.notes?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
 // ---------------------------------------------------------------------------
 // 表单：多字段一律 ModalBottomSheet（半屏可拖、键盘弹起体验远好于 AlertDialog）
+//
+// v1.0.91（批次 16）说明：以下弹层 composable **留在本文件**，不搬进
+// `WellnessOverlays.kt`。原因是它们背着 `config/detekt/baseline.xml` 里按
+// 「文件名 + 函数签名」登记的历史条目（`VitalsSheet` / `SupplementSheet` 的
+// `CyclomaticComplexMethod`、若干行超 140 字符的 `MaxLineLength`）——换个文件那些条目
+// 就会失配、detekt 立刻报新问题，而本批的约束是**不得新增基线**。
+// 因此本轮只搬「Flow 收在哪」，不搬这些已经带着历史账的 composable；
+// 它们本身都是**条件组合**的（`if (sheets.xxx) …`），不参与本屏的重组范围。
 // ---------------------------------------------------------------------------
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -961,7 +1056,12 @@ private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun DietSheet(vm: WellnessViewModel, current: DietProfile?, onDismiss: () -> Unit) {
+private fun DietSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
+    // 「当前是否已有画像」决定要不要显示「清除画像」：由本弹层自己收，不必根部代收
+    // （批次 16 之前 diet 收在根部，只为了让根级 `if (showDietForm) DietSheet(current = diet)` 传参）
+    val diet by vm.dietProfile.collectAsStateWithLifecycle()
+    val current = diet
+
     var pattern by remember { mutableStateOf(current?.dietPattern ?: "mixed") }
     var seafood by remember { mutableStateOf(current?.seafoodFreq ?: "rare") }
     var dairy by remember { mutableStateOf(current?.dairyTolerant ?: "yes") }
@@ -1241,4 +1341,3 @@ private fun WeightManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
         }
     }
 }
-

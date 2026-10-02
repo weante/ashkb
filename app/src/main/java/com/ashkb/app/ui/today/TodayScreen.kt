@@ -105,6 +105,11 @@ import java.util.Locale
  * 却必须在整页存活期间生效。
  *
  * ### 为什么 `today` 不能像其它六条那样下移（本轮的技术边界，实测编译失败）
+ * v1.0.91（批次 16）**更正**：原文写"`item { }` 里不能用 `remember`/`collectAsStateWithLifecycle`"，
+ * 经一次性编译探针实测**这条是错的**——`LazyListScope.item { }` 的 lambda **本身就是组合上下文**，
+ * 里面**可以**直接写 `remember` / `collectAsStateWithLifecycle`（探针编译通过）。
+ * 真正编译不过的是**另一个写法**：把函数标成 `@Composable LazyListScope.` 扩展、再从 `LazyColumn`
+ * 的内容 lambda 里调用它——那时**调用点**不是组合上下文。下面两条结论仍成立，但只针对那个写法。
  * `LazyListScope.item { }` / `items(...) { }` 只在**列表作用域**里解析得到，而
  * `remember` / `mutableStateOf` / `collectAsStateWithLifecycle` 只能在**组合上下文**里调用。
  * 想让一个 section 同时「自己收 Flow」并「把卡片发进宿主列表」，实测两条路都走不通：
