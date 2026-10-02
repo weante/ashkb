@@ -141,9 +141,19 @@ fun KeyValueRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(
-            // v1.0.90（批次 15）：数值列有权重，trailing 才不会被压成零宽（见函数 KDoc）。
-            // 必须是默认的 fill = true——`fill = false` 不收紧约束，数值照样吃满整行。
-            modifier = Modifier.weight(1f).padding(start = Spacing.sm),
+            // v1.0.93：**只有存在 trailing 时**才给数值列权重。
+            // v1.0.90 无条件加 `weight(1f)` 修好了"trailing 被压成零宽"，却把**短数值**也钉在了
+            // 标签右侧（权重子项吃满剩余宽）——「体重 71.2 kg」「发作 0 次」这类原本靠中间弹性
+            // Spacer 推到**右边缘**，改后紧贴标签，维护者真机截图反馈「全挤在一起了」。
+            // 无 trailing 时不加权重：`Arrangement.SpaceBetween` 会把数值推到右边缘（原排版），
+            // 长数值仍按"可用宽 − 标签宽 − 间距"折行，行为与 v1.0.90 之前一致。
+            // 有 trailing 时加权重（且必须是默认的 `fill = true`——`fill = false` 不收紧约束，
+            // 数值照样吃满整行、胶囊仍会被压）：胶囊因此永远拿得到自己的固有宽度。
+            modifier = if (trailing != null) {
+                Modifier.weight(1f).padding(start = Spacing.sm)
+            } else {
+                Modifier.padding(start = Spacing.sm)
+            },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
