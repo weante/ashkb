@@ -24,6 +24,24 @@ class WebDavClient(
 ) {
     class DavException(msg: String) : Exception(msg)
 
+    /**
+     * v1.0.86（批次 11 / D6）：**响应体超过上限**。与普通 [DavException] 分开，是为了让调用方
+     * 能把它翻成 strings.xml 里的用户文案（而不是把下面这句内部诊断直接怼到界面上）。
+     *
+     * 关键语义：**绝不静默截断**——一旦超限就整体拒绝，半个备份比没有备份更危险
+     * （截断的密文在解密阶段只会报「文件损坏」，用户会以为是自己记错口令）。
+     */
+    class DavResponseTooLargeException(
+        val path: String,
+        /** 已知的实际大小；流还没读完时为 null（调用方文案按"至少"表述）。 */
+        val actualBytes: Long?,
+        val limitBytes: Long,
+    ) : Exception(
+        "服务器响应超过上限：$path 返回" +
+            (actualBytes?.let { " $it 字节（${sizeMb(it)} MB）" } ?: "超过") +
+            "，上限 ${sizeMb(limitBytes)} MB——已中止读取（不截断）"
+    )
+
     /** W4：远程备份条目——name 含备份日期，size 供列表展示（服务器未报告时为 -1）。 */
     data class DavBackupFile(val name: String, val size: Long, val modified: String)
 
@@ -242,7 +260,7 @@ class WebDavClient(
             when {
                 code == 404 -> null
                 code !in 200..299 -> throw DavException("服务器拒绝列出目录（HTTP $code）——无法校验远端附件")
-                else -> conn.inputStream.use { it.readBytes().decodeToString() }
+                else -> readBounded(conn.inputStream, TEXT_RESPONSE_LIMIT, path).decodeToString()
             }
         } finally { conn.disconnect() }
     }
@@ -264,9 +282,9 @@ class WebDavClient(
         try {
             val code = conn.responseCode
             if (code !in 200..299) throw DavException("GET 失败：HTTP $code")
-            val buf = ByteArrayOutputStream()
-            conn.inputStream.use { it.copyTo(buf) }
-            return buf.toByteArray()
+            // v1.0.86（批次 11 / D6）：二进制读路径统一走上限——备份下载、附件懒下载、
+            // 上传后的回读校验（upload 内部也是 get）全在这里收口。
+            return readBounded(conn.inputStream, BINARY_RESPONSE_LIMIT, path)
         } finally { conn.disconnect() }
     }
 
@@ -305,13 +323,17 @@ class WebDavClient(
         return removed
     }
 
-    /** PROPFIND Depth:1 列 backup 目录；任何失败都返回空（轮换跳过，不影响备份主流程）。 */
+    /** PROPFIND Depth:1 列 backup 目录；网络失败返回空（轮换跳过，不影响备份主流程）。 */
     private fun listBackupFileNames(): List<String> {
         val conn = open("ashkb/backup/", "PROPFIND", depth = 1)
         return try {
             if (conn.responseCode !in 200..299) return emptyList()
-            val xml = conn.inputStream.use { it.readBytes().decodeToString() }
+            val xml = readBounded(conn.inputStream, TEXT_RESPONSE_LIMIT, "ashkb/backup/").decodeToString()
             parseBackupFileNames(xml)
+        } catch (e: DavResponseTooLargeException) {
+            // v1.0.86（批次 11 / D6）：**超限不在这里退化成空列表**——空列表会让轮换以为
+            // 「远端一份都没有」（于是本轮不清理），调用方也彻底看不到失败原因。
+            throw e
         } catch (_: Exception) {
             emptyList()
         } finally {
@@ -329,7 +351,7 @@ class WebDavClient(
             val code = conn.responseCode
             if (code !in 200..299)
                 throw DavException("服务器拒绝列出目录（HTTP $code）——无法获取远程备份列表")
-            val xml = conn.inputStream.use { it.readBytes().decodeToString() }
+            val xml = readBounded(conn.inputStream, TEXT_RESPONSE_LIMIT, "ashkb/backup/").decodeToString()
             parseDavBackups(xml)
         } finally {
             conn.disconnect()
@@ -337,6 +359,68 @@ class WebDavClient(
     }
 
     companion object {
+        /** 1 MiB。写成常量而不是散落的 `1024 * 1024`：两处上限与超限文案都要用。 */
+        const val BYTES_PER_MB: Long = 1024L * 1024L
+
+        /**
+         * v1.0.86（批次 11 / D6）：**XML / 文本类响应**（PROPFIND 多状态）的上限。
+         *
+         * 1 MiB 的依据：本应用只列三处目录——`ashkb/backup/`（轮换保留 7 日 + 4 周 + 6 月，
+         * 同一天可有多份时间戳备份，实际几十份量级）、`ashkb/attachments/` 与各日期子目录
+         * （每项只有 href + resourcetype，约 200 字节）。按 500 个条目 × 400 字节估算约 200 KB，
+         * 1 MiB 留了 5 倍余量；而正常目录列表离它还有数量级差距，故不会误伤真实用户。
+         */
+        const val TEXT_RESPONSE_LIMIT: Long = 1L * BYTES_PER_MB
+
+        /**
+         * v1.0.86（批次 11 / D6）：**二进制响应**（GET 单个文件）的上限。
+         *
+         * 6 MiB 的依据（取"现有备份实际体积范围"的上沿再留余量）：
+         *   · DB 备份是**全库导出 + AES-256-GCM 加密**的 JSON 文本（27 张表；最大的一张是
+         *     计划槽位快照，按「药 × 槽 × 天」增长，v1.0.77 起才有）。这个量级在正常使用下是
+         *     **几百 KB**，多年重度使用也到不了 MB 级；
+         *   · 单个附件另有 20 MB 硬上限（`AttachmentRepository.MAX_BYTES`），但那是"用户可能误选
+         *     大文件"的**闸门**，而实测区间是 100 KB–5 MB（见 AttachmentSheet 的体积文案注释）。
+         *
+         * 于是 6 MiB 同时满足两件事：① 覆盖真实备份 + 真实附件（连 5 MB 的大附件都进得来）；
+         * ② 把"远端被替换成超大文件 / 中间人塞垃圾"挡在读入内存之前。真机上备份涨到 6 MiB
+         * 会是几百倍的异常增长，届时应当报警而不是默默继续读。
+         */
+        const val BINARY_RESPONSE_LIMIT: Long = 6L * BYTES_PER_MB
+
+        /** 读流缓冲（8 KiB）：HTTP 响应体分块读取的常规粒度，与上限无关。 */
+        private const val READ_BUFFER_BYTES = 8 * 1024
+
+        /** 字节 → MB（整数，供上限 / 超限文案共用；不做四舍五入，宁可少报也不夸大）。 */
+        fun sizeMb(bytes: Long): Long = bytes / BYTES_PER_MB
+
+        /**
+         * v1.0.86（批次 11 / D6）：**带上限的读流**——超限即中止并抛
+         * [DavResponseTooLargeException]，**绝不返回截断结果**。
+         *
+         * 纯 JVM、无网络依赖，故单测可以直接喂字节流断言边界（恰好等于上限 = 接受；
+         * 多 1 字节 = 拒绝）。`available()` 只用来把"已知的 Content-Length"报进错误文案，
+         * 判定本身完全基于**实际读到的字节数**（服务器不报长度 / 谎报长度都挡得住）。
+         */
+        fun readBounded(stream: java.io.InputStream, maxBytes: Long, path: String): ByteArray {
+            stream.use { input ->
+                val declared = runCatching { input.available().toLong() }.getOrNull()
+                    ?.takeIf { it > maxBytes }
+                if (declared != null) throw DavResponseTooLargeException(path, declared, maxBytes)
+                val out = ByteArrayOutputStream()
+                val buf = ByteArray(READ_BUFFER_BYTES)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    out.write(buf, 0, n)
+                    if (out.size() > maxBytes) {
+                        throw DavResponseTooLargeException(path, out.size().toLong(), maxBytes)
+                    }
+                }
+                return out.toByteArray()
+            }
+        }
+
         /** 从 PROPFIND 多状态响应中提取本应用的备份文件名（纯 JVM 可单测）。 */
         fun parseBackupFileNames(xml: String): List<String> =
             Regex(">([^<>]*ashkb-backup-[^<>]*\\.ashkb)<").findAll(xml)

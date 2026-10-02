@@ -162,6 +162,10 @@ class BackupViewModel(
             _busy.value = true
             try {
                 _davBackups.value = repo.listWebdavBackups()
+            } catch (e: WebDavClient.DavResponseTooLargeException) {
+                // v1.0.86（批次 11 / D6）：目录列表超限与"拉取失败"分开报——正常目录列表
+                // 只有约 200 KB，撞上 1 MiB 上限说明远端目录本身异常，笼统文案会让人以为是网络问题。
+                fail(app.getString(R.string.vm_dav_list_too_large, WebDavClient.sizeMb(e.limitBytes)))
             } catch (e: Exception) {
                 fail(app.getString(R.string.vm_dav_list_failed, e.message))
             } finally { _busy.value = false }
@@ -177,6 +181,11 @@ class BackupViewModel(
                 val bytes = repo.downloadWebdavBackup(name)
                 _davPicked.value = name to bytes
                 info(app.getString(R.string.vm_dav_downloaded, name, bytes.size))
+            } catch (e: WebDavClient.DavResponseTooLargeException) {
+                // v1.0.86（批次 11 / D6）：超限单独报——文案走 strings.xml（含上限 MB 与
+                // 服务器声明的大小），用户据此能判断是"远端那份被换了"还是"上限该调"。
+                // 刻意**不**退回笼统的"下载失败"：那样用户只会反复重试同一个必然失败的下载。
+                fail(app.getString(R.string.vm_dav_download_too_large, WebDavClient.sizeMb(e.limitBytes), name))
             } catch (e: Exception) {
                 fail(app.getString(R.string.vm_dav_download_failed, e.message))
             } finally {

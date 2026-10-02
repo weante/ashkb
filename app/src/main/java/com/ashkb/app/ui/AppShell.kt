@@ -153,16 +153,27 @@ fun AppShell() {
         }
     }
 
-    val todayVm: TodayViewModel = viewModel(factory = TodayViewModel.Factory)
+    // v1.0.86（批次 11）：**只保留"构造即有代价且必须跨页共用"的 VM**。
+    //
+    // 下沉判据（三条全中才动，保守优先）：
+    //   ① 该 VM 只被**一个**路由使用（否则下沉会变成多实例，导航/作用域语义就变了）；
+    //   ② 构造期有真实代价（起协程 / 查库 / 解 Keystore），放在这里等于每次冷启动白付；
+    //   ③ 下沉后创建时机仍在该路由的 NavBackStackEntry 作用域内（viewModel() 在 composable<X>
+    //      里取到的 owner 就是这条目的 entry），返回栈语义不变。
+    //
+    // 已下沉（6 个）：Today / Symptom / Exercise / Knowledge / Report / Backup——都只属于一个路由，
+    // 且构造期分别有「起协程查库」「起 ticker 协程」「解 Keystore 读凭据」等真实代价。
+    // 保留在这里（4 个）：
+    //   · MeViewModel——被 Me / Meds / MedEdit **三个**路由共用，下沉会分裂成三份实例，
+    //     药单页与编辑页读到的 profile / meds 流各自独立（违反判据 ①）；
+    //   · Wellness / Checkup / EmergencyViewModel——除各自二级页外，还被 L1 的 HealthHub
+    //     （composable<Health>）用来渲染实时摘要副标题，同样多路由共用（判据 ①）。
+    // 保留这 4 个的代价：批次 11 之后**构造期已无任何协程 / 查库**（ticker 收归 DateProvider，
+    // 各流都是 WhileSubscribed 懒启动），只剩 MeViewModel 零成本、其余三个各持一份轻量对象。
     val meVm: MeViewModel = viewModel(factory = MeViewModel.Factory)
-    val symptomVm: SymptomViewModel = viewModel(factory = SymptomViewModel.Factory)
-    val exerciseVm: ExerciseViewModel = viewModel(factory = ExerciseViewModel.Factory)
-    val knowledgeVm: KnowledgeViewModel = viewModel(factory = KnowledgeViewModel.Factory)
     val wellnessVm: WellnessViewModel = viewModel(factory = WellnessViewModel.Factory)
     val checkupVm: CheckupViewModel = viewModel(factory = CheckupViewModel.Factory)
     val emergencyVm: EmergencyViewModel = viewModel(factory = EmergencyViewModel.Factory)
-    val reportVm: ReportViewModel = viewModel(factory = ReportViewModel.Factory)
-    val backupVm: BackupViewModel = viewModel(factory = BackupViewModel.Factory)
     // v1.0.40：Recipes / ExercisePlans 两个 VM 改为**进页面才创建**（见下方 L2 注册）。
     // 这两个 VM 的属性初始化会即时创建 Room Flow（进而触发数据库打开），放在这里会让冷启动
     // 多背两份构建成本与失败面；移入路由后，冷启动与它们彻底解耦。
@@ -212,8 +223,10 @@ fun AppShell() {
         ) {
             // ---- L1 ----
             composable<Today> {
+                // v1.0.86（批次 11）：本 VM 构造时即起协程算一次「昨天未记录」（查库），
+                // 而它只被今日页使用——故下沉到路由内，冷启动不再白付。
                 TodayScreen(
-                    vm = todayVm,
+                    vm = viewModel(factory = TodayViewModel.Factory),
                     onMedListNeeded = { nav.navigate(MedEdit()) },   // 修：直达表单，不再只切 tab
                     onOpenSymptom = { nav.navigate(Symptom) },
                     onOpenExercise = { nav.navigate(Exercise) },
@@ -231,11 +244,15 @@ fun AppShell() {
             }
             composable<Report> {
                 ReportScreen(
-                    vm = reportVm,
+                    // v1.0.86（批次 11）：报表 VM 只被本路由使用——下沉后冷启动不再为它查库
+                    // （取数时机同时从 init 改为首次进入本页，见 ReportViewModel.loadOnce）。
+                    vm = viewModel(factory = ReportViewModel.Factory),
                     onOpenBackup = { nav.navigate(Backup) },
                 )
             }
-            composable<Knowledge> { KnowledgeScreen(vm = knowledgeVm) }
+            composable<Knowledge> {
+                KnowledgeScreen(vm = viewModel(factory = KnowledgeViewModel.Factory))
+            }
             composable<Me> {
                 MeScreen(
                     vm = meVm,
@@ -247,10 +264,12 @@ fun AppShell() {
             }
 
             // ---- L2 ----
-            composable<Symptom> { SymptomScreen(vm = symptomVm, onBack = { nav.popBackStack() }) }
+            composable<Symptom> {
+                SymptomScreen(vm = viewModel(factory = SymptomViewModel.Factory), onBack = { nav.popBackStack() })
+            }
             composable<Exercise> {
                 ExerciseScreen(
-                    vm = exerciseVm,
+                    vm = viewModel(factory = ExerciseViewModel.Factory),
                     onOpenPlans = { nav.navigate(ExercisePlans) },
                     onBack = { nav.popBackStack() },
                 )
@@ -266,7 +285,14 @@ fun AppShell() {
             composable<Emergency> { EmergencyScreen(vm = emergencyVm, onBack = { nav.popBackStack() }) }
             // v1.0.72：提醒可靠性自检（从「我的」入口进入的二级页）
             composable<ReminderCheck> { ReminderCheckScreen(onBack = { nav.popBackStack() }) }
-            composable<Backup> { BackupScreen(vm = backupVm, onBack = { nav.popBackStack() }) }
+            composable<Backup> {
+                BackupScreen(
+                    // v1.0.86（批次 11）：备份页 VM 只被本路由使用；其构造期要解 Keystore 读
+                    // WebDAV 凭据（webdavConfig），下沉后冷启动不再白付这一次解密。
+                    vm = viewModel(factory = BackupViewModel.Factory),
+                    onBack = { nav.popBackStack() },
+                )
+            }
             composable<Meds> {
                 MedsScreen(
                     vm = meVm,

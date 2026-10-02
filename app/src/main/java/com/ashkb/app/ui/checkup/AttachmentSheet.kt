@@ -210,11 +210,7 @@ internal fun AttachmentSheet(
                     stringResource(res),
                     style = MaterialTheme.typography.bodySmall,
                     // 失败与成功用不同前景色：一次性提示会在下一次操作时被覆盖，颜色是唯一残留的语义
-                    color = if (
-                        res == R.string.attach_failed ||
-                        res == R.string.attach_open_failed ||
-                        res == R.string.attach_download_failed
-                    ) {
+                    color = if (res in ATTACH_FAILURE_STRINGS) {
                         MaterialTheme.colorScheme.error
                     } else {
                         MaterialTheme.colorScheme.primary
@@ -249,12 +245,14 @@ internal fun AttachmentSheet(
                             } else if (a.remotePath != null) {
                                 scope.launch {
                                     msg = R.string.attach_downloading
-                                    val ok = vm.ensureAttachmentLocal(a)
-                                    if (ok) {
+                                    // v1.0.86（批次 11 / D6）：返回失败原因的文案 id 而不是布尔——
+                                    // 超限（远端文件超过读取上限）与"云端没有 / 解密失败"必须能分辨。
+                                    val failure = vm.ensureAttachmentLocal(a)
+                                    if (failure == null) {
                                         msg = R.string.attach_download_ok
                                         openAttachment(context, vm, a) { msg = R.string.attach_open_failed }
                                     } else {
-                                        msg = R.string.attach_download_failed
+                                        msg = failure
                                     }
                                 }
                             } else {
@@ -476,3 +474,16 @@ private fun displayNameOf(context: Context, uri: Uri): String? = runCatching {
 private fun formatBytes(bytes: Long): String =
     if (bytes >= 1_048_576L) "%.1f MB".format(bytes / 1_048_576.0)
     else "%.0f KB".format(bytes / 1024.0)
+
+/**
+ * v1.0.86（批次 11 / D6）：**失败类**提示的文案集合。
+ *
+ * 抽成集合而不是一串 `||`：这批文案只增不减（本批次刚加了超限一条），写成条件表达式后
+ * 每加一条都要动一次判断、且很快会撞上 detekt 的复杂条件阈值（4）。
+ */
+private val ATTACH_FAILURE_STRINGS = setOf(
+    R.string.attach_failed,
+    R.string.attach_open_failed,
+    R.string.attach_download_failed,
+    R.string.attach_download_too_large,
+)

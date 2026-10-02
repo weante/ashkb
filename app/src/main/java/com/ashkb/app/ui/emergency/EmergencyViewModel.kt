@@ -17,40 +17,31 @@ import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.data.repo.ReportRepository
+import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.ui.report.ReportPdfWriter
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
-import java.time.Duration
 import java.time.LocalDate
-import java.time.LocalDateTime
 
 class EmergencyViewModel(
     private val app: Context,
     private val repo: HealthRepository,
     private val reports: ReportRepository,
     private val medicationRepo: MedicationRepository,
+    /** v1.0.86（批次 11）：全应用唯一的「今天」来源，取代此前的跨零点 ticker。 */
+    private val dateProvider: DateProvider,
 ) : ViewModel() {
 
-    /** 跨零点日期 ticker：紧急卡「当前用药」的在用判断依赖今天，不能冻结在首次组合时。 */
-    private val _date = MutableStateFlow(LocalDate.now())
-    val date: StateFlow<LocalDate> = _date.asStateFlow()
-
-    init {
-        viewModelScope.launch {
-            while (true) {
-                val now = LocalDateTime.now()
-                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
-                delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
-                _date.value = LocalDate.now()
-            }
-        }
-    }
+    /**
+     * 跨零点日期流：紧急卡「当前用药」的在用判断依赖今天，不能冻结在首次组合时。
+     *
+     * v1.0.86（批次 11）：底层改为进程级日期流（系统跨日广播驱动）——语义不变，仍是「今天」；
+     * 原 ticker 走 `Handler.postDelayed`（uptimeMillis，深睡不计时），夜里跨零点不触发。
+     */
+    val date: StateFlow<LocalDate> = dateProvider.today
 
     val contacts: StateFlow<List<EmergencyContact>> = repo.observeEmergencyContacts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -122,6 +113,7 @@ class EmergencyViewModel(
                     app.healthRepository,
                     app.reportRepository,
                     app.medicationRepository,
+                    app.dateProvider,
                 )
             }
         }

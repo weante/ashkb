@@ -102,6 +102,12 @@ fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
         }
     }
 
+    // v1.0.86（批次 11）：首次进入报表页才取数。
+    // 此前取数在 ReportViewModel 的 init 里，而该 VM 由 AppShell 在**应用启动时**创建——
+    // 冷启动因此白查一次库（overview + trends 两条聚合），哪怕用户从不打开报表。
+    // key = Unit：每次重新进入本页组合一次；VM 内的 loadOnce() 自己判重（已有数据即空操作）。
+    LaunchedEffect(Unit) { vm.loadOnce() }
+
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
@@ -585,6 +591,8 @@ private fun PeriodicPage(
 ) {
     // 进入本页签时按当前窗口取一次数（保留上次结果不清空，避免来回切页签时闪空态）；
     // 之后切窗口由 chips 走 vm.setPeriodDays 直接重载，不会重复触发这里。
+    // v1.0.86（批次 11）：重复触发已在 VM 侧按"参数"去重（loadPeriodic），这里保持不变——
+    // 页签滑出视口被 pager 释放后重新进入仍会走这一行，但窗口没变就是空操作。
     LaunchedEffect(Unit) { vm.loadPeriodic(days) }
 
     LazyColumn(

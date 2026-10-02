@@ -13,17 +13,16 @@ import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.domain.ExerciseEngine
 import com.ashkb.app.domain.Lifestyle
 import com.ashkb.app.domain.LifestylePrescription
 import com.ashkb.app.domain.MorningWarmup
 import com.ashkb.app.reminder.ExerciseReminderScheduler
-import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -48,24 +47,23 @@ data class ExerciseUiState(
 class ExerciseViewModel(
     private val repo: HealthRepository,
     private val app: AshkbApplication,
+    /** v1.0.86（批次 11）：全应用唯一的「今天」来源，取代此前的跨零点 ticker。 */
+    private val dateProvider: DateProvider,
 ) : ViewModel() {
 
-    private val _date = MutableStateFlow(LocalDate.now())
-    val date: LocalDate get() = _date.value
+    /**
+     * 语义与批次 10 完全一致：**今天**（今日打卡流、昨日症状 / 反馈都相对它取窗口）。
+     *
+     * v1.0.86（批次 11）：底层改为进程级日期流（系统跨日广播驱动）——原 ticker 走
+     * `Handler.postDelayed`（uptimeMillis，深睡不计时），夜里跨零点不触发。
+     */
+    private val date: LocalDate get() = dateProvider.today.value
 
     private val library = MutableStateFlow<List<KbEntry>>(emptyList())
     private val feedbackRefresh = MutableStateFlow(0)
 
     init {
         viewModelScope.launch { library.value = repo.exerciseLibrary() }
-        viewModelScope.launch {
-            while (true) {
-                val now = LocalDateTime.now()
-                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
-                delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
-                _date.value = LocalDate.now()
-            }
-        }
     }
 
     val profile: StateFlow<Profile?> =
@@ -87,12 +85,12 @@ class ExerciseViewModel(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExerciseUiState())
 
     val todayLogs: StateFlow<List<ExerciseLog>> =
-        _date.flatMapLatest { repo.observeExerciseLogs(it.toString()) }
+        dateProvider.today.flatMapLatest { repo.observeExerciseLogs(it.toString()) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** 昨日症状（疼痛 / 晨僵 / 体温）——处方 hero 的判读依据 */
     val yesterdaySymptom: StateFlow<com.ashkb.app.data.entity.SymptomDaily?> =
-        _date.flatMapLatest { repo.observeSymptom(it.minusDays(1).toString()) }
+        dateProvider.today.flatMapLatest { repo.observeSymptom(it.minusDays(1).toString()) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     /**
@@ -106,7 +104,7 @@ class ExerciseViewModel(
 
     /** R21：昨日已完成但未反馈的打卡（combine 取昨日日期，单层 flatMapLatest 更直白） */
     val feedbackPending: StateFlow<List<ExerciseLog>> =
-        combine(_date, feedbackRefresh) { d, _ -> d.minusDays(1).toString() }
+        combine(dateProvider.today, feedbackRefresh) { d, _ -> d.minusDays(1).toString() }
             .flatMapLatest { yesterday -> flow { emit(repo.pendingFeedbackLogs(yesterday)) } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -194,7 +192,7 @@ class ExerciseViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                ExerciseViewModel(app.healthRepository, app)
+                ExerciseViewModel(app.healthRepository, app, app.dateProvider)
             }
         }
     }

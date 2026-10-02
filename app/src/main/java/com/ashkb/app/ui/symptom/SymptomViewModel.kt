@@ -17,8 +17,8 @@ import com.ashkb.app.data.entity.SymptomDaily
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.reminder.BasdaiReminderScheduler
-import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
@@ -36,29 +36,38 @@ import kotlinx.coroutines.launch
 class SymptomViewModel(
     private val repo: HealthRepository,
     private val app: AshkbApplication,
+    /** v1.0.86（批次 11）：全应用唯一的「今天」来源，取代此前的跨零点 ticker。 */
+    private val dateProvider: DateProvider,
 ) : ViewModel() {
 
-    private val _date = MutableStateFlow(LocalDate.now())
-    val today: LocalDate get() = _date.value
+    /** 语义与批次 10 完全一致：**今天**（不是窗口起点），只是数据源换成了进程级日期流。 */
+    val today: LocalDate get() = dateProvider.today.value
 
     /** 自评记录日期：今天 / 昨天（补写漏记） */
-    private val _selectedDate = MutableStateFlow(today)
+    private val _selectedDate = MutableStateFlow(dateProvider.today.value)
     val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
 
+    /**
+     * 日期源是**进程级**单例，监听器必须随 VM 一起摘掉，否则被销毁的 VM 会被它一直持有。
+     * 声明在 init 之前：Kotlin 按声明顺序初始化属性，反过来会在构造期读到未初始化的字段。
+     */
+    private var unregisterDateListener: (() -> Unit)? = null
+
     init {
-        viewModelScope.launch {
-            while (true) {
-                val now = LocalDateTime.now()
-                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
-                delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
-                val d = LocalDate.now()
-                _date.value = d
-                // 跨零点后「所选日期」可能既不是今天也不是昨天（如 23:50 选的"昨天"），回落今天防两个 Chip 都不选中。
-                // 刻意写在 delay 之后（构造已完成），避免依赖属性声明顺序。
-                val cur = _selectedDate.value
-                if (cur != d && cur != d.minusDays(1)) _selectedDate.value = d
-            }
+        // v1.0.86（批次 11）：跨零点后「所选日期」可能既不是今天也不是昨天
+        // （如 23:50 选的"昨天"），回落今天防两个 Chip 都不选中。
+        // 此前这段逻辑写在 ticker 循环的 delay 之后（深睡不触发）；现在挂在日期源上，
+        // **只在日期真的变了时**执行一次——顺带也覆盖了「手动改系统日期 / 改时区」。
+        unregisterDateListener = dateProvider.addOnDateChangedListener { d ->
+            val cur = _selectedDate.value
+            if (cur != d && cur != d.minusDays(1)) _selectedDate.value = d
         }
+    }
+
+    override fun onCleared() {
+        unregisterDateListener?.invoke()
+        unregisterDateListener = null
+        super.onCleared()
     }
 
     fun selectDate(date: LocalDate) {
@@ -72,7 +81,7 @@ class SymptomViewModel(
 
     /** null = 当日未记录（与「实际为 0」严格区分） */
     val symptom: StateFlow<SymptomDaily?> =
-        _date
+        dateProvider.today
             .flatMapLatest { _selectedDate }
             .flatMapLatest { repo.observeSymptom(it.toString()) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -209,7 +218,7 @@ class SymptomViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                SymptomViewModel(app.healthRepository, app)
+                SymptomViewModel(app.healthRepository, app, app.dateProvider)
             }
         }
     }

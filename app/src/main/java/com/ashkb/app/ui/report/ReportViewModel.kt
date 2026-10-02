@@ -37,6 +37,12 @@ class ReportViewModel(
     // B4：周报 / 月报的统计窗口（默认 7 天）与小结数据
     private val _periodDays = MutableStateFlow(7)
     val periodDays: StateFlow<Int> = _periodDays
+    /**
+     * v1.0.86（批次 11）：**最近一次成功加载**的周月报窗口（`Int.MIN_VALUE` = 还没加载过）。
+     * 与 [_periodDays] 分开是有意的：前者是"用户现在选的窗口"，后者是"手上这份数据是哪段"——
+     * 二者在加载进行中/失败时会不一致，去重必须按后者判定。
+     */
+    private var loadedPeriodDays: Int = Int.MIN_VALUE
     private val _periodic = MutableStateFlow<ReportRepository.PeriodicReport?>(null)
     val periodic: StateFlow<ReportRepository.PeriodicReport?> = _periodic
     private val _busy = MutableStateFlow(false)
@@ -44,7 +50,19 @@ class ReportViewModel(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
 
-    init { refresh() }
+    /**
+     * v1.0.86（批次 11）：**进入报表页时才首次取数**。
+     *
+     * 此前是 `init { refresh() }`，而 `AppShell` 在应用启动时就把本 VM 创建出来——于是
+     * **哪怕从不看报表，冷启动也要查一次库**（overview + trends 两条聚合查询）。
+     * 现在：VM 改为在报表路由内按需创建（见 AppShell），首次组合由 [loadOnce] 触发。
+     */
+    fun loadOnce() {
+        // 判据用 overview == null：它是 refresh() 的第一个写入点，非空即代表这一轮取数已经跑过。
+        // 刻意不只看 busy——并发双击时 busy 可能都还是 false，会放两次查询进来。
+        if (_overview.value != null || _busy.value) return
+        refresh()
+    }
 
     fun refresh() {
         viewModelScope.launch {
@@ -63,6 +81,9 @@ class ReportViewModel(
     /**
      * B4：切换周报 / 月报的统计窗口并重新加载。
      * 先点同一个窗口且已有数据时不重复查询（避免列表页反复横跳导致的无效 IO）。
+     *
+     * v1.0.86（批次 11）：去重下沉到 [loadPeriodic]（它掌握"手上这份数据是哪段窗口"），
+     * 这里只表达用户意图——点同一个 chip 不必再走一遍判重。
      */
     fun setPeriodDays(days: Int) {
         if (days == _periodDays.value && _periodic.value != null) return
@@ -73,13 +94,32 @@ class ReportViewModel(
      * B4：加载指定窗口（7 / 30 天）的周报 / 月报小结。
      * 口径与 overview() 完全一致（部分完成计 0.5、症状空值不计入均值），文案由 UI 侧组装。
      * 失败时保留上一次结果而不是清空成空态，只走全局 Snackbar 提示——与 refresh() 同口径。
+     *
+     * v1.0.86（批次 11）：**参数级去重**。周月报页每次重新进入组合都会调一次本方法
+     * （`LaunchedEffect(Unit)`），而 `HorizontalPager` 在页签滑出视口后会释放页面——
+     * 于是「概览 → 周月报 → 概览 → 周月报」来回横跳会重复查同一窗口的库。
+     *
+     * 去重口径（刻意只用**参数**做键，不做时间窗缓存）：
+     *   · 上次成功加载的窗口 == 本次请求的窗口 → 跳过（数据仍是这份窗口的）；
+     *   · 参数变了（7 ↔ 30）→ **一定重载**，不返回旧窗口的数据；
+     *   · 上次失败（[_loadedPeriodDays] 未推进）→ 下次仍会重试，不会把失败缓存住。
+     * 也就是说这里省掉的是"同一份数据的重复查询"，不是"数据的新鲜度"——后者由用户切窗口 /
+     * 重进页面时的参数变化自然触发。
      */
     fun loadPeriodic(days: Int) {
+        if (days == loadedPeriodDays) return
         _periodDays.value = days
         viewModelScope.launch {
             _busy.value = true
             try {
-                _periodic.value = repo.periodicReport(days)
+                val fresh = repo.periodicReport(days)
+                // v1.0.86（批次 11）：慢查询结果后到时不回写——与 setTrendDays 同款保护。
+                // 快速连点 7→30 时，若 7 天的响应比 30 天的更晚返回，会把小结换成旧窗口的数据，
+                // 而副标题读的是 p.days，届时"chip 显示 30 天、正文是 7 天"。
+                if (_periodDays.value == days) {
+                    _periodic.value = fresh
+                    loadedPeriodDays = days
+                }
             } catch (e: Exception) {
                 _message.value = app.getString(R.string.vm_report_stats_failed, e.message)
             } finally {

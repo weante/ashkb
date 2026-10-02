@@ -17,11 +17,9 @@ import com.ashkb.app.data.entity.WeightLog
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.data.repo.nowIso
-import java.time.Duration
-import java.time.LocalDate
+import com.ashkb.app.domain.DateProvider
 import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -34,31 +32,30 @@ class WellnessViewModel(
     private val repo: HealthRepository,
     /** v1.0.38（B11）：药单仓储——补剂「时间错开」提醒与合并时间表需要今日服药时刻 */
     private val medRepo: MedicationRepository,
+    /** v1.0.86（批次 11）：全应用唯一的「今天」来源，取代此前的跨零点 ticker。 */
+    private val dateProvider: DateProvider,
 ) : ViewModel() {
-    private val _date = MutableStateFlow(LocalDate.now())
-    val date: LocalDate get() = _date.value
-    private val dateStr: String get() = _date.value.toString()
+    /**
+     * 语义与批次 10 完全一致：**今天**（今日体征 / 体重 / 补剂记录流都相对它取窗口，
+     * 写入时也用它当 `date`）。
+     *
+     * v1.0.86（批次 11）：底层改为进程级日期流（系统跨日广播驱动）——原 ticker 走
+     * `Handler.postDelayed`（uptimeMillis，深睡不计时），夜里跨零点不触发。
+     */
+    private val dateStr: String get() = dateProvider.today.value.toString()
 
-    init {
-        viewModelScope.launch {
-            while (true) {
-                val now = LocalDateTime.now()
-                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
-                delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
-                _date.value = LocalDate.now()
-            }
-        }
-    }
+    /** 今日日期（与批次 10 同为公开 getter，语义不变：**今天**）。 */
+    val date: java.time.LocalDate get() = dateProvider.today.value
 
     // ---- 观察 ----
     /** v10（C9）：体重目标区间取自档案，体重卡据此提示是否在区间内 */
     val profile: StateFlow<com.ashkb.app.data.entity.Profile?> = repo.observeProfile()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val vitalsToday: StateFlow<Vitals?> = _date.flatMapLatest { repo.observeVitals(it.toString()) }
+    val vitalsToday: StateFlow<Vitals?> = dateProvider.today.flatMapLatest { repo.observeVitals(it.toString()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val weightToday: StateFlow<WeightLog?> = _date.flatMapLatest { repo.observeWeightToday(it.toString()) }
+    val weightToday: StateFlow<WeightLog?> = dateProvider.today.flatMapLatest { repo.observeWeightToday(it.toString()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val weightRecent: StateFlow<List<WeightLog>> = repo.observeWeightRecent(30)
@@ -70,7 +67,7 @@ class WellnessViewModel(
     val supplements: StateFlow<List<Supplement>> = repo.observeSupplements()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val supplementLogsToday: StateFlow<List<SupplementLog>> = _date.flatMapLatest { repo.observeSupplementLogs(it.toString()) }
+    val supplementLogsToday: StateFlow<List<SupplementLog>> = dateProvider.today.flatMapLatest { repo.observeSupplementLogs(it.toString()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** v1.0.38（B11）：在用药单（已归档过滤），供补剂错开提醒与合并时间表使用 */
@@ -232,7 +229,7 @@ class WellnessViewModel(
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                WellnessViewModel(app.healthRepository, app.medicationRepository)
+                WellnessViewModel(app.healthRepository, app.medicationRepository, app.dateProvider)
             }
         }
     }

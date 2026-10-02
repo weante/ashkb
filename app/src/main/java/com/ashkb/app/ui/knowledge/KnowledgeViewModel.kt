@@ -9,17 +9,15 @@ import com.ashkb.app.AshkbApplication
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.repo.HealthRepository
+import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.Lifestyle
-import java.time.Duration
 import java.time.LocalDate
-import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -46,25 +44,22 @@ data class KnowledgeUiState(
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class KnowledgeViewModel(private val repo: HealthRepository) : ViewModel() {
+class KnowledgeViewModel(
+    private val repo: HealthRepository,
+    /** v1.0.86（批次 11）：全应用唯一的「今天」来源，取代此前的跨零点 ticker。 */
+    private val dateProvider: DateProvider,
+) : ViewModel() {
 
     private val query = MutableStateFlow("")
     private val category = MutableStateFlow<String?>(null)
 
-    /** 跨零点日期 ticker：复核到期计数依赖今天，不能冻结在构造时。 */
-    private val _date = MutableStateFlow(LocalDate.now())
-    val date: StateFlow<LocalDate> = _date.asStateFlow()
-
-    init {
-        viewModelScope.launch {
-            while (true) {
-                val now = LocalDateTime.now()
-                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
-                delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
-                _date.value = LocalDate.now()
-            }
-        }
-    }
+    /**
+     * 跨零点日期流：复核到期计数依赖今天，不能冻结在构造时。
+     *
+     * v1.0.86（批次 11）：底层改为进程级日期流（系统跨日广播驱动）——语义不变，仍是「今天」；
+     * 原 ticker 走 `Handler.postDelayed`（uptimeMillis，深睡不计时），夜里跨零点不触发。
+     */
+    val date: StateFlow<LocalDate> = dateProvider.today
 
     /**
      * v9 优化：检索防抖——输入停顿 [KbSearch.DEBOUNCE_MS] 后才真正查库，
@@ -90,7 +85,7 @@ class KnowledgeViewModel(private val repo: HealthRepository) : ViewModel() {
 
     /** 复核到期条目数（今日已过 review_due）——随跨零点日期重算（原 combine(flowOf(Unit)) 等价于 map）。 */
     private val overdue: kotlinx.coroutines.flow.Flow<Int> =
-        combine(repo.observeKbAll(), _date) { list, d ->
+        combine(repo.observeKbAll(), date) { list, d ->
             val today = d.toString()
             list.count { it.reviewDue < today }
         }
@@ -127,7 +122,7 @@ class KnowledgeViewModel(private val repo: HealthRepository) : ViewModel() {
     }
 
     fun refreshReviewCheck() {
-        val today = _date.value.toString()
+        val today = date.value.toString()
         viewModelScope.launch { repo.checkReviewDue(today) }
     }
 
@@ -135,7 +130,7 @@ class KnowledgeViewModel(private val repo: HealthRepository) : ViewModel() {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                KnowledgeViewModel(app.healthRepository)
+                KnowledgeViewModel(app.healthRepository, app.dateProvider)
             }
         }
     }

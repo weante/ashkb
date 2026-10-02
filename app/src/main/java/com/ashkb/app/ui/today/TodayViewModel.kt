@@ -14,16 +14,15 @@ import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.data.repo.MinimalPromptStore
 import com.ashkb.app.data.repo.TodayItem
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.domain.MinimalMode
 import com.ashkb.app.domain.PendingDoses
 import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
-import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -40,40 +39,52 @@ class TodayViewModel(
     private val repo: MedicationRepository,
     private val healthRepo: HealthRepository,
     private val app: AshkbApplication,
+    /** v1.0.86（批次 11）：全应用唯一的「今天」来源，取代此前的跨零点 ticker。 */
+    private val dateProvider: DateProvider,
 ) : ViewModel() {
 
-    private val _date = MutableStateFlow(LocalDate.now())
-    val date: LocalDate get() = _date.value
-
     /**
-     * 「今天」的**可观察**日期流——由 init 里既有的跨零点 ticker 推进（不新起 ticker）。
+     * 「今天」的**可观察**日期流。
      *
      * v1.0.84（批次 9）：[date] 只是普通 getter，UI 读它读不到跨零点的变化。`TodayScreen`
      * 于是自己用 `remember { LocalDate.now()… }`（**无 key**）取了一次日期，首次组合后永不重算：
      * 卡片里的 N 剂已按新「昨天」重算，标题上的日期却还指着前天。
+     *
+     * v1.0.86（批次 11）：底层换成 [DateProvider] 的进程级日期流（系统跨日广播驱动）。
+     * 公开语义不变——仍是「今天」，仍是可观察的 `StateFlow<LocalDate>`。
      */
-    val todayDate: StateFlow<LocalDate> = _date.asStateFlow()
+    val todayDate: StateFlow<LocalDate> = dateProvider.today
+
+    /** [date] 保持普通 getter（跨零点不重组的调用点用它，与批次 9 同口径）。 */
+    private val date: LocalDate get() = dateProvider.today.value
+
+    /**
+     * 日期源是**进程级**单例，监听器必须随 VM 一起摘掉，否则被销毁的 VM 会被它一直持有。
+     * 声明在 init 之前：Kotlin 按声明顺序初始化属性，反过来会在构造期读到未初始化的字段。
+     */
+    private var unregisterDateListener: (() -> Unit)? = null
 
     init {
-        viewModelScope.launch {
-            // v1.0.74：进页面即算一次「昨天未记录」（跨零点补记卡的初值）
-            refreshYesterdayPending()
-            while (true) {
-                val now = LocalDateTime.now()
-                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
-                delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
-                _date.value = LocalDate.now()
-                // 跨日后「昨天」变了，补记卡必须重算
-                refreshYesterdayPending()
-            }
+        // v1.0.74：进页面即算一次「昨天未记录」（跨零点补记卡的初值）
+        viewModelScope.launch { refreshYesterdayPending() }
+        // v1.0.86（批次 11）：跨日后「昨天」变了，补记卡必须重算。此前这段逻辑写在各自的
+        // ticker 循环里（深睡不触发）；现在挂在日期源上——**只在日期真的变了时**回调一次。
+        unregisterDateListener = dateProvider.addOnDateChangedListener {
+            viewModelScope.launch { refreshYesterdayPending() }
         }
+    }
+
+    override fun onCleared() {
+        unregisterDateListener?.invoke()
+        unregisterDateListener = null
+        super.onCleared()
     }
 
     val profile: StateFlow<Profile?> =
         repo.observeProfile().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val today: StateFlow<List<TodayItem>> =
-        _date.flatMapLatest { repo.observeToday(it) }
+        todayDate.flatMapLatest { repo.observeToday(it) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** P2：未读警报（红旗三通道 / BASDAI / 发作 / 复核到期） */
@@ -82,12 +93,12 @@ class TodayViewModel(
 
     /** 今日症状是否已记录（false = 未记录，区分实际为 0） */
     val symptomRecorded: StateFlow<Boolean> =
-        _date.flatMapLatest { healthRepo.observeSymptom(it.toString()) }.map { it != null }
+        todayDate.flatMapLatest { healthRepo.observeSymptom(it.toString()) }.map { it != null }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     /** 今日运动打卡数 */
     val exerciseDone: StateFlow<Int> =
-        _date.flatMapLatest { healthRepo.observeExerciseLogs(it.toString()) }.map { it.size }
+        todayDate.flatMapLatest { healthRepo.observeExerciseLogs(it.toString()) }.map { it.size }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     // ---- v1.0.65 B12：极简模式状态机 ----
@@ -99,7 +110,7 @@ class TodayViewModel(
      * ③ 今天还没问过。满足后再看近 [MinimalMode.THRESHOLD_DAYS] 天的症状记录是否连续缺失。
      */
     val minimalPrompt: StateFlow<Boolean> =
-        combine(_date, healthRepo.observeProfile()) { d, p -> d to p }
+        combine(todayDate, healthRepo.observeProfile()) { d, p -> d to p }
             .map { (d, p) ->
                 if (p == null || p.uiMode == MinimalMode.MODE_MINIMAL) return@map false
                 if (MinimalPromptStore.lastAskedDate(app) == d.toString()) return@map false
@@ -114,14 +125,14 @@ class TodayViewModel(
      * v1.0.84（批次 9）：init 里的 ticker 用协程 `delay`，在 Android 上落到主线程 Handler 的
      * `postDelayed`，而它按 **uptimeMillis** 计时——**深睡不计时**。夜里手机睡着时跨零点那一刻
      * 不会触发，ticker 可能要到早上醒来才补跑；期间「今天 / 昨天」都会落后一天（本页的
-     * 日期标题、昨日待补卡都读这条流）。这里只做「拉一次」的补齐，**不新起 ticker**；
-     * 日期没变时是空操作（StateFlow 同值不重复发射，也不会多余地重查库）。
+     * 日期标题、昨日待补卡都读这条流）。
+     *
+     * v1.0.86（批次 11）：跨零点检测已交给 [DateProvider] 的**系统日期变更广播**（深睡时系统
+     * 照发，醒来即达），这里退化为第二道防线——跟系统时钟对一次；日期没变时是空操作
+     * （StateFlow 同值不重复发射，也不会多余地重查库）。
      */
     fun refreshDateIfStale() {
-        val now = LocalDate.now()
-        if (_date.value == now) return
-        _date.value = now
-        viewModelScope.launch { refreshYesterdayPending() }
+        dateProvider.refreshIfStale()
     }
 
     /** 回答询问：无论选什么都记「今天问过」；身体不适 / 住院才切极简。 */
@@ -236,7 +247,7 @@ class TodayViewModel(
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                TodayViewModel(app.medicationRepository, app.healthRepository, app)
+                TodayViewModel(app.medicationRepository, app.healthRepository, app, app.dateProvider)
             }
         }
     }

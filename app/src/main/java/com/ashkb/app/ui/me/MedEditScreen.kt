@@ -293,7 +293,18 @@ fun MedEditScreen(
                     supportingText = { Text(stringResource(R.string.med_generic_key_note)) },
                 )
                 // P5 R8：自动匹配——键为空时按药品名检索建议
-                val keySuggestions = DrugKeyCatalog.suggest(if (nameKey.isBlank()) name else nameKey)
+                //
+                // v1.0.86（批次 11）：检索结果用 remember 记住。原实现每次组合都跑一遍
+                // DrugKeyCatalog.suggest（40 条目录 × 键/中文名/商品名/别名各一次 lowercase 匹配），
+                // 而本页每次按键都会重组 → 每键一次全表扫描。
+                //
+                // key 取 `keyQuery` 这个**单一字符串**，而不是 (nameKey, name) 二元组：
+                //   · 它已经把"到底拿哪个字段去查"（nameKey 非空用 nameKey，否则用 name）折进自身，
+                //     两个输入任一变都必然变 key —— 不存在"漏了某个影响结果的输入"；
+                //   · 用字符串而非 Pair 当 key，避免每次重组都新建一个 Pair 让 remember 白失效。
+                // limit 用默认值 6（本文件是唯一调用点），故不进 key。
+                val keyQuery = if (nameKey.isBlank()) name else nameKey
+                val keySuggestions = remember(keyQuery) { DrugKeyCatalog.suggest(keyQuery) }
                 if (keySuggestions.isNotEmpty() && !DrugKeyCatalog.isExactKey(nameKey)) {
                     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                         keySuggestions.forEach { s ->

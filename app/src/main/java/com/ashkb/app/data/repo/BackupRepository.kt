@@ -2,6 +2,7 @@ package com.ashkb.app.data.repo
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.ashkb.app.R
 import com.ashkb.app.data.backup.BackupEngine
 import com.ashkb.app.data.backup.KeystoreCipher
 import com.ashkb.app.data.backup.VaultCipher
@@ -647,19 +648,29 @@ class BackupRepository(private val context: Context) {
     /**
      * 懒下载：本地文件缺失但已有远端副本时，按需拉回并解密。
      *
-     * @return true = 已恢复本地文件；false = 远端没有 / 解密失败 / 未配置
+     * @return `null` = 本地已可用（原本就在 / 刚取回）；非 null = 失败原因对应的**文案资源 id**
+     *   （v1.0.86 批次 11：原来只返回 Boolean，超限与"云端没有"共用一句笼统提示，用户
+     *   无从知道是文件太大还是网络问题——D6 要求超限必须给出可诊断的错误）。
      */
-    suspend fun downloadAttachmentIfMissing(a: CheckupAttachment): Boolean = withContext(Dispatchers.IO) {
-        if (attachments.hasLocalFile(a)) return@withContext true
-        val remote = a.remotePath ?: return@withContext false
+    suspend fun downloadAttachmentIfMissing(a: CheckupAttachment): Int? = withContext(Dispatchers.IO) {
+        if (attachments.hasLocalFile(a)) return@withContext null
+        val remote = a.remotePath ?: return@withContext R.string.attach_download_failed
         val (url, user, pass) = webdavConfig()
-        if (url.isBlank()) return@withContext false
+        if (url.isBlank()) return@withContext R.string.attach_download_failed
         requireHttps(url)
-        val vaultKey = vaultKeys.current() ?: return@withContext false
+        val vaultKey = vaultKeys.current() ?: return@withContext R.string.attach_download_failed
         runCatching {
             val blob = WebDavClient(url, user, pass).downloadAttachment(remote)
             val plain = VaultCipher.decryptBlob(vaultKey, blob, a.id)
             attachments.writeLocal(a, plain)
-        }.getOrDefault(false)
+        }.fold(
+            onSuccess = { null },
+            onFailure = { e ->
+                // 超限单独报：这是唯一"重试也没用、必须换一份或调上限"的失败分支，
+                // 笼统的"云端未找到该附件，或网络异常"会把用户引到错误的排查方向。
+                if (e is WebDavClient.DavResponseTooLargeException) R.string.attach_download_too_large
+                else R.string.attach_download_failed
+            },
+        )
     }
 }

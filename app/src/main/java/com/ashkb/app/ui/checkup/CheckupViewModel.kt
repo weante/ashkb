@@ -14,14 +14,13 @@ import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.domain.CheckupDeletion
+import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.LabImport
 import com.ashkb.app.reminder.CheckupReminderScheduler
-import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,20 +35,16 @@ class CheckupViewModel(
     private val attachmentRepo: com.ashkb.app.data.repo.AttachmentRepository,
     private val backupRepo: com.ashkb.app.data.repo.BackupRepository,
     private val app: AshkbApplication,
+    /** v1.0.86（批次 11）：全应用唯一的「今天」来源，取代此前的跨零点 ticker。 */
+    private val dateProvider: DateProvider,
 ) : ViewModel() {
-    private val _date = MutableStateFlow(LocalDate.now())
-    val date: LocalDate get() = _date.value
-
-    init {
-        viewModelScope.launch {
-            while (true) {
-                val now = LocalDateTime.now()
-                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
-                delay(Duration.between(now, nextMidnight).toMillis() + 1_000L)
-                _date.value = LocalDate.now()
-            }
-        }
-    }
+    /**
+     * 语义与批次 10 完全一致：**今天**（`CheckupPrepCard` 据此算「下次复诊还有几天」）。
+     *
+     * v1.0.86（批次 11）：底层改为进程级日期流（系统跨日广播驱动）——原 ticker 走
+     * `Handler.postDelayed`（uptimeMillis，深睡不计时），夜里跨零点不触发。
+     */
+    val date: LocalDate get() = dateProvider.today.value
 
     val checkupItems: StateFlow<List<CheckupItem>> = repo.observeCheckupItems()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -265,16 +260,17 @@ class CheckupViewModel(
 
     /**
      * 懒下载：本地文件缺失且已有远端副本时按需取回并解密。
-     * @return true = 本地已可用（原本就在 / 刚取回）；false = 云端没有或解密失败
+     * @return `null` = 本地已可用（原本就在 / 刚取回）；非 null = 失败原因对应的文案资源 id
+     *   （v1.0.86 批次 11：超限与"云端没有"不再共用一句笼统提示）
      */
-    suspend fun ensureAttachmentLocal(a: com.ashkb.app.data.entity.CheckupAttachment): Boolean =
+    suspend fun ensureAttachmentLocal(a: com.ashkb.app.data.entity.CheckupAttachment): Int? =
         backupRepo.downloadAttachmentIfMissing(a)
 
     companion object {
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                CheckupViewModel(app.healthRepository, app.attachmentRepository, app.backupRepository, app)
+                CheckupViewModel(app.healthRepository, app.attachmentRepository, app.backupRepository, app, app.dateProvider)
             }
         }
     }

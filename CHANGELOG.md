@@ -4,6 +4,37 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.86] — 2026-10-02
+
+**批次 11：冷启动/IO 小优化 6 项 + WebDAV 读取上限（D6）。** 无库结构变更，可覆盖安装。
+
+### B 组：冷启动与 IO
+
+- **B1 报表不再"白查库"**：`ReportViewModel` 原在 `init` 里就 `refresh()`，而 `AppShell` **应用启动即 eager 创建它** → 即使从不看报表，冷启动也查一次库。现删 `init`、新增 `loadOnce()`（判据 `overview == null && !busy`，并发双击也不会放两次查询），由报表页 `LaunchedEffect` 触发；**并把该 VM 下沉到报表路由内**
+- **B2 AppShell 的 10 个 VM 下沉 6 个**（Today / Symptom / Exercise / Knowledge / Report / Backup）——判据三条全中才动：①只被一个路由使用 ②构造期有真实代价 ③下沉后创建时机仍在路由作用域内、返回栈语义不变。**保留 4 个**（Me / Wellness / Checkup / Emergency）：被多个路由共用（如 HealthHub 读其摘要副标题），下沉会分裂成多份实例；且构造期代价在 B3 之后已归零
+- **B3 `DateProvider` 单例：7 份重复 ticker 收敛为 1，并真正修掉深睡坑**：原先各 VM 用协程 `delay` → Android 落 `Handler.postDelayed`，按 **uptimeMillis** 计时、**深睡不计时** → 夜里手机睡着时跨零点不触发，可能早上才补跑。现改为**订阅系统日期变更广播**（`ACTION_DATE_CHANGED` / `TIME_CHANGED` / `TIMEZONE_CHANGED`，API 33+ 带 `RECEIVER_NOT_EXPORTED`）——**系统在跨日那一刻主动送达**，而非"醒来后补偿"；`ON_RESUME` 的 `refreshIfStale()` 保留为第二道防线。**7 个 VM 逐一核对日期语义：全部是「今天」，无「窗口起点」，语义未变**；Today/Symptom 在 `onCleared` 反注册（日期源是进程级单例，否则会持有已销毁的 VM）
+- **B4** `MedEditScreen` 的 `DrugKeyCatalog.suggest` 包 `remember`（key 取单一字符串——它已把"用哪个字段查"折进自身，两个输入任一变必然变 key；用字符串而非 Pair，避免每次重组新建 Pair 让 remember 失效）
+- **B5** `loadPeriodic` 参数级去重：`loadedPeriodDays`（手上这份数据是哪段）与 `_periodDays`（用户现在选的）分开；同窗口跳过、**参数变了必重载**、**失败不推进缓存**（下次仍重试）；另加慢查询保护（快速连点 7→30 时不让旧窗口数据覆盖新窗口）
+- **B6 报告此条不成立**：`AttachmentSheet` 该处**已有 key**（L236 `rows.forEach { a -> key(a.id) { … } }`，注释写明是 v1.0.43 的修复）；报告指的 L231 是空态 `Text`。**未改动**
+
+### F 组：WebDAV 读取大小上限（D6）
+
+- **上限**：二进制响应（GET 单文件）**6 MiB**；XML/文本（PROPFIND 列表）**1 MiB**。依据：DB 备份是"全库导出 + AES-256-GCM 的 JSON 文本"，正常几百 KB；附件实测区间 100 KB–5 MB（另有 20 MB 硬闸门）。6 MiB 覆盖"真实备份 + 真实大附件"并把"远端被换成超大文件"挡在读入内存之前。**说明**：本机无真机 `/data/data` 访问权，体积为**仓库内既有口径的量级估算**，代码注释已如实标注
+- **绝不静默截断**：新增 `DavResponseTooLargeException(path, actualBytes, limitBytes)`，实读超限**立刻抛出**；判定完全基于**实读字节数**（不报长度、谎报长度都挡得住）
+- **覆盖全部读路径**（`grep readBytes` 已 0 命中）：备份下载 / 附件懒下载 / 上传后回读校验（共用同一收口）· 附件目录列举 · 恢复列表 · 轮换列举——**其中轮换列举原有 `catch(Exception) { emptyList() }` 会把超限吞成"远端一份都没有"**，已改为显式重抛
+- 错误文案走 `strings.xml`（无 BOM 断言 + 3 条锚点唯一匹配 + 同一编码写回；CRLF +6 只来自新增行，**LF-only 600 不变**）；附件懒下载返回类型 `Boolean` → `Int?`，UI 可区分"太大"与"云端没有"
+
+### 测试与构建
+
+- 单测 **678 → 691 条全绿**；`detekt` 中途报的 10 条新问题**全部改代码修掉而非进基线**；**`:app:lintDebug` 0 error**
+- 新增 `WebDavBoundedReadTest` 8 条 · `DateProviderTest` 5 条
+- release / debug 均 versionCode **91 / 1.0.86**
+
+### 未做 / 残余风险
+
+- **`DateProvider.start()` 的广播注册未写 Robolectric 测试**（只测纯 JVM 推进/通知语义）：注册路径需真机验证"跨零点收到 `ACTION_DATE_CHANGED`"，已在注释写明残余风险 + `ON_RESUME` 兜底
+- **B5 取舍**：同窗口内数据变了不会自动重载（参数变了才重载）；报表页"刷新"按钮行为未变
+- **F 组上限依据是量级估算而非真机实测**；若手上有实际备份体积建议核对一次 6 MiB
 ## [v1.0.85] — 2026-10-02
 
 **批次 10：`BackupScreen` 拆分（第二批第 1 块）——根级 Flow 19 → 3。** 纯重构，无库结构变更、无行为改动，可覆盖安装。

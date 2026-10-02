@@ -12,6 +12,7 @@ import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.data.repo.RecipeRepository
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.data.repo.ReminderConfigRepository
+import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.KbSeedRefresh
 import com.ashkb.app.reminder.BasdaiReminderScheduler
@@ -36,6 +37,16 @@ import org.json.JSONObject
 class AshkbApplication : Application() {
 
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * v1.0.86（批次 11）：全应用唯一的「今天」来源。
+     *
+     * 进程级单例：7 个 ViewModel 共用同一个日期流，跨零点只算一次、只通知一次；深睡不可靠的
+     * 协程 ticker 被系统日期变更广播取代（设计与理由见 [DateProvider]）。用 [appScope] 而不是
+     * 各 VM 自己的 scope——日期本身的寿命与进程相同。
+     */
+    val dateProvider = DateProvider(appScope)
+
     val medicationRepository: MedicationRepository by lazy { MedicationRepository(this) }
     val healthRepository: HealthRepository by lazy { HealthRepository(this) }
     val backupRepository: BackupRepository by lazy { BackupRepository(this) }
@@ -50,6 +61,10 @@ class AshkbApplication : Application() {
         // v1.0.40：先装崩溃留档（本地文件 + Logcat）——任何未捕获异常都留痕，便于定位
         CrashLogger.install(this)
         NotificationHelper.ensureChannels(this)
+        // v1.0.86（批次 11）：日期变更广播「注册即生效」——注册动作在 onCreate 同步完成，
+        // 不等启动期那批 IO（下面 appScope.launch 里的例行工作），否则冷启动恰好跨零点时，
+        // 页面可能先读到还没校正的旧日期。
+        dateProvider.start(this)
         appScope.launch {
             // v1.0.40：启动期例行工作**整体兜底**。这里的异常发生在协程内（appScope 无
             // CoroutineExceptionHandler），会直接冒泡到线程未捕获处理器并杀进程——必须显式捕获，
@@ -132,6 +147,18 @@ class AshkbApplication : Application() {
                 CrashLogger.recordNonFatal(this@AshkbApplication, "启动期例行工作", it)
             }
         }
+    }
+
+    /**
+     * v1.0.86（批次 11）：反注册日期变更广播。
+     *
+     * 真实设备上进程结束不会走这里（`onTerminate` 只在模拟进程里调用），但那条广播接收器是
+     * 应用级的——注册一次、随进程消亡，不构成泄漏；这里补上是为了「注册 / 反注册成对」，
+     * 也方便将来进程复用的场景（如多进程 or 测试宿主）。
+     */
+    override fun onTerminate() {
+        dateProvider.stop(this)
+        super.onTerminate()
     }
 
     /**
