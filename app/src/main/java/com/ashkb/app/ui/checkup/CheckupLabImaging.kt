@@ -2,8 +2,10 @@ package com.ashkb.app.ui.checkup
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
@@ -384,7 +386,14 @@ internal fun LabsList(
  * `LongMethod` 上限，而这一组的折叠状态、归属胶囊、三个动作都是独立可读的一件事）。
  *
  * item key 稳定 + `rememberSaveable`：翻页加载更早记录、滚动回收、旋转屏均保持折叠状态。
+ *
+ * v1.0.90（批次 15）：动作行由 `Row` 改 `FlowRow`——该行是「归属胶囊 + 归属复诊记录 + 附件归档」，
+ * 最坏组合（已归属时）固有宽度 ≈94+8+114+8+84 = **308dp**，而卡片内宽：360dp 屏 296dp、
+ * 320dp 屏仅 256dp。`Row` 只会把末位「附件归档」挤到 6dp（文字逐字竖排、不可见也不可点），
+ * `FlowRow` 则把放不下的那一项整体折到下一行，每项都保住自己的固有宽度。
+ * 折行只发生在窄屏/大字号下，宽屏观感与原来逐像素一致（同一行、同一间距）。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LabDateGroup(
     date: String,
@@ -418,9 +427,10 @@ private fun LabDateGroup(
     ) {
         // 归属/附件动作放在折叠开关之外：折叠状态下也要能直接归档，
         // 否则"这天有没有归属"得先展开才能查、才能改
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
             if (linkedId != null) {
                 // 只有"已归属"才给胶囊：未归属是常态，不额外占用视觉噪音
@@ -491,7 +501,19 @@ internal fun ImagingList(
 /**
  * 单条影像卡片（从 [ImagingList] 抽出来：列表函数本身要控制长度，而这一张卡片的排版
  * ——日期 / 类型 / 部位 / 医院 / 结论摘要 / 三个动作——是独立可读的一件事）。
+ *
+ * v1.0.90（批次 15）：动作行由 `Row` 改 `FlowRow`——该行是「归属胶囊 + 编辑 + 归属复诊记录 +
+ * 附件归档」，最坏组合（导入影像后归属过复诊记录）固有宽度 ≈94+58+114+84+3×8 = **374dp**，
+ * 而卡片内宽：360dp 屏 296dp、320dp 屏 256dp。`Row` 按序测量，末位「附件归档」只能拿到
+ * 6dp（文字逐字竖排 → 不可见且不可点，远低于 48dp 触达区）；`FlowRow` 把放不下的项整体
+ * 折到下一行，每项保住固有宽度与 `Size.touchMin` 高度。
+ *
+ * 为什么用 `FlowRow` 而不是把「归属」胶囊挪出该行：胶囊是**状态**、三个按钮是**动作**，
+ * 拆成两行要额外占一行高度、且「已归属」这个状态与「改归属」的入口被拉开；`FlowRow` 只在
+ * 真的放不下时才折行，宽屏观感与原来逐像素一致（同一行、同一间距）。本仓库已有同一成例
+ * （`WellnessScreen` 的补剂动作行、`MedsScreen` 的注射部位组、`CheckupForms` 的单选组）。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ImagingRow(
     rec: ImagingRecord,
@@ -541,10 +563,12 @@ private fun ImagingRow(
                 )
             }
             // 归属/附件排在结论之后：先读结论（这才是这张片子的价值），再决定它算哪次复诊。
-            // 外层 Surface 有点击（打开详情），Compose 里子节点优先消费点击，按钮不会被吞
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            // 外层 Surface 有点击（打开详情），Compose 里子节点优先消费点击，按钮不会被吞。
+            // v1.0.90（批次 15）：FlowRow 而非 Row——见上方 KDoc 的宽度推算（374 > 296）。
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
                 if (rec.checkupId != null) {
                     // 只有"已归属"才给胶囊：未归属是常态，不额外占用视觉噪音

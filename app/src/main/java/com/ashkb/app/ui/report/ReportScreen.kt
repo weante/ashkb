@@ -65,6 +65,7 @@ import com.ashkb.app.ui.components.SmallTrendChart
 import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.components.TrendChart
 import com.ashkb.app.ui.components.TrendPoint
+import com.ashkb.app.ui.components.WeightedTrailingRow
 import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.ui.theme.accent
 import com.ashkb.app.ui.theme.DataLarge
@@ -199,31 +200,26 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
                         else -> StatusTone.Danger
                     }
                     val accent = tone.accent()
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("$rate%", style = DataLarge, color = accent)
-                        Spacer(Modifier.padding(start = Spacing.lg))
-                        // v1.0.82（批次 8）：这一列必须参与权重分配，否则它会按内容宽度吃掉整行，
-                        // 右侧「达标」徽标只剩被挤压的残宽 → 两字被迫竖排后被裁（维护者截图反馈）。
-                        // fill = false：列宽按剩余空间收缩、不强行撑满，徽标得以按自身内容宽度测量。
-                        Column(
-                            modifier = Modifier.weight(1f, fill = false),
-                            verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
-                        ) {
-                            Text(
-                                stringResource(R.string.report_supp_adherence_detail, sup.done, sup.partial, sup.skipped),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            Text(
-                                stringResource(R.string.report_adherence_total, sup.total),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        // 徽标紧跟内容（不再用 weight 撑开）——把剩余空间交给上面的列，
-                        // 权重撑开的写法在窄屏上会把徽标挤到零宽
-                        Spacer(Modifier.padding(start = Spacing.sm))
-                        StatusChip(ClinicalThresholds.adherenceLabel(rate), tone)
-                    }
+                    // v1.0.90（批次 15）：本行原本是"内联的那一份"（v1.0.82 只修了它，共用组件没修，
+                    // 于是同一个形状在别处继续复发）。宽度规则已收进 [WeightedTrailingRow]，
+                    // 这里改为调用组件——本文件不再持有第二份排版实现。
+                    WeightedTrailingRow(
+                        leading = { Text("$rate%", style = DataLarge, color = accent) },
+                        content = {
+                            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                                Text(
+                                    stringResource(R.string.report_supp_adherence_detail, sup.done, sup.partial, sup.skipped),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Text(
+                                    stringResource(R.string.report_adherence_total, sup.total),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
+                        trailing = { StatusChip(ClinicalThresholds.adherenceLabel(rate), tone) },
+                    )
                     Spacer(Modifier.height(Spacing.sm))
                     LinearProgressIndicator(
                         progress = { rate / 100f },

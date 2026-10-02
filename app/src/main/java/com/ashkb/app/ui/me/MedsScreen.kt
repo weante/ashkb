@@ -194,6 +194,7 @@ fun MedsScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MedRow(
     med: Medication,
@@ -232,9 +233,16 @@ private fun MedRow(
                     modifier = Modifier.size(Size.iconSm),
                 )
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            // v1.0.90（批次 15）：频次 / 核对 / 减量中三枚胶囊由 Row 改 FlowRow。
+            // 本列宽度是 `weight(1f)` 的**剩余宽**，360dp 屏上卡片内 296dp 再扣掉右侧
+            // 「编辑图标 48 + 停药按钮 ≈84 + 两处 8dp 间距」只剩 **≈148–206dp**；
+            // 三枚固有宽度 ≈52+8+90+8+55 = 213dp（TAPERING 且核对待办未勾的最坏组合）
+            // 放不下，`Row` 把末位「减量中」压到 55dp 以下逐字折行（28dp 下限之下的两行被裁）。
+            // `FlowRow` 把放不下的那枚整体折到下一行——与补剂卡动作行同一成例。
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
                 Text(
                     buildString {

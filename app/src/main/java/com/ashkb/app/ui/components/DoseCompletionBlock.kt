@@ -2,15 +2,11 @@ package com.ashkb.app.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.ashkb.app.R
@@ -72,20 +68,26 @@ fun DoseCompletionBlock(
             )
         } else {
             val tone = completionTone(rate)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("$rate%", style = DataLarge, color = tone.accent())
-                Spacer(Modifier.width(Spacing.lg))
-                Text(
-                    stringResource(
-                        R.string.dose_completion_plan_breakdown,
-                        dose.done, dose.partial, dose.skipped, dose.missed, dose.planned,
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Spacer(Modifier.weight(1f))
-                // 有计划快照才有判定：completionLabel 对 null 恒为 null（无快照上面已拦掉）
-                ClinicalThresholds.completionLabel(rate)?.let { StatusChip(it, tone) }
-            }
+            // v1.0.90（批次 15）：本行改走 [WeightedTrailingRow]（正文列 weight(1f) + 徽标前固定间距）。
+            // 此前这里与报表页内联的那一份各写一套，v1.0.82 只动了报表内联的那一份 → 走本组件的
+            // 报表首卡与药单历史弹层里的「达标」徽标一直是零宽（维护者两次截图反馈的其实是同一个形状）。
+            // 宽度规则收进组件后两处不可能再分叉；组件内为什么必须 fill = true 见其 KDoc。
+            WeightedTrailingRow(
+                leading = { Text("$rate%", style = DataLarge, color = tone.accent()) },
+                content = {
+                    Text(
+                        stringResource(
+                            R.string.dose_completion_plan_breakdown,
+                            dose.done, dose.partial, dose.skipped, dose.missed, dose.planned,
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                },
+                trailing = {
+                    // 有计划快照才有判定：completionLabel 对 null 恒为 null（无快照上面已拦掉）
+                    ClinicalThresholds.completionLabel(rate)?.let { StatusChip(it, tone) }
+                },
+            )
             // 数字与进度条必须同色（同 tone）——曾出现过「数字红、进度条绿」的矛盾观感
             LinearProgressIndicator(
                 progress = { rate / 100f },

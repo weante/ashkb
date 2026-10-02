@@ -4,12 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.TrendingDown
 import androidx.compose.material.icons.rounded.TrendingFlat
@@ -92,6 +90,28 @@ fun StatTile(
 /**
  * 键值行：取代此前 6 个同义变体（`ProfileRow` / `CheckRow` / `LedgerRow` / 化验行 …）。
  * 数值可带语义色调与状态图标（三重编码）。
+ *
+ * v1.0.90（批次 15）：**数值列参与权重分配**（`weight(1f)`），不再让「标签 + 弹性 Spacer +
+ * 数值 + trailing」四者中只有 Spacer 有权重。
+ *
+ * 为什么必须改（对照 Compose foundation-layout 1.7.3 `RowColumnMeasurePolicyKt.measure` 字节码）：
+ * `Row` 先测量**非权重**子项（各拿"当前可用宽 − 间距"），剩下的才分给权重子项；而权重子项拿到的
+ * 宽上限由 `fill` 决定——`fill = true`（默认）时约束被收紧成"分给它的那一份"，`fill = false` 时
+ * 仍是**整行宽**。过去只有 Spacer 有权重，于是标签与数值都按**固有宽度**先测：数值一长就吃掉整行，
+ * 排在最后的 trailing 拿到 maxWidth ≈ 0。急救页「当前用药」的免疫抑制标记
+ * （`KeyValueRow(label = 药名, value = 剂量说明, trailing = 胶囊)`）就是受害者——「免疫抑制」
+ * 被压成 2.5dp 后逐字竖排。
+ *
+ * 改法（两步）：
+ *  · 数值列给 `weight(1f)`（**不能**用 `fill = false`，那样约束仍是整行宽、等于没改）——
+ *    它被钉在"整行宽 − 标签宽 − 间距"上，放不下时由它折行；
+ *  · 中间的 `Spacer(weight(1f))` 删掉，改在 Row 上挂 `Arrangement.SpaceBetween`——
+ *    权重 Spacer 正是把 trailing 挤成零宽的那一步（它与 trailing 抢同一份剩余，且排在前面）。
+ *    多余空间由 SpaceBetween 落在"标签↔数值↔trailing"之间：trailing 因此恒在行尾，
+ *    且**永远拿得到自己的固有宽度**。
+ *
+ * 无 trailing 的调用点行为不变：数值列照旧拿到"可用宽 − 标签宽 − 间距"，短数值显示完整；
+ * 唯一差别是标签与数值之间不再有一个只会撑宽的 Spacer（它原本就是靠权重吃掉剩余、不画任何东西）。
  */
 @Composable
 fun KeyValueRow(
@@ -112,15 +132,18 @@ fun KeyValueRow(
             .heightIn(min = Size.rowMinHeight)
             .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        // v1.0.90（批次 15）：SpaceBetween 取代原来的 `Spacer(weight(1f))`——见函数 KDoc
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             label,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.weight(1f).width(Spacing.sm))
         Row(
+            // v1.0.90（批次 15）：数值列有权重，trailing 才不会被压成零宽（见函数 KDoc）。
+            // 必须是默认的 fill = true——`fill = false` 不收紧约束，数值照样吃满整行。
+            modifier = Modifier.weight(1f).padding(start = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {

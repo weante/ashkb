@@ -7,8 +7,11 @@ import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -256,48 +259,17 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         } else {
+                            // v1.0.90（批次 15）：单条联系人的排版抽成 ContactRow——
+                            // 本函数已到 detekt 的 LongMethod / CyclomaticComplexMethod 阈值
+                            // （基线只兜住**原始签名**，加一个 @OptIn 就不再匹配），
+                            // 而「名称 / 关系 / 改删 / 拨号」本身是独立可读的一件事。
                             DividerList(contacts, key = { it.id }) { c ->
-                                Column(
-                                    Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
-                                ) {
-                                    Text(c.name, style = MaterialTheme.typography.titleMedium)
-                                    c.relation?.let {
-                                        Text(
-                                            it,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                    // v1.0.80（批次 6）：改 / 删联系人。
-                                    // 此前这一区只有「添加」与「拨号」——号码录错一位就只能再加一条，
-                                    // 而 deleteContact 明明已经在仓库层躺了很久，界面上却没有入口。
-                                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                                        TextButton(
-                                            onClick = { editContact = c },
-                                            modifier = Modifier.heightIn(min = Size.touchMin),
-                                        ) { Text(stringResource(R.string.common_edit)) }
-                                        DestructiveAction(
-                                            label = stringResource(R.string.common_delete),
-                                            confirmTitle = stringResource(R.string.emergency_delete_contact_confirm, c.name),
-                                            confirmBody = stringResource(R.string.emergency_delete_contact_note) + "\n" +
-                                                stringResource(R.string.common_delete_irreversible),
-                                            onConfirm = { vm.deleteContact(c.id) },
-                                        )
-                                    }
-                                }
-                                FilledTonalButton(
-                                    onClick = { context.dial(c.phone) },
-                                    modifier = Modifier.heightIn(min = Size.touchComfort),
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.Call,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(Size.iconSm),
-                                    )
-                                    Spacer(Modifier.width(Spacing.xs))
-                                    Text(c.phone)
-                                }
+                                ContactRow(
+                                    contact = c,
+                                    onDial = { context.dial(c.phone) },
+                                    onEdit = { editContact = c },
+                                    onDelete = { vm.deleteContact(c.id) },
+                                )
                             }
                         }
                     }
@@ -509,6 +481,72 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
         onSave = { vm.saveEmergencyEvent(it); showEventForm = false },
         onDismiss = { showEventForm = false },
     )
+}
+
+/**
+ * 单条紧急联系人（从 [EmergencyScreen] 抽出：那边已到 detekt 的 `LongMethod` /
+ * `CyclomaticComplexMethod` 阈值，而「名称 / 关系 / 改删 / 拨号」是独立可读的一件事）。
+ *
+ * v1.0.90（批次 15）：改 / 删由 `Row` 改 `FlowRow`。本列宽是外层 `Row` 里 `weight(1f)` 的
+ * **剩余宽**，右边「拨号」按钮按 `c.phone` 的固有宽度先测（长号码格式 `+86 138 0013 8000`
+ * ≈196dp）→ 本列只剩 ≈44dp，`Row` 会把「编辑」压到 28dp、「删除」压到 12dp 逐字折行——
+ * 两个按钮都掉到 48dp 触达区之下（不可点）。`FlowRow` 放不下就整项折到下一行，每项保底
+ * `Size.touchMin`。电话按钮保持无权重：号码是这一行最有用的信息，不能为排版让位；
+ * 它的文字本身可折行，缩不到零宽。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RowScope.ContactRow(
+    contact: EmergencyContact,
+    onDial: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Column(
+        Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+    ) {
+        Text(contact.name, style = MaterialTheme.typography.titleMedium)
+        contact.relation?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // v1.0.80（批次 6）：改 / 删联系人。
+        // 此前这一区只有「添加」与「拨号」——号码录错一位就只能再加一条，
+        // 而 deleteContact 明明已经在仓库层躺了很久，界面上却没有入口。
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            TextButton(
+                onClick = onEdit,
+                modifier = Modifier.heightIn(min = Size.touchMin),
+            ) { Text(stringResource(R.string.common_edit)) }
+            DestructiveAction(
+                label = stringResource(R.string.common_delete),
+                modifier = Modifier.heightIn(min = Size.touchMin),
+                confirmTitle = stringResource(R.string.emergency_delete_contact_confirm, contact.name),
+                confirmBody = stringResource(R.string.emergency_delete_contact_note) + "\n" +
+                    stringResource(R.string.common_delete_irreversible),
+                onConfirm = onDelete,
+            )
+        }
+    }
+    FilledTonalButton(
+        onClick = onDial,
+        modifier = Modifier.heightIn(min = Size.touchComfort),
+    ) {
+        Icon(
+            Icons.Rounded.Call,
+            contentDescription = null,
+            modifier = Modifier.size(Size.iconSm),
+        )
+        Spacer(Modifier.width(Spacing.xs))
+        Text(contact.phone)
+    }
 }
 
 // ===== 联系人表单（字段少，保留 AlertDialog；校验错误可见 + 可读） =====
