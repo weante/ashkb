@@ -2,7 +2,6 @@ package com.ashkb.app.ui.wellness
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -377,21 +377,28 @@ internal data class SupplementRowActions(
 )
 
 /**
- * v1.0.87（批次 12）：补剂档案列表的一行——左侧补剂信息（点开详情）+ 右侧今日动作或状态。
+ * v1.0.87（批次 12）：补剂档案列表的一行——上方补剂信息（点开详情），下方动作区。
  *
- * 新增「跳过」后，这一行的右半部从「一个按钮 / 一个胶囊」变成最多 4 个元素
- * （胶囊或两个动作按钮 + 编辑 + 删除），因此整行收进本函数：原来那 3 个块直接挂在
- * `DividerList` 的 `RowScope` 里，加一个按钮就会把名称列挤成一条缝。
+ * v1.0.89（批次 14 布局回归修复）：动作整体移到名称的**下一行**。
  *
- * 布局与批次 7 保持一致（分割线、可点区域、编辑 / 删除入口的位置都没动）：
- *  · 左列：`fillMaxWidth()` + 父 Row 的 `weight(1f)` 一起把右侧推到屏幕边缘；
- *  · 右侧：胶囊（已记录）**或**两个动作按钮（未记录），下面依次是编辑与删除。
+ * 为什么不能再挂在 `DividerList` 的 `RowScope` 上：`itemContent` 是 `RowScope.(T) -> Unit`，
+ * 函数体里的每一块都是那个横向 Row 的**直接子项**，于是名称列与「打卡 / 跳过 / 撤销 / 编辑 / 删除」
+ * 抢同一行的宽度。四个 TextButton 的固有宽度（文字 + 12dp×2 内边距，下限 58dp）合计 ≈244dp，
+ * 360dp 屏上卡片内宽只剩 ≈14dp 给名称——维护者真机看到的就是「名称被挤没、只剩四个按钮」。
+ * 根节点改成 Column 后，内容列与动作行各自独占一整行宽度，名称不再与按钮争宽。
+ *
+ * 动作行用 `FlowRow` 而非 `Row`：最坏组合（状态胶囊 + 撤销打卡 + 编辑 + 删除）≈282dp，
+ * 320dp 宽的机型（卡片内 ≈256dp）或大字号下仍放不下——`Row` 会把末尾按钮截到屏幕外，
+ * `FlowRow` 则整体折到下一行（与本文件 `ChipGroup` 同一成例）。
+ * 每个动作都带 `heightIn(min = Size.touchMin)`：既守住触达区下限，又让各项等高，
+ * 折行时不会出现「胶囊与按钮各吊各的」错位。
  *
  * 「跳过」不弹任何表单、不要求填理由：补剂不是处方药，没有「为什么没吃」这一问
  * （药品那套 `SkipReason` 是给漏服追责用的，照搬到补剂只是多一步无用输入）。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun RowScope.SupplementCardRow(
+private fun SupplementCardRow(
     sup: Supplement,
     todayStatus: String?,
     actions: SupplementRowActions,
@@ -399,84 +406,121 @@ private fun RowScope.SupplementCardRow(
     onSkip: () -> Unit,
     onUndo: () -> Unit,
 ) {
-    Column(
-        // v1.0.81（批次 7）：点整行打开「补剂详情」（最近服用记录 + 逐条删除）。卡片状态由
-        // WellnessScreen 的 detailSup 持有，这里只回调——写成两份 state 的话，点击只改一份、
-        // 弹层读另一份，点了没反应。
-        // v1.0.88（批次 12 回归修复）：这里必须是 weight(1f) 而不是 fillMaxWidth()。
-        // DividerList 的 itemContent 是 RowScope——fillMaxWidth() 会把整行宽度吃光，
-        // 后面的「打卡/跳过/撤销/编辑/删除」全被挤成零宽（维护者真机看到卡片只剩名称，
-        // 按钮全部消失）。weight(1f) 既保留"点整行开详情"的触达区，又给按钮留下自己的宽度。
-        Modifier.weight(1f).clickable { actions.onOpenDetail() },
-        verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
-    ) {
-        Text("${sup.name} ${sup.dose}", style = MaterialTheme.typography.bodyMedium)
-        Text(
-            SupplementCategory.fromKey(sup.category).label +
-                (sup.brand?.let { " · $it" } ?: ""),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        // B11：当日累计（单次剂量 × 每日次数）超出用户自填的每日上限 → 警示；
-        // 未填上限 / 未量化单次剂量时 exceedsDailyMax 返回 null，静默不提示
-        if (SupplementLimits.exceedsDailyMax(sup) == true) {
-            val total = SupplementLimits.dailyTotal(sup)
-            val max = sup.dailyMax
-            if (total != null && max != null) {
-                Text(
-                    stringResource(
-                        R.string.supp_over_limit,
-                        fmtNum(total), SupplementLimits.unitLabel(sup), fmtNum(max),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+    // v1.0.89（批次 14）：根是纵向 Column——本函数已不再挂在 DividerList 的 RowScope 上，
+    // 所以这里可以放心 fillMaxWidth()（此前必须是 weight(1f)，否则名称会把按钮挤没）。
+    Column(Modifier.fillMaxWidth()) {
+        Column(
+            // v1.0.81（批次 7）：点整行打开「补剂详情」（最近服用记录 + 逐条删除）。卡片状态由
+            // WellnessScreen 的 detailSup 持有，这里只回调——写成两份 state 的话，点击只改一份、
+            // 弹层读另一份，点了没反应。
+            // v1.0.88（批次 12 回归修复）：这里必须是 weight(1f) 而不是 fillMaxWidth()。
+            // DividerList 的 itemContent 是 RowScope——fillMaxWidth() 会把整行宽度吃光，
+            // 后面的「打卡/跳过/撤销/编辑/删除」全被挤成零宽（维护者真机看到卡片只剩名称，
+            // 按钮全部消失）。weight(1f) 既保留"点整行开详情"的触达区，又给按钮留下自己的宽度。
+            // v1.0.89（批次 14）：根改成 Column 后，本列是这一行唯一的子项，fillMaxWidth() 不再
+            // 与任何兄弟争宽——它只吃自己这一行，顺带把「点整行开详情」的触达区还给了整行。
+            Modifier.fillMaxWidth().clickable { actions.onOpenDetail() },
+            verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+        ) {
+            Text("${sup.name} ${sup.dose}", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                SupplementCategory.fromKey(sup.category).label +
+                    (sup.brand?.let { " · $it" } ?: ""),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            // B11：当日累计（单次剂量 × 每日次数）超出用户自填的每日上限 → 警示；
+            // 未填上限 / 未量化单次剂量时 exceedsDailyMax 返回 null，静默不提示
+            if (SupplementLimits.exceedsDailyMax(sup) == true) {
+                val total = SupplementLimits.dailyTotal(sup)
+                val max = sup.dailyMax
+                if (total != null && max != null) {
+                    Text(
+                        stringResource(
+                            R.string.supp_over_limit,
+                            fmtNum(total), SupplementLimits.unitLabel(sup), fmtNum(max),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+        // 动作行：独占名称下方的一行。用 FlowRow 而不是 Row——见上方 KDoc 的宽度推算，
+        // 窄屏 / 大字号下它会整体折行，而 Row 只会把末尾按钮挤出屏幕。
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+        ) {
+            when (todayStatus) {
+                // 已服 / 跳过都由 SupplementLogStatus 映射（文案与色调与详情弹层同源）；
+                // 跳过用**中性色**：与药品卡（`medStatusOf`）一致——不是错误，不该报警
+                AdherenceCalc.SKIPPED -> SupplementStatusSlot(
+                    status = todayStatus,
+                    icon = Icons.Rounded.RemoveCircleOutline,
+                )
+                // v1.0.89（批次 14）：两个按钮直接作为 FlowRow 的项（不再套一层 Row），
+                // 窄屏上可以各自折行，而不是被当成一个整体一起挤出去。
+                null -> {
+                    TextButton(onClick = onCheckIn, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                        Text(stringResource(R.string.exercise_checkin_short))
+                    }
+                    TextButton(onClick = onSkip, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                        Text(stringResource(R.string.med_skip))
+                    }
+                }
+                else -> SupplementStatusSlot(status = todayStatus, icon = Icons.Rounded.CheckCircle)
+            }
+            // v1.0.80（批次 6）：撤销误点的打卡——此前点错了就再也回不到「今天还没吃」，
+            // 「已服用」胶囊会一直挂着（而它与补剂本身的删除入口长得一样危险）。
+            // v1.0.87（批次 12）：对「已服」与「跳过」用同一个入口与同一句文案——撤销就是把今天的
+            // 记录整个抹掉回到未记录态，两种状态在这里没有区别，分成两句话只会让用户多读一行。
+            if (todayStatus != null) {
+                DestructiveAction(
+                    label = stringResource(R.string.nutrition_supplement_undo),
+                    confirmTitle = stringResource(R.string.nutrition_supplement_undo_confirm, sup.name),
+                    confirmBody = stringResource(R.string.nutrition_supplement_undo_note),
+                    onConfirm = onUndo,
+                    // v1.0.89（批次 14）：与其它动作等高，折行时才不会与胶囊错位
+                    modifier = Modifier.heightIn(min = Size.touchMin),
                 )
             }
+            // v1.0.89（批次 14）：此前「编辑」没有高度下限（TextButton 默认 40dp，低于触达区
+            // 下限 48dp），补齐后动作行各项等高。
+            TextButton(onClick = actions.onEdit, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                Text(stringResource(R.string.common_edit))
+            }
+            // v1.0.81（批次 7）：这里的删除 = **删掉整个补剂条目**（连带它名下的服用记录，
+            // 条数由确认框异步取并报出，见 SupplementDeleteDialog）。只想删某一天的记录时，
+            // 走「点击补剂」打开的详情弹层——两种语义此前共用一句「删除…？」，
+            // 而确认框里那句「已产生的服用记录仍保留」更是与实情相反，正是用户困惑的根源。
+            TextButton(
+                onClick = actions.onDelete,
+                modifier = Modifier.heightIn(min = Size.touchMin),
+            ) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
         }
     }
-    when (todayStatus) {
-        // 已服 / 跳过都由 SupplementLogStatus 映射（文案与色调与详情弹层同源）；
-        // 跳过用**中性色**：与药品卡（`medStatusOf`）一致——不是错误，不该报警
-        AdherenceCalc.SKIPPED -> StatusChip(
-            text = stringResource(SupplementLogStatus.labelRes(todayStatus)),
-            tone = SupplementLogStatus.tone(todayStatus),
-            icon = Icons.Rounded.RemoveCircleOutline,
-        )
-        null -> Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            TextButton(onClick = onCheckIn, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                Text(stringResource(R.string.exercise_checkin_short))
-            }
-            TextButton(onClick = onSkip, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                Text(stringResource(R.string.med_skip))
-            }
-        }
-        else -> StatusChip(
-            text = stringResource(SupplementLogStatus.labelRes(todayStatus)),
-            tone = SupplementLogStatus.tone(todayStatus),
-            icon = Icons.Rounded.CheckCircle,
-        )
-    }
-    // v1.0.80（批次 6）：撤销误点的打卡——此前点错了就再也回不到「今天还没吃」，
-    // 「已服用」胶囊会一直挂着（而它与补剂本身的删除入口长得一样危险）。
-    // v1.0.87（批次 12）：对「已服」与「跳过」用同一个入口与同一句文案——撤销就是把今天的
-    // 记录整个抹掉回到未记录态，两种状态在这里没有区别，分成两句话只会让用户多读一行。
-    if (todayStatus != null) {
-        DestructiveAction(
-            label = stringResource(R.string.nutrition_supplement_undo),
-            confirmTitle = stringResource(R.string.nutrition_supplement_undo_confirm, sup.name),
-            confirmBody = stringResource(R.string.nutrition_supplement_undo_note),
-            onConfirm = onUndo,
-        )
-    }
-    TextButton(onClick = actions.onEdit) { Text(stringResource(R.string.common_edit)) }
-    // v1.0.81（批次 7）：这里的删除 = **删掉整个补剂条目**（连带它名下的服用记录，
-    // 条数由确认框异步取并报出，见 SupplementDeleteDialog）。只想删某一天的记录时，
-    // 走「点击补剂」打开的详情弹层——两种语义此前共用一句「删除…？」，
-    // 而确认框里那句「已产生的服用记录仍保留」更是与实情相反，正是用户困惑的根源。
-    TextButton(
-        onClick = actions.onDelete,
+}
+
+/**
+ * v1.0.89（批次 14）：动作行里的状态胶囊槽。
+ *
+ * `StatusChip` 不收 modifier（自身钉了 28dp 下限），直接放进一排 48dp 高的按钮里会顶在上沿；
+ * 套一个等高槽并居中后两者等高——换不换行都不会出现「胶囊吊在按钮上方」的错位。
+ */
+@Composable
+private fun SupplementStatusSlot(status: String, icon: ImageVector) {
+    Box(
         modifier = Modifier.heightIn(min = Size.touchMin),
-    ) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
+        contentAlignment = Alignment.Center,
+    ) {
+        StatusChip(
+            text = stringResource(SupplementLogStatus.labelRes(status)),
+            tone = SupplementLogStatus.tone(status),
+            icon = icon,
+        )
+    }
 }
 
 /**

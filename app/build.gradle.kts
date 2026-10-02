@@ -28,8 +28,8 @@ android {
         applicationId = "com.ashkb.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 93
-        versionName = "1.0.88"
+        versionCode = 94
+        versionName = "1.0.89"
         // 批次 2（测试安全网）：instrumented 测试（Room schema 漂移校验）需要 runner
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
