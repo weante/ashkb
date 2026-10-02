@@ -1,7 +1,5 @@
 package com.ashkb.app.ui.me
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,39 +8,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -55,15 +35,12 @@ import com.ashkb.app.data.entity.MedClass
 import com.ashkb.app.data.entity.MedFrequency
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.repo.nowIso
-import com.ashkb.app.domain.DrugKeyCatalog
 import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.ui.components.DateFieldRules
-import com.ashkb.app.ui.components.DateTextField
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import java.time.LocalDate
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 
@@ -73,6 +50,42 @@ import org.json.JSONArray
  * 原为 15 字段的两步 `AlertDialog`，弹窗里必然局促且无法保存草稿 —— 改为全屏表单：
  * 顶栏承载步骤标题与返回，底部固定操作条，内容区整屏滚动。
  * v1.0.31：[editId] 非空 = 编辑既有在用药品（预填全部参数，保留 id / createdAt / 核对记录）。
+ *
+ * ### v1.0.92（批次 17）：按字段组拆 section，敲键只重组那个字段所在的 section
+ *
+ * **拆分前**：24 个 state 全挂在根级，而且每个字段都在**根级正文**里被读一次
+ * （`OutlinedTextField(name, { name = it }, …)`：实参在根级求值）→ 敲一个键就把整个表单
+ * 从头重组一遍。这是本屏最痛的地方，也是它排进本批的原因。
+ *
+ * **拆分后**：字段 state 仍在根级**声明**，但一个都不在根级正文里读——每个 section 收
+ * `MutableState`，在**自己的组合作用域**里 `.value`。重组范围由快照读点决定，读点在哪、
+ * 重组就限定在哪，于是：敲「药名」只重组基础信息 section；敲「存放」只重组存放 section；
+ * 底部操作条只在它自己依赖的字段（step / editMissing / route / frequency / startDate）变化时
+ * 重组（`Scaffold` 的 topBar / bottomBar / content 是三个独立作用域）。各 section 见
+ * `MedEditSections.kt`。
+ *
+ * ### 为什么字段 state 仍在根级（而不是搬进 section 里 remember）
+ * ① **保存路径读全表单**：`buildMed()` 在底部按钮的点击回调里读全部 20 个字段。回调不是
+ *    组合上下文，读点天然是"延迟"的；但那些 state 必须由根级持有，回调才够得着。
+ * ② **编辑模式的一次性预填要写同一份 state**：`LaunchedEffect(editId)` 按 id 直查后写 20 个
+ *    字段（v1.0.43 的缺陷正是这条链断了：编辑被静默变成新建）。state 搬进 section 就成了两份，
+ *    预填只写得进其中一份；更硬的一条是 `cycleDays` / `startDate` 这类**字段不可见时仍会落库**
+ *    的值（`buildMed` 里 `injCycleDays` 只看 `route`，不看字段可不可见）——state 跟着可见性
+ *    分支一起消失，等于在隐藏期间悄悄改值。
+ * ③ 这些字段是 `rememberSaveable`：转屏 / 进程死亡后的恢复语义与拆分前**逐字相同**——每个字段
+ *    仍是自己的一个 Bundle 槽，没有引入新的 `Saver`（本模块**无 Compose UI 测试依赖**，
+ *    新 Saver 一旦把字段顺序或键写错，只有在真机转屏时才看得出来，静态测试抓不到）。
+ *
+ * ### 根级**读点**：0
+ * 本函数正文里不再出现任何字段的读（`step` / `editMissing` 也只在 topBar / bottomBar /
+ * content 三个子作用域里读）。`cycleAnchorVisible` 与 `DateFieldRules.requiredOk(startDate)`
+ * 原本是根级正文里的两个 `val`——正是它们让"敲锚点日期重组整屏"，现在改在**使用它们的
+ * 作用域**里求值（见 [MedScheduleSection] 与底部操作条）。
+ *
+ * ### detekt 基线的硬边界
+ * 本函数在 `config/detekt/baseline.xml` 里有 `LongMethod` / `CyclomaticComplexMethod` 两条历史
+ * 条目，ID 是「文件 + 完整签名」（连 `@OptIn` 一起）。故本批**签名与注解逐字未动**，也不在这里
+ * 使用任何需要新增 `@OptIn` 的 API（`FlowRow` 之类都进了 section 文件）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,40 +97,39 @@ fun MedEditScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var step by rememberSaveable { mutableStateOf(1) }
+
+    // ---- 根级 state（24 个槽位，读点全在 section / 子作用域里；声明顺序与拆分前逐字一致，
+    //      `rememberSaveable` 的位置键因此不变）----
+    val step = rememberSaveable { mutableStateOf(1) }
 
     // ---- 第一步字段 ----
-    var name by rememberSaveable { mutableStateOf("") }
-    var brand by rememberSaveable { mutableStateOf("") }
-    var nameKey by rememberSaveable { mutableStateOf("") }
-    var medClass by rememberSaveable { mutableStateOf(MedClass.OTHER) }
-    var route by rememberSaveable { mutableStateOf("oral") }
-    var dose by rememberSaveable { mutableStateOf("") }
-    var frequency by rememberSaveable { mutableStateOf(MedFrequency.DAILY) }
-    var times by rememberSaveable { mutableStateOf(listOf(ScheduleCalc.DEFAULT_PLAN_TIME)) }
-    var weekday by rememberSaveable { mutableStateOf(1) }
-    var weekday2 by rememberSaveable { mutableStateOf(4) }
-    var biwError by rememberSaveable { mutableStateOf(false) }
-    var cycleDays by rememberSaveable { mutableStateOf("14") }
-    var food by rememberSaveable { mutableStateOf("any") }
-    var prnReason by rememberSaveable { mutableStateOf("") }
-    var storage by rememberSaveable { mutableStateOf("") }
-    var startDate by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
+    val name = rememberSaveable { mutableStateOf("") }
+    val brand = rememberSaveable { mutableStateOf("") }
+    val nameKey = rememberSaveable { mutableStateOf("") }
+    val medClass = rememberSaveable { mutableStateOf(MedClass.OTHER) }
+    val route = rememberSaveable { mutableStateOf("oral") }
+    val dose = rememberSaveable { mutableStateOf("") }
+    val frequency = rememberSaveable { mutableStateOf(MedFrequency.DAILY) }
+    val times = rememberSaveable { mutableStateOf(listOf(ScheduleCalc.DEFAULT_PLAN_TIME)) }
+    val weekday = rememberSaveable { mutableStateOf(1) }
+    val weekday2 = rememberSaveable { mutableStateOf(4) }
+    val biwError = rememberSaveable { mutableStateOf(false) }
+    val cycleDays = rememberSaveable { mutableStateOf("14") }
+    val food = rememberSaveable { mutableStateOf("any") }
+    val prnReason = rememberSaveable { mutableStateOf("") }
+    val storage = rememberSaveable { mutableStateOf("") }
+    val startDate = rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
     // v1.0.78（批次 4 收尾）：注射周期锚点日期此前是自由文本、**无任何校验**——
     // `2026-13-45` 一旦落库，「每 N 天」的周期推算会整体错位，且没有任何地方会报错。
-    // 该输入框只在「注射 + 每 N 天 / 自定义」分支出现，故校验也只在它可见时生效
-    // （不可见时不动既有值，避免挡住与它无关的编辑）。
-    val cycleAnchorVisible = route == "injection" && frequency != MedFrequency.PRN &&
-        (frequency == MedFrequency.Q2W || frequency == MedFrequency.CUSTOM)
-    val startDateOk = DateFieldRules.requiredOk(startDate)
+    // 「可见 == 校验生效」的那条判定收在 [cycleAnchorVisible] 一处（见 MedEditSections.kt）。
     // ---- C6 服药三态：固定 / 按需 / 减量中（默认固定，编辑时按原值预填） ----
-    var doseState by rememberSaveable { mutableStateOf(DoseState.FIXED) }
-    var taperNote by rememberSaveable { mutableStateOf("") }
+    val doseState = rememberSaveable { mutableStateOf(DoseState.FIXED) }
+    val taperNote = rememberSaveable { mutableStateOf("") }
 
     // ---- 第二步 R03 ----
-    var hits by remember { mutableStateOf<List<KbEntry>?>(null) }
-    var doctorTold by rememberSaveable { mutableStateOf(false) }
-    var leafletRead by rememberSaveable { mutableStateOf(false) }
+    val hits = remember { mutableStateOf<List<KbEntry>?>(null) }
+    val doctorTold = rememberSaveable { mutableStateOf(false) }
+    val leafletRead = rememberSaveable { mutableStateOf(false) }
 
     val prnFallback = stringResource(R.string.med_reason_backup)
 
@@ -126,76 +138,113 @@ fun MedEditScreen(
     // 或恢复备份后 id 漂移，谓词永不为真 → 协程永久挂起 → original 恒为 null → 保存时
     // id = Ids.new("med")，把「编辑」静默变成**新建一条重复药**，并丢掉病史核对记录。
     // 改为按 id 一次性直查（不限在用）；查不到则明确提示并禁止保存，绝不静默新建。
-    var original by remember { mutableStateOf<Medication?>(null) }
-    var editMissing by rememberSaveable { mutableStateOf(false) }
+    val original = remember { mutableStateOf<Medication?>(null) }
+    val editMissing = rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(editId) {
         if (editId == null) return@LaunchedEffect
         val med = vm.medicationById(editId)
         if (med == null) {
-            editMissing = true
+            editMissing.value = true
             return@LaunchedEffect
         }
-        original = med
-        name = med.name
-        brand = med.brandName ?: ""
-        nameKey = med.nameKey
-        medClass = MedClass.fromKey(med.medClass)
-        route = med.route
-        dose = med.dose
-        frequency = MedFrequency.fromKey(med.frequency)
-        times = ScheduleCalc.takeTimesOf(med).ifEmpty { listOf(ScheduleCalc.DEFAULT_PLAN_TIME) }
-        weekday = med.weeklyWeekday ?: 1
-        weekday2 = med.weeklyWeekday2 ?: 4
-        cycleDays = med.injCycleDays?.toString() ?: "14"
-        food = med.takeWithFood ?: "any"
-        prnReason = med.prnReason ?: ""
-        storage = med.storage ?: ""
-        startDate = med.startDate
+        original.value = med
+        name.value = med.name
+        brand.value = med.brandName ?: ""
+        nameKey.value = med.nameKey
+        medClass.value = MedClass.fromKey(med.medClass)
+        route.value = med.route
+        dose.value = med.dose
+        frequency.value = MedFrequency.fromKey(med.frequency)
+        times.value = ScheduleCalc.takeTimesOf(med).ifEmpty { listOf(ScheduleCalc.DEFAULT_PLAN_TIME) }
+        weekday.value = med.weeklyWeekday ?: 1
+        weekday2.value = med.weeklyWeekday2 ?: 4
+        cycleDays.value = med.injCycleDays?.toString() ?: "14"
+        food.value = med.takeWithFood ?: "any"
+        prnReason.value = med.prnReason ?: ""
+        storage.value = med.storage ?: ""
+        startDate.value = med.startDate
         // C6：未显式设置（旧数据）时按 frequency 推断
-        doseState = DoseState.of(med)
-        taperNote = med.taperNote ?: ""
-        doctorTold = med.checkDoctorTold
-        leafletRead = med.checkLeafletRead
+        doseState.value = DoseState.of(med)
+        taperNote.value = med.taperNote ?: ""
+        doctorTold.value = med.checkDoctorTold
+        leafletRead.value = med.checkLeafletRead
     }
 
     fun buildMed(): Medication = Medication(
         // 编辑模式保留身份与创建时间（updatedAt 由仓库层 upsert 刷新）；新增模式维持原逻辑
-        id = original?.id ?: Ids.new("med"),
-        name = name.trim(),
-        brandName = brand.trim().ifBlank { null },
-        nameKey = nameKey.trim().lowercase(),
-        medClass = medClass.name,
-        route = route,
-        dose = dose.trim(),
-        frequency = frequency.name,
-        prnReason = if (frequency == MedFrequency.PRN) prnReason.trim().ifBlank { prnFallback } else null,
-        takeTimes = if (frequency == MedFrequency.PRN || route == "injection") {
-            times.take(1).let { if (it.isEmpty()) null else JSONArray(it).toString() }
+        id = original.value?.id ?: Ids.new("med"),
+        name = name.value.trim(),
+        brandName = brand.value.trim().ifBlank { null },
+        nameKey = nameKey.value.trim().lowercase(),
+        medClass = medClass.value.name,
+        route = route.value,
+        dose = dose.value.trim(),
+        frequency = frequency.value.name,
+        prnReason = if (frequency.value == MedFrequency.PRN) prnReason.value.trim().ifBlank { prnFallback } else null,
+        takeTimes = if (frequency.value == MedFrequency.PRN || route.value == "injection") {
+            times.value.take(1).let { if (it.isEmpty()) null else JSONArray(it).toString() }
         } else {
-            JSONArray(times).toString()
+            JSONArray(times.value).toString()
         },
-        weeklyWeekday = if (frequency == MedFrequency.WEEKLY || frequency == MedFrequency.BIW) weekday else null,
-        weeklyWeekday2 = if (frequency == MedFrequency.BIW) weekday2 else null,
-        startDate = DateFieldRules.toIsoOrNull(startDate) ?: startDate,
-        injCycleDays = if (route == "injection") cycleDays.toIntOrNull() ?: 14 else null,
-        storage = storage.trim().ifBlank { null },
-        takeWithFood = if (route == "oral") food else null,
+        weeklyWeekday = if (frequency.value == MedFrequency.WEEKLY || frequency.value == MedFrequency.BIW) {
+            weekday.value
+        } else {
+            null
+        },
+        weeklyWeekday2 = if (frequency.value == MedFrequency.BIW) weekday2.value else null,
+        startDate = DateFieldRules.toIsoOrNull(startDate.value) ?: startDate.value,
+        injCycleDays = if (route.value == "injection") cycleDays.value.toIntOrNull() ?: 14 else null,
+        storage = storage.value.trim().ifBlank { null },
+        takeWithFood = if (route.value == "oral") food.value else null,
         // C6：服药状态；减量备注仅在「减量中」时落库（切回固定 / 按需即清空，避免残留脏备注）
-        doseState = doseState.name,
-        taperNote = if (doseState == DoseState.TAPERING) taperNote.trim().ifBlank { null } else null,
-        checkDoctorTold = doctorTold,
-        checkLeafletRead = leafletRead,
-        interactionCheckDate = original?.interactionCheckDate
-            ?: if (step >= 2) LocalDate.now().toString() else null,
-        createdAt = original?.createdAt ?: nowIso(),
+        doseState = doseState.value.name,
+        taperNote = if (doseState.value == DoseState.TAPERING) taperNote.value.trim().ifBlank { null } else null,
+        checkDoctorTold = doctorTold.value,
+        checkLeafletRead = leafletRead.value,
+        interactionCheckDate = original.value?.interactionCheckDate
+            ?: if (step.value >= 2) LocalDate.now().toString() else null,
+        createdAt = original.value?.createdAt ?: nowIso(),
         updatedAt = nowIso(),
         // v1.0.43：编辑模式必须保留归档态——buildMed 未列出该字段时取实体默认值 false，
         // 会把「已停用」的药静默复活（预填改为按 id 直查后可能拿到归档药，故此处置为必需）
-        isArchived = original?.isArchived ?: false,
+        isArchived = original.value?.isArchived ?: false,
     )
 
+    /**
+     * 底部主按钮的动作（v1.0.92 从 `Button` 的内联 lambda 抽出）。
+     *
+     * 抽出来的**唯一**目的是把"读全表单"这件事留在回调里：回调不在组合上下文里执行，
+     * 因此这 20 个 `.value` 读不会让任何 composable 订阅它们——这正是本批要的形状。
+     * 校验规则与拆分前逐字一致（包括 `return` 的时机）。
+     */
+    fun onPrimary() {
+        // v1.0.43：编辑目标查不到时禁止保存——否则会静默新建一条重复药
+        if (editMissing.value) return
+        if (step.value == 1) {
+            if (name.value.isBlank() || nameKey.value.isBlank() || dose.value.isBlank()) return
+            // v1.0.78（批次 4 收尾）：锚点日期非法时不许进入核对步骤（按钮已同步置灰）
+            if (cycleAnchorVisible(route.value, frequency.value) &&
+                !DateFieldRules.requiredOk(startDate.value)
+            ) {
+                return
+            }
+            if (frequency.value == MedFrequency.BIW && weekday.value == weekday2.value) {
+                biwError.value = true
+                return
+            }
+            val draft = buildMed()
+            scope.launch {
+                hits.value = vm.interactionsFor(draft)
+                step.value = 2
+            }
+        } else {
+            vm.saveMedication(context, buildMed())
+            onSaved()
+        }
+    }
+
     fun goBackStep() {
-        if (step == 1) onBack() else step = 1
+        if (step.value == 1) onBack() else step.value = 1
     }
 
     Scaffold(
@@ -203,14 +252,20 @@ fun MedEditScreen(
         topBar = {
             ScreenTopBar(
                 title = when {
-                    editId != null && step == 1 -> stringResource(R.string.med_edit_medication)
-                    step == 1 -> stringResource(R.string.med_add_medication)
+                    editId != null && step.value == 1 -> stringResource(R.string.med_edit_medication)
+                    step.value == 1 -> stringResource(R.string.med_add_medication)
                     else -> stringResource(R.string.med_verify_checklist)
                 },
                 onBack = ::goBackStep,
             )
         },
         bottomBar = {
+            // v1.0.92（批次 17）：两个判定改在**本 lambda 内**求值。它们原本是根级正文里的
+            // `val cycleAnchorVisible` / `val startDateOk`——只要 startDate 一变，根级就重组，
+            // 整个表单跟着重跑。本 lambda 是 Scaffold 的一个独立作用域：这些字段变化只重组
+            // 这根操作条（它本来就依赖它们，见下方 `enabled`）。
+            val cycleAnchorShown = cycleAnchorVisible(route.value, frequency.value)
+            val anchorDateOk = DateFieldRules.requiredOk(startDate.value)
             Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Row(
                     modifier = Modifier
@@ -221,33 +276,23 @@ fun MedEditScreen(
                     OutlinedButton(
                         onClick = ::goBackStep,
                         modifier = Modifier.weight(1f).heightIn(min = Size.touchMin),
-                    ) { Text(if (step == 1) stringResource(R.string.common_cancel) else stringResource(R.string.backup_return_modify)) }
+                    ) {
+                        Text(
+                            if (step.value == 1) stringResource(R.string.common_cancel)
+                            else stringResource(R.string.backup_return_modify)
+                        )
+                    }
 
                     Button(
-                        onClick = {
-                            // v1.0.43：编辑目标查不到时禁止保存——否则会静默新建一条重复药
-                            if (editMissing) return@Button
-                            if (step == 1) {
-                                if (name.isBlank() || nameKey.isBlank() || dose.isBlank()) return@Button
-                                // v1.0.78（批次 4 收尾）：锚点日期非法时不许进入核对步骤（按钮已同步置灰）
-                                if (cycleAnchorVisible && !startDateOk) return@Button
-                                if (frequency == MedFrequency.BIW && weekday == weekday2) {
-                                    biwError = true
-                                    return@Button
-                                }
-                                val draft = buildMed()
-                                scope.launch {
-                                    hits = vm.interactionsFor(draft)
-                                    step = 2
-                                }
-                            } else {
-                                vm.saveMedication(context, buildMed())
-                                onSaved()
-                            }
-                        },
-                        enabled = !editMissing && (!cycleAnchorVisible || startDateOk),
+                        onClick = ::onPrimary,
+                        enabled = !editMissing.value && (!cycleAnchorShown || anchorDateOk),
                         modifier = Modifier.weight(1f).heightIn(min = Size.touchMin),
-                    ) { Text(if (step == 1) stringResource(R.string.med_next_verify) else stringResource(R.string.checkup_save_record)) }
+                    ) {
+                        Text(
+                            if (step.value == 1) stringResource(R.string.med_next_verify)
+                            else stringResource(R.string.checkup_save_record)
+                        )
+                    }
                 }
             }
         },
@@ -260,9 +305,9 @@ fun MedEditScreen(
                 .padding(horizontal = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            if (step == 1) {
+            if (step.value == 1) {
                 // v1.0.43：编辑目标不存在（已删除 / id 失效）时明确告知，不静默新建
-                if (editMissing) {
+                if (editMissing.value) {
                     Surface(
                         Modifier.fillMaxWidth(),
                         color = MaterialTheme.colorScheme.errorContainer,
@@ -276,365 +321,27 @@ fun MedEditScreen(
                         )
                     }
                 }
-                OutlinedTextField(
-                    name, { name = it },
-                    label = { Text(stringResource(R.string.med_name_field)) },
-                    modifier = Modifier.fillMaxWidth(),
+                // 各 section 只收自己那组 state（读点因此落在 section 内）；顺序与拆分前逐字一致
+                MedBasicsSection(name = name, brand = brand, nameKey = nameKey, medClass = medClass)
+                MedRouteDoseSection(route = route, dose = dose)
+                MedScheduleSection(
+                    frequency = frequency,
+                    route = route,
+                    times = times,
+                    prnReason = prnReason,
+                    cycleDays = cycleDays,
+                    startDate = startDate,
                 )
-                OutlinedTextField(
-                    brand, { brand = it },
-                    label = { Text(stringResource(R.string.med_brand_field)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    nameKey, { nameKey = it },
-                    label = { Text(stringResource(R.string.med_generic_key_field)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    supportingText = { Text(stringResource(R.string.med_generic_key_note)) },
-                )
-                // P5 R8：自动匹配——键为空时按药品名检索建议
-                //
-                // v1.0.86（批次 11）：检索结果用 remember 记住。原实现每次组合都跑一遍
-                // DrugKeyCatalog.suggest（40 条目录 × 键/中文名/商品名/别名各一次 lowercase 匹配），
-                // 而本页每次按键都会重组 → 每键一次全表扫描。
-                //
-                // key 取 `keyQuery` 这个**单一字符串**，而不是 (nameKey, name) 二元组：
-                //   · 它已经把"到底拿哪个字段去查"（nameKey 非空用 nameKey，否则用 name）折进自身，
-                //     两个输入任一变都必然变 key —— 不存在"漏了某个影响结果的输入"；
-                //   · 用字符串而非 Pair 当 key，避免每次重组都新建一个 Pair 让 remember 白失效。
-                // limit 用默认值 6（本文件是唯一调用点），故不进 key。
-                val keyQuery = if (nameKey.isBlank()) name else nameKey
-                val keySuggestions = remember(keyQuery) { DrugKeyCatalog.suggest(keyQuery) }
-                if (keySuggestions.isNotEmpty() && !DrugKeyCatalog.isExactKey(nameKey)) {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                        keySuggestions.forEach { s ->
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        nameKey = s.key
-                                        if (name.isBlank()) name = s.display
-                                        if (brand.isBlank() && !s.brand.isNullOrBlank()) brand = s.brand
-                                        if (medClass == MedClass.OTHER) medClass = s.medClass
-                                    },
-                            ) {
-                                Text(
-                                    "${s.key} · ${s.display}${s.brand?.let { "（$it）" } ?: ""}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        }
-                    }
-                }
-                Text(stringResource(R.string.med_category), style = MaterialTheme.typography.labelMedium)
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                    MedClass.entries.forEach { c ->
-                        FilterChip(selected = medClass == c, onClick = { medClass = c }, label = { Text(c.label) })
-                    }
-                }
-                Text(stringResource(R.string.med_route), style = MaterialTheme.typography.labelMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    FilterChip(selected = route == "oral", onClick = { route = "oral" }, label = { Text(stringResource(R.string.med_route_oral)) })
-                    FilterChip(selected = route == "injection", onClick = { route = "injection" }, label = { Text(stringResource(R.string.med_route_injection)) })
-                }
-                OutlinedTextField(
-                    dose, { dose = it },
-                    label = { Text(stringResource(R.string.med_dose_field)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(stringResource(R.string.med_frequency), style = MaterialTheme.typography.labelMedium)
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-                    MedFrequency.entries.forEach { f ->
-                        FilterChip(selected = frequency == f, onClick = { frequency = f }, label = { Text(f.label) })
-                    }
-                }
-                if (frequency != MedFrequency.PRN) {
-                    if (route == "oral") {
-                        Text(stringResource(R.string.med_dose_time_field), style = MaterialTheme.typography.labelMedium)
-                        PlanTimePicker(
-                            times = times,
-                            onTimesChange = { times = it },
-                            single = false,
-                        )
-                    } else {
-                        // v1.0.51：注射类此前**没有任何「计划用药时间」入口**——时刻选择只在口服分支里，
-                        // 注射的时刻被静默写成表单默认值 08:00，用户既看不到也改不了；
-                        // 今日卡又只显示「注射」不显示时刻，于是「计划用药时间」在全应用都无处可见。
-                        // 与顶部 cycleAnchorVisible 同一判定：**校验生效的范围 == 输入框可见的范围**，
-                        // 两处各写一遍条件迟早会漂移（改了这里忘了那里，就会出现「看得见却没人校验」）
-                        if (cycleAnchorVisible) {
-                            OutlinedTextField(
-                                cycleDays, { cycleDays = it.filter { c -> c.isDigit() }.take(3) },
-                                label = { Text(stringResource(R.string.med_inj_cycle_field)) },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            DateTextField(
-                                value = startDate,
-                                onValueChange = { startDate = it },
-                                label = stringResource(R.string.med_cycle_anchor_date),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        Text(stringResource(R.string.med_dose_time_field), style = MaterialTheme.typography.labelMedium)
-                        PlanTimePicker(
-                            times = times,
-                            onTimesChange = { times = it },
-                            single = true,
-                        )
-                        // 固定星期类（WEEKLY / BIW）才按星期出卡，故说明只在这类频次下显示
-                        if (frequency != MedFrequency.Q2W && frequency != MedFrequency.CUSTOM) {
-                            Text(
-                                stringResource(R.string.med_inj_schedule_note),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                } else {
-                    OutlinedTextField(
-                        prnReason, { prnReason = it },
-                        label = { Text(stringResource(R.string.med_prn_reason_field)) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                if (frequency == MedFrequency.WEEKLY || frequency == MedFrequency.BIW) {
-                    Text(
-                        if (frequency == MedFrequency.BIW) stringResource(R.string.med_biweekly_note)
-                        else stringResource(R.string.med_freq_fixed_weekday),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                        listOf(1 to stringResource(R.string.weekday_one), 2 to stringResource(R.string.weekday_two), 3 to stringResource(R.string.weekday_three), 4 to stringResource(R.string.weekday_four), 5 to stringResource(R.string.weekday_five), 6 to stringResource(R.string.weekday_six), 7 to stringResource(R.string.weekday_sunday)).forEach { (d, l) ->
-                            FilterChip(
-                                selected = weekday == d,
-                                onClick = { weekday = d; biwError = false },
-                                label = { Text(l) },
-                            )
-                        }
-                    }
-                    if (frequency == MedFrequency.BIW) {
-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                            listOf(1 to stringResource(R.string.weekday_one), 2 to stringResource(R.string.weekday_two), 3 to stringResource(R.string.weekday_three), 4 to stringResource(R.string.weekday_four), 5 to stringResource(R.string.weekday_five), 6 to stringResource(R.string.weekday_six), 7 to stringResource(R.string.weekday_sunday)).forEach { (d, l) ->
-                                FilterChip(
-                                    selected = weekday2 == d,
-                                    onClick = { weekday2 = d; biwError = false },
-                                    label = { Text(l) },
-                                )
-                            }
-                        }
-                        if (biwError && weekday == weekday2) {
-                            Text(
-                                stringResource(R.string.med_inj_two_days_error),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
-                }
-                if (route == "oral") {
-                    Text(stringResource(R.string.nutrition_meal_relation), style = MaterialTheme.typography.labelMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        listOf("with_food" to stringResource(R.string.med_with_meal), "empty_stomach" to stringResource(R.string.med_fasting), "any" to stringResource(R.string.common_any)).forEach { (k, l) ->
-                            FilterChip(selected = food == k, onClick = { food = k }, label = { Text(l) })
-                        }
-                    }
-                }
-                OutlinedTextField(
-                    storage, { storage = it },
-                    label = { Text(stringResource(R.string.med_storage_hint)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                // C6：服药三态（固定 / 按需 / 减量中），与分类、给药途径同为单选 chip
-                Text(stringResource(R.string.med_dose_state_label), style = MaterialTheme.typography.labelMedium)
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                    DoseState.entries.forEach { s ->
-                        FilterChip(selected = doseState == s, onClick = { doseState = s }, label = { Text(s.label) })
-                    }
-                }
-                if (doseState == DoseState.TAPERING) {
-                    OutlinedTextField(
-                        taperNote, { taperNote = it },
-                        label = { Text(stringResource(R.string.med_taper_note_label)) },
-                        placeholder = { Text(stringResource(R.string.med_taper_note_hint)) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    // 说明「减量中」在停药流程里豁免自行停药警示
-                    Text(
-                        stringResource(R.string.med_taper_exempt_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                MedWeekdaySection(frequency = frequency, weekday = weekday, weekday2 = weekday2, biwError = biwError)
+                MedMealSection(route = route, food = food)
+                MedStorageSection(storage = storage)
+                MedDoseStateSection(doseState = doseState, taperNote = taperNote)
             } else {
                 // ---- 第二步：R03 核对清单 ----
-                val h = hits
-                if (h == null) {
-                    Text(stringResource(R.string.knowledge_searching))
-                } else if (h.isEmpty()) {
-                    Text(
-                        stringResource(R.string.knowledge_no_interaction_data),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                } else {
-                    Text(stringResource(R.string.med_kb_hits_prefix, h.size), style = MaterialTheme.typography.titleSmall)
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-                        h.take(5).forEach { e ->
-                            Text(
-                                "· ${if (e.severityLevel == "high") stringResource(R.string.knowledge_high_risk_prefix) else stringResource(R.string.common_notice_prefix)}${e.title}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (e.severityLevel == "high") MaterialTheme.colorScheme.error
-                                else MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                        if (h.size > 5) {
-                            Text("…其余 ${h.size - 5} 条可在知识库查看", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-                HorizontalDivider(Modifier.padding(vertical = Spacing.xs))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = doctorTold, onCheckedChange = { doctorTold = it })
-                    Text(stringResource(R.string.med_told_doctor))
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = leafletRead, onCheckedChange = { leafletRead = it })
-                    Text(stringResource(R.string.med_verified_manual))
-                }
-                Text(
-                    stringResource(R.string.med_verify_optional_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                MedVerifySection(hits = hits, doctorTold = doctorTold, leafletRead = leafletRead)
             }
             // 底部操作条已固定，这里补足滚动余量
             Text("", Modifier.padding(bottom = Spacing.xl))
         }
     }
-}
-
-/** 表示「正在新增一个时刻」的下标哨兵（非负下标表示在编辑已有时刻） */
-private const val NEW_TIME_INDEX = -1
-
-/**
- * 计划用药时间选择器。
- *
- * v1.0.52：**不再给「06:30 / 08:00 / …」这类固定候选**，改为一个真正的时间选择器
- * （[TimePickerDialog]），并且**始终把当前已设的时刻显示出来**。
- *
- * 旧实现用固定 chip 的「选中态」表达当前值，只要存的时刻不在那 5 个候选里
- * （如 07:30），编辑页上**没有任何 chip 被选中**——用户看不到自己设过什么，
- * 也无从判断该不该改。
- *
- * - **口服可多选**（一天多次）：已选时刻逐个列出，点它改、点 ✕ 删，另有「添加时刻」；
- * - **注射单选**：只有一行，点开即改——一针只有一个时刻，且不会退化成「零个时刻」
- *   （否则 `take_times` 变 null，计划时刻会被静默回退到 [ScheduleCalc.DEFAULT_PLAN_TIME]）。
- */
-@Composable
-private fun PlanTimePicker(
-    times: List<String>,
-    onTimesChange: (List<String>) -> Unit,
-    single: Boolean,
-) {
-    val shown = times.distinct().sorted()
-    var editingIndex by remember { mutableStateOf<Int?>(null) }
-
-    if (single) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = Size.touchMin)
-                .clickable(onClickLabel = stringResource(R.string.med_edit_time)) { editingIndex = 0 },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Text(
-                shown.firstOrNull() ?: ScheduleCalc.DEFAULT_PLAN_TIME,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Icon(
-                Icons.Rounded.Schedule,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(Size.iconSm),
-            )
-        }
-    } else {
-        shown.forEachIndexed { idx, t ->
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Row(
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = Size.touchMin)
-                        .clickable(onClickLabel = stringResource(R.string.med_edit_time)) { editingIndex = idx },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Text(t, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                    Icon(
-                        Icons.Rounded.Edit,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(Size.iconSm),
-                    )
-                }
-                IconButton(
-                    onClick = { onTimesChange(shown.filterNot { it == t }) },
-                    modifier = Modifier.size(Size.touchMin),
-                ) {
-                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.med_remove_time))
-                }
-            }
-        }
-        TextButton(onClick = { editingIndex = NEW_TIME_INDEX }) {
-            Text(stringResource(R.string.med_add_time))
-        }
-    }
-
-    editingIndex?.let { idx ->
-        TimePickerDialog(
-            // 初始值 = 该行当前已设的时刻（新增时用默认值）——编辑已有药品时看到的就是存过的值
-            initial = shown.getOrNull(idx) ?: ScheduleCalc.DEFAULT_PLAN_TIME,
-            onConfirm = { picked ->
-                onTimesChange(
-                    when {
-                        single -> listOf(picked)
-                        idx == NEW_TIME_INDEX -> (shown + picked).distinct().sorted()
-                        else -> shown.toMutableList().also { it[idx] = picked }.distinct().sorted()
-                    }
-                )
-                editingIndex = null
-            },
-            onDismiss = { editingIndex = null },
-        )
-    }
-}
-
-/**
- * 计划用药时间选择对话框（M3 `TimePicker`，24 小时制）。
- *
- * 初始值取**当前已设时刻**并容错（见 [ScheduleCalc.timeParts]），
- * 因此「编辑已有药品」时显示的是已保存的值，而不是某个写死的默认值。
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TimePickerDialog(
-    initial: String,
-    onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val hm = remember(initial) { ScheduleCalc.timeParts(initial) }
-    val state = rememberTimePickerState(initialHour = hm.first, initialMinute = hm.second, is24Hour = true)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.med_time_picker_title)) },
-        text = { TimePicker(state = state) },
-        confirmButton = {
-            TextButton(onClick = { onConfirm("%02d:%02d".format(state.hour, state.minute)) }) {
-                Text(stringResource(R.string.common_save))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
-    )
 }

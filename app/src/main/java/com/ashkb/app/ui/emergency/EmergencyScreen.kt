@@ -406,34 +406,16 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                             )
                         } else {
                             val shown = if (showAllEvents) events else events.take(3)
+                            // v1.0.92（批次 17）：单条事件抽成 EventRow——理由与 v1.0.90 的 ContactRow 相同：
+                            // 本函数已在 detekt 基线里（`LongMethod` / `CyclomaticComplexMethod`，按
+                            // 「文件 + 完整签名」记账），而 FlowRow 需要的 `@OptIn(ExperimentalLayoutApi::class)`
+                            // 一旦加到本函数上，签名就不再匹配基线。
                             DividerList(shown) { e ->
-                                Column(Modifier.weight(1f)) {
-                                    Text(e.date, style = MaterialTheme.typography.titleSmall)
-                                    Text(
-                                        EmergencyScene.fromKey(e.scene).label,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    // v1.0.80（批次 6）：事件记录也能改 / 删（表单内删除）
-                                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                                        TextButton(
-                                            onClick = { editEvent = e },
-                                            modifier = Modifier.heightIn(min = Size.touchMin),
-                                        ) { Text(stringResource(R.string.common_edit)) }
-                                        DestructiveAction(
-                                            label = stringResource(R.string.common_delete),
-                                            confirmTitle = stringResource(R.string.emergency_delete_event_confirm, e.date),
-                                            confirmBody = stringResource(R.string.emergency_delete_event_note) + "\n" +
-                                                stringResource(R.string.common_delete_irreversible),
-                                            onConfirm = { vm.deleteEmergencyEvent(e.id) },
-                                        )
-                                    }
-                                }
-                                if (e.resolvedDate != null) {
-                                    StatusChip(stringResource(R.string.symptom_outcome_done), StatusTone.Success, Icons.Rounded.CheckCircle)
-                                } else {
-                                    StatusChip(stringResource(R.string.symptom_flare_ongoing), StatusTone.Danger, Icons.Rounded.Schedule)
-                                }
+                                EventRow(
+                                    event = e,
+                                    onEdit = { editEvent = e },
+                                    onDelete = { vm.deleteEmergencyEvent(e.id) },
+                                )
                             }
                             if (events.size > 3 && !showAllEvents) {
                                 TextButton(
@@ -481,6 +463,76 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
         onSave = { vm.saveEmergencyEvent(it); showEventForm = false },
         onDismiss = { showEventForm = false },
     )
+}
+
+/**
+ * 单条紧急事件（从 [EmergencyScreen] 抽出，理由与 [ContactRow] 相同：那边已在 detekt 基线里，
+ * 而本行需要 `@OptIn(ExperimentalLayoutApi::class)`，加到那个函数上就不再匹配基线签名）。
+ *
+ * v1.0.92（批次 17）：改 / 删由 `Row` 改 `FlowRow`。
+ *
+ * **本卡真正的挤压点在这一层，不在外层。** 外层「正文列 `weight(1f)`（默认 `fill = true`）
+ * + 尾部 `StatusChip`（无权重）」本身是安全的：`Row` 先测无权重子项，尾部胶囊因此恒拿得到
+ * 自己的固有宽（本卡「已转归」/「进行中」≈77dp @1.0×、≈116dp @2.0×），正文列被钉在
+ * 「行宽 − 间距 − 胶囊宽」上、放不下时自己折行。危险的是正文列**内部**这一行：它的宽就是
+ * 上面那份剩余宽，而两个按钮都无权重——放不下时 `Row` 按顺序分剩余宽，后一个按钮会被压到
+ * `Size.touchMin` 之下并逐字折行（与 v1.0.90 修好的联系人行完全同形）。
+ *
+ * 最窄宽度（算术模型，字宽按 CJK 1em 估；本模块**无 Compose UI 测试依赖**，v1.0.90 实测过
+ * Robolectric 的字体度量不可用，故这里是算式而非运行时测量）：
+ *  · 改前：两个按钮并排需要 `btn + Spacing.xs + Size.touchMin`（`btn = max(58dp, 2×15sp + 24dp)`），
+ *    加上页面/卡片边距与尾部胶囊，安全下限 = `72 + (38 + 39×fontScale) + btn + 52`
+ *    → 默认字号 259dp、1.5× 289.5dp、2.0× **324dp**（320dp 屏 + 2.0× 字号时「删除」只剩 44dp）。
+ *  · 改后：`FlowRow` 放不下就把整项折到下一行，每项保底自己的固有宽（≥ 58dp ≥ `Size.touchMin`），
+ *    安全下限降到 `72 + (38 + 39×fontScale) + 58` → 默认字号 207dp、2.0× 246dp
+ *    （真实设备最窄 320dp 下 2.0× 仍有 74dp 余量）。
+ *
+ * 尾部胶囊保持无权重：状态是这一行最需要一眼看到的信息，不为排版让位。
+ * 刻意**不**改用 [com.ashkb.app.ui.components.WeightedTrailingRow]：该组件的 `leading` 是
+ * 必填项且 `leading` 与 `content` 之间恒插一个固定间距，本卡没有前缀——传空 `leading` 会给
+ * 每条事件行凭空加 16dp 左缩进（可见的版式变化）；而且它只管一层行，够不到这里真正出问题的
+ * 嵌套按钮行。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RowScope.EventRow(
+    event: EmergencyEvent,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Column(Modifier.weight(1f)) {
+        Text(event.date, style = MaterialTheme.typography.titleSmall)
+        Text(
+            EmergencyScene.fromKey(event.scene).label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        // v1.0.80（批次 6）：事件记录也能改 / 删（表单内删除）
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            TextButton(
+                onClick = onEdit,
+                modifier = Modifier.heightIn(min = Size.touchMin),
+            ) { Text(stringResource(R.string.common_edit)) }
+            DestructiveAction(
+                label = stringResource(R.string.common_delete),
+                // v1.0.92（批次 17）：与「编辑」同款保底。`TextButton` 自身的高度下限只有 40dp，
+                // 并排时被「编辑」的 48dp 盖住看不出问题，折到单独一行时就露出来了（同 ContactRow）。
+                modifier = Modifier.heightIn(min = Size.touchMin),
+                confirmTitle = stringResource(R.string.emergency_delete_event_confirm, event.date),
+                confirmBody = stringResource(R.string.emergency_delete_event_note) + "\n" +
+                    stringResource(R.string.common_delete_irreversible),
+                onConfirm = onDelete,
+            )
+        }
+    }
+    if (event.resolvedDate != null) {
+        StatusChip(stringResource(R.string.symptom_outcome_done), StatusTone.Success, Icons.Rounded.CheckCircle)
+    } else {
+        StatusChip(stringResource(R.string.symptom_flare_ongoing), StatusTone.Danger, Icons.Rounded.Schedule)
+    }
 }
 
 /**
