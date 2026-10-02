@@ -2,6 +2,7 @@ package com.ashkb.app.ui.wellness
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -390,7 +391,7 @@ internal data class SupplementRowActions(
  * （药品那套 `SkipReason` 是给漏服追责用的，照搬到补剂只是多一步无用输入）。
  */
 @Composable
-private fun SupplementCardRow(
+private fun RowScope.SupplementCardRow(
     sup: Supplement,
     todayStatus: String?,
     actions: SupplementRowActions,
@@ -402,7 +403,11 @@ private fun SupplementCardRow(
         // v1.0.81（批次 7）：点整行打开「补剂详情」（最近服用记录 + 逐条删除）。卡片状态由
         // WellnessScreen 的 detailSup 持有，这里只回调——写成两份 state 的话，点击只改一份、
         // 弹层读另一份，点了没反应。
-        Modifier.fillMaxWidth().clickable { actions.onOpenDetail() },
+        // v1.0.88（批次 12 回归修复）：这里必须是 weight(1f) 而不是 fillMaxWidth()。
+        // DividerList 的 itemContent 是 RowScope——fillMaxWidth() 会把整行宽度吃光，
+        // 后面的「打卡/跳过/撤销/编辑/删除」全被挤成零宽（维护者真机看到卡片只剩名称，
+        // 按钮全部消失）。weight(1f) 既保留"点整行开详情"的触达区，又给按钮留下自己的宽度。
+        Modifier.weight(1f).clickable { actions.onOpenDetail() },
         verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
     ) {
         Text("${sup.name} ${sup.dose}", style = MaterialTheme.typography.bodyMedium)
