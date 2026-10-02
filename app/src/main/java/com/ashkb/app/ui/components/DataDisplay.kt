@@ -144,8 +144,13 @@ fun KeyValueRow(
             label,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            // v1.0.94：标签列最小宽度——短标签也占满，数值起点因此固定（见函数 KDoc）
-            modifier = Modifier.widthIn(min = Size.labelColumnMin),
+            // v1.0.95：标签列最小宽度——短标签也占满，长值起点因此固定（见函数 KDoc）。
+            // v1.0.96：**带 trailing 的行不加这个下限**——紧急卡「当前用药」的标签是用户自填药名
+            // （可能很长），右边还要放「免疫抑制」胶囊；再吃掉 128dp 后数值列只剩约 60dp，
+            // 剂量说明被挤成 6 行（维护者截图可见）。trailing 行改为按标签固有宽度，
+            // 把宽度让给真正需要折行的剂量说明；代价是该行数值起点不参与全局对齐，
+            // 但这一行本来就与其它行语义不同（是"药名 + 剂量 + 风险标记"三元组）。
+            modifier = if (trailing != null) Modifier else Modifier.widthIn(min = Size.labelColumnMin),
         )
         Row(
             // v1.0.95：**不加权重**——让"文本量"自己决定排版，两种诉求才能同时成立：
