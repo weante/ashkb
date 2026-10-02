@@ -28,6 +28,15 @@ object Size {
     val iconLg = 28.dp
     val chipHeight = 28.dp
     val rowMinHeight = 44.dp    // 键值行
+    // v1.0.94：键值行（KeyValueRow）**标签列**的最小宽度——短标签也占这么宽，数值因此从同一条 x 起排。
+    //
+    // 为什么是 128：本 App 把 bodyMedium 上调到 **15sp**、字距 0.25sp（见 `ui/theme/Type.kt`，
+    // 不是 M3 默认的 14sp），中文方块字的字宽 ≈ 字号，本应用最长的静态标签是「骶髂关节影像分期」
+    // （8 个 CJK 字）→ 8 × (15 + 0.25) ≈ 122dp；向上取 4dp 的整数倍，留 ~5% 余量兜住各家
+    // 回退字体（Noto Sans CJK / 厂商字体）的字宽差异。
+    // 再长的标签（用户自填的药名、系统字号放大到 2.0×）会按固有宽度继续把数值起点往右推——
+    // 这是预期降级（标签本身不会溢出，Text 受整行宽约束会折行），不是缺陷。
+    val labelColumnMin = 128.dp
     val navRowHeight = 68.dp    // 带副标题的导航行
     val heroMinHeight = 120.dp
     val chartHeight = 200.dp    // 图表：需容纳轴标签
