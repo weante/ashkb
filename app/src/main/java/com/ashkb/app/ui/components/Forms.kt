@@ -213,6 +213,10 @@ fun DestructiveAction(
     confirmBody: String,
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
+    // v1.0.87（批次 12）：确认按钮的文案可覆盖。默认仍是「删除」，但**语义不是删除**的动作
+    // （例如复诊项目只有「停用」、历史记录保留）必须传自己的动词——否则标题问「停用该项目？」
+    // 而按钮写「删除」，用户会以为整条项目连同历史都被删掉（维护者真机反馈）。
+    confirmLabel: String? = null,
 ) {
     var confirming by remember { mutableStateOf(false) }
     TextButton(onClick = { confirming = true }, modifier = modifier) {
@@ -230,7 +234,7 @@ fun DestructiveAction(
                         onConfirm()
                     },
                 ) {
-                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
+                    Text(confirmLabel ?: stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {

@@ -90,6 +90,8 @@
     <string name="checkup_hospital_field">医院名称</string>
     <string name="checkup_imaging_tab">影像</string>
     <string name="checkup_item_name">项目名称</string>
+    <string name="checkup_item_open_records">查看该项目的复诊记录</string>
+    <string name="checkup_item_open_records_hint">查看记录</string>
     <string name="checkup_items_empty">暂无复诊项目</string>
     <string name="checkup_lab_tab">化验</string>
     <string name="checkup_manage_title">复诊管理</string>
@@ -100,6 +102,10 @@
     <string name="checkup_positive">阳性</string>
     <string name="checkup_record_visit">记录复诊</string>
     <string name="checkup_records_empty">暂无复诊记录</string>
+    <string name="checkup_records_filter_chip">仅显示：%1$s</string>
+    <string name="checkup_records_filter_clear">清除筛选</string>
+    <string name="checkup_records_filtered_empty">「%1$s」暂无复诊记录</string>
+    <string name="checkup_records_filtered_empty_note">点「记录复诊」补录这次就诊：项目名已预填「%1$s」，保存后就会出现在这里。</string>
     <string name="checkup_save_record">保存入库</string>
     <string name="checkup_section_note">记录复诊结果、化验指标，便于趋势追踪与就医回顾</string>
     <string name="checkup_vaccine_tab">疫苗</string>
@@ -124,6 +130,7 @@
     <string name="common_details">详情</string>
     <string name="common_doctor_final_note">就医核对时以医生意见为准</string>
     <string name="common_edit">编辑</string>
+    <string name="common_expand">展开</string>
     <string name="common_extra_notes">补充说明</string>
     <string name="common_failed">失败</string>
     <string name="common_got_it">知道了</string>
@@ -397,12 +404,13 @@
     <string name="nutrition_supplement_log_delete_action">删除 %1$s 的服用记录</string>
     <string name="nutrition_supplement_log_delete_confirm">删除 %1$s 的服用记录？</string>
     <string name="nutrition_supplement_log_delete_note">仅删除该日期的这一条服用记录；补剂本身与其它日期的记录不受影响。</string>
-    <string name="nutrition_supplement_history_hint">点击补剂可查看近 90 天服用记录</string>
+    <string name="nutrition_supplement_history_hint">点击补剂可查看近 90 天服用与跳过记录</string>
     <string name="nutrition_supplement_history_title">最近服用记录</string>
-    <string name="nutrition_supplement_history_count">近 90 天已服 %1$d 次</string>
+    <string name="nutrition_supplement_history_count">近 90 天记录 %1$d 次</string>
     <string name="nutrition_supplement_history_empty">近 90 天没有「%1$s」的服用打卡</string>
     <string name="nutrition_supplement_history_entry">服用于 %1$s</string>
     <string name="nutrition_supplement_history_truncated">仅列出最近 %1$d 条，更早的记录未显示</string>
+    <string name="nutrition_supplement_history_skipped_entry">跳过记录于 %1$s</string>
     <string name="nutrition_tolerance_tag">耐受</string>
     <string name="nutrition_delete_profile_confirm">清除饮食画像？</string>
     <string name="nutrition_delete_profile_note">清除后回到「未设置」状态，可随时重新填写；可在备份中恢复。</string>
@@ -667,7 +675,7 @@
     <string name="exercise_feedback_title">昨日运动后感受：%1$s</string>
     <string name="exercise_minutes_suffix">" · %1$s 分钟"</string>
     <string name="exercise_today_done">今日已打卡 %1$s 项</string>
-    <string name="health_badge_checkup_lab">复诊项目 %1$s 项 · 化验 %2$s 条</string>
+    <string name="health_badge_checkup_lab">复诊项目 %1$s 项 · 化验 %2$s 项</string>
     <string name="health_badge_contacts_ready">紧急联系人 %1$s 位 · 已就绪</string>
     <string name="knowledge_evidence_meta">证据层级 %1$s · 适配 %2$s · 复核 %3$s · v%4$s</string>
     <string name="knowledge_overdue_count">%1$s 条内容已过复核日</string>
@@ -692,6 +700,7 @@
     <string name="lab_mark_normal">正常</string>
     <string name="lab_mark_abnormal">异常</string>
     <string name="lab_mark_unknown">未标注</string>
+    <string name="lab_window_hint">共 %1$d 项 · 当前显示最近 %2$d 项</string>
     <string name="me_in_use_prefix">"在用 %1$s 种 · "</string>
     <string name="me_med_disable">停用 %1$s</string>
     <string name="me_meds_count">在用药品（%1$s）</string>
@@ -961,6 +970,7 @@
     <string name="checkup_prep_overdue">下次复诊已过 %1$d 天，请更新复诊记录</string>
     <string name="checkup_prep_fasting_tag">需空腹</string>
     <string name="checkup_prep_check_items">本次需做的检查</string>
+    <string name="checkup_prep_check_count_suffix">" · 需做 %1$d 项"</string>
     <string name="checkup_prep_bring">建议携带</string>
     <string name="checkup_prep_export_hint">可在「报表 → 导出」生成复诊报告 PDF 一并带去。</string>
     <string name="checkup_prep_disclaimer">以上为通用准备提示，具体以医院要求为准。</string>
@@ -1318,6 +1328,6 @@
     <string name="recipes_delete_note">自建食谱删除后无法恢复；种子食谱会在下次启动时重新种入。</string>
     <string name="nutrition_supplement_undo">撤销打卡</string>
     <string name="nutrition_supplement_undo_confirm">撤销「%1$s」今天的打卡？</string>
-    <string name="nutrition_supplement_undo_note">撤销后回到「今天还没服用」的未记录状态；补剂本身与其历史记录不受影响。</string>
+    <string name="nutrition_supplement_undo_note">撤销后今天这条补剂回到未记录状态（无论此前是「已服」还是「跳过」）；补剂本身与其历史记录不受影响。</string>
 </resources>
 

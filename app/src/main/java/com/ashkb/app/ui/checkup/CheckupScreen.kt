@@ -25,11 +25,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
 import com.ashkb.app.R
@@ -64,8 +67,32 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
     val vaccines by vm.vaccineRecords.collectAsStateWithLifecycle()
     val labRecent by vm.labRecent.collectAsStateWithLifecycle()
     val labLimit by vm.labLimit.collectAsStateWithLifecycle()
+    val labTotal by vm.labTotal.collectAsStateWithLifecycle()
     val imagingRecords by vm.imagingRecords.collectAsStateWithLifecycle()
     val seedResult by vm.seedResult.collectAsStateWithLifecycle()
+
+    // v1.0.87（批次 13）：「项目」点一行 →「记录」tab 只看这个项目的记录。
+    // 默认 null = 不筛选，「记录」tab 的默认展示（全部记录）因此没有变化。
+    // rememberSaveable：转屏 / 切 tab 不丢筛选；离开本页（返回栈弹出）才清空。
+    var recordsFilterItemId by rememberSaveable { mutableStateOf<String?>(null) }
+    // 项目被「停用」后就不再出现在 items 里（列表只查 is_active = 1），此处的筛选随之失效——
+    // 于是不再做「自动清除」这类跨状态同步：解析不到项目就当没筛选，天然不会出现
+    // 「顶栏挂着一个查不到名字的标识、列表却永远空」的状态
+    val filterItem = items.firstOrNull { it.id == recordsFilterItemId }
+
+    // 记录表单的项目名预填（见下方 onAdd）：记录与项目的关联靠名字快照，
+    // 带筛选补录时不预填就会「补录完仍然不在该项目下」——空态里那句引导也就成了空话
+    var recordFormPresetItem by remember { mutableStateOf<CheckupItem?>(null) }
+
+    // 筛选走 SQL（而不是「先取最近 50 条再在内存里筛」）：项目的记录可能整段落在窗口之外，
+    // 那样筛出来是「该项目没有记录」——恰好是这一批要消灭的「找不到东西」。
+    // 冷 Flow + remember(filterItem)：项目改名后按新名字重订阅（查询条件里含名字快照）
+    val itemRecordsFlow: Flow<List<CheckupRecord>> = remember(filterItem) {
+        filterItem?.let { vm.checkupRecordsForItem(it) } ?: emptyFlow()
+    }
+    val itemRecords by itemRecordsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    // 未筛选时仍用 VM 那份常驻 StateFlow——「记录」tab 的默认展示与筛选前完全一致
+    val visibleRecords = if (filterItem != null) itemRecords else records
 
     // C10 种入结果是本页的一次性反馈：VM 常驻在 AppShell，退出本页时清空，
     // 否则下次进来还会看到上次的"已添加 N 个节点"
@@ -129,20 +156,33 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
                     seedResult = seedResult,
                     onSeed = { vm.seedBiologicScreening() },
                     onEdit = { editItem = it },
+                    // v1.0.87（批次 13）：先落筛选再翻页——翻页是协程，若先翻页，
+                    // 记录 tab 会有一帧显示"全部记录"，看起来像筛选没生效
+                    onOpenRecords = { item ->
+                        recordsFilterItemId = item.id
+                        scope.launch { pager.animateScrollToPage(CheckupTab.RECORDS.ordinal) }
+                    },
                 )
                 CheckupTab.RECORDS -> CheckupRecordsList(
-                    records = records,
-                    onAdd = { showRecordForm = true },
+                    records = visibleRecords,
+                    filterItemName = filterItem?.name,
+                    onClearFilter = { recordsFilterItemId = null },
+                    onAdd = {
+                        recordFormPresetItem = filterItem
+                        showRecordForm = true
+                    },
                     onViewLab = { showLabDetail = it },
                     onAttach = { attachTarget = it },
                     onOpenAllAttachments = { showAllAttachments = true },
                     onEdit = { editRecord = it },
                     onDelete = { deleteRecord = it },
-                    // 准备清单排在最前：复诊管理的首要问题是"下次该做什么"，其次才是翻历史
+                    // 准备清单排在最前：复诊管理的首要问题是"下次该做什么"，其次才是翻历史。
+                    // 它算的是**全部**记录（下次复诊与当前筛选无关），故这里传未筛选的 records
                     prepHeader = { CheckupPrepCard(items, records, vm.date) },
                 )
                 CheckupTab.LABS -> LabsList(
                     labs = labRecent,
+                    totalCount = labTotal,
                     canLoadMore = labRecent.size >= labLimit,
                     onLoadMore = { vm.loadMoreLabs() },
                     onImport = { showLabImport = true },
@@ -173,6 +213,7 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
     )
     if (showRecordForm) CheckupRecordFormSheet(
         items = items,
+        presetItemName = recordFormPresetItem?.name,
         onSave = { vm.saveCheckupRecord(it); showRecordForm = false },
         onDismiss = { showRecordForm = false },
     )

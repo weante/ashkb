@@ -458,10 +458,23 @@ interface SupplementLogDao {
     @Query("SELECT * FROM supplement_logs WHERE sup_id = :supId AND date = :date AND slot_key = :slotKey")
     suspend fun find(supId: String, date: String, slotKey: String?): SupplementLog?
 
-    /** U3 服用历史：按 sup_id 弱引用或名称快照匹配（补剂真删后仍可按快照追历史），日期窗口近 90 天 */
+    /**
+     * U3 服用历史：按 sup_id 弱引用或名称快照匹配（补剂真删后仍可按快照追历史），日期窗口近 90 天。
+     *
+     * v1.0.87（批次 12）：状态过滤由**写死的 `status = 'done'`** 改为入参 [statuses]，
+     * 调用方传 [com.ashkb.app.domain.AdherenceCalc.SETTLED_STATUSES]（done / partial / skipped）。
+     * 补剂卡片新增「跳过」后，跳过也是一次交代：它必须出现在历史流里（否则用户按了跳过、
+     * 卡片上的胶囊也变了，翻历史却找不到那条记录，只会以为没记上）。
+     * 过滤值不从 SQL 里再抄一份，是为了让「已结算」这套定义全应用只有 [AdherenceCalc.SETTLED_STATUSES] 一处。
+     */
     @Query("SELECT * FROM supplement_logs WHERE (sup_id = :supId OR (sup_id IS NULL AND sup_name = :name)) " +
-        "AND status = 'done' AND date >= :fromDate ORDER BY date DESC, recorded_at DESC")
-    fun observeHistoryFor(supId: String, name: String, fromDate: String): Flow<List<SupplementLog>>
+        "AND status IN (:statuses) AND date >= :fromDate ORDER BY date DESC, recorded_at DESC")
+    fun observeHistoryFor(
+        supId: String,
+        name: String,
+        statuses: Collection<String>,
+        fromDate: String,
+    ): Flow<List<SupplementLog>>
 
     @Upsert
     suspend fun upsert(log: SupplementLog)
@@ -631,8 +644,21 @@ interface CheckupRecordDao {
     @Query("SELECT * FROM checkup_records WHERE date BETWEEN :from AND :to ORDER BY date DESC")
     suspend fun between(from: String, to: String): List<CheckupRecord>
 
-    @Query("SELECT * FROM checkup_records WHERE item_id = :itemId ORDER BY date DESC LIMIT :limit")
-    fun observeByItem(itemId: String, limit: Int = 10): Flow<List<CheckupRecord>>
+    /**
+     * v1.0.87（批次 13）：某个复诊项目名下的记录（「项目」→「记录」的项目筛选）。
+     *
+     * 为什么条件是 `item_id OR item_name`：`item_id` 列 v11 就建好了（还带索引），但
+     * **至今没有任何写入路径**——复诊记录表单只填一个自由文本 `item_name`
+     * （见 `CheckupForms.kt` 的 `CheckupRecordDraft.toRecord`），故现存记录的 `item_id` 全是 NULL。
+     * 只按 `item_id` 过滤，维护者点「MRI」看到的会是空列表——正是这一批要消灭的「找不到东西」。
+     * 名字快照是记录落库时抄下来的，项目后来改名它不跟着变，故两条都要认；改名后旧记录按新名字
+     * 搜不到，这是快照口径的已知代价（与「历史记录靠 item_name 快照自持」的既定口径一致）。
+     */
+    @Query(
+        "SELECT * FROM checkup_records WHERE item_id = :itemId OR item_name = :itemName " +
+            "ORDER BY date DESC LIMIT :limit",
+    )
+    fun observeByItem(itemId: String, itemName: String, limit: Int = 10): Flow<List<CheckupRecord>>
 
     @Upsert
     suspend fun upsert(record: CheckupRecord)
@@ -677,6 +703,17 @@ interface LabResultDao {
 
     @Query("SELECT * FROM lab_results ORDER BY date DESC LIMIT :limit")
     fun observeRecent(limit: Int = 100): Flow<List<LabResult>>
+
+    /**
+     * v1.0.87（批次 13）：**全部**化验行数（不分页）。
+     *
+     * 为什么不能拿 `observeRecent(limit).size` 当总数：那是一个**分页窗口**的长度，
+     * 库里行数 ≥ 窗口时它恒等于窗口值（初值 100）——健康页摘要「化验 100 条」正是这么来的，
+     * 而且删掉几行也不会变（维护者真机反馈：删掉一条 4 项化验单后数字没动）。
+     * 总数只能由 COUNT(*) 给出：它随化验表的任何增删改自动失效并重查。
+     */
+    @Query("SELECT COUNT(*) FROM lab_results")
+    fun observeCount(): Flow<Int>
 
     /**
      * v11：把某一天的全部化验归属到指定复诊记录（或解除归属传 null）。

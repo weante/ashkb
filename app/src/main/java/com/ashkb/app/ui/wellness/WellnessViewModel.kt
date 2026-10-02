@@ -160,7 +160,12 @@ class WellnessViewModel(
     suspend fun supplementLogCount(id: String): Int? =
         runCatching { repo.countSupplementLogs(id) }.getOrNull()
 
-    /** U3 单个补剂的服用历史流（近 90 天，仅 done） */
+    /**
+     * U3 单个补剂的服用历史流（近 90 天）。
+     *
+     * v1.0.87（批次 12）：**已结算状态全取**（done / partial / skipped）——卡片新增「跳过」后，
+     * 「哪天跳过了」和「哪天吃了」一样是补剂历史的一部分（口径同 `AdherenceCalc.SETTLED_STATUSES`）。
+     */
     fun observeSupplementHistory(sup: Supplement) =
         repo.observeSupplementHistory(sup.id, sup.name)
 
@@ -184,6 +189,11 @@ class WellnessViewModel(
      * 删**当天该补剂的全部**打卡行而不是只删第一条：`supplement_logs` 的唯一索引含 `slot_key`，
      * 而补剂打卡的 slot_key 恒为 NULL（SQLite 里 NULL 互不相等），所以连点几次就会留下几行——
      * 只删一行的话，卡片上的「已服用」胶囊不会消失，用户会以为撤销没生效。
+     *
+     * v1.0.87（批次 12）：**对「已服」与「跳过」一视同仁**——按 `supId` 过滤、不按状态过滤，
+     * 两种状态都会回到「今天还没记录」的未记录态。这里刻意不加状态条件：同一天先跳过、后
+     * 补记已服（或反过来）会留下两行，只删其中一种的话卡片上那个胶囊仍挂着——正是批次 6
+     * 修掉的那个症状；「撤销今天的打卡」在用户眼里就是「今天这条补剂回到没记录」。
      */
     fun undoSupplementCheckIn(supp: Supplement) {
         viewModelScope.launch {

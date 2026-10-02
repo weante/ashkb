@@ -8,11 +8,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -43,6 +48,9 @@ import com.ashkb.app.ui.theme.StatusTone
  *                   （VM 无 Context，不负责取词）。
  * @param onSeed     触发种入结核 / 乙肝 / 丙肝筛查 + 生物制剂续方节点。
  * @param onEdit     v1.0.80（批次 6）修改复诊项目（周期 / 类型 / 备注）——此前只能新建，写错了只能停用重建。
+ * @param onOpenRecords v1.0.87（批次 13）整行可点 → 跳到「记录」tab 并**按该项目筛选**。
+ *                   此前项目卡片只有「编辑 / 停用」两个按钮、整行不可点，维护者在真机上点「MRI」
+ *                   以为会进该项目的记录，结果毫无反应。
  */
 @Composable
 internal fun CheckupItemsList(
@@ -52,6 +60,7 @@ internal fun CheckupItemsList(
     seedResult: Int?,
     onSeed: () -> Unit,
     onEdit: (CheckupItem) -> Unit,
+    onOpenRecords: (CheckupItem) -> Unit,
 ) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
@@ -74,28 +83,12 @@ internal fun CheckupItemsList(
             }
         } else {
             items(items, key = { it.id }) { item ->
-                SectionCard(
-                    title = item.name,
-                    subtitle = buildString {
-                        append(CheckupType.fromKey(item.checkType).label)
-                        if (item.cycleDays != null) append(stringResource(R.string.checkup_cycle_days_suffix, item.cycleDays))
-                        else append(stringResource(R.string.med_prn_suffix))
-                    },
-                    action = {
-                        // 改（编辑）与删（停用）并排：复诊项目没有物理删除入口，
-                        // 「停用」即它的生命周期终点（历史记录靠 item_name 快照自持，见 README 口径）
-                        TextButton(
-                            onClick = { onEdit(item) },
-                            modifier = Modifier.heightIn(min = Size.touchMin),
-                        ) { Text(stringResource(R.string.common_edit)) }
-                        DestructiveAction(
-                            label = stringResource(R.string.med_deactivate),
-                            confirmTitle = stringResource(R.string.checkup_deactivate_title),
-                            confirmBody = stringResource(R.string.checkup_disable_confirm, item.name),
-                            onConfirm = { onDeactivate(item.id) },
-                        )
-                    },
-                ) {}
+                CheckupItemCard(
+                    item = item,
+                    onEdit = onEdit,
+                    onDeactivate = onDeactivate,
+                    onOpenRecords = onOpenRecords,
+                )
             }
             item {
                 OutlinedButton(
@@ -134,6 +127,68 @@ internal fun CheckupItemsList(
     }
 }
 
+/**
+ * 单个复诊项目卡片（从 [CheckupItemsList] 抽出来，与 [CheckupRecordCard] 同一理由：
+ * 列表函数还要管空态、种入入口与底部按钮，而这张卡自己承载三件事——
+ * 整行可点进该项目的记录、编辑、停用）。
+ *
+ * v1.0.87（批次 13）：整行可点。此前卡片只有「编辑 / 停用」两个按钮、整行不可点，
+ * 维护者在真机上点「MRI」以为会进该项目的记录，结果毫无反应。
+ */
+@Composable
+private fun CheckupItemCard(
+    item: CheckupItem,
+    onEdit: (CheckupItem) -> Unit,
+    onDeactivate: (String) -> Unit,
+    onOpenRecords: (CheckupItem) -> Unit,
+) {
+    SectionCard(
+        title = item.name,
+        subtitle = buildString {
+            append(CheckupType.fromKey(item.checkType).label)
+            if (item.cycleDays != null) append(stringResource(R.string.checkup_cycle_days_suffix, item.cycleDays))
+            else append(stringResource(R.string.med_prn_suffix))
+        },
+        action = {
+            // 改（编辑）与删（停用）并排：复诊项目没有物理删除入口，
+            // 「停用」即它的生命周期终点（历史记录靠 item_name 快照自持，见 README 口径）
+            TextButton(
+                onClick = { onEdit(item) },
+                modifier = Modifier.heightIn(min = Size.touchMin),
+            ) { Text(stringResource(R.string.common_edit)) }
+            DestructiveAction(
+                label = stringResource(R.string.med_deactivate),
+                confirmTitle = stringResource(R.string.checkup_deactivate_title),
+                confirmBody = stringResource(R.string.checkup_disable_confirm, item.name),
+                // 该动作只是「停用」（历史记录保留），故确认按钮也必须说「停用」而不是默认的「删除」
+                confirmLabel = stringResource(R.string.med_deactivate),
+                onConfirm = { onDeactivate(item.id) },
+            )
+        },
+        onClick = { onOpenRecords(item) },
+        onClickLabel = stringResource(R.string.checkup_item_open_records),
+    ) {
+        // 「整行可点」在界面里本身看不见：给一行明示入口 + 雪佛龙（沿用 NavRow 的可点惯例，
+        // 图标装饰性、语义由这行字承载）。维护者上次点「MRI」毫无反应，正是缺这个入口
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            Text(
+                stringResource(R.string.checkup_item_open_records_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Icon(
+                Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(Size.iconSm),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
 // ===== 复诊记录列表 =====
 /**
  * @param onAttach   打开某条记录的附件归档 sheet（附件入口在卡片正文里，与右上角动作槽区分开）
@@ -142,6 +197,10 @@ internal fun CheckupItemsList(
  * @param onDelete   v1.0.80（批次 6）删除该条复诊记录——走**级联确认框**（列明将一并删除的化验 / 影像 / 附件条数）
  * @param prepHeader 列表顶部插槽（复诊准备清单）。做成插槽而非固定内容：
  *                   卡片需要 items/records/today 三路数据，由调用方组装，本列表不必知道 C4。
+ * @param filterItemName v1.0.87（批次 13）：非空 = 当前**只显示该项目的记录**（从「项目」tab 点进来的）。
+ *                   过滤本身由调用方完成（本列表拿到的就是筛过的数据），这里只负责两件事：
+ *                   顶部那个可清除的筛选标识、以及点名到项目的空态。
+ * @param onClearFilter 清除筛选（null = 不渲染清除按钮）
  */
 @Composable
 internal fun CheckupRecordsList(
@@ -153,11 +212,18 @@ internal fun CheckupRecordsList(
     onEdit: (CheckupRecord) -> Unit,
     onDelete: (CheckupRecord) -> Unit,
     prepHeader: (@Composable () -> Unit)? = null,
+    filterItemName: String? = null,
+    onClearFilter: (() -> Unit)? = null,
 ) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
+        // v1.0.87（批次 13）：筛选标识排在**最前**——从「项目」点进来的人第一眼就要看到
+        // 「现在只有这一个项目的记录」；否则一段短列表会被当成「记录丢了」
+        if (filterItemName != null) {
+            item(key = "records-filter") { RecordsFilterRow(filterItemName, onClearFilter) }
+        }
         // 准备清单必须排在空态/列表之前：它是"下次复诊该做什么"的唯一答案，不能滚出首屏
         prepHeader?.let { header ->
             item { header() }
@@ -172,17 +238,11 @@ internal fun CheckupRecordsList(
         }
         if (records.isEmpty()) {
             item {
-                SectionCard(title = stringResource(R.string.checkup_records_empty)) {
-                    Text(
-                        stringResource(R.string.checkup_section_note),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(Spacing.sm))
-                    Button(
-                        onClick = onAdd,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
-                    ) { Text(stringResource(R.string.checkup_record_visit)) }
+                // 筛选后的空态必须点名到项目：通用的「暂无复诊记录」会让用户以为整份记录丢了
+                if (filterItemName != null) {
+                    RecordsFilteredEmptyCard(name = filterItemName, onAdd = onAdd)
+                } else {
+                    RecordsEmptyCard(onAdd = onAdd)
                 }
             }
         } else {
@@ -197,6 +257,70 @@ internal fun CheckupRecordsList(
                 Spacer(Modifier.height(Spacing.xxl))
             }
         }
+    }
+}
+
+/**
+ * v1.0.87（批次 13）：筛选标识（「仅显示：MRI」+ ✕）。
+ * 整行只有「清除」这一件事，故 ✕ 做成独立按钮（48dp 触达区）而不是把胶囊本身变成按钮——
+ * 避免两个可点目标重叠，读屏也能只报一个「清除筛选」。
+ */
+@Composable
+private fun RecordsFilterRow(name: String, onClearFilter: (() -> Unit)?) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        StatusChip(text = stringResource(R.string.checkup_records_filter_chip, name), tone = StatusTone.Info)
+        if (onClearFilter != null) {
+            IconButton(onClick = onClearFilter, modifier = Modifier.size(Size.touchMin)) {
+                Icon(
+                    Icons.Rounded.Close,
+                    contentDescription = stringResource(R.string.checkup_records_filter_clear),
+                    modifier = Modifier.size(Size.iconSm),
+                )
+            }
+        }
+    }
+}
+
+/** 一条记录都没有时的通用空态（未筛选时的展示与 v1.0.80 之前一致，未被本次改动触碰）。 */
+@Composable
+private fun RecordsEmptyCard(onAdd: () -> Unit) {
+    SectionCard(title = stringResource(R.string.checkup_records_empty)) {
+        Text(
+            stringResource(R.string.checkup_section_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        Button(
+            onClick = onAdd,
+            modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
+        ) { Text(stringResource(R.string.checkup_record_visit)) }
+    }
+}
+
+/**
+ * v1.0.87（批次 13）：「该项目名下没有任何记录」的专属空态。
+ *
+ * 与通用空态的差别不只是措辞：从这里点「记录复诊」进表单时，项目名会被**预填**成该项目
+ * （见 `CheckupScreen` 的 `recordFormPresetItem`）——记录表单的项目名是自由文本、与项目的关联
+ * 靠名字快照，不预填就成了「补录完仍然不在该项目下」的空转。
+ */
+@Composable
+private fun RecordsFilteredEmptyCard(name: String, onAdd: () -> Unit) {
+    SectionCard(title = stringResource(R.string.checkup_records_filtered_empty, name)) {
+        Text(
+            stringResource(R.string.checkup_records_filtered_empty_note, name),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        Button(
+            onClick = onAdd,
+            modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
+        ) { Text(stringResource(R.string.checkup_record_visit)) }
     }
 }
 

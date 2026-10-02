@@ -49,8 +49,17 @@ class CheckupViewModel(
     val checkupItems: StateFlow<List<CheckupItem>> = repo.observeCheckupItems()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val checkupRecords: StateFlow<List<CheckupRecord>> = repo.observeCheckupRecent(50)
+    val checkupRecords: StateFlow<List<CheckupRecord>> = repo.observeCheckupRecent(RECORDS_WINDOW)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * v1.0.87（批次 13）：某个复诊项目名下的记录——「项目」tab 点一行 →「记录」tab 只看它。
+     *
+     * 冷 Flow、由调用点 `remember(item)` 记住订阅（与 [labResultsFor] / [imagingFor] 同一约定：
+     * 筛选状态在 UI 层记住，VM 不缓存列表）。窗口与未筛选列表一致，避免两条路径给出不同长度。
+     */
+    fun checkupRecordsForItem(item: CheckupItem): Flow<List<CheckupRecord>> =
+        repo.observeCheckupByItem(item.id, item.name, RECORDS_WINDOW)
 
     val vaccineRecords: StateFlow<List<VaccineRecord>> = repo.observeVaccinesAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -62,6 +71,16 @@ class CheckupViewModel(
     val labRecent: StateFlow<List<LabResult>> = _labLimit
         .flatMapLatest { repo.observeLabRecent(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * v1.0.87（批次 13）：化验**总条数**（健康页摘要「化验 N 项」的口径）。
+     *
+     * 与 [labRecent] 的区别是这一条的全部意义：`labRecent` 是**分页窗口**（初值 100，
+     * 「加载更早」再加 100），窗口装满时它的长度恒等于窗口值——拿它当总数，数字会卡在 100
+     * 不动，删掉几行也不变（维护者真机反馈）。总数只能由 COUNT(*) 给出。
+     */
+    val labTotal: StateFlow<Int> = repo.observeLabCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val imagingRecords: StateFlow<List<ImagingRecord>> = repo.observeImagingRecords()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -267,6 +286,12 @@ class CheckupViewModel(
         backupRepo.downloadAttachmentIfMissing(a)
 
     companion object {
+        /**
+         * v1.0.87（批次 13）：复诊记录列表的窗口大小——未筛选与「按项目筛选」共用同一个值，
+         * 否则同一批数据在两条路径下会给出不同的长度上限。
+         */
+        private const val RECORDS_WINDOW = 50
+
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication

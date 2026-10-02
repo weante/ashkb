@@ -282,6 +282,9 @@ internal fun LabDetailDialog(record: CheckupRecord, vm: CheckupViewModel, onDism
 
 // ===== 化验结果列表（按日期分组，支持 AI 导入；底部翻页加载更早记录） =====
 /**
+ * @param totalCount v1.0.87（批次 13）：库里化验的**总条数**（COUNT(*)）。
+ *   列表本身只是一个分页窗口（[labs] 最多装窗口大小行），窗口装满时页面上的分组数之和
+ *   会小于总数——健康页摘要正是报总数，不把这层口径写出来，两个数字看起来就是"对不上"。
  * @param onAttachDate 归档该日期的附件（附件本身也属于这次抽血）
  * @param onLinkDate   把该日期的整组化验归属到某条复诊记录
  * @param onEditLab    v1.0.80（批次 6）修改单条化验（表单内可删除）：改数值 / 参考范围会重跑本地判读
@@ -295,6 +298,7 @@ internal fun LabsList(
     onAttachDate: (String) -> Unit,
     onLinkDate: (String) -> Unit,
     onEditLab: (LabResult) -> Unit,
+    totalCount: Int = labs.size,
 ) {
     // 派生计算上提到 LazyColumn 之外并 remember：LazyListScope 不是 @Composable 作用域，
     // 写在 item/forEach 内会随每次重组重跑 groupBy / maxOfOrNull（数十条化验 × 每次重组）
@@ -340,6 +344,17 @@ internal fun LabsList(
                     onClick = onImport,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
                 ) { Text(stringResource(R.string.lab_ai_import_title)) }
+            }
+            // v1.0.87（批次 13）：只在"窗口装不下全部"时提示——两个数字（总数 / 本页列出）
+            // 不同时必须说清哪个是哪个，否则会被当成又一处"数字对不上"
+            if (totalCount > labs.size) {
+                item(key = "lab-window-hint") {
+                    Text(
+                        stringResource(R.string.lab_window_hint, totalCount, labs.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             // Y1：日期分组折叠——历史数据多时页面不再被全展开的旧日期撑长；
             // 默认展开规则贴合复诊沟通导向：有异常的日期或最近一次化验展开，其余收起

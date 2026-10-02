@@ -4,6 +4,47 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.0.87] — 2026-10-02
+
+**批次 12 + 13：补剂「跳过」· `TodayScreen` 拆分 · 复诊可发现性 · 化验计数口径（含一个真 bug）。** 无库结构变更，可覆盖安装。
+
+### 批次 12 · A：补剂打卡支持「跳过」
+
+- 卡片未打卡时给**两个动作**：「打卡」与「跳过」（跳过**不弹表单、不填理由**，写 `AdherenceCalc.SKIPPED`）
+- **历史流改为同时包含 done 与 skipped**：`SupplementLogDao.observeHistoryFor` 的 `status = 'done'` → `status IN (:statuses)`，过滤值直接引用 `AdherenceCalc.SETTLED_STATUSES`（**不再在 SQL 里抄第二份**）
+- 详情胶囊新增 `domain/SupplementLogStatus`（`loggedToday` / `labelRes` / `tone`）作为唯一实现，与药品侧逐字同词；跳过行用新串「跳过记录于 %1$s」（跳过的 `takenAt` 为 null，沿用旧句会把跳过说成服用）
+- **撤销**天然覆盖两种状态（原逻辑按 `supId` 过滤、不按状态过滤）
+- **依从率与药品完全同口径**：跳过**进分母、不进分子、不算漏服**（`ratePct(done, partial, done+partial+skipped)`，与药品 `doseCompletion` 的 `SKIPPED -> Unit` 一致），**未改任何公式**
+- **补剂根本不在漏服通知路径上**（`MissedDoseReminder` 只读计划槽位与用药记录）→「跳过不算漏服」天然成立
+- **老数据回归锁三重**：纯算术把旧补剂分支原样跑一遍逐位比对 · 真库 SQL 断言条数/倒序不变 · 未知状态仍不进历史
+
+### 批次 12 · B：`TodayScreen` 拆分（根级 Flow 8 → 3）
+
+- 下移 `alerts` / `symptomRecorded` / `exerciseDone` / `minimalPrompt` / `yesterdayPending` 五条；消除派生值 `yesterdayDate`
+- **留根级三条各有硬理由**：`profile`（三处共用 + 派生 `isMinimal`）· **`todayDate`**（Hero 标题 / 漏服判定 / 补记卡必须是**同一个「今天」**——批次 9 刚修过"两处各读系统时钟→跨零点差一天"，绝不允许各 section 各收一份）· `today`（药品列表内容，须由根 `LazyColumn` 亲自发出）
+- **实测出的硬边界**：四个弹层 target **下不去**——`LazyListScope.item { }` 只在列表作用域解析得到，而 `remember`/`collectAsStateWithLifecycle` 只在组合上下文可用（标普通扩展报"必须加 @Composable"，标 `@Composable LazyListScope.` 又在 `LazyColumn` 内容 lambda 里报"调用点不是组合上下文"；两条绕法——嵌套 LazyColumn、整列表塞一个 item——都被否掉）。它们是 `remember` 槽位、**不是 Flow**
+- 新增静态守卫 `TodayScreenStateScopeTest`（白名单 + 下移反查 + 根级 `mutableStateOf` 恰好 4 个 + 日期流全页只收一次 + 全文件只允许一个 `LazyColumn`）；**它只证明"代码里怎么写的"，不证明"运行时只重组那块"**，且只认 `collectAsStateWithLifecycle` 一种写法（已写进用例注释）
+
+### 批次 13：三处"找得到东西 / 数字说得准"
+
+1. **复诊「项目」行可点** → 跳到「记录」tab 并**按该项目筛选**（此前整行不可点，点「MRI」毫无反应）；筛选时顶部显示可清除的「仅显示：MRI ✕」，筛选状态 `rememberSaveable`
+2. **「准备清单」可折叠**：不再把复诊记录卡挤出首屏（此前维护者因此以为"记录不存在"）
+3. **「化验 100 条」的真 bug**：该摘要用的查询**上限就是 100**——`Daos.kt` 注释自己写着「库里行数 ≥ 窗口时它**恒等于窗口值（初值 100）**」→ 只要化验 ≥ 100 条就永远显示 100（维护者删掉 4 条后数字不变，正是这个原因）。新增真 `COUNT`（`HealthRepository.observeLabCount()` → `labResultDao.observeCount()`），`AppShell` 改用 `checkupVm.labTotal`
+
+### 另修：一处自相矛盾的文案
+
+`DestructiveAction` 新增 `confirmLabel` 参数（**默认仍是「删除」**，其它调用点行为不变）；复诊项目的停用确认改说「**停用**」——此前标题问「停用该项目？」而按钮写「删除」，用户会以为整条项目连同历史都被删掉。
+
+### 测试与构建
+
+- 单测 **691 → 728 条全绿**；`detekt` 通过（批次 12 过程中报出的 4 条新问题**全部改代码修掉**）；**`:app:lintDebug` 0 error**
+- release / debug 均 versionCode **92 / 1.0.87**
+
+### 未做 / 残余
+
+- **本模块无 Compose UI 测试依赖**：`TodayScreen` 拆分与三处可发现性改动的**运行时行为无法用组合测试证明**，替代证据是静态守卫 + 编译证据；真机目视由维护者进行
+- 补剂 `partial`（部分完成）**没有写入路径**（卡片只给已服/跳过，与药品一致）——若日后要加，`SupplementLogStatus` 与依从率已就位
+- 老数据为**空**时补剂报表仍给 `0`（`ratePct`），而「记录内完成度」对空数据给 `null`——两者是不同指标，已在 `SupplementAdherenceParityTest` 里单列用例写明边界
 ## [v1.0.86] — 2026-10-02
 
 **批次 11：冷启动/IO 小优化 6 项 + WebDAV 读取上限（D6）。** 无库结构变更，可覆盖安装。

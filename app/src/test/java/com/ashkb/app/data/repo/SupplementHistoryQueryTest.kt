@@ -21,9 +21,14 @@ import org.robolectric.annotation.Config
 /**
  * v1.0.81（批次 7）：详情弹层「最近服用记录」的数据源——`SupplementLogDao.observeHistoryFor`。
  *
- * 为什么过真库：这段取数全靠 SQL 表达（窗口 / 只取 done / 两级倒序 / 按名称快照兜底），
+ * 为什么过真库：这段取数全靠 SQL 表达（窗口 / 状态过滤 / 两级倒序 / 按名称快照兜底），
  * 只有真的跑一遍 SQLite 才知道 ORDER BY 与 WHERE 是不是写成了想要的样子。
  * 弹层的顺序错了不会崩、也不会有人报错——只是「最近服用记录」不再是最新的，静默地骗人。
+ *
+ * v1.0.87（批次 12）：状态过滤参数化（`status IN (:statuses)`，调用方传
+ * `AdherenceCalc.SETTLED_STATUSES`）。本文件因此新增了两类用例：
+ *  · 跳过**必须**能查到（旧行为是查不到，那条断言已刻意反转并注明）；
+ *  · 老数据（只有 done）的条数 / 顺序 / 名称快照兜底**一条都不能变**（回归锁）。
  *
  * 与 [SupplementDeletionCascadeTest] 共用两条基建约定（每个用例前清单例；库操作走 IO 线程）。
  */
@@ -58,15 +63,59 @@ class SupplementHistoryQueryTest {
     }
 
     @Test
-    fun `只有跳过状态的记录时同样是空列表`() {
+    fun `跳过状态的记录也出现在历史里`() {
         val date = daysAgo(1)
         io {
             db.supplementDao().upsert(supplement("sup-b7-h2"))
-            // skipped = 「今天决定不吃」，不是一次服用——它不该出现在「已服」历史里
             db.supplementLogDao().upsert(log("slog-b7-h2-1", "sup-b7-h2", date, status = "skipped"))
         }
 
-        assertTrue(io { repo.observeSupplementHistory("sup-b7-h2", "测试补剂 sup-b7-h2").first() }.isEmpty())
+        val rows = io { repo.observeSupplementHistory("sup-b7-h2", "测试补剂 sup-b7-h2").first() }
+
+        // v1.0.87（批次 12）：卡片能写 skipped 之后，这条断言**刻意反转**。
+        // 旧断言（跳过不进历史）在只写得进 done 的年代成立；现在跳过也是一次交代，
+        // 用户按了跳过却翻不到那条记录，只会以为没记上。
+        assertEquals("跳过必须能在历史里查到", listOf("slog-b7-h2-1"), rows.map { it.id })
+    }
+
+    /**
+     * v1.0.87（批次 12）**回归锁**：老数据（只有 done）的历史结果必须与改动前完全一致。
+     *
+     * 过滤条件从写死的 `status = 'done'` 放宽为「已结算三态」，最容易出的错是顺手写成
+     * 「不等于 done 就留下」或「一律留下」——那会让历史里凭空多出用户没记过的行。
+     */
+    @Test
+    fun `只有 done 的老数据条数与顺序都不变`() {
+        io {
+            db.supplementDao().upsert(supplement("sup-b7-h8"))
+            db.supplementLogDao().upsert(log("slog-b7-h8-1", "sup-b7-h8", daysAgo(3)))
+            db.supplementLogDao().upsert(log("slog-b7-h8-2", "sup-b7-h8", daysAgo(1)))
+            db.supplementLogDao().upsert(log("slog-b7-h8-3", "sup-b7-h8", daysAgo(2)))
+        }
+
+        val rows = io { repo.observeSupplementHistory("sup-b7-h8", "测试补剂 sup-b7-h8").first() }
+
+        assertEquals(3, rows.size)
+        assertEquals(
+            "日期倒序这条口径不能被状态放宽带偏",
+            listOf(daysAgo(1), daysAgo(2), daysAgo(3)),
+            rows.map { it.date },
+        )
+    }
+
+    /** 未知状态（手工导入 / 未来新增）不进历史：既不算已服也不算跳过。 */
+    @Test
+    fun `未知状态不进历史`() {
+        val date = daysAgo(2)
+        io {
+            db.supplementDao().upsert(supplement("sup-b7-h9"))
+            db.supplementLogDao().upsert(log("slog-b7-h9-done", "sup-b7-h9", date))
+            db.supplementLogDao().upsert(log("slog-b7-h9-odd", "sup-b7-h9", date, status = "mystery"))
+        }
+
+        val rows = io { repo.observeSupplementHistory("sup-b7-h9", "测试补剂 sup-b7-h9").first() }
+
+        assertEquals(listOf("slog-b7-h9-done"), rows.map { it.id })
     }
 
     @Test

@@ -27,6 +27,7 @@ import com.ashkb.app.data.entity.SymptomDaily
 import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.entity.WeightLog
+import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.CheckupDeletion
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.DerivedAlerts
@@ -445,12 +446,16 @@ class HealthRepository(private val context: Context) {
     fun observeSupplementLogs(date: String): Flow<List<SupplementLog>> = supplementLogDao.observeByDate(date)
 
     /**
-     * U3 单个补剂的服用历史（近 90 天，仅 done）。
+     * U3 单个补剂的服用历史（近 90 天，**已结算**状态：done / partial / skipped）。
      * v1.0.81（批次 7）：窗口长度改为引用 `domain/SupplementHistory` 的常量——
      * 弹层的行数上限与这里的窗口是同一条规则，散在两个文件里迟早只改一处。
+     * v1.0.87（批次 12）：状态集改为引用 [AdherenceCalc.SETTLED_STATUSES] 的**同一份**定义——
+     * 此前 SQL 里写死 `status = 'done'`，跳过被记进库却在历史里查无此条（详见 Dao 注释）。
      */
     fun observeSupplementHistory(supId: String, name: String): Flow<List<SupplementLog>> =
-        supplementLogDao.observeHistoryFor(supId, name, SupplementHistory.fromDate(LocalDate.now()))
+        supplementLogDao.observeHistoryFor(
+            supId, name, AdherenceCalc.SETTLED_STATUSES, SupplementHistory.fromDate(LocalDate.now()),
+        )
 
     suspend fun saveSupplement(supp: Supplement) {
         val now = nowIso()
@@ -612,8 +617,14 @@ class HealthRepository(private val context: Context) {
 
     // ---- 复诊记录 ----
     fun observeCheckupRecent(limit: Int = 20): Flow<List<CheckupRecord>> = checkupRecordDao.observeRecent(limit)
-    fun observeCheckupByItem(itemId: String, limit: Int = 10): Flow<List<CheckupRecord>> =
-        checkupRecordDao.observeByItem(itemId, limit)
+
+    /**
+     * v1.0.87（批次 13）：某个复诊项目名下的记录（「项目」→「记录」的项目筛选）。
+     * `itemId` 认的是记录与项目的**显式关联**，`itemName` 认的是名字快照——现存记录的
+     * `item_id` 一律是 NULL（该列至今没有写入路径），只认前者会筛出空列表。
+     */
+    fun observeCheckupByItem(itemId: String, itemName: String, limit: Int = 10): Flow<List<CheckupRecord>> =
+        checkupRecordDao.observeByItem(itemId, itemName, limit)
 
     suspend fun saveCheckupRecord(record: CheckupRecord) {
         val toSave = if (record.id.isBlank()) record.copy(id = Ids.new("crec")) else record
@@ -711,6 +722,14 @@ class HealthRepository(private val context: Context) {
 
     /** 化验结果总览（化验 Tab：按日期倒序，含 AI 导入的独立化验单） */
     fun observeLabRecent(limit: Int = 100): Flow<List<LabResult>> = labResultDao.observeRecent(limit)
+
+    /**
+     * v1.0.87（批次 13）：化验**总条数**（健康页摘要用）。
+     *
+     * 摘要此前拿的是 [observeLabRecent] 的长度——那是分页窗口（初值 100），窗口装满时
+     * 它恒等于窗口值，删几条也不动。总数口径见 `LabResultDao.observeCount` 的注释。
+     */
+    fun observeLabCount(): Flow<Int> = labResultDao.observeCount()
 
     // ---- M6 影像记录（v1.0.4 AI 导入） ----
     fun observeImagingRecords(): Flow<List<ImagingRecord>> = imagingDao.observeAll()

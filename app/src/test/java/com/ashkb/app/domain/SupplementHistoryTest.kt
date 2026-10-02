@@ -54,12 +54,57 @@ class SupplementHistoryTest {
         assertTrue(SupplementHistory.visible(emptyList()).isEmpty())
     }
 
-    /** 造 n 条记录：id 递增即可，本测试只关心行数与顺序，不关心日期。 */
-    private fun history(n: Int): List<SupplementLog> = (1..n).map { i ->
-        SupplementLog(
-            id = "slog-$i", date = "2026-10-01", recordedAt = "2026-10-01T08:00:00",
-            supId = "sup-1", supKey = "sup-1", supName = "测试补剂",
-            doseSnapshot = "1 粒", status = "done", takenAt = "2026-10-01T08:00:00",
-        )
+    // ---- v1.0.87（批次 12）：历史流的状态口径（跳过也是一次交代） ----
+
+    /**
+     * 详情弹层的历史流取的是**已结算**状态，不是只取 done。
+     *
+     * 为什么锁在纯函数而不是继续写死在 SQL 里：批次 12 之前 `observeHistoryFor` 把
+     * `status = 'done'` 写死在 SQL 字符串里，卡片一旦能写 skipped，那条记录就会
+     * 「记进库了、历史里查无此条」。现在过滤值由调用方传 [AdherenceCalc.SETTLED_STATUSES]，
+     * 本用例钉住这份集合就是全部三种结算态。
+     */
+    @Test
+    fun `已结算状态含已服与跳过`() {
+        assertEquals(setOf("done", "partial", "skipped"), AdherenceCalc.SETTLED_STATUSES)
     }
+
+    /**
+     * **回归锁**：历史里「已服」的条数不能因为新增跳过而变。
+     *
+     * 现网老数据只有 done 行（跳过是批次 12 才写得出来的）。老数据的显示结果必须与改动前
+     * 完全一致——过滤条件从 `status = 'done'` 放宽到三态后，若有人把它改成「含未知状态」，
+     * 这里会立刻失败。
+     */
+    @Test
+    fun `老数据只有 done 时历史条数与改动前一致`() {
+        val legacy = listOf(
+            log("slog-legacy-1", "done"),
+            log("slog-legacy-2", "done"),
+            log("slog-legacy-3", "done"),
+        )
+
+        val kept = legacy.filter { it.status in AdherenceCalc.SETTLED_STATUSES }
+
+        assertEquals("老数据（只有 done）必须一条不少地留下", 3, kept.size)
+        assertEquals(legacy.map { it.id }, kept.map { it.id })
+    }
+
+    /** 未知 / 空状态既不是 done 也不是跳过：不得混进历史（否则会凭空多出用户没记过的行）。 */
+    @Test
+    fun `未知状态不进历史流`() {
+        val logs = listOf(log("slog-x-1", "done"), log("slog-x-2", "mystery"))
+
+        assertEquals(listOf("slog-x-1"), logs.filter { it.status in AdherenceCalc.SETTLED_STATUSES }.map { it.id })
+    }
+
+    /** 造 n 条记录：id 递增即可，本测试只关心行数与顺序，不关心日期。 */
+    private fun history(n: Int): List<SupplementLog> = (1..n).map { i -> log("slog-$i", "done") }
+
+    private fun log(id: String, status: String) = SupplementLog(
+        id = id, date = "2026-10-01", recordedAt = "2026-10-01T08:00:00",
+        supId = "sup-1", supKey = "sup-1", supName = "测试补剂",
+        doseSnapshot = "1 粒", status = status,
+        takenAt = if (status == "done") "2026-10-01T08:00:00" else null,
+    )
 }

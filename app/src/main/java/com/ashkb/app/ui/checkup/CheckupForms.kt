@@ -93,18 +93,25 @@ internal fun CheckupItemFormSheet(
 }
 
 // ===== 复诊记录表单（多字段，ModalBottomSheet） =====
-/** v1.0.80（批次 6）：[existing] 非空 = 编辑（回填原值并沿用主键，避免「改一次多一条」）。 */
+/**
+ * v1.0.80（批次 6）：[existing] 非空 = 编辑（回填原值并沿用主键，避免「改一次多一条」）。
+ *
+ * v1.0.87（批次 13）：[presetItemName] 只在**新增**时充当项目名初值——从「记录」tab 的项目筛选
+ * 空态点「记录复诊」进来时，项目名已填好那个项目，补录的这条才会落回当前筛选下
+ * （记录与项目的关联靠名字快照，不预填就是白补一条）。编辑时一律以原记录为准，它被忽略。
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun CheckupRecordFormSheet(
     items: List<CheckupItem>,
     existing: CheckupRecord? = null,
+    presetItemName: String? = null,
     onSave: (CheckupRecord) -> Unit,
     onDismiss: () -> Unit,
 ) {
     // 表单初值先算好（编辑回填 / 新增给默认档），字段状态以它为 key——
     // 详情见 CheckupRecordDraft.of 的注释（圈复杂度与「一处实现」两个理由）
-    val draft = CheckupRecordDraft.of(existing)
+    val draft = CheckupRecordDraft.of(existing, presetItemName)
     var itemName by remember(draft) { mutableStateOf(draft.itemName) }
     var checkType by remember(draft) { mutableStateOf(draft.checkType) }
     var date by remember(draft) { mutableStateOf(draft.isoDate) }
@@ -190,9 +197,12 @@ private data class CheckupRecordDraft(
          * 为什么把这一串 `?:` 收进工厂：它们直接写在 Composable 里会一条条叠加圈复杂度
          * （每个安全调用与 Elvis 各算一个分支，九个字段就顶到 detekt 的 `CyclomaticComplexMethod`
          * 阈值），而 Composable 里本就还有标题、校验、保存分支。
+         *
+         * v1.0.87（批次 13）：[presetItemName] 只在新增时兜底项目名（项目筛选空态进来的预填）；
+         * 编辑时原记录的项目名优先，预填不影响已有记录。
          */
-        fun of(existing: CheckupRecord?): CheckupRecordDraft = CheckupRecordDraft(
-            itemName = existing?.itemName ?: "",
+        fun of(existing: CheckupRecord?, presetItemName: String? = null): CheckupRecordDraft = CheckupRecordDraft(
+            itemName = existing?.itemName ?: presetItemName.orEmpty(),
             // 新增时的默认档与旧实现一致（CONSULT）；fromKey(null) 的 OTHER 是给脏数据的兜底
             checkType = existing?.let { CheckupType.fromKey(it.checkType) } ?: CheckupType.CONSULT,
             isoDate = existing?.date ?: LocalDate.now().toString(),

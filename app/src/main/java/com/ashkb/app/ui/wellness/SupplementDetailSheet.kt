@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Medication
+import androidx.compose.material.icons.rounded.RemoveCircleOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -32,15 +33,16 @@ import com.ashkb.app.data.entity.MedFrequency
 import com.ashkb.app.data.entity.Supplement
 import com.ashkb.app.data.entity.SupplementCategory
 import com.ashkb.app.data.entity.SupplementLog
+import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.SupplementDeletion
 import com.ashkb.app.domain.SupplementHistory
+import com.ashkb.app.domain.SupplementLogStatus
 import com.ashkb.app.ui.checkup.SheetColumn
 import com.ashkb.app.ui.components.DividerList
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
-import com.ashkb.app.ui.theme.StatusTone
 
 /**
  * v1.0.81（批次 7）：补剂详情弹层——补剂本身的关键信息 + **最近服用记录（逐条可删）**。
@@ -55,6 +57,10 @@ import com.ashkb.app.ui.theme.StatusTone
  *
  * 记录取数规则（近 90 天窗口 / 最多列 30 行 / 日期倒序，且倒序由 SQL 保证）见 `domain/SupplementHistory`。
  * 列表走 Room Flow，删一行后**即时刷新**：不需要手动重查，也不需要「刷新」按钮。
+ *
+ * v1.0.87（批次 12）：卡片支持「跳过」后，本条记录流取的是**已结算**状态（done / partial / skipped，
+ * 见 `AdherenceCalc.SETTLED_STATUSES`）而不只是 done——跳过也是一次交代，用户按了跳过却翻不到
+ * 那条记录，只会以为没记上。状态胶囊的文案与色调统一走 [SupplementLogStatus]（唯一实现）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,7 +128,7 @@ internal fun SupplementDetailSheet(vm: WellnessViewModel, sup: Supplement, onDis
 }
 
 /**
- * 记录行左半部：日期 + 服用时刻；右半部是「已服」胶囊与**只删这一条**的删除入口。
+ * 记录行左半部：日期 + 记录时刻；右半部是**状态胶囊**与**只删这一条**的删除入口。
  *
  * 必须是 [RowScope] 扩展：行内的左半列要 `Modifier.weight(1f)` 吃掉剩余宽度，把胶囊与删除按钮推到右边，
  * 而 `weight` 只在 Row 的作用域里存在。挂到 RowScope 上（而不是自带一个 Row）是为了让本函数
@@ -136,20 +142,26 @@ private fun RowScope.SupplementLogRow(log: SupplementLog, onDelete: () -> Unit) 
     ) {
         Text(log.date, style = MaterialTheme.typography.bodyMedium)
         Text(
+            // v1.0.87（批次 12）：跳过的记录里 `takenAt` 是 null（没服用就没有服用时刻，
+            // 见 WellnessViewModel.checkInSupplement），此时显示记录时刻并明确写成「跳过记录于」——
+            // 沿用旧句「服用于 …」会把一次跳过说成一次服用。已服那行的文案与旧实现逐字一致。
             stringResource(
-                R.string.nutrition_supplement_history_entry,
+                if (log.status == AdherenceCalc.SKIPPED) R.string.nutrition_supplement_history_skipped_entry
+                else R.string.nutrition_supplement_history_entry,
                 (log.takenAt ?: log.recordedAt).take(16).replace("T", " "),
             ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    // 状态胶囊与记录流同源（历史流只取 status='done'），故此处恒为「已服」；
-    // 用资源而不是字面量，是为了与今日列表上的同一状态永远同一个词。
+    // 状态胶囊：文案与色调走 SupplementLogStatus（**唯一实现**，与今日列表上那条补剂同一个词）。
+    // v1.0.87（批次 12）：历史流改为同时含 done 与 skipped 后，这里不能再硬编码「已服」——
+    // 跳过的那几行必须显示「跳过」，否则用户会以为自己昨天吃了。
+    // 图标仍按状态二选一（中性色 + 划掉的圆 / 绿 + 对勾），与药品卡的图标约定一致。
     StatusChip(
-        text = stringResource(R.string.med_status_taken_short),
-        tone = StatusTone.Success,
-        icon = Icons.Rounded.CheckCircle,
+        text = stringResource(SupplementLogStatus.labelRes(log.status)),
+        tone = SupplementLogStatus.tone(log.status),
+        icon = if (log.status == AdherenceCalc.SKIPPED) Icons.Rounded.RemoveCircleOutline else Icons.Rounded.CheckCircle,
     )
     IconButton(onClick = onDelete, modifier = Modifier.size(Size.touchMin)) {
         Icon(

@@ -1,5 +1,6 @@
 package com.ashkb.app.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -33,6 +34,10 @@ import com.ashkb.app.ui.theme.Spacing
  *
  * 层级靠表面色阶而非阴影：普通卡片放 `surfaceContainerLowest`（浅色下为纯白），
  * 在 `surface`（暖米底）上自然浮起，elevation 恒为 0。
+ *
+ * v1.0.87（批次 13）：新增可点的 [onClick]。[onClickLabel] 是读屏用的动作名——
+ * 卡片可点时正文交给读屏当动作提示（与 `NavRow` 的「整行可点，语义在标题」同一约定）。
+ * 点击挂在内层 Column 上（Surface 之内）：涟漪被卡片圆角裁掉，动作槽里的按钮照旧吃自己的点击。
  */
 @Composable
 fun SectionCard(
@@ -40,6 +45,8 @@ fun SectionCard(
     subtitle: String? = null,
     action: (@Composable RowScope.() -> Unit)? = null,
     container: Color = MaterialTheme.colorScheme.surfaceContainerLowest,
+    onClick: (() -> Unit)? = null,
+    onClickLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
@@ -47,7 +54,17 @@ fun SectionCard(
         shape = MaterialTheme.shapes.large,
         color = container,
     ) {
-        Column(Modifier.padding(Spacing.lg)) {
+        Column(
+            Modifier
+                .then(
+                    if (onClick != null) {
+                        Modifier.clickable(onClickLabel = onClickLabel, onClick = onClick)
+                    } else {
+                        Modifier
+                    },
+                )
+                .padding(Spacing.lg),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(title, style = MaterialTheme.typography.titleMedium)

@@ -352,7 +352,9 @@ private fun HealthHub(
     val vitals by wellnessVm.vitalsToday.collectAsStateWithLifecycle()
     val weight by wellnessVm.weightToday.collectAsStateWithLifecycle()
     val checkupItems by checkupVm.checkupItems.collectAsStateWithLifecycle()
-    val labRecent by checkupVm.labRecent.collectAsStateWithLifecycle()
+    // v1.0.87（批次 13）：摘要报的是**总数**，不是化验列表分页窗口的长度——
+    // 旧口径（labRecent.size）在库里化验 ≥100 行时恒为 100，且删掉几行也不变（维护者真机反馈）
+    val labTotal by checkupVm.labTotal.collectAsStateWithLifecycle()
     val contacts by emergencyVm.contacts.collectAsStateWithLifecycle()
 
     val wellnessSub = buildList {
@@ -360,7 +362,7 @@ private fun HealthHub(
         add(if (weight != null) stringResource(R.string.vitals_weight_recorded) else stringResource(R.string.vitals_weight_not_recorded))
     }.joinToString(" · ")
 
-    val checkupSub = stringResource(R.string.health_badge_checkup_lab, checkupItems.size, labRecent.size)
+    val checkupSub = stringResource(R.string.health_badge_checkup_lab, checkupItems.size, labTotal)
 
     val emergencySub = if (contacts.isEmpty()) {
         stringResource(R.string.emergency_no_contacts)

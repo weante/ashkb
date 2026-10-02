@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.NoMeals
+import androidx.compose.material.icons.rounded.RemoveCircleOutline
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Straighten
 import androidx.compose.material.icons.rounded.WarningAmber
@@ -55,11 +56,14 @@ import com.ashkb.app.data.entity.FoodAvoidItem
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.Supplement
 import com.ashkb.app.data.entity.SupplementCategory
+import com.ashkb.app.data.entity.SupplementLog
 import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.Labels
 import com.ashkb.app.domain.SupplementLimits
+import com.ashkb.app.domain.SupplementLogStatus
 import com.ashkb.app.domain.SupplementTiming
 import com.ashkb.app.domain.WeightTarget
 import com.ashkb.app.R
@@ -195,10 +199,6 @@ fun WellnessScreen(vm: WellnessViewModel, onOpenRecipes: () -> Unit, onBack: () 
                 )
             }
             item {
-                // 补剂打卡态集合一次性算好：避免每行对全部 supLogs 做 O(N·M) 线性扫描
-                val doneIds: Set<String?> = remember(supLogs) {
-                    supLogs.asSequence().filter { it.status == "done" }.map { it.supId }.toSet()
-                }
                 SectionCard(
                     title = stringResource(R.string.nutrition_supplement_archive),
                     subtitle = stringResource(R.string.wellness_supplements_count, supplements.size),
@@ -216,61 +216,19 @@ fun WellnessScreen(vm: WellnessViewModel, onOpenRecipes: () -> Unit, onBack: () 
                         )
                     } else {
                         DividerList(supplements, key = { it.id }) { sup ->
-                            Column(
-                                // v1.0.81（批次 7）：点整行打开「补剂详情」（最近服用记录 + 逐条删除）。
-                                // 状态变量就是下面弹层用的 detailSup——**同一个**变量：写成两份 state 的话，
-                                // 点击只改一份、弹层读另一份，点了没反应。
-                                Modifier.weight(1f).clickable { detailSup = sup },
-                                verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
-                            ) {
-                                Text("${sup.name} ${sup.dose}", style = MaterialTheme.typography.bodyMedium)
-                                Text(
-                                    SupplementCategory.fromKey(sup.category).label +
-                                        (sup.brand?.let { " · $it" } ?: ""),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                // B11：当日累计（单次剂量 × 每日次数）超出用户自填的每日上限 → 警示；
-                                // 未填上限 / 未量化单次剂量时 exceedsDailyMax 返回 null，静默不提示
-                                if (SupplementLimits.exceedsDailyMax(sup) == true) {
-                                    val total = SupplementLimits.dailyTotal(sup)
-                                    val max = sup.dailyMax
-                                    if (total != null && max != null) {
-                                        Text(
-                                            stringResource(
-                                                R.string.supp_over_limit,
-                                                fmtNum(total), SupplementLimits.unitLabel(sup), fmtNum(max),
-                                            ),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.error,
-                                        )
-                                    }
-                                }
-                            }
-                            if (sup.id in doneIds) {
-                                StatusChip(text = stringResource(R.string.med_status_taken_short), tone = StatusTone.Success, icon = Icons.Rounded.CheckCircle)
-                                // v1.0.80（批次 6）：撤销误点的打卡——此前点错了就再也回不到「今天还没吃」，
-                                // 「已服用」胶囊会一直挂着（而它与补剂本身的删除入口长得一样危险）
-                                DestructiveAction(
-                                    label = stringResource(R.string.nutrition_supplement_undo),
-                                    confirmTitle = stringResource(R.string.nutrition_supplement_undo_confirm, sup.name),
-                                    confirmBody = stringResource(R.string.nutrition_supplement_undo_note),
-                                    onConfirm = { vm.undoSupplementCheckIn(sup) },
-                                )
-                            } else {
-                                TextButton(onClick = {
-                                    vm.checkInSupplement(sup, "done", null, null)
-                                }) { Text(stringResource(R.string.exercise_checkin_short)) }
-                            }
-                            TextButton(onClick = { editSup = sup }) { Text(stringResource(R.string.common_edit)) }
-                            // v1.0.81（批次 7）：这里的删除 = **删掉整个补剂条目**（连带它名下的服用记录，
-                            // 条数由确认框异步取并报出，见 SupplementDeleteDialog）。只想删某一天的记录时，
-                            // 走「点击补剂」打开的详情弹层——两种语义此前共用一句「删除…？」，
-                            // 而确认框里那句「已产生的服用记录仍保留」更是与实情相反，正是用户困惑的根源。
-                            TextButton(
-                                onClick = { deletingSup = sup },
-                                modifier = Modifier.heightIn(min = Size.touchMin),
-                            ) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
+                            SupplementCardRow(
+                                sup = sup,
+                                // 打卡态集合一次性算好：避免每行对全部 supLogs 做 O(N·M) 线性扫描
+                                todayStatus = SupplementLogStatus.loggedToday(supLogs, sup.id),
+                                actions = SupplementRowActions(
+                                    onOpenDetail = { detailSup = sup },
+                                    onEdit = { editSup = sup },
+                                    onDelete = { deletingSup = sup },
+                                ),
+                                onCheckIn = { vm.checkInSupplement(sup, AdherenceCalc.DONE, null, null) },
+                                onSkip = { vm.checkInSupplement(sup, AdherenceCalc.SKIPPED, null, null) },
+                                onUndo = { vm.undoSupplementCheckIn(sup) },
+                            )
                         }
                         // B11：矿物类补剂与「螯合类」用药服用时间过近（间隔 < 2 小时）→ 错开提醒
                         val conflicts = remember(supplements, medications) {
@@ -400,6 +358,120 @@ fun WellnessScreen(vm: WellnessViewModel, onOpenRecipes: () -> Unit, onBack: () 
     detailSup?.let { sup -> SupplementDetailSheet(vm = vm, sup = sup, onDismiss = { detailSup = null }) }
     editSup?.let { sup -> SupplementSheet(vm = vm, current = sup, onDismiss = { editSup = null }) }
     deletingSup?.let { sup -> SupplementDeleteDialog(vm = vm, sup = sup, onDismiss = { deletingSup = null }) }
+}
+
+/**
+ * v1.0.87（批次 12）：补剂行的**归属类动作**（与「今天打卡态」无关的那三个入口）。
+ *
+ * 为什么收成一个参数对象：补剂行同时要接「今日动作」（打卡 / 跳过 / 撤销）、「状态」
+ * （`todayStatus`）与「档案类动作」（详情 / 编辑 / 删除）三组东西，摊平就是 8 个形参——
+ * detekt 的 `LongParameterList`（阈值 8）立刻报警。这三件事的共同点是**与今天无关**：
+ * 无论今天有没有打卡，它们都长在行上、都指向同一条补剂。收成一组后形参降到 6 个，
+ * 顺带让「今天的状态变化」不会牵动这三个入口的语义。
+ */
+internal data class SupplementRowActions(
+    val onOpenDetail: () -> Unit,
+    val onEdit: () -> Unit,
+    val onDelete: () -> Unit,
+)
+
+/**
+ * v1.0.87（批次 12）：补剂档案列表的一行——左侧补剂信息（点开详情）+ 右侧今日动作或状态。
+ *
+ * 新增「跳过」后，这一行的右半部从「一个按钮 / 一个胶囊」变成最多 4 个元素
+ * （胶囊或两个动作按钮 + 编辑 + 删除），因此整行收进本函数：原来那 3 个块直接挂在
+ * `DividerList` 的 `RowScope` 里，加一个按钮就会把名称列挤成一条缝。
+ *
+ * 布局与批次 7 保持一致（分割线、可点区域、编辑 / 删除入口的位置都没动）：
+ *  · 左列：`fillMaxWidth()` + 父 Row 的 `weight(1f)` 一起把右侧推到屏幕边缘；
+ *  · 右侧：胶囊（已记录）**或**两个动作按钮（未记录），下面依次是编辑与删除。
+ *
+ * 「跳过」不弹任何表单、不要求填理由：补剂不是处方药，没有「为什么没吃」这一问
+ * （药品那套 `SkipReason` 是给漏服追责用的，照搬到补剂只是多一步无用输入）。
+ */
+@Composable
+private fun SupplementCardRow(
+    sup: Supplement,
+    todayStatus: String?,
+    actions: SupplementRowActions,
+    onCheckIn: () -> Unit,
+    onSkip: () -> Unit,
+    onUndo: () -> Unit,
+) {
+    Column(
+        // v1.0.81（批次 7）：点整行打开「补剂详情」（最近服用记录 + 逐条删除）。卡片状态由
+        // WellnessScreen 的 detailSup 持有，这里只回调——写成两份 state 的话，点击只改一份、
+        // 弹层读另一份，点了没反应。
+        Modifier.fillMaxWidth().clickable { actions.onOpenDetail() },
+        verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+    ) {
+        Text("${sup.name} ${sup.dose}", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            SupplementCategory.fromKey(sup.category).label +
+                (sup.brand?.let { " · $it" } ?: ""),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        // B11：当日累计（单次剂量 × 每日次数）超出用户自填的每日上限 → 警示；
+        // 未填上限 / 未量化单次剂量时 exceedsDailyMax 返回 null，静默不提示
+        if (SupplementLimits.exceedsDailyMax(sup) == true) {
+            val total = SupplementLimits.dailyTotal(sup)
+            val max = sup.dailyMax
+            if (total != null && max != null) {
+                Text(
+                    stringResource(
+                        R.string.supp_over_limit,
+                        fmtNum(total), SupplementLimits.unitLabel(sup), fmtNum(max),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+    when (todayStatus) {
+        // 已服 / 跳过都由 SupplementLogStatus 映射（文案与色调与详情弹层同源）；
+        // 跳过用**中性色**：与药品卡（`medStatusOf`）一致——不是错误，不该报警
+        AdherenceCalc.SKIPPED -> StatusChip(
+            text = stringResource(SupplementLogStatus.labelRes(todayStatus)),
+            tone = SupplementLogStatus.tone(todayStatus),
+            icon = Icons.Rounded.RemoveCircleOutline,
+        )
+        null -> Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            TextButton(onClick = onCheckIn, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                Text(stringResource(R.string.exercise_checkin_short))
+            }
+            TextButton(onClick = onSkip, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                Text(stringResource(R.string.med_skip))
+            }
+        }
+        else -> StatusChip(
+            text = stringResource(SupplementLogStatus.labelRes(todayStatus)),
+            tone = SupplementLogStatus.tone(todayStatus),
+            icon = Icons.Rounded.CheckCircle,
+        )
+    }
+    // v1.0.80（批次 6）：撤销误点的打卡——此前点错了就再也回不到「今天还没吃」，
+    // 「已服用」胶囊会一直挂着（而它与补剂本身的删除入口长得一样危险）。
+    // v1.0.87（批次 12）：对「已服」与「跳过」用同一个入口与同一句文案——撤销就是把今天的
+    // 记录整个抹掉回到未记录态，两种状态在这里没有区别，分成两句话只会让用户多读一行。
+    if (todayStatus != null) {
+        DestructiveAction(
+            label = stringResource(R.string.nutrition_supplement_undo),
+            confirmTitle = stringResource(R.string.nutrition_supplement_undo_confirm, sup.name),
+            confirmBody = stringResource(R.string.nutrition_supplement_undo_note),
+            onConfirm = onUndo,
+        )
+    }
+    TextButton(onClick = actions.onEdit) { Text(stringResource(R.string.common_edit)) }
+    // v1.0.81（批次 7）：这里的删除 = **删掉整个补剂条目**（连带它名下的服用记录，
+    // 条数由确认框异步取并报出，见 SupplementDeleteDialog）。只想删某一天的记录时，
+    // 走「点击补剂」打开的详情弹层——两种语义此前共用一句「删除…？」，
+    // 而确认框里那句「已产生的服用记录仍保留」更是与实情相反，正是用户困惑的根源。
+    TextButton(
+        onClick = actions.onDelete,
+        modifier = Modifier.heightIn(min = Size.touchMin),
+    ) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
 }
 
 /**
