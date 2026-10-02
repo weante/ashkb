@@ -106,8 +106,10 @@ fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
     // v1.0.86（批次 11）：首次进入报表页才取数。
     // 此前取数在 ReportViewModel 的 init 里，而该 VM 由 AppShell 在**应用启动时**创建——
     // 冷启动因此白查一次库（overview + trends 两条聚合），哪怕用户从不打开报表。
-    // key = Unit：每次重新进入本页组合一次；VM 内的 loadOnce() 自己判重（已有数据即空操作）。
-    LaunchedEffect(Unit) { vm.loadOnce() }
+    // key = Unit：每次重新进入本页组合一次。
+    // v1.1.1（HIGH-3）：这里**必须**每次都重查——"已有数据即空操作"会让「恢复备份后返回本页」
+    // 继续显示恢复前的数字（VM 挂在返回栈条目上，返回时并没有被重建）。
+    LaunchedEffect(Unit) { vm.onEnterReport() }
 
     Column(Modifier.fillMaxSize()) {
         Row(

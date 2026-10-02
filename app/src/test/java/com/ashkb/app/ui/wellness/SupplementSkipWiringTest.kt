@@ -42,6 +42,7 @@ class SupplementSkipWiringTest {
 
     private val wellnessScreen get() = source("com/ashkb/app/ui/wellness/WellnessScreen.kt")
     private val detailSheet get() = source("com/ashkb/app/ui/wellness/SupplementDetailSheet.kt")
+    private val wellnessVm get() = source("com/ashkb/app/ui/wellness/WellnessViewModel.kt")
 
     @Test
     fun `卡片同时提供打卡与跳过两个动作`() {
@@ -71,6 +72,18 @@ class SupplementSkipWiringTest {
                 !src.contains("status == \"done\"") && !src.contains("status == \"skipped\""),
             )
         }
+        // v1.1.1（MEDIUM-6）：**ViewModel 也纳入扫描**。此前只扫 Screen 与详情弹层，
+        // 而 `checkInSupplement` 里 `takenAt = if (status == "done") …` 就写在 VM 里：
+        // 状态词打错不会编译失败，只会让 skipped 行带上服用时刻（弹层把一次跳过说成一次服用），
+        // 而当时没有任何门会红。
+        assertTrue(
+            "WellnessViewModel 不得内联状态字面量（v1.1.1 起纳入本守卫）",
+            !wellnessVm.contains("status == \"done\"") && !wellnessVm.contains("status == \"skipped\""),
+        )
+        assertTrue(
+            "takenAt 的判据必须走 AdherenceCalc.DONE 常量",
+            wellnessVm.contains("if (status == AdherenceCalc.DONE)"),
+        )
         assertTrue(
             "卡片必须用共享判据算今日打卡态",
             wellnessScreen.contains("SupplementLogStatus.loggedToday(supLogs, sup.id)"),

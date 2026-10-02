@@ -211,7 +211,10 @@ class WebDavClient(
 
     fun downloadAttachment(remotePath: String): ByteArray {
         requirePath(remotePath)
-        return get(AttachmentPath.fullPathOf(remotePath))
+        // v1.1.1：附件走**附件上限**而不是备份的 6 MiB——上传侧允许 20 MB
+        // （`AttachmentRepository.MAX_BYTES`），读侧卡 6 MiB 会让 6–20 MB 的附件
+        // 传得上去、永远取不下来（本批次修的 HIGH-2）。
+        return get(AttachmentPath.fullPathOf(remotePath), ATTACHMENT_RESPONSE_LIMIT)
     }
 
     /** 删除远端附件；404 视为已不存在（幂等，重试安全）。 */
@@ -277,14 +280,17 @@ class WebDavClient(
         } finally { conn.disconnect() }
     }
 
-    private fun get(path: String): ByteArray {
+    private fun get(path: String, maxBytes: Long = BINARY_RESPONSE_LIMIT): ByteArray {
         val conn = open(path, "GET")
         try {
             val code = conn.responseCode
             if (code !in 200..299) throw DavException("GET 失败：HTTP $code")
             // v1.0.86（批次 11 / D6）：二进制读路径统一走上限——备份下载、附件懒下载、
             // 上传后的回读校验（upload 内部也是 get）全在这里收口。
-            return readBounded(conn.inputStream, BINARY_RESPONSE_LIMIT, path)
+            // v1.1.1：上限改为**由调用方给**——备份（几百 KB）与附件（≤ 20 MB）不是同一条尺寸带，
+            // 用同一个 6 MiB 卡两者，会让 6–20 MB 的附件"传得上去、永远取不下来"
+            // （附件走 ATTACHMENT_RESPONSE_LIMIT，见其 KDoc）。
+            return readBounded(conn.inputStream, maxBytes, path)
         } finally { conn.disconnect() }
     }
 
@@ -387,6 +393,21 @@ class WebDavClient(
          * 会是几百倍的异常增长，届时应当报警而不是默默继续读。
          */
         const val BINARY_RESPONSE_LIMIT: Long = 6L * BYTES_PER_MB
+
+        /**
+         * v1.1.1：**附件**（GET 单个附件密文）的上限——与备份上限分开，因为两者的尺寸带不同。
+         *
+         * 为什么必须分开：上传侧闸门是 `AttachmentRepository.MAX_BYTES` = 20 MB（用户拍照/选
+         * PDF 时按文件长度拦），而 v1.0.86 把读侧统一卡在 6 MiB。于是一张 8 MB 的 MRI 报告
+         * 照片**传得上去、列表里看得到，取回时必然抛 DavResponseTooLarge**，且用户没有任何
+         * 途径提高上限——这是"两个不同的上限被合并成一条"造成的死路。
+         *
+         * 21 MiB = 20 MiB（上传闸门）+ 余量。余量只需覆盖 `VaultCipher.encryptBlob` 的信封
+         * （8 字节 magic + 12 字节 IV + 16 字节 GCM tag = 36 字节），留 1 MiB 是为了不让
+         * "恰好 20 MB 的文件 + 信封"卡在边界上。磁盘上的明文文件被 MAX_BYTES 卡死，
+         * 故这里放宽不会变成无上限读入内存的口子。
+         */
+        const val ATTACHMENT_RESPONSE_LIMIT: Long = 21L * BYTES_PER_MB
 
         /** 读流缓冲（8 KiB）：HTTP 响应体分块读取的常规粒度，与上限无关。 */
         private const val READ_BUFFER_BYTES = 8 * 1024

@@ -19,6 +19,23 @@ object SupplementTiming {
     /** 建议最小间隔（分钟）。 */
     const val MIN_GAP_MINUTES = 120
 
+    /** 一天的分钟数：环形距离的模。 */
+    private const val MINUTES_PER_DAY = 24 * 60
+
+    /**
+     * v1.1.1（M2）：**环形距离**——两个「当日分钟数」之间最短的那一侧间隔。
+     *
+     * 为什么不能用 `abs(a - b)`：时刻是**环**上的点，23:50 与 00:15 的真实间隔是 25 分钟
+     * （左甲状腺素 23:50 + 钙剂 00:15，典型的螯合冲突），而线性差给出 1415 分钟 → 120 分钟规则
+     * 不触发 → **跨午夜的螯合提醒静默失效**。补剂/用药的服用时刻由用户自填，跨零点组合完全可能。
+     *
+     * 返回 [0, 720]：超过半天的那一侧永远不是"最短间隔"。
+     */
+    fun circularGapMinutes(a: Int, b: Int): Int {
+        val linear = abs(a - b)
+        return minOf(linear, MINUTES_PER_DAY - linear)
+    }
+
     /** 会与钙 / 矿物螯合的通用名或中文名片段（小写包含匹配）。 */
     private val CHELATION_KEYS = listOf(
         "levothyroxine", "euthyrox", "左甲状腺素", "优甲乐",
@@ -65,7 +82,8 @@ object SupplementTiming {
             chelating.forEach { m ->
                 timesOf(m.takeTimes).forEach { mt ->
                     sTimes.forEach { st ->
-                        val gap = abs(st - mt)
+                        // v1.1.1（M2）：环形距离——23:50 与 00:15 的间隔是 25 分钟，不是 1415
+                        val gap = circularGapMinutes(st, mt)
                         if (gap < MIN_GAP_MINUTES) out.add(Conflict(s.name, m.name, gap))
                     }
                 }

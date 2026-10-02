@@ -455,8 +455,32 @@ interface SupplementLogDao {
     @Query("SELECT * FROM supplement_logs WHERE date = :date")
     suspend fun byDate(date: String): List<SupplementLog>
 
-    @Query("SELECT * FROM supplement_logs WHERE sup_id = :supId AND date = :date AND slot_key = :slotKey")
+    /**
+     * v1.1.1：**判等用 `IS` 而不是 `=`**——这是"补剂连点会写多行"的根因。
+     *
+     * `slot_key` 在本表恒为 NULL（补剂打卡没有槽位，见 `WellnessViewModel.checkInSupplement`），
+     * 而 SQL 里 `NULL = NULL` 的结果是 NULL（不为真）→ 这个幂等守卫**永远返回 null**，
+     * `HealthRepository.checkInSupplement` 于是每次点击都当作新记录插入一行。
+     * 后果不止"历史里多几行"：报表的补剂完成度按**行**计数，连点三次 = 分母 +3，
+     * 用户看到的是被自己手速抬高的依从率（本批次修的 HIGH-1）。
+     *
+     * `IS` 是 SQLite 的 NULL 安全判等（`NULL IS NULL` 为真），语义正是这里要的
+     * 「同一天、同一补剂、都没有槽位」= 同一条记录。药品侧不需要改：那边只在 `slotKey` 非空时
+     * 查库（PRN 刻意允许一天多行），调用点已用 `slotKey?.let { }` 挡住 NULL。
+     */
+    @Query("SELECT * FROM supplement_logs WHERE sup_id = :supId AND date = :date AND slot_key IS :slotKey")
     suspend fun find(supId: String, date: String, slotKey: String?): SupplementLog?
+
+    /**
+     * v1.1.1：窗口内**整行**（不过滤状态、不去重）——报表的补剂依从在 Kotlin 侧按
+     * 「天 × 补剂」去重后再计数（见 `SupplementLogStatus.latestPerDay` 的 KDoc）。
+     *
+     * 为什么不再直接 `COUNT(*)`：连点留下的重复行、以及"同一天先跳过再补记已服"的两行，
+     * 都会让分母虚增。去重键必须与卡片上的「今日打卡态」同源（那边也是取 `recordedAt` 最大的
+     * 那一条），否则卡片显示一个状态、报表按另一个状态计数。
+     */
+    @Query("SELECT * FROM supplement_logs WHERE date BETWEEN :from AND :to")
+    suspend fun between(from: String, to: String): List<SupplementLog>
 
     /**
      * U3 服用历史：按 sup_id 弱引用或名称快照匹配（补剂真删后仍可按快照追历史），日期窗口近 90 天。
@@ -498,9 +522,11 @@ interface SupplementLogDao {
     @Query("DELETE FROM supplement_logs WHERE sup_id = :supId")
     suspend fun deleteBySupId(supId: String)
 
-    /** C2（v1.0.37）：补剂依从统计——按状态计数（与 medication_logs 同口径）。 */
-    @Query("SELECT COUNT(*) FROM supplement_logs WHERE date BETWEEN :from AND :to AND status = :status")
-    suspend fun countBetweenStatus(from: String, to: String, status: String): Int
+    // v1.1.1（HIGH-1）：原 `countBetweenStatus`（按行 `COUNT(*)`）已删除——它是"补剂连点虚增
+    // 依从率分母"的另一半：即便写侧不再产生重复行，用户库里已有的重复行、以及"同日先跳过再补记"
+    // 的两行，也会被它按行数计进分母。报表改用 `between(...)` 取整行后在 Kotlin 侧按
+    // 「天 × 补剂」去重（`SupplementLogStatus.latestPerDay`），口径与卡片上的打卡态同源。
+    // 留着那个查询只会给下一个人一条"看起来能直接用"的错路。
 
     /**
      * v1.0.80（批次 6）：撤销一次补剂打卡（误点）。

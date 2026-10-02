@@ -39,6 +39,28 @@ internal object SupplementLogStatus {
     }
 
     /**
+     * v1.1.1：**按「天 × 补剂」去重**——同一天同一补剂只保留 `recordedAt` 最大的那一行。
+     *
+     * 为什么报表侧需要它（HIGH-1 的后半段）：
+     *  · 旧版本的补剂打卡不带 `slot_key`，而 `SupplementLogDao.find` 当时用 `slot_key = :slotKey`
+     *    比较（`NULL = NULL` 不为真）→ 幂等守卫恒失效，**连点几次就留下几行**。写侧已在本批次
+     *    改成 `IS`（不再新增重复行），但**用户库里已经写进去的重复行不会自己消失**；
+     *  · 同一天"先跳过、后补记已服"（或反过来）本来就会留下两行，而卡片只显示最后一条。
+     * 依从率若继续按行计数，同一天会被算两次（一行 done + 一行 skipped → 报表显示约 50%），
+     * 与卡片上那一个胶囊互相矛盾——同一个指标两处口径，必然漂移。
+     *
+     * 去重规则与 [loggedToday] **逐字一致**（`recordedAt` 最大者胜；`recordedAt` 相同则取先遇到的，
+     * 此时两行本就是同一秒内的重复点击）。身份键用 `supId`，为空（手工导入的快照行）时退回
+     * `supName`——快照行没有 sup_id，不退回会把同一天不同补剂的快照行错误合并成一条。
+     *
+     * 返回顺序未定义（只用于计数），调用方不要依赖它。
+     */
+    fun latestPerDay(logs: List<SupplementLog>): List<SupplementLog> =
+        logs.groupBy { it.date to (it.supId ?: it.supName) }
+            .values
+            .mapNotNull { rows -> rows.maxByOrNull { it.recordedAt } }
+
+    /**
      * 状态 → 文案资源。未知状态按「已服」兜底，与药品历史（`MedsScreen.statusLabel`）**逐字一致**：
      * 存库值只产生三态，未知值只可能来自手工导入的老数据，把它显示成空白或「未知」对用户毫无帮助。
      */

@@ -114,4 +114,41 @@ class SupplementTimingTest {
             ).isEmpty()
         )
     }
+
+    /**
+     * v1.1.1（M2）：**跨午夜按环形距离算**。
+     *
+     * 左甲状腺素 23:50 + 钙剂 00:15 的真实间隔是 25 分钟（典型螯合冲突），
+     * 而旧的 `abs(st - mt)` 给出 1415 分钟 → 120 分钟规则不触发 → **这条提醒在跨零点时静默失效**。
+     */
+    @Test
+    fun `跨午夜的螯合冲突按环形距离报出`() {
+        val c = SupplementTiming.conflicts(
+            listOf(sup(times = "00:15")),
+            listOf(med("优甲乐", "levothyroxine", takeTimes = "23:50")),
+        )
+        assertEquals(1, c.size)
+        assertEquals("23:50 → 00:15 是 25 分钟，不是 1415", 25, c.first().gapMinutes)
+    }
+
+    /** 环形距离本身：取值域 [0, 720]，超过半天的那一侧永远不是"最短间隔"。 */
+    @Test
+    fun `环形距离的边界`() {
+        assertEquals(0, SupplementTiming.circularGapMinutes(0, 0))
+        assertEquals(25, SupplementTiming.circularGapMinutes(1430, 15))      // 23:50 与 00:15
+        assertEquals(720, SupplementTiming.circularGapMinutes(0, 720))       // 恰好半天，两侧一样
+        assertEquals(120, SupplementTiming.circularGapMinutes(1380, 60))     // 23:00 与 01:00
+        assertEquals(150, SupplementTiming.circularGapMinutes(1320, 30))     // 22:00 与 00:30
+    }
+
+    /** 跨午夜但间隔够（≥ 2h）→ 仍然不报，不能把环形距离用成"到处都报"。 */
+    @Test
+    fun `跨午夜但间隔足够时不报冲突`() {
+        assertTrue(
+            SupplementTiming.conflicts(
+                listOf(sup(times = "00:30")),
+                listOf(med("优甲乐", "levothyroxine", takeTimes = "22:00")),
+            ).isEmpty()
+        )
+    }
 }

@@ -195,12 +195,27 @@ object BackupEngine {
      * 双校验：行数快速核对 + 逐表排序序列化 SHA-256 精确比对（协议 §5）。
      * P5 修订 R9：跨 schema 恢复兼容——低版本备份缺少新列（如 v6 的 weekly_weekday2），
      * 按「备份自身的列集」重算摘要而非当前库全列，避免列增迁移后旧备份被误判损坏。
+     *
+     * v1.1.1（S-1 / M6）：**遍历的是 `tables` 对象的键，不再遍历 `manifest` 的键。**
+     *
+     * 为什么必须换：`manifest` 的键同样来自备份文件，而 `readTable` 会把表名拼进
+     * `SELECT * FROM \`$t\``——含反引号的键可以闭合转义。威胁模型正是本项目自己写下的
+     * 「诱导用户导入攻击者提供、口令已知的备份」（见 `insertTable` 的列名白名单注释）：
+     * 表名白名单只作用于 `tables`（唯一调用点 `:154`），manifest 这条镜像缺口此前无人守。
+     * 遍历 `tables` 的键（它已整体过白名单）后，备份文件里的任意键都不可能到达动态 SQL。
+     *
+     * 顺带修掉 M6：`tables` 里有、`manifest` 里没有的表，旧实现**既不校验也照样报
+     * `rowsOk=true`**（"已校验"是假的）。现在该表的期望值取不到（`m_rows` 给 -1、`m_sha` 给空串），
+     * 一律判为不匹配 → 恢复被拒绝并回滚，`rowDetails` 里能看见是哪张表。
      */
     fun verifyAgainst(db: SupportSQLiteDatabase, manifest: JSONObject, tablesJson: JSONObject? = null): VerifyResult {
         val rowsBad = mutableListOf<String>()
         val shaBad = mutableListOf<String>()
         var total = 0
-        val keys = manifest.keys().asSequence().toList()
+        // 有 tablesJson（正常恢复路径）时只信它；没有时（自生成负载）退回 manifest 键，
+        // 但仍然先过一遍当前库的表白名单——两条路径都不允许备份文件自带的键直达 SQL。
+        val keys = tablesJson?.keys()?.asSequence()?.toList()
+            ?: manifest.keys().asSequence().filter { it in tableNames(db).toHashSet() }.toList()
         for (t in keys) {
             val rows = readTable(db, t)
             // 备份列集（按行内出现顺序——与导出时 readTable 的列序一致，保证 toString 字节一致）
@@ -226,8 +241,14 @@ object BackupEngine {
         )
     }
 
-    private fun m_rows(manifest: JSONObject, t: String): Int = manifest.getJSONObject(t).getInt("rows")
-    private fun m_sha(manifest: JSONObject, t: String): String = manifest.getJSONObject(t).getString("sha256")
+    // v1.1.1（M6）：取不到期望值时给"必然不匹配"的哨兵，而不是抛 JSONException——
+    // 缺 manifest 条目的备份应当被**判为损坏并回滚**（可诊断），而不是以一句
+    // "恢复写入失败：No value for xxx" 收场。
+    private fun m_rows(manifest: JSONObject, t: String): Int =
+        manifest.optJSONObject(t)?.optInt("rows", -1) ?: -1
+
+    private fun m_sha(manifest: JSONObject, t: String): String =
+        manifest.optJSONObject(t)?.optString("sha256").orEmpty()
 
     /**
      * v1.0.44（S4）：把备份里的值当数值取。

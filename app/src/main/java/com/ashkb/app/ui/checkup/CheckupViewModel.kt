@@ -43,8 +43,14 @@ class CheckupViewModel(
      *
      * v1.0.86（批次 11）：底层改为进程级日期流（系统跨日广播驱动）——原 ticker 走
      * `Handler.postDelayed`（uptimeMillis，深睡不计时），夜里跨零点不触发。
+     *
+     * v1.1.1（MEDIUM-4）：暴露成 **StateFlow 而不是 `get() = today.value`**。
+     * 原来的写法只把日期流"读了一次"：UI 侧 `CheckupPrepCard(items, records, vm.date)` 里
+     * `remember(items, records, today)` 的键在**跨零点后不会变**（日期不是可观察状态，组合不会
+     * 因为日期变化而重跑），于是「还有 N 天」一直冻在前一天，直到 items/records 恰好有一次写入。
+     * 现在 `date` 是可观察的，日期一变就重组、`remember` 的键跟着变。
      */
-    val date: LocalDate get() = dateProvider.today.value
+    val date: StateFlow<LocalDate> = dateProvider.today
 
     val checkupItems: StateFlow<List<CheckupItem>> = repo.observeCheckupItems()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

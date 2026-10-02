@@ -47,6 +47,12 @@ fun KbDetailDialog(
 ) {
     val payload = runCatching { JSONObject(entry.payload) }.getOrDefault(JSONObject())
     val uriHandler = LocalUriHandler.current
+    // v1.1.1（MEDIUM-4）**残留（明说）**：这里仍然读系统时钟，是本批次三处「第二个日期源」里
+    // 唯一没修掉的一处。原因不是忘了，而是**改签名会撞 detekt 基线**：基线按"规则 + 完整函数签名"
+    // 记账，本函数的 `LongMethod` 就在基线里（它本来就 125 行），加一个 `today: LocalDate` 形参
+    // 会让那条基线失配 → 构建失败；而把它拆短属于布局重构（本模块无 Compose UI 测试），
+    // 不该塞进这批修复。影响面：跨零点前后那个「已过期」小胶囊可能与页面顶部日期差一天。
+    // 记在这里，避免下一个人以为是漏改。
     val overdue = entry.reviewDue < LocalDate.now().toString()
 
     AlertDialog(

@@ -19,6 +19,8 @@ import com.ashkb.app.domain.AttachmentPath
 import com.ashkb.app.domain.RecoveryCode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
@@ -41,6 +43,15 @@ class BackupRepository(private val context: Context) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("webdav_config", Context.MODE_PRIVATE)
+
+    /**
+     * v1.1.1（HIGH-4）：恢复的**串行化锁**——见 [restore] 的 KDoc。
+     *
+     * 全应用只有这一条路径会「清表 + 重写全部医疗记录」，它此前没有任何互斥：
+     * 并发的两次恢复会互相拍到对方写到一半的库。锁只覆盖 [restore]（上传/下载/演练不需要，
+     * 它们不动生产库）。
+     */
+    private val restoreMutex = Mutex()
 
     private fun nowIso(): String = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
 
@@ -275,11 +286,20 @@ class BackupRepository(private val context: Context) {
      *
      * @param snapshotPassword pre-restore 快照口令——与主备份口令一致（审查 P0：
      *   不再硬编码，退路文件用户自己可解，反编译 APK 也拿不到口令）。
+     *
+     * v1.1.1（本批次修的 HIGH-4）：**整个恢复过程串行化**（[restoreMutex]）。
+     *
+     * 这是全应用后果最重的一条写入路径（清表 + 重写全部医疗记录），而它此前没有任何互斥：
+     * 两个恢复并发跑同一条「pre-restore 快照 → DELETE 全表 → 重插 → 双校验」时，快照可能拍到
+     * 对方的中间状态、两次 DELETE 交错，用户拿到的是**静默半恢复**的库。
+     * 调用侧（`BackupViewModel.doRestore`）本批次也补了 `busy` 守卫，但 UI 的 `enabled = !busy`
+     * 是在组合期读的、重组异步，双击仍可能进两次；真正的保证必须落在仓库层。
+     * 后到的恢复**排队执行**（而不是被丢弃）：用户点了"恢复"，就该恢复完。
      */
     suspend fun restore(
         decrypted: DecryptedFile, snapshotPassword: CharArray,
         mode: BackupEngine.RestoreMode = BackupEngine.RestoreMode.FULL_ROLLBACK,
-    ): BackupEngine.VerifyResult =
+    ): BackupEngine.VerifyResult = restoreMutex.withLock {
         withContext(Dispatchers.IO) {
             // 1. pre-restore 快照（退路）
             val snapshot = BackupEngine.export(supportDb(), nowIso())
@@ -303,6 +323,7 @@ class BackupRepository(private val context: Context) {
                 throw e
             }
         }
+    }
 
     // ======================= 恢复演练（协议 §7 首次恢复演练） =======================
 

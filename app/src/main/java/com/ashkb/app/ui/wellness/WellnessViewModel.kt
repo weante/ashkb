@@ -17,6 +17,7 @@ import com.ashkb.app.data.entity.WeightLog
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.DateProvider
 import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -169,6 +170,14 @@ class WellnessViewModel(
     fun observeSupplementHistory(sup: Supplement) =
         repo.observeSupplementHistory(sup.id, sup.name)
 
+    /**
+     * v1.1.1（MEDIUM-6）：`takenAt` 的判据由裸字面量 `"done"` 改为 [AdherenceCalc.DONE]。
+     *
+     * 为什么这不是洁癖：本方法写错状态词不会编译失败，只会让 skipped 行**带上服用时刻**
+     * （详情弹层于是把一次跳过描述成一次服用）。此前 `SupplementSkipWiringTest` 只扫
+     * `WellnessScreen.kt` 与 `SupplementDetailSheet.kt`，**扫不到本文件**——写错了没有任何
+     * 门会红。本批次把本文件也纳入该守卫的扫描范围，并把这里的字面量换成常量。
+     */
     fun checkInSupplement(supp: Supplement, status: String, reason: String?, notes: String?) {
         viewModelScope.launch {
             repo.checkInSupplement(
@@ -176,7 +185,7 @@ class WellnessViewModel(
                     id = "", date = dateStr, recordedAt = nowIso(),
                     supId = supp.id, supKey = supp.id, supName = supp.name,
                     doseSnapshot = supp.dose, status = status, reason = reason,
-                    takenAt = if (status == "done") nowIso() else null,
+                    takenAt = if (status == AdherenceCalc.DONE) nowIso() else null,
                     notes = notes,
                 )
             )
@@ -194,6 +203,11 @@ class WellnessViewModel(
      * 两种状态都会回到「今天还没记录」的未记录态。这里刻意不加状态条件：同一天先跳过、后
      * 补记已服（或反过来）会留下两行，只删其中一种的话卡片上那个胶囊仍挂着——正是批次 6
      * 修掉的那个症状；「撤销今天的打卡」在用户眼里就是「今天这条补剂回到没记录」。
+     *
+     * v1.1.1：上面那句「连点几次就会留下几行」描述的写入行为**已在写侧修掉**
+     * （`SupplementLogDao.find` 改用 NULL 安全的 `IS`，连点不再追加行），本方法保留"删当天全部行"
+     * 的语义不变——用户库里在 v1.1.1 之前留下的重复行仍需被一次撤销清干净，而且"先跳过再补记"
+     * 依然会产生两行。
      */
     fun undoSupplementCheckIn(supp: Supplement) {
         viewModelScope.launch {

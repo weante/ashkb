@@ -92,32 +92,44 @@ fun StatTile(
  * 键值行：取代此前 6 个同义变体（`ProfileRow` / `CheckRow` / `LedgerRow` / 化验行 …）。
  * 数值可带语义色调与状态图标（三重编码）。
  *
- * v1.0.94：**标签列定宽（[Size.labelColumnMin]）+ 固定间距（[Spacing.lg]），数值列吃满剩余宽并折行。**
+ * ## 宽度规则（v1.1.1 重写：前两版的注释都写错了机理）
  *
- * 为什么还要改（维护者真机反馈 v1.0.93 之后：「周月报还是挤在一起了，观感上不够直观」）：
- * v1.0.90 与 v1.0.93 都在调"标签与数值怎么分剩余空间"，可**数值的起点始终跟着标签长短走**——
- * 「症状」（2 字 ≈ 31dp）后面的数值紧贴标签，「记录内完成度」（6 字 ≈ 92dp）后面的数值被推到 90dp
- * 开外。同一张卡里每条数值各起一行 x，这种参差才是"挤在一起、不直观"的根源，而不是间距本身：
- * 维护者说的「给一个固定的间隔」，实质是**固定的数值起点**。
+ * 结构：`外层 Row[ 主体 Row(weight(1f))[ 标签 , 数值列(weight(1f) + 末端对齐) ] , 胶囊 ]`——
+ * **标签与数值一起被包进唯一的权重子项**，外层 Row 里只剩胶囊一个非权重子项。
  *
- * 改法（三步，缺一不可）：
- *  · 标签列挂 `widthIn(min = Size.labelColumnMin)`：短标签也占满 128dp，于是 [Spacing.lg] 之后的
- *    数值起点对全 App 的键值行是同一个 x；本应用最长的静态标签「骶髂关节影像分期」也在 128dp
- *    之内（估算见 [Size.labelColumnMin]），故它同样对齐；更长的标签（用户自填药名、2.0× 字号）
- *    会把数值起点往右推——预期降级；
- *  · `Arrangement.SpaceBetween` 删掉，数值列改为**无条件** `weight(1f)`：v1.0.93 只在有 trailing
- *    时才加权重、无 trailing 时靠 SpaceBetween 把短数值推到**右边缘**，于是同一张卡里"短数值贴右、
- *    长数值贴标签"两种对齐混用，而且是按标签长短随机二选一。删掉 SpaceBetween 后数值一律左对齐
- *    到固定起点，放不下就折行（多行显示）；
- *  · 间距落在数值列的 `padding(start = Spacing.lg)`：标签与数值之间恒定 16dp，与标签宽窄无关。
+ * 机理（对照 Compose foundation-layout 1.7.3 `RowColumnMeasurePolicyKt.measure` 字节码）：
+ *  ① `Row` 第一遍**只测非权重子项**，按声明顺序，每个拿到的 maxWidth 是**当时的剩余宽**
+ *     （`mainAxisMax − fixedSpace`；`fixedSpace` 随已测非权重子项累加，含 arrangement 间距）。
+ *     权重子项在这一遍里只被计数、**不测量**；
+ *  ② 第二遍才把 `mainAxisMax − fixedSpace` 按权重分给权重子项：`fill = true`（默认）时约束被
+ *     收紧成"分给它的那一份"，放不下由它自己折行。
  *
- * 为什么 trailing 仍然安全（v1.0.90 修过「免疫抑制」胶囊被压成 2.5dp，不能复发）：
- * `Row` 先测量**非权重**子项（标签、trailing，各拿"当前可用宽 − 间距"），再把剩余分给权重子项；
- * `weight(1f)` 默认 `fill = true`，数值列的约束被**收紧成"分给它的那一份"**，因此它吃不下时自己
- * 折行，绝不会去挤 trailing 的固有宽度（`fill = false` 时约束仍是整行宽，等于没改——v1.0.82 踩过）。
- * 急救卡「当前用药」（`label = 药名, value = 剂量说明, trailing = 胶囊`）因此照旧拿到完整胶囊宽。
- * 已知代价：320dp 窄屏 + trailing 时，标签列下限(128) 与胶囊(≈90dp) 会吃掉大半行，数值列只剩
- * 约 40dp 而多折几行；这是"标签/胶囊本身就长"的既有降级，不是本次引入的回归。
+ * 由此得到两条必须遵守的结论：
+ *  · **胶囊的固有宽度只在"它前面没有非权重子项"时才被保证。** v1.0.95 写的
+ *    「trailing 的保底不靠权重：它是兄弟节点、非权重 → 按序测量时先拿到固有宽度」**是错的**：
+ *    数值列排在胶囊**前面**且非权重，长数值在第一遍里就能吃掉全部剩余宽（它拿到的 maxWidth
+ *    是"行宽 − 标签宽"），排在它后面的胶囊随后拿到 `maxWidth = 0` → 被压成零宽。
+ *    这正是 v1.0.90 修好、v1.0.95 为"短值靠右"放开权重后**重新引入**的那次回归
+ *    （急救卡 `EmergencyScreen.kt` 的「药名 + 剂量说明 + 免疫抑制胶囊」那一行就是当初立案的行）。
+ *  · 所以本版改为：让胶囊成为外层 Row 的**唯一非权重子项**——它在第一遍拿到的 maxWidth 是
+ *    整行宽，固有宽度**无条件**成立，与标签、数值多长都无关（标签再长也只影响主体那一份）。
+ *
+ * 短值靠右怎么同时成立：数值列仍是 `weight(1f)`（被钉在"主体宽 − 标签宽 − 16dp"上），
+ * 但列内改用 `Arrangement.spacedBy(Spacing.xs, Alignment.End)` **末端对齐**——短值被推到列的
+ * 右边缘（无胶囊时就是行的右边缘），长值填满整列并在列内折行（填满时首末端对齐等价）。
+ * 这比 v1.0.95 的 `Arrangement.SpaceBetween` + 非权重数值列多一条保证：**长值不会再去挤别人**。
+ * 间距：标签与数值列之间恒定 [Spacing.lg]，主体与胶囊之间恒定 [Spacing.sm]（外层 `spacedBy`）。
+ *
+ * 已知代价（v1.1.1 复算，三种情形的最窄宽度见批次说明）：
+ * 320dp 窄屏 + 2.0× 字号下，「长标签 + 长数值 + 胶囊」三者不可能同时满足。本版的取舍是
+ * **胶囊优先**（它是安全标记，压成 0 等于从急救卡上消失），代价是极端情况下数值列可能被很长的
+ * 标签吃到 0 宽。v1.0.95/96 的取舍相反（牺牲胶囊），而实测那正是维护者截图里看到的坏界面。
+ * 正常字号（1.0×）下三种情形都有正宽。
+ *
+ * 与 [WeightedTrailingRow] 的关系：那套规则的表述（**权重正文 + 固定间距 + 非权重尾部**）在本行
+ * 同样成立，但它的 `leading` 是排在最前的非权重子项，只适合"短且有界"的前缀（大号百分比数字）；
+ * 本行的标签是用户自填药名（长度无界），直接套用会把"标签吃掉胶囊"的同一个缺口重新打开。
+ * 故宽度规则保持一处表述、两处实现，两处都写明为什么。
  */
 @Composable
 fun KeyValueRow(
@@ -138,45 +150,47 @@ fun KeyValueRow(
             .heightIn(min = Size.rowMinHeight)
             .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        // 固定间距（主体↔胶囊）：权重分配前先扣掉 arrangement 间距，故这里给的就是净间距。
+        // 单子项（无胶囊）时 spacedBy 不产生任何间距。
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            // v1.0.95：标签列最小宽度——短标签也占满，长值起点因此固定（见函数 KDoc）。
-            // v1.0.96：**带 trailing 的行不加这个下限**——紧急卡「当前用药」的标签是用户自填药名
-            // （可能很长），右边还要放「免疫抑制」胶囊；再吃掉 128dp 后数值列只剩约 60dp，
-            // 剂量说明被挤成 6 行（维护者截图可见）。trailing 行改为按标签固有宽度，
-            // 把宽度让给真正需要折行的剂量说明；代价是该行数值起点不参与全局对齐，
-            // 但这一行本来就与其它行语义不同（是"药名 + 剂量 + 风险标记"三元组）。
-            modifier = if (trailing != null) Modifier else Modifier.widthIn(min = Size.labelColumnMin),
-        )
+        // 主体 = 标签 + 数值列，整块作为一个权重子项：见 KDoc 机制②——它拿到的宽是
+        // "行宽 − 胶囊固有宽 − 间距"，因此**它内部怎么排都不可能挤到胶囊**。
         Row(
-            // v1.0.95：**不加权重**——让"文本量"自己决定排版，两种诉求才能同时成立：
-            //  · 短值（健康档案「曾庆城 / 阳性 / 未填」）：只占自身宽度 → 外层 SpaceBetween 把它
-            //    推到**右边缘**，留白落在中间（维护者要的"协调"观感）；
-            //  · 长值（周月报「100% (完成 2 · 部分 0 · 跳过 0, 共 2 条记录)」）：占满
-            //    "行宽 − 标签 − 间距" → 起点固定在**同一 x**（标签列 `Size.labelColumnMin` +
-            //    `Spacing.lg`）并在**列内折行**（多行显示）。
-            // v1.0.90 曾无条件加 `weight(1f)` 救 trailing（成功），但权重子项吃满剩余宽 → 短值
-            // 也被钉在标签右侧；v1.0.93 修回靠右、v1.0.94 又改成一律左对齐 → 维护者反馈健康档案
-            // "不协调"。三种写法都不对，因为**同一个规则套了两种文本量**。
-            // trailing 的保底不靠权重：它是**兄弟节点**、非权重 → 按序测量时先拿到固有宽度。
-            modifier = Modifier.padding(start = Spacing.lg),
+            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
-            if (valueIcon != null) {
-                Icon(
-                    imageVector = valueIcon,
-                    contentDescription = null,   // 装饰性：value 文本已承载语义
-                    modifier = Modifier.size(Size.iconSm),
-                    tint = valueColor,
-                )
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // v1.0.95：标签列最小宽度——短标签也占满，长值起点因此固定（见 KDoc）。
+                // v1.0.96：**带 trailing 的行不加这个下限**——紧急卡「当前用药」的标签是用户自填
+                // 药名（可能很长），右边还要放「免疫抑制」胶囊；再吃掉 128dp 后数值列会更窄。
+                // 该行改为按标签固有宽度，把宽度让给真正需要折行的剂量说明；代价是该行数值起点
+                // 不参与全局对齐（这一行本来就是"药名 + 剂量 + 风险标记"三元组，语义与其它行不同）。
+                modifier = if (trailing != null) Modifier else Modifier.widthIn(min = Size.labelColumnMin),
+            )
+            Row(
+                // 权重（fill = true）：约束被收紧成"主体宽 − 标签宽 − 间距"，数值在其中折行。
+                // 不加权重则长值会吃掉整个主体宽、把标签挤到 0（v1.0.95 的写法）。
+                modifier = Modifier.weight(1f).padding(start = Spacing.lg),
+                verticalAlignment = Alignment.CenterVertically,
+                // 末端对齐（v1.1.1）：短值贴列右缘 = 无胶囊时的行右缘；长值填满整列、原位折行。
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs, Alignment.End),
+            ) {
+                if (valueIcon != null) {
+                    Icon(
+                        imageVector = valueIcon,
+                        contentDescription = null,   // 装饰性：value 文本已承载语义
+                        modifier = Modifier.size(Size.iconSm),
+                        tint = valueColor,
+                    )
+                }
+                Text(value, style = MaterialTheme.typography.bodyMedium, color = valueColor)
             }
-            Text(value, style = MaterialTheme.typography.bodyMedium, color = valueColor)
         }
+        // 胶囊：外层 Row 里唯一的非权重子项 → 第一遍测量就拿整行宽，固有宽度无条件成立。
         if (trailing != null) trailing()
     }
 }

@@ -77,8 +77,10 @@ object LabTrends {
         var unitAssumed = 0
         // date -> 该日出现过的**不同**数值（升序）；同一天多个不同值**全部保留**（见 LabTrend 的说明）
         val byDate = LinkedHashMap<String, MutableList<Double>>()
-        // date -> 该日 recordedAt 最新的一条（仅用于取参考上限，不参与「取值」）
-        val latestRowByDate = LinkedHashMap<String, LabResult>()
+        // date -> (recordedAt, 该行 refHigh **按同一 factor 换算后**的值)
+        // 只记**被采纳**的行（单位认不出的行不画点，它的参考上限自然也不该拿来画阈值线）。
+        // v1.1.1：此前这里只存整行、取 refHigh 时原样 `.toFloat()`，与数据点差一个 factor。
+        val latestRefByDate = LinkedHashMap<String, Pair<String, Float?>>()
 
         for (row in rows) {
             if (!indicator.matches(row.testName)) continue
@@ -104,8 +106,16 @@ object LabTrends {
             // 完全相同数值只留一次（同 x 同 y，重复画看不出差别，也无信息损失）
             if (values.none { abs(it - converted) <= 1e-6 }) values.add(converted)
 
-            val prev = latestRowByDate[row.date]
-            if (prev == null || row.recordedAt > prev.recordedAt) latestRowByDate[row.date] = row
+            // v1.1.1（HIGH-3）：参考上限必须与数据点用**同一个 factor** 换算。
+            // 此前 `refHigh` 原样入图：一张「CRP 0.5 mg/dL、refHigh 0.5」的化验单会画出
+            // **5.0 的点配 0.5 的阈值线**，还报「1 项超标」——在一条专门回答"炎症有没有升高"的图上。
+            // 反向（refHigh 存 mg/L、点按 mg/dL）则低报。factor 为 null 只可能是"单位缺失"那一支
+            // （认不出的单位已在上面 continue），此时点也按规范单位计，故乘 1.0 与点同口径。
+            val convertedRef = row.refHigh?.let { (it * (factor ?: 1.0)).toFloat() }
+            val prev = latestRefByDate[row.date]
+            if (prev == null || row.recordedAt > prev.first) {
+                latestRefByDate[row.date] = row.recordedAt to convertedRef
+            }
         }
 
         val orderedDates = byDate.keys.sorted()
@@ -113,7 +123,11 @@ object LabTrends {
             indicator = indicator,
             // 同一天多个不同值都画出来（升序），一个不丢
             points = orderedDates.flatMap { d -> byDate.getValue(d).sorted().map { LabPoint(d, it.toFloat()) } },
-            refHigh = orderedDates.mapNotNull { latestRowByDate[it]?.refHigh }.lastOrNull()?.toFloat(),
+            // v1.1.1：取的是换算后的参考上限（换算见上面的 convertedRef）。
+            // 残余（明说）：跨单位变更的序列仍只有**一条**阈值线（取范围内最新一条非空值），
+            // 早于那次变更的点会与这条线不同源。要按点各自成线需要把阈值下移到每个点上，
+            // 属于图表语义改动，本批次不动。
+            refHigh = orderedDates.mapNotNull { latestRefByDate[it]?.second }.lastOrNull(),
             unitMismatch = unitMismatch,
             unitAssumed = unitAssumed,
         )

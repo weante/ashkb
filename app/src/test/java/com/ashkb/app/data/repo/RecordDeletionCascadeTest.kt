@@ -363,9 +363,13 @@ class RecordDeletionCascadeTest {
     fun `撤销补剂打卡会回到未记录态`() {
         val date = "2026-09-18"
         io {
-            // 连点两次打卡：slot_key 为 NULL 而 SQLite 里 NULL 互不相等，故会留下两行
-            repo.checkInSupplement(supplementLog(date))
-            repo.checkInSupplement(supplementLog(date))
+            // v1.1.1：**连点不再产生重复行**（`SupplementLogDao.find` 改用 NULL 安全的 `IS`，
+            // 幂等守卫第一次真正生效）。本用例真正要钉的是"撤销 = 回到未记录态"，
+            // 所以这里直接写两行——模拟用户库里在 v1.1.1 之前连点留下的重复行：
+            // 撤销必须把它们**一次清干净**，否则卡片上的「已服用」胶囊会挂着不走
+            // （批次 6 修的就是这个症状）。行数幂等那一条由 SupplementCheckInIdempotencyTest 负责。
+            db.supplementLogDao().upsert(supplementLog(date, id = "slog-批次6-dup1"))
+            db.supplementLogDao().upsert(supplementLog(date, id = "slog-批次6-dup2"))
         }
         assertEquals(2, io { db.supplementLogDao().byDate(date) }.size)
 
@@ -374,6 +378,22 @@ class RecordDeletionCascadeTest {
         assertTrue(
             "撤销后应回到「今天还没服用」的未记录态（不是 skipped——用户并没有决定不吃）",
             io { db.supplementLogDao().byDate(date) }.isEmpty(),
+        )
+    }
+
+    /** v1.1.1：连点两次只留一行（写侧幂等生效）。 */
+    @Test
+    fun `补剂连点打卡只留一行`() {
+        val date = "2026-09-19"
+        io {
+            repo.checkInSupplement(supplementLog(date))
+            repo.checkInSupplement(supplementLog(date))
+        }
+
+        assertEquals(
+            "同一天同一补剂连点两次必须只有一行——`slot_key = NULL` 的判等是幂等守卫失效的根因",
+            1,
+            io { db.supplementLogDao().byDate(date) }.size,
         )
     }
 
@@ -436,8 +456,8 @@ class RecordDeletionCascadeTest {
     )
 
     /** 一次补剂打卡（slot_key 留空 = 补剂打卡的真实形态，见 SupplementLogDao.upsert 的调用点）。 */
-    private fun supplementLog(date: String) = SupplementLog(
-        id = "", date = date, recordedAt = "${date}T08:00:00",
+    private fun supplementLog(date: String, id: String = "") = SupplementLog(
+        id = id, date = date, recordedAt = "${date}T08:00:00",
         supId = "sup-批次6", supKey = "sup-批次6", supName = "测试补剂",
         doseSnapshot = "1 粒", status = "done", takenAt = "${date}T08:00:00",
     )

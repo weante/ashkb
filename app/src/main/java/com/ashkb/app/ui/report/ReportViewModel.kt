@@ -51,16 +51,32 @@ class ReportViewModel(
     val message: StateFlow<String?> = _message
 
     /**
-     * v1.0.86（批次 11）：**进入报表页时才首次取数**。
+     * v1.0.86（批次 11）：**进入报表页时才首次取数**（此前是 `init { refresh() }`，而 `AppShell`
+     * 在应用启动时就创建本 VM → 哪怕从不看报表，冷启动也要查一次库）。
      *
-     * 此前是 `init { refresh() }`，而 `AppShell` 在应用启动时就把本 VM 创建出来——于是
-     * **哪怕从不看报表，冷启动也要查一次库**（overview + trends 两条聚合查询）。
-     * 现在：VM 改为在报表路由内按需创建（见 AppShell），首次组合由 [loadOnce] 触发。
+     * v1.1.1（HIGH-3）：改为 **[onEnterReport]** ——"只取一次"这个前提是错的。
+     *
+     * 为什么错：本 VM 由 `AppShell` 的 `composable<Report>` 持有（作用域 = 该路由的返回栈条目），
+     * 用户「报表页 → 备份页恢复数据 → 返回报表页」时**VM 还活着**，而 v1.0.86 的守卫是
+     * `if (_overview.value != null || _busy.value) return`——返回本页时它直接空操作，
+     * 于是周月报仍是**恢复前**的数字，且界面上没有任何提示。打卡写入同理（去今日页打卡再回来）。
+     * 原 KDoc 说"数据的新鲜度由用户切窗口 / 重进页面时的参数变化自然触发"，与它自己的立项理由
+     * （"重进页面会以同一参数重复调本方法"）正好矛盾——同参数重进恰恰是它跳过的那个场景。
+     *
+     * 现口径：**每次重新进入报表页都重查**（进入本页正是数据可能已经变了的时刻）；
+     * 同一次访问内的重复查询（`HorizontalPager` 把页签滑出视口后释放、再滑回来）仍由
+     * [loadPeriodic] / [setTrendDays] 的参数去重挡住——那才是 v1.0.86 想去掉的 IO。
+     *
+     * 残余（明说）：页面**停留在前台**期间由后台写入的数据（例如通知栏直接打卡）不会自动刷新，
+     * 需要一次重新进入或下拉/重试触发 [refresh]。做到"写入即推送"需要跨模块的数据代次广播，
+     * 本批次不做（详见批次说明的取舍）。
      */
-    fun loadOnce() {
-        // 判据用 overview == null：它是 refresh() 的第一个写入点，非空即代表这一轮取数已经跑过。
-        // 刻意不只看 busy——并发双击时 busy 可能都还是 false，会放两次查询进来。
-        if (_overview.value != null || _busy.value) return
+    fun onEnterReport() {
+        // 并发双击 / 快速来回导航时不必放两次查询进来（busy 期间的结果随后就到）
+        if (_busy.value) return
+        // 周月报的"参数级去重"键必须一并失效：它的 LaunchedEffect(Unit) 在本页重新进入时
+        // 会再跑一次，若 loadedPeriodDays 还留着上次的值，那一页就会继续显示旧数字。
+        loadedPeriodDays = Int.MIN_VALUE
         refresh()
     }
 
@@ -86,7 +102,9 @@ class ReportViewModel(
      * 这里只表达用户意图——点同一个 chip 不必再走一遍判重。
      */
     fun setPeriodDays(days: Int) {
-        if (days == _periodDays.value && _periodic.value != null) return
+        // v1.1.1（HIGH-3）：本方法不再自己判 `_periodic.value != null`——去重只认
+        // [loadPeriodic] 手里的「已加载窗口」。否则"重新进入本页后点同一个 chip"会被这里提前
+        // return，而那时数据可能已经变了（恢复备份、打卡），点 chip 却看不到任何变化。
         loadPeriodic(days)
     }
 

@@ -251,6 +251,12 @@ class BackupViewModel(
     }
 
     fun doRestore() {
+        // v1.1.1（HIGH-4）：**重入守卫**。UI 的门是 `Button(enabled = !busy)`，而 `enabled` 在组合期
+        // 读取、重组异步——大文件恢复时双击「执行恢复」会进两次。此前这里没有任何守卫，
+        // 两次 `repo.restore()` 会并发对同一个 `ashkb.db` 做「清表 + 重写」。
+        // 仓库层本批次也加了 Mutex（真正的保证在那里），这一行只是让第二次点击干脆不排队、
+        // 也不重复设置 busy/结果状态。
+        if (_busy.value) return
         val d = pendingRestore.value ?: return
         val pass = restorePassword ?: run {
             fail(app.getString(R.string.vm_restore_password_expired))

@@ -16,6 +16,7 @@ import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.EmergencyMeds
 import com.ashkb.app.domain.LabTrend
 import com.ashkb.app.domain.LabTrends
+import com.ashkb.app.domain.SupplementLogStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -123,11 +124,17 @@ class ReportRepository(private val context: Context) {
         val planDose = AdherenceCalc.doseCompletion(planned, logDao.listBetween(f, t))
 
         // C2（v1.0.37）：补剂（营养）依从——与用药同口径（部分完成计 0.5）
+        // v1.1.1（HIGH-1）：**先按「天 × 补剂」去重再计数**。旧实现是三条 `COUNT(*)`（按行数），
+        // 连点留下的重复行、以及"同日先跳过再补记已服"的两行都会虚增分母——用户手速能改指标。
+        // 去重键与卡片上的今日打卡态同源（SupplementLogStatus），两处不会再各算各的。
         val supDao = db.supplementLogDao()
-        val supDone = supDao.countBetweenStatus(f, t, "done")
-        val supPartial = supDao.countBetweenStatus(f, t, "partial")
-        val supSkipped = supDao.countBetweenStatus(f, t, "skipped")
-        val supTotal = supDone + supPartial + supSkipped
+        val supSettled = SupplementLogStatus.latestPerDay(supDao.between(f, t))
+            .filter { it.status in AdherenceCalc.SETTLED_STATUSES }
+        val supCount = AdherenceCalc.completionByStatus(supSettled.map { it.status })
+        val supDone = supCount.done
+        val supPartial = supCount.partial
+        val supSkipped = supCount.skipped
+        val supTotal = supCount.total
         val supRate = AdherenceCalc.ratePct(supDone, supPartial, supTotal)
 
         val exLogs = db.exerciseLogDao().between(f, t)
@@ -214,10 +221,16 @@ class ReportRepository(private val context: Context) {
         val mr = AdherenceCalc.ratePct(md, mp, mt)
 
         val supDao = db.supplementLogDao()
-        val sd = supDao.countBetweenStatus(f, t, "done")
-        val sp = supDao.countBetweenStatus(f, t, "partial")
-        val ss = supDao.countBetweenStatus(f, t, "skipped")
-        val st = sd + sp + ss
+        // v1.1.1（HIGH-1）：与 overview() 同一份去重口径（按「天 × 补剂」取最后一次表态）
+        val supCount = AdherenceCalc.completionByStatus(
+            SupplementLogStatus.latestPerDay(supDao.between(f, t))
+                .filter { it.status in AdherenceCalc.SETTLED_STATUSES }
+                .map { it.status },
+        )
+        val sd = supCount.done
+        val sp = supCount.partial
+        val ss = supCount.skipped
+        val st = supCount.total
         val sr = AdherenceCalc.ratePct(sd, sp, st)
 
         val exLogs = db.exerciseLogDao().between(f, t)

@@ -81,6 +81,7 @@ import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -97,8 +98,8 @@ import java.util.Locale
  * 根部只留三条：
  *  · [profile]——Hero 的「姓名 · 诊断」、极简横幅、补记卡（空态文案分叉）三处都要它，
  *    `isMinimal` 也由它派生（同一份判据给横幅与快捷入口共用，不能各收一次）；
- *  · [todayDate]——Hero 的日期标题、药品卡的漏服判定（`isMissed` 要求 `today == LocalDate.now()`）、
- *    补记卡的「昨天」三处**必须是同一个「今天」**。批次 9 修的就是「两处各读一次系统时钟、
+ *  · [todayDate]——Hero 的日期标题、药品卡的漏服判定（`isMissed` 以「槽位所属日 + 计划时刻」为判据，
+ *    见其注释）、补记卡的「昨天」三处**必须是同一个「今天」**。批次 9 修的就是「两处各读一次系统时钟、
  *    跨零点前后差一天」的缺陷，所以这条日期流绝不允许下移到 section 里各收一份；
  *  · [today]——药品列表的**内容**，必须由根部的 `LazyColumn` 亲自发出（理由见下）。
  * 生命周期观察（进页 / 回前台跟系统时钟对一次日期）不进任何 section：它不渲染任何东西，
@@ -237,6 +238,10 @@ fun TodayScreen(
             postpone = postponeTarget,
             missedGuide = missedGuideTarget,
         ),
+        // v1.1.1（MEDIUM-4）：顺延对话框要的「今天」由**根部这一份**传下去。
+        // 不在 TodayDialogs 里再收一次 vm.todayDate：那样同屏就有两个「今天」，
+        // 正是批次 9 修掉的缺陷（`TodayScreenStateScopeTest` 会红）。
+        today = todayDate,
         onClear = { which ->
             when (which) {
                 TodayDialog.SKIP -> skipTarget = null
@@ -294,7 +299,13 @@ private fun RefreshDateOnResume(vm: TodayViewModel) {
  * 这里只接值 + 一个按标识清空的回调。
  */
 @Composable
-private fun TodayDialogs(vm: TodayViewModel, pending: TodayDialogTargets, onClear: (TodayDialog) -> Unit) {
+private fun TodayDialogs(
+    vm: TodayViewModel,
+    pending: TodayDialogTargets,
+    /** v1.1.1（MEDIUM-4）：根部那一份「今天」——顺延对话框据此算目标日，不再自己读系统时钟。 */
+    today: LocalDate,
+    onClear: (TodayDialog) -> Unit,
+) {
     pending.skip?.let { target ->
         SkipDialog(
             medName = target.med.name,
@@ -322,6 +333,7 @@ private fun TodayDialogs(vm: TodayViewModel, pending: TodayDialogTargets, onClea
         PostponeDialog(
             medName = target.med.name,
             cycleDays = target.med.injCycleDays,
+            today = today,
             onConfirm = { date ->
                 vm.postpone(target, date)
                 onClear(TodayDialog.POSTPONE)
@@ -759,9 +771,20 @@ private fun medStatusOf(item: TodayItem, missed: Boolean): MedStatus = when {
 private fun isMissed(item: TodayItem, today: LocalDate): Boolean {
     if (item.isPrn || item.done || item.skipped) return false
     val t = item.slotTime ?: return false
-    if (today != LocalDate.now()) return false
+    // v1.1.1（MEDIUM-4）：判据从「今天 == 系统日期 且 现在时刻 > 计划时刻」改为
+    // **「槽位所属日 + 计划时刻」这个瞬间已经过去**——日期只来自入参（VM 的 DateProvider 日期流），
+    // `LocalDateTime.now()` 只回答"此刻是几点"。
+    //
+    // 删掉的那句 `if (today != LocalDate.now()) return false` 是**第二个日期源**（组合期读系统时钟）：
+    // 它与 VM 的日期流在跨零点 / 深睡不触发广播的窗口里会不一致，后果不是"更安全"，而是
+    // **漏服标记被静默抑制**——页面显示的是 X 日的卡片，却不给 X 日到点未服的剂次标「漏服」。
+    // 改成整时刻比较后，即使 VM 的日期落后一天，判据也仍然正确（昨天 08:00 的槽位当然已经过去）。
+    //
+    // 残余（明说）：`LocalDateTime.now()` 仍是组合期的时钟读数——「到点没到点」需要一个"此刻"，
+    // 而当前没有任何分钟级的可观察时钟（DateProvider 只广播**日期**变化）。页面停留在前台
+    // 且没有任何重组时，标记不会自己出现；这是既有行为，不在本批次范围内。
     val slot = runCatching { LocalTime.parse(t) }.getOrNull() ?: return false
-    return LocalTime.now().isAfter(slot)
+    return LocalDateTime.now().isAfter(LocalDateTime.of(today, slot))
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -959,10 +982,11 @@ private fun InjSiteDialog(
 private fun PostponeDialog(
     medName: String,
     cycleDays: Int?,
+    /** v1.1.1（MEDIUM-4）：由调用方传入的「今天」（VM 的日期流），不再自己读系统时钟。 */
+    today: LocalDate,
     onConfirm: (LocalDate) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val today = LocalDate.now()
     var offset by remember { mutableStateOf(1) }
     var custom by remember { mutableStateOf("") }
     val customDate = runCatching { LocalDate.parse(custom.trim()) }.getOrNull()

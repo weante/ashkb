@@ -464,9 +464,50 @@ class MedicationRepository(private val context: Context) {
             to = today.plusDays(ReminderScheduler.HORIZON_DAYS),
         )
 
-    /** R17 注射顺延：锚点移至新日期，周期从新日期起算重排；实际注射发生时才写日志（未记录=无行） */
-    suspend fun postponeInjection(med: Medication, toDate: LocalDate) {
-        medDao.upsert(med.copy(startDate = toDate.toString(), updatedAt = nowIso()))
+    /**
+     * R17 注射顺延：锚点移至新日期，周期从新日期起算重排；实际注射发生时才写日志（未记录=无行）。
+     *
+     * v1.1.1（本批次修的 HIGH-2）：**补上「清今天起的计划槽位」与 `medication_changes` 审计行**。
+     *
+     * 此前本方法只改 `startDate`，而同文件的 [saveMedication] / [stopMedication] 都会先调
+     * `slotDao.deleteOfMedFrom`。顺延把锚点从"今天"挪到"明天"之后，**旧锚点已经物化在今天..+7
+     * 的行仍留在 `planned_slots` 里**，而物化例程是 `INSERT OR IGNORE`（只加不删，见
+     * [plannedSlotWindow] 上方注释）→ 那些行永远不会被新锚点覆盖：
+     * `AdherenceCalc.doseCompletion` 会给它们配上一个永远不会存在的日志 → `missed++` →
+     * **该剂量在其落入的每个报表窗口里都被永久计为漏服**，`MissedDoses.unsettled` 也会每天
+     * 提示它。App 自己的漏服安全信号与用户在顺延对话框里刚做的决定互相矛盾。
+     *
+     * 这是本项目第三次踩「计划槽位只加不删」（前两次的教训就写在上面两处注释里）——所以这里
+     * 不是"补一行"，而是与另两个入口对齐成同一口径：**改用法/停药/顺延都必须清掉今天起的快照**。
+     * 只删"今天起"：历史计划行不该被今天的改动抹掉。
+     *
+     * 审计行一并补上：本方法此前是本文件里唯一不留痕的药品变更，用户事后无法回答
+     * 「这药是什么时候改成隔天打的」。`change_type` 用既有词汇表里的 `schedule_change`
+     * （见实体注释），UI 目前只读 `stop` 行，这条是留给台账与导出的。
+     */
+    suspend fun postponeInjection(med: Medication, toDate: LocalDate) = db.withTransaction {
+        val now = nowIso()
+        val today = LocalDate.now().toString()
+        val before = medDao.byId(med.id) ?: med
+        val after = med.copy(startDate = toDate.toString(), updatedAt = now)
+        medDao.upsert(after)
+        slotDao.deleteOfMedFrom(med.id, today)
+        changeDao.insert(
+            MedicationChange(
+                id = Ids.new("mchg"),
+                recordedAt = now,
+                medId = med.id,
+                medKey = med.nameKey,
+                changeType = "schedule_change",
+                oldSnapshot = medSnapshot(before, archived = false),
+                newSnapshot = medSnapshot(after, archived = false),
+                effectiveDate = toDate.toString(),
+                // reason 一列按实体注释是停药原因（StopReason 小写）；非停药行填本条变更的类别，
+                // 供台账/导出辨认，没有任何读取方按它分支（UI 只查 change_type='stop'）。
+                reason = "postpone",
+                source = "self",
+            )
+        )
     }
 
     // ---- 通知动作写入（ReminderReceiver / CheckInActionReceiver 共用） ----

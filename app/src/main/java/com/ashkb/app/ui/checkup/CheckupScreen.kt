@@ -177,8 +177,13 @@ fun CheckupScreen(vm: CheckupViewModel, onBack: () -> Unit) {
                     onEdit = { editRecord = it },
                     onDelete = { deleteRecord = it },
                     // 准备清单排在最前：复诊管理的首要问题是"下次该做什么"，其次才是翻历史。
-                    // 它算的是**全部**记录（下次复诊与当前筛选无关），故这里传未筛选的 records
-                    prepHeader = { CheckupPrepCard(items, records, vm.date) },
+                    // 它算的是**全部**记录（下次复诊与当前筛选无关），故这里传未筛选的 records。
+                    // v1.1.1（MEDIUM-4）：日期改为**收集** VM 的 StateFlow（此前是普通 getter，
+                    // 跨零点不会触发重组，卡片里的「还有 N 天」会冻在前一天）。
+                    prepHeader = {
+                        val today by vm.date.collectAsStateWithLifecycle()
+                        CheckupPrepCard(items, records, today)
+                    },
                 )
                 CheckupTab.LABS -> LabsList(
                     labs = labRecent,
