@@ -138,6 +138,7 @@ fun KeyValueRow(
             .heightIn(min = Size.rowMinHeight)
             .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             label,
@@ -147,13 +148,17 @@ fun KeyValueRow(
             modifier = Modifier.widthIn(min = Size.labelColumnMin),
         )
         Row(
-            // v1.0.94：**无条件** `weight(1f)`（且必须是默认的 `fill = true`——`fill = false`
-            // 不收紧约束，数值会吃满整行、把 trailing 的胶囊压成零宽）。
-            // 它把数值列钉在"整行宽 − 标签 − 间距 − trailing"上：短数值左对齐到固定起点（不再被
-            // SpaceBetween 推到右边缘），长数值在列内折行（多行显示），trailing 恒拿固有宽度。
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = Spacing.lg),
+            // v1.0.95：**不加权重**——让"文本量"自己决定排版，两种诉求才能同时成立：
+            //  · 短值（健康档案「曾庆城 / 阳性 / 未填」）：只占自身宽度 → 外层 SpaceBetween 把它
+            //    推到**右边缘**，留白落在中间（维护者要的"协调"观感）；
+            //  · 长值（周月报「100% (完成 2 · 部分 0 · 跳过 0, 共 2 条记录)」）：占满
+            //    "行宽 − 标签 − 间距" → 起点固定在**同一 x**（标签列 `Size.labelColumnMin` +
+            //    `Spacing.lg`）并在**列内折行**（多行显示）。
+            // v1.0.90 曾无条件加 `weight(1f)` 救 trailing（成功），但权重子项吃满剩余宽 → 短值
+            // 也被钉在标签右侧；v1.0.93 修回靠右、v1.0.94 又改成一律左对齐 → 维护者反馈健康档案
+            // "不协调"。三种写法都不对，因为**同一个规则套了两种文本量**。
+            // trailing 的保底不靠权重：它是**兄弟节点**、非权重 → 按序测量时先拿到固有宽度。
+            modifier = Modifier.padding(start = Spacing.lg),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
