@@ -35,6 +35,7 @@ import com.ashkb.app.data.entity.MedClass
 import com.ashkb.app.data.entity.MedFrequency
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.DrugInteractionKeys
 import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.ui.components.DateFieldRules
 import com.ashkb.app.ui.components.ScreenTopBar
@@ -114,6 +115,8 @@ fun MedEditScreen(
     val weekday = rememberSaveable { mutableStateOf(1) }
     val weekday2 = rememberSaveable { mutableStateOf(4) }
     val biwError = rememberSaveable { mutableStateOf(false) }
+    // v1.1.2（批次 18）：甲氨蝶呤选到非每周频次时的强提示（与 biwError 同款「提交时才亮」的错误位）
+    val mtxFrequencyError = rememberSaveable { mutableStateOf(false) }
     val cycleDays = rememberSaveable { mutableStateOf("14") }
     val food = rememberSaveable { mutableStateOf("any") }
     val prnReason = rememberSaveable { mutableStateOf("") }
@@ -232,6 +235,13 @@ fun MedEditScreen(
                 biwError.value = true
                 return
             }
+            // v1.1.2（批次 18）：甲氨蝶呤的频次只能是每周一次（itx-001 的行为承诺，第四份审查报告 §一）。
+            // 放在 step 1 拦，**新增与编辑走的是同一个 onPrimary**——只拦新增会漏掉
+            // 「把 weekly 改成 daily」这条更要命的路径。
+            if (frequency.value != MedFrequency.WEEKLY && DrugInteractionKeys.requiresWeeklyFrequency(nameKey.value)) {
+                mtxFrequencyError.value = true
+                return
+            }
             val draft = buildMed()
             scope.launch {
                 hits.value = vm.interactionsFor(draft)
@@ -331,6 +341,8 @@ fun MedEditScreen(
                     prnReason = prnReason,
                     cycleDays = cycleDays,
                     startDate = startDate,
+                    nameKey = nameKey,
+                    mtxError = mtxFrequencyError,
                 )
                 MedWeekdaySection(frequency = frequency, weekday = weekday, weekday2 = weekday2, biwError = biwError)
                 MedMealSection(route = route, food = food)

@@ -323,6 +323,7 @@
     <string name="med_inj_schedule_note">注射日按下方选择的固定星期自动出卡；提醒时刻取上方「计划用药时间」。</string>
     <string name="med_inj_site_prompt">请选择本次注射部位：</string>
     <string name="med_inj_two_days_error">两针星期需不同（如周一 / 周四），请调整</string>
+    <string name="med_mtx_frequency_error">甲氨蝶呤只能每周服用一次（itx-001：误按每日服用已有致死通报）。请改选「每周一次（如甲氨蝶呤）」；确需调整请先与医生确认。</string>
     <string name="med_injection_suffix">" · 注射"</string>
     <string name="med_late_note">（晚于计划 30 分钟以上）</string>
     <string name="med_manage_title">药单管理</string>

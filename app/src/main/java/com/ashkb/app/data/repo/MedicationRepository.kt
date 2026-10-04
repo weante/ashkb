@@ -12,7 +12,10 @@ import com.ashkb.app.data.entity.PlannedSlot
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.entity.Reaction
 import com.ashkb.app.data.entity.StopReason
+import com.ashkb.app.data.entity.Supplement
+import com.ashkb.app.data.entity.SupplementCategory
 import com.ashkb.app.domain.AdherenceCalc
+import com.ashkb.app.domain.DrugInteractionKeys
 import com.ashkb.app.domain.MedDeletion
 import com.ashkb.app.domain.MedLogEdit
 import com.ashkb.app.domain.ScheduleCalc
@@ -52,6 +55,13 @@ class MedicationRepository(private val context: Context) {
     private val kbDao = db.kbEntryDao()
     private val changeDao = db.medicationChangeDao()
     private val slotDao = db.plannedSlotDao()
+
+    /**
+     * v1.1.2（批次 18）：补剂也要进用药核对——**叶酸**（itx-006 / itx-007 的 `drug_b`）
+     * 与钙剂 / 维生素 D3 都记在**补剂档案**里，不在 `medications` 表。
+     * 只看药品表会把「服甲氨蝶呤需每周补充叶酸」这一整类医嘱配合条目漏掉。
+     */
+    private val supplementDao = db.supplementDao()
 
     // ---- 档案 ----
     fun observeProfile(): Flow<Profile?> = profileDao.observe()
@@ -113,22 +123,78 @@ class MedicationRepository(private val context: Context) {
         .put("is_archived", archived)
         .toString()
 
-    // ---- R03 核对清单：按 name_key 与类别查种子相互作用条目 ----
-    suspend fun interactionsFor(med: Medication): List<KbEntry> =
-        (listOf(med.nameKey, med.medClass) + medClassKeys(med))
-            .filter { it.isNotBlank() }
-            .distinct()
-            .flatMap { kbDao.interactionsFor(it) }
-            .distinctBy { it.id }
+    // ---- R03 核对清单：按**结构化药物键**查种子相互作用条目 ----
+    /**
+     * v1.1.2（批次 18）：R03 用药核对清单的取数。
+     *
+     * ### 改前（v1.1.1 及以前）是什么情况下看不到
+     * 旧实现是「把 `nameKey` / `medClass` / 硬编码类别键逐个拿去 `payload LIKE '%key%'`」，
+     * 三条实测复现的失效路径（审查报告 §2，本批次独立复现，命令与输出见批次回报）：
+     *  ① `medClassKeys` 没有 JAK 分支 → 乌帕替尼 / 托法替布 / 巴瑞替尼**命中 0 条**；
+     *  ② `MedClass.OTHER.name` = "OTHER" 撞上 itx-015 引文里的英文单词 `other` →
+     *     唑来膦酸 / 骨化三醇 / 维生素 D3 / 钙剂收到**阿仑膦酸钠**的服药规则；
+     *  ③ `medClassKeys("csdmard")` 硬编码 `["mtx","methotrexate","sulfasalazine"]` →
+     *     来氟米特 / 艾拉莫德收到「甲氨蝶呤误当每日服用可致死」。
+     *
+     * ### 改后是什么情况下能看到
+     * ① 药单上的每个词（`nameKey` / 药名 / 商品名 / `medClass`）经词汇表归一成规范键，
+     *    键的取值域与种子 `drug_a`/`drug_b` 的取值域**同一套**（`DrugInteractionKeys`）；
+     * ② **药品–药品的组合条目要求两侧都真的在药单上**（旧实现只查单侧，
+     *    把「MTX + NSAIDs 合用需监测」错报成「吃 MTX 就有这条风险」）；
+     * ③ 补剂与药品**一并进 token 集**（叶酸记在补剂档案里，而它正是 itx-006 / itx-007 的 `drug_b`）；
+     * ④ 语境型 `drug_b`（活疫苗 / 钙与食物）**不作适用性前提**——它们是该药患者迟早要看到的
+     *    用药规则，患者还没录疫苗 / 补剂就不显示等于把规则藏起来。
+     *
+     * 判据（可复现）：新增「来氟米特（爱若华 / CSDMARD）」后，第二步核对清单**不再出现 itx-001**；
+     * 新增「乌帕替尼（艾乐明 / JAK）」后**能出现** itx-002 / itx-010（原先一条都没有）；
+     * 新增「阿仑膦酸钠（福善美 / OTHER）」后**出现且只出现** itx-015；
+     * 新增「钙剂（补剂 / OTHER）」后**不再出现** itx-015。
+     *
+     * 逐条回归锁见 `MedicationInteractionChainTest`（载入真种子 `kb_seed_itx.json` 跑完整链路）。
+     *
+     * @param med 正在新增 / 编辑的那一支（它自己还没落库，故必须显式并进药单）
+     */
+    suspend fun interactionsFor(med: Medication): List<KbEntry> {
+        val entries = kbDao.interactions()
+        val existing = medDao.listActive()
+        val supplements = supplementDao.listActive()
+        val tokens = tokensOf(existing, supplements) + tokensOfMedication(med)
+        return entries
+            .filter { appliesTo(it, tokens) }
             .sortedByDescending { severityRank(it.severityLevel) }
+    }
 
-    /** 类别键覆盖（如 nsaid 命中所有 NSAID 条目的 drug_a="nsaid"） */
-    private fun medClassKeys(med: Medication): List<String> = when (med.medClass.lowercase()) {
-        "nsaid" -> listOf("nsaid")
-        "glucocorticoid" -> listOf("glucocorticoid", "steroid")
-        "csdmard" -> listOf("mtx", "methotrexate", "sulfasalazine")
-        "biologic" -> listOf("biologic", "adalimumab", "tnf")
-        else -> emptyList()
+    /**
+     * 药单「在用药品 + 在用补剂」→ token 集。
+     *
+     * 抽出来是为了让 [interactionsFor] 与将来的「药单体检」入口共用同一份口径：
+     * 药单里到底算哪些东西、每个东西贡献哪些词，只能有一处定义。
+     */
+    suspend fun medicationTokens(): List<String> =
+        tokensOf(medDao.listActive(), supplementDao.listActive())
+
+    private fun tokensOf(meds: List<Medication>, supplements: List<Supplement>): List<String> =
+        meds.flatMap { tokensOfMedication(it) } + supplements.flatMap { tokensOfSupplement(it) }
+
+    private fun tokensOfMedication(m: Medication): List<String> =
+        listOfNotNull(m.nameKey, m.name, m.brandName, m.medClass)
+
+    private fun tokensOfSupplement(s: Supplement): List<String> =
+        listOfNotNull(s.name, s.brand, SupplementCategory.fromKey(s.category).label)
+
+    /**
+     * 单条判定（纯函数在 `domain/DrugInteractionKeys.matches`，这里只负责把 payload 拆出两侧）。
+     *
+     * payload 解析失败时**返回 false 而不是 true**：一条读不懂的条目不该出现在患者的核对清单里
+     * ——宁可少提示也不要递一条来源不明的警告（与 `ExerciseEngine` 的「失败即封闭」同向）。
+     */
+    private fun appliesTo(entry: KbEntry, tokens: List<String>): Boolean {
+        val payload = runCatching { org.json.JSONObject(entry.payload) }.getOrNull() ?: return false
+        val declared = DrugInteractionKeys.classify(
+            drugA = payload.optString("drug_a").takeIf { it.isNotBlank() && it != "null" },
+            drugB = payload.optString("drug_b").takeIf { it.isNotBlank() && it != "null" },
+        )
+        return DrugInteractionKeys.matches(declared, tokens)
     }
 
     private fun severityRank(s: String) = when (s.lowercase()) {

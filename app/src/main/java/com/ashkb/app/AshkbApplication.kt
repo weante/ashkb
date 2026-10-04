@@ -225,18 +225,39 @@ class AshkbApplication : Application() {
         }.getOrDefault(emptyList())
     }
 
-    private companion object {
+    /**
+     * 内部可见（不是 `private`）：`KbSeedVersionGateTest` 要读它，把「改种子必须 bump 版本」
+     * 这条约定变成一条会红的断言（第四份审查报告 §九）。其余常量仍私有。
+     */
+    internal companion object {
         /**
          * **知识库种子包版本**。每次增补 / 修订种子内容都必须 +1——否则老设备不会重新核对。
-         * 1 = 旧实现（首启导入后永不再看）；2 = v1.0.44 起启用增量刷新。
+         * 1 = 旧实现（首启导入后永不再看）；2 = v1.0.44 起启用增量刷新；
+         * 3 = v1.1.2（批次 18）**补闸**——把闸门补开到「当前内容」。
+         *
+         * 为什么要补这一跳：`git log` 显示 v1.0.70 往 `kb_seed_edu.json` 加了 `edu-005`、
+         * 另一次提交改写了 `exc-004` 的文案，两次都**没有**动这个常量。
+         * 而 `importKbSeedIfNeeded` 见到 `prefs >= 2` 就直接 return ——
+         * 于是这批已安装用户至今没跑过那一次核对：`edu-005` 从未进过他们的库，
+         * `exc-004` 仍是旧文案（第四份审查报告 §九 预言的失败模式，仓库里已经真实发生过）。
+         * 补到 3 后他们会在下次冷启动时被重新核对一次（`KbSeedRefresh` 逐条补入 / 修订，
+         * `user_note` 照旧保留）。
+         *
+         * ⚠️ 今后 bump 之后还必须同步 `KbSeedVersionGateTest.FINGERPRINTS`（那条断言会先红，
+         * 提醒你登记新指纹）——两者是同一件事的两半，漏一个都会让已安装用户永久停在旧内容。
          */
-        const val KB_SEED_VERSION = 2
+        internal const val KB_SEED_VERSION = 3
 
-        const val PREFS = "app_prefs"
-        const val KEY_SEED_VERSION = "kb_seed_version"
+        private const val PREFS = "app_prefs"
+        private const val KEY_SEED_VERSION = "kb_seed_version"
 
-        /** 种子文件清单（47 条 = itx 15 / exc 15（红10+黑5）/ fdg 6 / emr 5 / edu 6（含阈值 2）） */
-        val SEED_FILES = listOf(
+        /**
+         * 种子文件清单（47 条 = itx 15 / exc 15（红10+黑5）/ fdg 6 / emr 5 / edu 6（含阈值 2））。
+         *
+         * 内部可见（不是 `private`）：`KbSeedVersionGateTest` 的内容指纹**必须覆盖同一份清单**，
+         * 否则「少改一个文件 / 改了一个没登记的文件」就能绕过那道门——这正是它要防的事。
+         */
+        internal val SEED_FILES = listOf(
             "kb_seed_itx.json", "kb_seed_exc.json", "kb_seed_fdg.json",
             "kb_seed_emr.json", "kb_seed_edu.json",
         )

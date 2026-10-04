@@ -197,13 +197,38 @@ interface KbEntryDao {
     @Update
     suspend fun updateAll(entries: List<KbEntry>)
 
+    /**
+     * v1.1.2（批次 18）：**取全部相互作用条目，匹配交给 Kotlin 侧的结构化判定**
+     * （`domain/DrugInteractionKeys` + `MedicationRepository.interactionsFor`）。
+     *
+     * 为什么删掉旧的 `interactionsFor(key)`（`payload LIKE '%'||:key||'%'`）：
+     * 它把「条目关心哪个药」这件事交给**子串巧合**决定，实测两个方向都错——
+     *   · 漏：JAK 一类的键压根没有对应分支，乌帕替尼 / 托法替布 / 巴瑞替尼药单零提示；
+     *   · 错：`MedClass.OTHER.name` = "OTHER" 命中了 itx-015 引文里的英文单词 `other`，
+     *     于是钙剂 / 维生素 D3 / 骨化三醇药单收到「阿仑膦酸钠服用规则」。
+     * 正确性无法靠「把键拼得更细」解决——子串匹配本身不是「药物身份」的表达方式。
+     *
+     * 不新增索引列的取舍：交互条目固定 15 条（`kb_seed_itx.json`），一次全取在量级上可忽略；
+     * 而加 `drug_a_key`/`drug_b_key` 索引列要牵动 Room 迁移、schema 导出、备份恢复回填
+     * 与 `KB_SEED_VERSION` 闸门四处（见 `MIGRATION_8_9` 为 `search_text` 付过的代价），
+     * 换来的只是把同一次判定从 Kotlin 挪回 SQL。本次选择**把改动收敛在代码层**。
+     *
+     * 排序与 [FoodAvoidItemDao.observeAll] 同一个坑：`severity_level` 是 TEXT，
+     * `ORDER BY severity_level DESC` 得到的是 medium → low → high。
+     * 这里改成 `CASE` 序数排序，让「DAO 自己给出的顺序」就是对的——
+     * 过去它被 `MedicationRepository.severityRank` 的重排**掩盖**了，
+     * 于是同一个 bug 看起来「已经被处理过」，下一个调用者直接吃到错序。
+     */
     @Query(
-        "SELECT * FROM kb_entries WHERE category = 'interaction' AND " +
-            "(payload LIKE '%' || :key || '%') ORDER BY severity_level DESC"
+        "SELECT * FROM kb_entries WHERE category = 'interaction' " +
+            "ORDER BY CASE severity_level WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END DESC, id",
     )
-    suspend fun interactionsFor(key: String): List<KbEntry>
+    suspend fun interactions(): List<KbEntry>
 
-    @Query("SELECT * FROM kb_entries WHERE category = 'interaction' ORDER BY severity_level DESC, id")
+    @Query(
+        "SELECT * FROM kb_entries WHERE category = 'interaction' " +
+            "ORDER BY CASE severity_level WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END DESC, id",
+    )
     fun observeInteractions(): Flow<List<KbEntry>>
 
     @Query("SELECT * FROM kb_entries WHERE id = :id")
@@ -290,6 +315,17 @@ interface BasdaiDao {
     /** v1.0.59 B5：最近一次评估记录（BasdaiReminderScheduler 推算 dueDate / Receiver 验真用）。 */
     @Query("SELECT * FROM basdai_records ORDER BY date DESC, recorded_at DESC LIMIT 1")
     suspend fun latest(): BasdaiRecord?
+
+    /**
+     * v1.1.2（批次 18）：最近两次评估记录（`edu-th-002` 触发判定用）。
+     *
+     * 取「最近两次」而不是「某个固定窗口内的两次」：窗口宽度取决于**自评周期**
+     * （`ReminderConfigRepository.DEFAULT_BASDAI_CYCLE = 28` 天），写死一个比周期短的窗口
+     * 会让按默认节奏自评的患者永远攒不出第二条记录——`basdai_high` 于是成了一条死分支
+     * （审查报告 §五）。这里只取行，判定在 `HealthRepository.evaluateBasdaiAlert`。
+     */
+    @Query("SELECT * FROM basdai_records ORDER BY date DESC, recorded_at DESC LIMIT 2")
+    suspend fun latestTwo(): List<BasdaiRecord>
 
     @Upsert
     suspend fun upsert(record: BasdaiRecord)
@@ -631,10 +667,28 @@ interface DietProfileDao {
 
 @Dao
 interface FoodAvoidItemDao {
-    @Query("SELECT * FROM food_avoid_items ORDER BY severity DESC, created_at")
+    /**
+     * v1.1.2（批次 18）：忌口清单按**危险度**排序，**不能**直接 `ORDER BY severity DESC`。
+     *
+     * `severity` 是 TEXT，取值 `high` / `medium` / `low`。SQLite 的 TEXT 比较是**字典序**，
+     * 而字典序里 `'high' < 'low' < 'medium'`（h < l < m）——`DESC` 得到的是
+     * **medium → low → high**，最该忌口的那条恰好沉到列表最后。
+     * 这条查询是**活的用户可见路径**（`WellnessScreen` 的忌口清单直接消费它），
+     * 且此前**没有任何 Kotlin 侧纠正**——排序错在这里等于把最危险的信息埋掉。
+     *
+     * 用 `CASE` 把词汇映射成序数再排：与 `MedicationRepository.severityRank`
+     * （high=3 / medium=2 / 其余=1）同一口径，不新造第二套等级定义。
+     */
+    @Query(
+        "SELECT * FROM food_avoid_items " +
+            "ORDER BY CASE severity WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END DESC, created_at",
+    )
     fun observeAll(): Flow<List<FoodAvoidItem>>
 
-    @Query("SELECT * FROM food_avoid_items WHERE category = :category ORDER BY severity DESC")
+    @Query(
+        "SELECT * FROM food_avoid_items WHERE category = :category " +
+            "ORDER BY CASE severity WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END DESC",
+    )
     fun observeByCategory(category: String): Flow<List<FoodAvoidItem>>
 
     @Upsert

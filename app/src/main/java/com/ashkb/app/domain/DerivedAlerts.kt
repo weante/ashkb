@@ -25,7 +25,13 @@ object DerivedAlerts {
     const val VACCINE_LIVE_PENDING = "vaccine_live_pending"
     const val FLARE_DAY7 = "flare_day7"
 
-    /** 症状记录派生的全部警报类型——删一条症状记录要清的就是这几个。 */
+    /**
+     * 症状记录派生的全部警报类型。
+     *
+     * v1.1.2（批次 18）起**不再整体照单删除**：发热警报（[SYMPTOM_ABNORMAL]）有第二个来源——
+     * 体征录入（`vitals.temperature`，见第四份审查报告 §六），删症状记录时若体征仍发热，
+     * 那条警报依然成立。见 `HealthRepository.deleteSymptom`。
+     */
     val SYMPTOM_TYPES = listOf(SYMPTOM_ABNORMAL, NEURO_RED_FLAG)
 
     /**

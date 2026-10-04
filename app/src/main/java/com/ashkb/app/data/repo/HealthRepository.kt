@@ -80,7 +80,10 @@ class HealthRepository(private val context: Context) {
         const val FEVER_THRESHOLD = 38.5
         // v1.0.77（批次 4）：原 `BASDAI_THRESHOLD = 4.0` 已删除——与 `ClinicalThresholds.BASDAI_HIGH` 是同一个值，
     // 两个常量并存会让「改了一处忘了另一处」成为必然（第三份审查报告 §六）。一律走 `ClinicalThresholds.basdaiHigh()`。
-        const val BASDAI_WINDOW_DAYS = 14L
+        //
+        // v1.1.2（批次 18）：原 `BASDAI_WINDOW_DAYS = 14L` 同样删除——它是「持续 2 周」这句话的代码化，
+        // 但比默认自评周期（28 天）还短，使 `basdai_high` 在默认配置下不可达（第四份审查报告 §五）。
+        // 判据改用「最近两次自评」（见 `evaluateBasdaiAlert`），不再需要任何窗口常数。
         const val FLARE_ALERT_DAY = 7L
     }
 
@@ -135,11 +138,19 @@ class HealthRepository(private val context: Context) {
      *
      * 按「记录日」清是有意的：`ref_date` 就是派生它的那条记录的日期，一一对应，不会误伤别的日期。
      * 已被用户确认（ack）的警报保留——那是「他确实看过」的留痕，且不出现在未读列表里。
+     *
+     * v1.1.2（批次 18）：**发热警报有两个来源**（症状自评的「发热 + 体温」与体征录入的体温），
+     * 共用同一个 `(type='symptom_abnormal', ref_date)` 去重键。故删除症状记录时，
+     * 只有当**体征侧也不再发热**才清这条警报——体征还挂着 38.7 ℃ 时把它删掉，
+     * 等于凭空抹掉一条仍然成立的急症提示。
      */
     suspend fun deleteSymptom(date: String) = db.withTransaction {
         val row = symptomDao.byDate(date) ?: return@withTransaction
         symptomDao.delete(row.id)
-        DerivedAlerts.SYMPTOM_TYPES.forEach { alertDao.deleteUnackedByRef(it, row.date) }
+        alertDao.deleteUnackedByRef(DerivedAlerts.NEURO_RED_FLAG, row.date)
+        if (!vitalsStillFever(row.date)) {
+            alertDao.deleteUnackedByRef(DerivedAlerts.SYMPTOM_ABNORMAL, row.date)
+        }
     }
 
     /** 红旗三通道：发热→emr-002 / 眼→emr-001 / 神经→emr-004（edu-th-001 阈值联动） */
@@ -188,15 +199,28 @@ class HealthRepository(private val context: Context) {
         evaluateBasdaiAlert(record)
     }
 
-    /** edu-th-002：14 天内 ≥2 次记录均 ≥4.0 → basdai_high 警报（提示性非诊断性） */
+    /**
+     * `edu-th-002`：BASDAI 活动度**持续**偏高 → `basdai_high` 警报（提示性非诊断性）。
+     *
+     * v1.1.2（批次 18）把判据从「14 天窗口内 ≥2 次 ≥4.0」换成「**最近两次自评均 ≥4.0**」
+     * （审查报告 §五）。旧判据在默认配置下**不可达**：BASDAI 提醒的默认周期是 28 天
+     * （`ReminderConfigRepository.DEFAULT_BASDAI_CYCLE`），按默认节奏自评的人在 14 天内
+     * 根本攒不出第二条记录，`basdai_high` 成了死分支——除非他中途手动自评。
+     * 窗口是**自评节奏**的函数，不该在代码里另写一个比节奏还短的常数。
+     *
+     * 新判据与任何周期对齐（7 / 14 / 28 / 56 / 84 天都可触发），且仍然**不会**在只有
+     * 单次高分时触发——单次偏高由报表页的即时提示承担（`ReportScreen` 的
+     * `basdai_high_alert_note`），警报留给「持续」这件事。
+     */
     private suspend fun evaluateBasdaiAlert(record: BasdaiRecord) {
         if (!ClinicalThresholds.basdaiHigh(record.total)) return
-        val from = LocalDate.parse(record.date).minusDays(BASDAI_WINDOW_DAYS).toString()
-        val recent = basdaiDao.between(from, record.date).filter { ClinicalThresholds.basdaiHigh(it.total) }
-        if (recent.size >= 2) {
+        val lastTwo = basdaiDao.latestTwo()
+        if (lastTwo.size < 2) return
+        if (lastTwo.all { ClinicalThresholds.basdaiHigh(it.total) }) {
             insertAlertOnce(
                 type = "basdai_high", severity = "medium", refDate = record.date,
-                message = "14 天内 BASDAI 已 ${recent.size} 次 ≥4.0（本次 ${"%.1f".format(record.total)} 分）。自评活动度持续偏高，建议预约风湿科复诊评估。",
+                message = "最近 2 次 BASDAI 自评均 ≥4.0（本次 ${"%.1f".format(record.total)} 分）。" +
+                    "自评活动度持续偏高，建议预约风湿科复诊评估。",
                 kbRef = "edu-th-002",
             )
         }
@@ -511,6 +535,36 @@ class HealthRepository(private val context: Context) {
         val log = if (existing != null) input.copy(id = existing.id)
         else input.copy(id = Ids.new("vit"))
         vitalsDao.upsert(log)
+        evaluateVitalsAlerts(log)
+    }
+
+    /**
+     * v1.1.2（批次 18）：**体征录入也触发发热红旗**（审查报告 §六）。
+     *
+     * 为什么以前不触发：红旗判定只挂在 `saveSymptom` 上，条件是「勾了发热 **且** 填了体温」。
+     * 而患者量体温的正常路径是「体征」页——在那里录 38.6 ℃ 什么都不会发生。
+     * 于是 `edu-th-001` 里写的 `vitals.temperature >= value 触发 alert`、
+     * 以及 `emr-002` 的「≥38.5 自动弹本卡」都是空头承诺。
+     * 对免疫抑制（生物制剂 / JAK / 激素）的患者，发热是急症级信号：
+     * 触发源必须是**体温本身被记下来**，而不是「今天顺手做了症状自评并且勾对了框」。
+     *
+     * 与症状侧同用 `symptom_abnormal` 类型 + `insertAlertOnce` 的 `(type, refDate)` 去重：
+     * 两条来源同一天只会留下一条警报，不刷屏。
+     */
+    private suspend fun evaluateVitalsAlerts(log: Vitals) {
+        val t = log.temperature ?: return
+        if (t < FEVER_THRESHOLD) return
+        insertAlertOnce(
+            type = "symptom_abnormal", severity = "high", refDate = log.date,
+            message = "体征体温 $t℃ ≥ 阈值 $FEVER_THRESHOLD℃。感染发热需先评估再注射生物制剂——请查看应急处理卡。",
+            kbRef = "emr-002",
+        )
+    }
+
+    /** 当天体征是否仍构成发热红旗——发热警报有**两个来源**，删除时按它决定留不留。 */
+    private suspend fun vitalsStillFever(date: String): Boolean {
+        val t = vitalsDao.latestByDate(date)?.temperature ?: return false
+        return t >= FEVER_THRESHOLD
     }
 
     /** U4 误录删除 */

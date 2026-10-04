@@ -41,6 +41,7 @@ import com.ashkb.app.R
 import com.ashkb.app.data.entity.DoseState
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.entity.MedClass
+import com.ashkb.app.domain.DrugInteractionKeys
 import com.ashkb.app.data.entity.MedFrequency
 import com.ashkb.app.domain.DrugKeyCatalog
 import com.ashkb.app.domain.ScheduleCalc
@@ -204,12 +205,30 @@ internal fun MedScheduleSection(
     prnReason: MutableState<String>,
     cycleDays: MutableState<String>,
     startDate: MutableState<String>,
+    // v1.1.2（批次 18）：甲氨蝶呤频次强提示需要「用户填的是什么药」，
+    // 而「填药名」在 MedBasicsSection——多收这一组 state 只为让错误提示**贴着频次 chips** 显示，
+    // 与 `biwError` 的做法一致（错误要出现在它约束的那几个控件旁边，不是另找一处）。
+    nameKey: MutableState<String> = mutableStateOf(""),
+    mtxError: MutableState<Boolean> = mutableStateOf(false),
 ) {
     Text(stringResource(R.string.med_frequency), style = MaterialTheme.typography.labelMedium)
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
         MedFrequency.entries.forEach { f ->
-            FilterChip(selected = frequency.value == f, onClick = { frequency.value = f }, label = { Text(f.label) })
+            FilterChip(
+                selected = frequency.value == f,
+                onClick = { frequency.value = f; mtxError.value = false },
+                label = { Text(f.label) },
+            )
         }
+    }
+    if (mtxError.value && DrugInteractionKeys.requiresWeeklyFrequency(nameKey.value) &&
+        frequency.value != MedFrequency.WEEKLY
+    ) {
+        Text(
+            stringResource(R.string.med_mtx_frequency_error),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
     }
     if (frequency.value != MedFrequency.PRN) {
         if (route.value == "oral") {
