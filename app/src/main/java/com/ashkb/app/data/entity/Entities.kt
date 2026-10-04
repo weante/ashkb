@@ -765,8 +765,10 @@ data class BackupLedger(
  * B3（v1.0.39）：推荐食谱（recipes）。
  *
  * 双层结构同知识库：**种子层**（`is_seed=true`，随版本更新）+ **自建层**（用户自己添加）。
- * 标签用于筛选（抗炎 / 胃肠友好 / 控热量）；`sources` 只存编号（`S1`…），完整题录见
+ * 标签用于筛选（抗炎 / 胃肠友好 / 控热量）；`sources` 只存编号（`R1`…），完整题录见
  * `domain/RecipeSources`——列表页不占版面，**点开某条食谱才在详情里展开出处**。
+ * v1.1.2：编号前缀由 `S` 改为 `R`（与知识库的 `S1`–`S4` 证据层级区分开）；**老库里
+ * 仍是 `S1` 这类旧值**（种子按 id 幂等，不会重种），由 `RecipeSources` 归一后再查。
  */
 @Entity(tableName = "recipes", indices = [Index("is_favorite"), Index("is_seed")])
 data class Recipe(
@@ -778,7 +780,7 @@ data class Recipe(
     @ColumnInfo(name = "ingredients") val ingredients: String,
     /** 做法（每行一步） */
     @ColumnInfo(name = "steps") val steps: String,
-    /** 出处编号 JSON 数组：["S1","S4"]（完整题录见 domain/RecipeSources） */
+    /** 出处编号 JSON 数组：["R1","R4"]（完整题录见 domain/RecipeSources） */
     @ColumnInfo(name = "sources") val sources: String? = null,
     @ColumnInfo(name = "is_favorite") val isFavorite: Boolean = false,
     @ColumnInfo(name = "is_seed") val isSeed: Boolean = false,

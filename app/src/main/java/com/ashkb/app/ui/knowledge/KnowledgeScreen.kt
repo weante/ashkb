@@ -231,8 +231,10 @@ private fun KbListCard(
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
+            // v1.1.2：层级不再只显示裸字母——列表给「字母 + 短释义」一行放得下，
+            // 最重要的是这行是**多数人唯一会看**的地方（详情未必有人点开）
             Text(
-                "${entry.sourceTier} · ${entry.sourceName}",
+                "${tierShortLabel(entry.sourceTier)} · ${entry.sourceName}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

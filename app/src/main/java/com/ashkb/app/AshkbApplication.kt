@@ -233,9 +233,10 @@ class AshkbApplication : Application() {
         /**
          * **知识库种子包版本**。每次增补 / 修订种子内容都必须 +1——否则老设备不会重新核对。
          * 1 = 旧实现（首启导入后永不再看）；2 = v1.0.44 起启用增量刷新；
-         * 3 = v1.1.2（批次 18）**补闸**——把闸门补开到「当前内容」。
+         * 3 = v1.1.2（批次 18）**补闸**——把闸门补开到「当前内容」；
+         * 4 = v1.1.2 修订 `exc-004` 的来源链接（站点更名致原 PDF 404）并同步机构名。
          *
-         * 为什么要补这一跳：`git log` 显示 v1.0.70 往 `kb_seed_edu.json` 加了 `edu-005`、
+         * 为什么要补这一跳（3 那一跳）：`git log` 显示 v1.0.70 往 `kb_seed_edu.json` 加了 `edu-005`、
          * 另一次提交改写了 `exc-004` 的文案，两次都**没有**动这个常量。
          * 而 `importKbSeedIfNeeded` 见到 `prefs >= 2` 就直接 return ——
          * 于是这批已安装用户至今没跑过那一次核对：`edu-005` 从未进过他们的库，
@@ -243,10 +244,14 @@ class AshkbApplication : Application() {
          * 补到 3 后他们会在下次冷启动时被重新核对一次（`KbSeedRefresh` 逐条补入 / 修订，
          * `user_note` 照旧保留）。
          *
+         * 4 = 「`exc-004` 的 `source_url` 指向已下线的 Versus Arthritis PDF」：原文链接现在
+         * 302 到 `/error/404`，患者点「查看原文」只会看到一个错误页。改指 Internet Archive 上
+         * **同一份 PDF** 的存档（内容与链接一一对应，见 `KbSeedVersionGateTest` 的指纹登记）。
+         *
          * ⚠️ 今后 bump 之后还必须同步 `KbSeedVersionGateTest.FINGERPRINTS`（那条断言会先红，
          * 提醒你登记新指纹）——两者是同一件事的两半，漏一个都会让已安装用户永久停在旧内容。
          */
-        internal const val KB_SEED_VERSION = 3
+        internal const val KB_SEED_VERSION = 4
 
         private const val PREFS = "app_prefs"
         private const val KEY_SEED_VERSION = "kb_seed_version"

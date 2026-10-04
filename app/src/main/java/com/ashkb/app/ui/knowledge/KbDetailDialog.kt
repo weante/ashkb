@@ -157,8 +157,16 @@ fun KbDetailDialog(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        // v1.1.2：详情页把层级展开成**完整释义**（列表只给短版），
+                        // S4 的「商业平台 · 仅备用」这一限定也在这里才说得清
                         Text(
-                            stringResource(R.string.knowledge_evidence_meta, entry.sourceTier, entry.adaptedAt, entry.reviewDue, entry.version),
+                            stringResource(
+                                R.string.knowledge_evidence_meta,
+                                tierFullLabel(entry.sourceTier),
+                                entry.adaptedAt,
+                                entry.reviewDue,
+                                entry.version,
+                            ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

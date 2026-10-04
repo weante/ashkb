@@ -678,6 +678,14 @@
     <string name="exercise_today_done">今日已打卡 %1$s 项</string>
     <string name="health_badge_checkup_lab">复诊项目 %1$s 项 · 化验 %2$s 项</string>
     <string name="health_badge_contacts_ready">紧急联系人 %1$s 位 · 已就绪</string>
+    <string name="kb_tier_s1_short">S1 官方指南/药品标签/政府页面</string>
+    <string name="kb_tier_s2_short">S2 期刊开放获取全文</string>
+    <string name="kb_tier_s3_short">S3 权威患者组织/医院/NHS 患者教育</string>
+    <string name="kb_tier_s4_short">S4 商业平台（仅备用）</string>
+    <string name="kb_tier_s1_full">S1 官方指南、官方药品标签或政府机构页面</string>
+    <string name="kb_tier_s2_full">S2 同行评审期刊的开放获取全文（如 PMC）</string>
+    <string name="kb_tier_s3_full">S3 权威患者组织、医院或 NHS 的患者教育页</string>
+    <string name="kb_tier_s4_full">S4 商业平台（用药助手、drugs.com 等），仅作备用参考</string>
     <string name="knowledge_evidence_meta">证据层级 %1$s · 适配 %2$s · 复核 %3$s · v%4$s</string>
     <string name="knowledge_overdue_count">%1$s 条内容已过复核日</string>
     <string name="knowledge_source_line">来源：%1$s</string>

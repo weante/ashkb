@@ -553,13 +553,15 @@ private fun DietProfileCard(vm: WellnessViewModel, onEdit: () -> Unit) {
 }
 
 /**
- * 忌口清单卡：最多展示 5 条，超出给「查看全部」。
+ * 忌口清单卡：默认最多展示 5 条，**但高危项一条都不截**（见 [prioritizeHigh]），超出给「查看全部」。
  *
  * v1.0.91（批次 16）：`foodAvoidItems` 改由本卡自收（原读点在根部）。
  */
 @Composable
 private fun AvoidListCard(vm: WellnessViewModel, onManage: () -> Unit) {
     val avoids by vm.foodAvoidItems.collectAsStateWithLifecycle()
+    // 预览集合按「高危优先 + 其余补足」算一次：avoids 每条增删改都会换新列表，remember 的 key 就是它
+    val preview = remember(avoids) { prioritizeHigh(avoids, AVOID_PREVIEW_LIMIT) }
 
     SectionCard(
         title = stringResource(R.string.nutrition_avoid_list),
@@ -577,7 +579,7 @@ private fun AvoidListCard(vm: WellnessViewModel, onManage: () -> Unit) {
                 onAction = onManage,
             )
         } else {
-            DividerList(avoids.take(5)) { item ->
+            DividerList(preview) { item ->
                 Text(
                     item.name,
                     style = MaterialTheme.typography.bodyMedium,
@@ -589,13 +591,43 @@ private fun AvoidListCard(vm: WellnessViewModel, onManage: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (avoids.size > 5) {
+            // 有条目真的被藏起来时才给这个入口（v1.1.2：高危项超限时仍会藏「其余」那条）
+            if (avoids.size > preview.size) {
                 TextButton(onClick = onManage) {
                     Text(stringResource(R.string.wellness_view_all_avoids, avoids.size))
                 }
             }
         }
     }
+}
+
+/** 忌口卡的预览条数：卡片的**信息意图**是「摘要 + 全部入口」，不是把整份清单铺开。 */
+private const val AVOID_PREVIEW_LIMIT = 5
+
+/**
+ * v1.1.2：忌口清单卡的预览集合——**高危（`high`）条目一条都不许被截掉**。
+ *
+ * ### 为什么这层不能只靠 DAO 排序
+ * 批次 18 已经把 `FoodAvoidItemDao.observeAll` 的 `ORDER BY CASE` 修成「高危在前」，
+ * 看上去 `take(5)` 已经够了。但那是**两层之外的 SQL 排序**：展示层的安全性质
+ * （「高危项不会被这一屏藏起来」）挂在一个改查询就会静默失效的隐式约定上——
+ * 任何人把排序调回去、或换个未排序的集合喂进来，症状是**过敏/禁忌这种危险信息凭空消失**，
+ * 而且不报任何错。安全性质必须落在**渲染它的那一层**。
+ *
+ * ### 为什么不干脆全量展示
+ * 忌口是**用户自己攒**的、条数无上界；全量铺开会让这张卡在长列表里长到需要滚动，
+ * 把同屏的体征 / 补剂内容挤下去。所以保留「只展示前 N 条」的意图，只把**截断规则**换成
+ * 「高危全给 + 其余按原顺序补足到 N」：卡片长度仍然有上界（`高危数 + N`），
+ * 而**最该被看到的信息永远在最上面、且一条不少**。
+ *
+ * 全部条目另有出口（卡片右上「管理」与这条「查看全部 N 项」都进同一张管理弹层），
+ * 所以被折叠的只可能是「非高危的补充条目」，不是「看不到」的信息。
+ */
+internal fun prioritizeHigh(items: List<FoodAvoidItem>, limit: Int): List<FoodAvoidItem> {
+    if (items.size <= limit) return items
+    // partition 保序：两段内部都维持传入顺序，所以「其余」仍是原顺序（不是重排过的）
+    val (high, others) = items.partition { it.severity == "high" }
+    return (high + others).take(maxOf(limit, high.size))
 }
 
 /** 饮食画像卡的槽位登记（内容见 [DietProfileCard]）。 */

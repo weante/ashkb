@@ -51,6 +51,10 @@ class KbSeedVersionGateTest {
         2 to "ecb509ea7b4ef0f671317e870993daa49a2cc8dd27b9c5967d4292dbe268c9ae",
         // 3 = v1.1.2（批次 18）补闸：把闸门补开到「当前内容」，让漏 bump 的那批用户被重新核对。
         3 to "ecb509ea7b4ef0f671317e870993daa49a2cc8dd27b9c5967d4292dbe268c9ae",
+        // 4 = v1.1.2：`exc-004` 的 `source_url` 改指 Internet Archive 上**同一份 PDF** 的存档
+        // （原 Versus Arthritis 链接已 302 到 /error/404），机构名随之改为 Arthritis UK。
+        // 只有 `kb_seed_exc.json` 变了，其余四个种子文件字节不变。
+        4 to "96e6771fa065b88e5f37e11c563f66b4611838d3cd5f55e6adbdd4d78df5c266",
     )
 
     /** 单测工作目录是模块目录（`app/`），与 `MedicationInteractionChainTest` 同一约定。 */
