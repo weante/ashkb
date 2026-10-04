@@ -134,21 +134,33 @@ internal fun MedBasicsSection(
     if (keySuggestions.isNotEmpty() && !DrugKeyCatalog.isExactKey(nameKey.value)) {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             keySuggestions.forEach { s ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            nameKey.value = s.key
-                            if (name.value.isBlank()) name.value = s.display
-                            if (brand.value.isBlank() && !s.brand.isNullOrBlank()) brand.value = s.brand
-                            if (medClass.value == MedClass.OTHER) medClass.value = s.medClass
-                        },
-                ) {
-                    Text(
-                        "${s.key} · ${s.display}${s.brand?.let { "（$it）" } ?: ""}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                Column {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                nameKey.value = s.key
+                                if (name.value.isBlank()) name.value = s.display
+                                if (brand.value.isBlank() && !s.brand.isNullOrBlank()) brand.value = s.brand
+                                if (medClass.value == MedClass.OTHER) medClass.value = s.medClass
+                            },
+                    ) {
+                        Text(
+                            "${s.key} · ${s.display}${s.brand?.let { "（$it）" } ?: ""}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    // v1.1.3（批次 19 · J-7）：选中前后都把 [DrugKeyEntry.note] 摆在建议行下方。
+                    // 放在**建议列表里**而不是选中后的确认弹窗：患者是在这一步决定「录哪支药」，
+                    // 等录完再提示就晚了。中性措辞见 DrugKeyCatalog.IL23_NO_AS。
+                    s.note?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }

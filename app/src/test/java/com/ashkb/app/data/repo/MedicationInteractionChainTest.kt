@@ -151,23 +151,111 @@ class MedicationInteractionChainTest {
      *
      * 改前：`medClassKeys` 没有 JAK 分支 → 键只有 `upadacitinib` 与 `JAK`，
      * 而 15 条 itx 的 `drug_a` 里两者都不存在 → **零条**（审查报告附录 A 第 8–10 行）。
-     * 改后：`upadacitinib` 归一成 {upadacitinib, jak}；条目侧 `adalimumab` 覆盖 `tnf_inhibitor`，
-     * `tnf_inhibitor` 又覆盖 adalimumab 等 5 个 TNF 抑制剂 —— **但不覆盖 JAK**，
-     * 故 JAK 只命中它真正相关的三条：itx-002（生物制剂类严重感染）、itx-010（活疫苗接种窗口）、
-     * itx-012（高剂量激素 — 只在药单上真有激素时才出）。
+     * 批次 18：`biologic` 家族登记了 JAK → JAK 收到 itx-002 与 itx-010。
      *
-     * ⚠️ 本条**不**断言 JAK 应当看到什么医学内容——那要由维护者裁决是否补 JAK 专属条目
-     * （审查报告 §4③ / §7 P1）。这里锁的是：**同一份种子在旧机制下一条都到不了、在新机制下能到**。
+     * v1.1.3（批次 19 · J-2）：维护者裁决 itx-002（阿达木单抗 PI 黑框）**不按家族递**，
+     * 它改挂 `tnf_inhibitor_strict`（键空间在 TNF 家族内闭合，不上溢到 `biologic`）→
+     * **JAK 不再收到 itx-002**。itx-010（ACR 2022 Table 5 活疫苗停药窗口，对 JAK 有独立条目）**保留**。
+     *
+     * ⚠️ 两条断言方向相反，**都必须留着**：只断言 (a) 会让「JAK 干脆一条都收不到」
+     * 这种过度收窄悄悄通过——而那比误报更危险（真正该看到活疫苗警告的人看不到了）。
      */
     @Test
-    fun `JAK 抑制剂药单从零命中变为可命中生物制剂类条目`() {
+    fun `JAK 药单不再收到 TNF 专属黑框，但仍保留活疫苗提示`() {
         seedItx()
-        val hits = hitsOf(med("艾乐明", "upadacitinib", MedClass.JAK, brand = "艾乐明"))
-        assertTrue(
-            "JAK 药单改后应当能命中 itx-002 / itx-010，实际 $hits",
-            hits.containsAll(listOf("itx-002", "itx-010")),
+        val hits = hitsOf(med("瑞福", "upadacitinib", MedClass.JAK, brand = "瑞福"))
+        assertFalse(
+            "itx-002 是引阿达木单抗 PI 的 TNF 专属黑框，JAK 药单不该收到（v1.1.3 · J-2）——实际 $hits",
+            hits.contains("itx-002"),
         )
-        assertFalse("JAK 不是 TNF 抑制剂，不该被 itx-012 之外的高剂量激素条目命中", hits.contains("itx-015"))
+        assertTrue(
+            "JAK 仍应收到 itx-010（ACR 2022 Table 5 对 JAK 抑制剂有独立的活疫苗停药窗口）——实际 $hits",
+            hits.contains("itx-010"),
+        )
+        assertFalse("JAK 不是 TNF 抑制剂，不该被 itx-015 命中", hits.contains("itx-015"))
+    }
+
+    /**
+     * v1.1.3（批次 19 · J-2）：**收窄的反向判据**——TNF 抑制剂**必须仍然命中** itx-002。
+     *
+     * 这是本批次最危险的一个方向：`itx-002` 的 `drug_a` 从具体品牌 `adalimumab`
+     * 改成了类级键，改得太宽会把警告递给 JAK（错报），改得太窄会让**真正需要它的
+     * TNF 患者看不到结核 / 严重感染的黑框**（漏报，比错报更危险）。
+     * 「收窄过头」不会报错、不会崩，只会让警告安静地消失——所以必须逐支药钉住。
+     *
+     * 覆盖：① 5 支具体 TNF 抑制剂的中文通用名；② 商品名；③ 目录里的「TNF 抑制剂」类别键；
+     * ④ **反向**：同属生物制剂但**不是** TNF 的 IL-17 / IL-23 药不得命中。
+     */
+    @Test
+    fun `TNF 抑制剂仍然命中 itx-002（收窄不能过头）`() {
+        seedItx()
+        val tnfMeds = listOf(
+            med("阿达木单抗", "adalimumab", MedClass.BIOLOGIC, brand = "修美乐"),
+            med("依那西普", "etanercept", MedClass.BIOLOGIC, brand = "恩利"),
+            med("英夫利西单抗", "infliximab", MedClass.BIOLOGIC, brand = "类克"),
+            med("戈利木单抗", "golimumab", MedClass.BIOLOGIC, brand = "欣普尼"),
+            med("培塞利珠单抗", "certolizumab", MedClass.BIOLOGIC, brand = "希敏佳"),
+            // 只输入商品名、nameKey 留空的情况：患者按药盒上的名字录入
+            med("修美乐", "", MedClass.BIOLOGIC, brand = "修美乐"),
+            // 目录里的类别键
+            med("【类别】TNF 抑制剂", "tnf", MedClass.BIOLOGIC),
+        )
+        for (m in tnfMeds) {
+            val hits = hitsOf(m)
+            assertTrue(
+                "${m.name}（nameKey=${m.nameKey}）是 TNF 抑制剂，必须命中 itx-002——实际 $hits",
+                hits.contains("itx-002"),
+            )
+        }
+
+        // 反向：同属生物制剂但不是 TNF 抑制剂，不得收到这条 TNF 专属黑框
+        val nonTnf = listOf(
+            med("司库奇尤单抗", "secukinumab", MedClass.BIOLOGIC),
+            med("依奇珠单抗", "ixekizumab", MedClass.BIOLOGIC),
+            med("乌司奴单抗", "ustekinumab", MedClass.BIOLOGIC),
+        )
+        for (m in nonTnf) {
+            val hits = hitsOf(m)
+            assertFalse(
+                "${m.name} 不是 TNF 抑制剂，不该命中 itx-002——实际 $hits",
+                hits.contains("itx-002"),
+            )
+        }
+    }
+
+    /**
+     * v1.1.3（批次 19 · J-2）：**键空间的根因判据**——为什么只把 `adalimumab` 换成
+     * `tnf_inhibitor` 并不能让 JAK 脱身。
+     *
+     * 批次 19 的任务书写「副作用自动消解」，实测**不成立**：
+     * `keySpace` 是 `coveredTokens` 里每个词各走一遍 `drugOf` 后的**并集**，
+     * 而 `drugOf("adalimumab")` 含 `biologic` → `keySpace("tnf_inhibitor")` **含 `biologic`**；
+     * JAK 的 `drugOf("upadacitinib")` 也含 `biologic` → 两者仍相交。
+     * 故 itx-002 必须挂 [DrugInteractionKeys] 的**家族内闭合**键 `tnf_inhibitor_strict`。
+     *
+     * 这条用例把「为什么不能图省事直接写 `tnf_inhibitor`」钉成可执行断言，
+     * 免得下一个人「统一风格」时把两个键改回同一个。
+     */
+    @Test
+    fun `tnf_inhibitor 会带上 biologic 而 strict 不会`() {
+        assertTrue(
+            "前提：drugOf(adalimumab) 必须含 biologic（这是收窄失效的根因）",
+            DrugInteractionKeys.drugOf("adalimumab").contains("biologic"),
+        )
+        assertTrue(
+            "前提：JAK 的键空间必须含 biologic（否则上面前提不构成问题）",
+            DrugInteractionKeys.drugOf("upadacitinib").contains("biologic"),
+        )
+        // 家族内闭合的键：itx-002 用它
+        val strictMatches = DrugInteractionKeys.active("tnf_inhibitor_strict", listOf("upadacitinib", "瑞福", "JAK"))
+        assertFalse("itx-002 的键不该被 JAK 命中", strictMatches)
+        val strictHitsTnf = DrugInteractionKeys.active("tnf_inhibitor_strict", listOf("依那西普", "etanercept", "BIOLOGIC"))
+        assertTrue("itx-002 的键必须被 TNF 抑制剂命中", strictHitsTnf)
+        // 未闭合的键：itx-010 继续用它，JAK 仍命中（ACR 2022 Table 5 对 JAK 有独立条目）
+        assertTrue(
+            "itx-010 仍应递给 JAK（ACR Table 5：JAK inhibitors | 1 week | 4 weeks）",
+            DrugInteractionKeys.active("tnf_inhibitor", listOf("upadacitinib", "瑞福", "JAK")),
+        )
     }
 
     /**
@@ -474,8 +562,10 @@ class MedicationInteractionChainTest {
     @Test
     fun `词汇表认得药单上的常见写法`() {
         assertEquals(
-            "adalimumab 应归一到具体药 + TNF 类别 + 生物制剂",
-            setOf("adalimumab", "tnf_inhibitor", "biologic"),
+            "adalimumab 应归一到具体药 + TNF 类别 + 家族内闭合键 + 生物制剂。" +
+                "（`tnf_inhibitor_strict` 是 itx-002 的类级键，它登记了 adalimumab，" +
+                "故 adalimumab 的父键里多出这一项——这正是「TNF 家族内闭合」的登记方式）",
+            setOf("adalimumab", "tnf_inhibitor", "tnf_inhibitor_strict", "biologic"),
             DrugInteractionKeys.drugOf("adalimumab"),
         )
         assertTrue("中文通用名", DrugInteractionKeys.drugOf("依那西普").contains("tnf_inhibitor"))

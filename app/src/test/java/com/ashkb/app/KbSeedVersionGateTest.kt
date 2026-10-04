@@ -55,6 +55,11 @@ class KbSeedVersionGateTest {
         // （原 Versus Arthritis 链接已 302 到 /error/404），机构名随之改为 Arthritis UK。
         // 只有 `kb_seed_exc.json` 变了，其余四个种子文件字节不变。
         4 to "96e6771fa065b88e5f37e11c563f66b4611838d3cd5f55e6adbdd4d78df5c266",
+        // 5 = v1.1.3（批次 19）：落实维护者的 5 项医学内容裁决 + 4 项无需医学判断的修订。
+        // 五个种子文件**全部**有改动：itx（`itx-002` 类级化、`itx-012` 按 ACR 2022 拆两条）/
+        // exc（`exc-001`/`exc-003` 诚实口径、`exb-004` 降 S4）/ fdg（`fdg-004` 降 S4）/
+        // edu（两条阈值条目改标 SYS、`edu-th-002` 文案对齐实现）；emr 字节未变。
+        5 to "e593d2ad60ecf1d53a084ee7bd1cb3b195aa75db3d7dd962162bcf3c11c3036c",
     )
 
     /** 单测工作目录是模块目录（`app/`），与 `MedicationInteractionChainTest` 同一约定。 */

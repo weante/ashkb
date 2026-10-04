@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 
+import com.ashkb.app.domain.BasdaiScoring
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.BasdaiRecord
@@ -265,10 +266,14 @@ internal fun BasdaiDialog(
     var q5 by remember(existing?.id, date) { mutableStateOf<Int?>(existing?.q5StiffnessDegree) }
     var q6 by remember(existing?.id, date) { mutableStateOf<Int?>(existing?.q6StiffnessDuration) }
     var note by remember(existing?.id, date) { mutableStateOf(existing?.notes ?: "") }
-    // W3：BASDAI 语境 0=无症状——未作答的题按 0 计入总分（用户实测「只有疲劳感」场景：
-    // 答一题 + 其余留空即可提交，与逐题点 0 等价）；提交门槛 = 至少一题已答，防空记录。
-    val answered = listOf(q1, q2, q3, q4, q5, q6).count { it != null }
-    val total = BasdaiRecord.total(q1 ?: 0, q2 ?: 0, q3 ?: 0, q4 ?: 0, q5 ?: 0, q6 ?: 0)
+    // v1.1.3（批次 19 · J-6）：**六题全部作答才计分**。旧实现门槛是「至少答 1 题」，
+    // 未答的题按 0 计入——只答 Q1=8 会得到 1.6 分这种「看起来合法、实际不成立」的总分，
+    // 并流进趋势图 / PDF / 复诊提示。判定收敛到 domain 的 [BasdaiScoring]（纯函数，可单测）。
+    val answers = listOf(q1, q2, q3, q4, q5, q6)
+    val answered = BasdaiScoring.answeredCount(answers)
+    val complete = BasdaiScoring.isComplete(answers)
+    // 不完整时**不显示总分**：显示了就是在鼓励患者把一个残缺分数当成结果。
+    val total = if (complete) BasdaiRecord.total(q1!!, q2!!, q3!!, q4!!, q5!!, q6!!) else null
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -293,27 +298,33 @@ internal fun BasdaiDialog(
                     label = { Text(stringResource(R.string.common_notes_optional)) }, modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(Spacing.sm))
-                if (answered < 6) {
+                if (!complete) {
                     Text(
-                        stringResource(R.string.basdai_default_zero_note, answered),
+                        stringResource(R.string.basdai_incomplete_note, answered),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.height(Spacing.sm))
-                Text(
-                    "总分：%.1f".format(total) +
-                    if (ClinicalThresholds.basdaiHigh(total)) stringResource(R.string.basdai_high_note_paren) else "",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (ClinicalThresholds.basdaiHigh(total)) MaterialTheme.colorScheme.error
-                else MaterialTheme.colorScheme.primary,
-                )
+                if (total != null) {
+                    Spacer(Modifier.height(Spacing.sm))
+                    Text(
+                        "总分：%.1f".format(total) +
+                        if (ClinicalThresholds.basdaiHigh(total)) stringResource(R.string.basdai_high_note_paren) else "",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (ClinicalThresholds.basdaiHigh(total)) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(q1 ?: 0, q2 ?: 0, q3 ?: 0, q4 ?: 0, q5 ?: 0, q6 ?: 0, note.ifBlank { null }) },
-                enabled = answered >= 1,
+                onClick = {
+                    if (complete) {
+                        onConfirm(q1!!, q2!!, q3!!, q4!!, q5!!, q6!!, note.ifBlank { null })
+                    }
+                },
+                enabled = complete,
             ) { Text(if (existing == null) stringResource(R.string.common_submit) else stringResource(R.string.common_update)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },

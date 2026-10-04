@@ -37,8 +37,8 @@ package com.ashkb.app.domain
  * ### 边界
  * 本文件只做**匹配**，不做医学判断：词汇表里的每一个键都来自种子 JSON 自身已经写下的
  * `drug_a` / `drug_b` 取值与 `DrugKeyCatalog` / `MedClass` 既有枚举，没有新增任何医学结论。
- * 「JAK 抑制剂按生物制剂家族级条目提示」是**匹配层的覆盖取舍**（宁可多提示一条，也不要零提示），
- * 条目该不该按家族改写仍由维护者裁决（见批次 18 回报的第三阶段提案表）。
+ * 「JAK 抑制剂按生物制剂家族级条目提示」是**匹配层的覆盖取舍**（宁可多提示一条，也不要零提示）——
+ * v1.1.3（批次 19）维护者已就 itx-002 裁决为「不按家族递」，落地见 [familyBoundedKeys]。
  */
 internal object DrugInteractionKeys {
 
@@ -76,10 +76,10 @@ internal object DrugInteractionKeys {
         "ixekizumab" to listOf("ixekizumab", "依奇珠单抗", "拓咨", "taltz"),
         "ustekinumab" to listOf("ustekinumab", "乌司奴单抗", "喜达诺", "stelara"),
         "guselkumab" to listOf("guselkumab", "古塞奇尤单抗", "特诺雅", "tremfya"),
-        "risankizumab" to listOf("risankizumab", "瑞莎珠单抗", "利生奇珠", "skyrizi"),
+        "risankizumab" to listOf("risankizumab", "利生奇珠单抗", "利生奇珠", "skyrizi"),
         "tofacitinib" to listOf("tofacitinib", "托法替布", "尚杰", "xeljanz"),
-        "upadacitinib" to listOf("upadacitinib", "乌帕替尼", "艾乐明", "rinvoq"),
-        "baricitinib" to listOf("baricitinib", "巴瑞替尼", "艾乐铭", "olumiant"),
+        "upadacitinib" to listOf("upadacitinib", "乌帕替尼", "瑞福", "rinvoq"),
+        "baricitinib" to listOf("baricitinib", "巴瑞替尼", "艾乐明", "olumiant"),
         "prednisone" to listOf("prednisone", "泼尼松", "强的松"),
         "methylprednisolone" to listOf("methylprednisolone", "甲泼尼龙", "美卓乐", "甲强龙"),
         "dexamethasone" to listOf("dexamethasone", "地塞米松"),
@@ -134,7 +134,7 @@ internal object DrugInteractionKeys {
         // 激素这一条**例外**：它是 ACR 原文里的类目名，除目录里的三种外还有别的糖皮质激素
         // （布地奈德 / 可的松…）。故激素类药物不但容不下 TNF 的具体药——那会让「泼尼松」
         // 的展开变成「五种 TNF 抑制剂」，进而让激素用户收到生物制剂警告。
-        // ⚠️ 这条不是可选的：itx-002 / itx-010 的 `drug_a` 是 `adalimumab` / `tnf_inhibitor`，
+        // ⚠️ 这条不是可选的：itx-002 / itx-010 的 `drug_a` 是 `tnf_inhibitor_strict` / `tnf_inhibitor`，
         // 只要 `glucocorticoid` 的成员里混进 TNF 药，激素用户就会收到生物制剂黑框警告。
         "glucocorticoid" to listOf(
             "glucocorticoid", "steroid", "激素", "激素类", "糖皮质激素",
@@ -151,17 +151,38 @@ internal object DrugInteractionKeys {
             "tnf", "tnf抑制剂", "tnf_inhibitor",
             "adalimumab", "etanercept", "infliximab", "golimumab", "certolizumab",
         ),
+        // v1.1.3（批次 19 · J-2）：`tnf_inhibitor_strict` —— itx-002 专用，**TNF 家族内闭合**。
+        //
+        // ⚠️ 为什么不能直接把 itx-002 的 drug_a 写成 `tnf_inhibitor`（那看上去更「一致」）：
+        // 判据是 [keySpace]，而 keySpace 不是「这个键自己」，是 `coveredTokens` 里**每个词**
+        // 走一遍 [drugOf] 后的**并集**。`adalimumab` 走 [drugOf] 会带上 `biologic`（它在
+        // `biologic` 的成员清单里），于是 `keySpace("tnf_inhibitor")` **含 `biologic`**；
+        // 而 JAK 的 `drugOf("upadacitinib")` = {upadacitinib, jak, biologic} → **仍然相交**。
+        // 也就是说：只把 `adalimumab` 换成 `tnf_inhibitor`，JAK **照样**收到这条 TNF 专属黑框。
+        // 「副作用自动消解」不成立，必须让键空间**不越过 TNF 家族边界**（见 [familyBoundedKeys]）。
+        //
+        // 为什么不给 itx-010 一起收紧：itx-010 是 ACR 2022 Table 5 的**活疫苗停药窗口**，
+        // 原文对 JAK 抑制剂**有**明确条目（JAK inhibitors | 1 week | 4 weeks）。让 JAK 一起失去
+        // 它x-010 才是真正的「收窄过头」——那会把一条该看的警告从真正需要的人手里拿走。
+        "tnf_inhibitor_strict" to listOf(
+            "tnf", "tnf抑制剂", "tnf_inhibitor",
+            "adalimumab", "etanercept", "infliximab", "golimumab", "certolizumab",
+        ),
         // IL-17 / IL-23 类：用于把「生物制剂」这个类别词展开到具体药，
         // 让 TNF 条目**不**命中 IL-17 药（种子至今没有 IL-17 专属条目，见审查报告 §4①）。
         "il17_inhibitor" to listOf("il17", "il-17", "il17抑制剂", "il-17抑制剂", "secukinumab", "ixekizumab"),
         "il23_inhibitor" to listOf("il23", "il-23", "il12_23", "il-12/23", "ustekinumab", "guselkumab", "risankizumab"),
         // 生物制剂（含 JAK 抑制剂这一「靶向治疗」家族）。
-        // 为什么把三支 JAK 抑制剂登记进来：种子的生物制剂级条目（itx-002 严重感染/结核黑框、
-        // itx-010 活疫苗接种窗口）挂在**具体品牌**上，而 JAK 抑制剂在旧实现下命中 0 条
-        // （审查报告 §2.3①，本批次已用 `MedicationInteractionChainTest` 复现）。
-        // 同属靶向治疗家族却一条提示都没有，比「多给一条家族级提示」危险得多。
-        // ⚠️ 这只是**覆盖取舍**，不等于 JAK 与 TNF 可互换：它x-002 的用药人群是否要按家族重写，
-        // 属医学内容，交维护者裁决（批次 18 回报的第三阶段提案表）。
+        // 为什么把三支 JAK 抑制剂登记进来：种子的生物制剂级条目挂在**类级键**上，
+        // 而 JAK 抑制剂在旧实现下命中 0 条（审查报告 §2.3①，本批次已用
+        // `MedicationInteractionChainTest` 复现）。同属靶向治疗家族却一条提示都没有，
+        // 比「多给一条家族级提示」危险得多。
+        //
+        // v1.1.3（批次 19 · J-2）：维护者已裁决——itx-002（阿达木单抗 PI 黑框）**不**按家族递，
+        // 它改挂 [familyBoundedKeys] 里的 `tnf_inhibitor_strict`，故 JAK 收不到它。
+        // JAK 目前**仍**收到 itx-010（ACR 2022 Table 5 对 JAK 有独立的活疫苗停药窗口：
+        // 接种前 1 周 / 接种后 4 周，与 TNF 的 1 个给药间隔不同），这一条**有意保留**。
+        // JAK 是否另需家族级条目，仍由维护者另行裁决；本批次**不**新建 JAK 条目。
         "biologic" to listOf(
             "biologic", "生物制剂", "生物类", "bmdard",
             "adalimumab", "etanercept", "infliximab", "golimumab", "certolizumab",
@@ -172,10 +193,13 @@ internal object DrugInteractionKeys {
         // 这些键**不覆盖家族键**，只列具体药：家族键 `nsaid` / `glucocorticoid` 本身已经涵盖具体药，
         // 若在这里再写一遍家族键，语义上没有任何增益，反而让「限定键 = 家族键」这层意图变得含糊。
         //
-        // `glucocorticoid_high_dose`（itx-012）：ACR 2022 表 4 的分层阈值是
+        // `glucocorticoid_high_dose`（itx-012）：ACR 2022 **Table 4** 的分层阈值是
         // **≥20 mg/天泼尼松等效**（本批次已核原文）。实现层仍是「激素在药单上即命中」
         // ——阈值判定需要药单剂量解析与替代激素换算，属独立议题（列入「未做」清单）。
         // 刻意从宽：宁可多提示一条，也不要因为算不出等效剂量而漏掉。
+        // v1.1.3（批次 19 · J-1）：itx-012 的正文已按 Table 4 改写——该剂量阈值管的是
+        //「除流感外的**非活**疫苗」，而「活疫苗」那条是**不分剂量的类别级**建议。
+        // 两条都挂在同一个 `drug_a` 上，故匹配层无需改动。
         "glucocorticoid_high_dose" to listOf("prednisone", "methylprednisolone", "dexamethasone"),
         // `nsaid_longterm`（itx-014）：条目语义是「长期 / 高危 NSAID 使用」，同样是强度限定词。
         "nsaid_longterm" to listOf(
@@ -217,13 +241,30 @@ internal object DrugInteractionKeys {
      */
     private val categoryKeys: Set<String> = setOf(
         "nsaid", "glucocorticoid", "csdmard", "jak", "biologic",
-        "tnf_inhibitor", "il17_inhibitor", "il23_inhibitor",
+        "tnf_inhibitor", "tnf_inhibitor_strict", "il17_inhibitor", "il23_inhibitor",
         "glucocorticoid_high_dose", "nsaid_longterm", MULTI_ANTI_INFLAMMATORY,
         "antihypertensive", "ssri", "ppi",
     )
 
     /** 语境键：种子里会被写成 `drug_b`、但判定入口不在 `medications` 表的那些（见 [LIVE_VACCINE]）。 */
     private val contextKeys = setOf(LIVE_VACCINE, "food_calcium")
+
+    /**
+     * v1.1.3（批次 19 · J-2）：**键空间在家族边界内闭合**的类级键。
+     *
+     * 这些键的键空间算完后要**剔掉** `biologic` 这个更大的「靶向治疗」家族——
+     * 因为条目问的是「这个家族里的药」，而 `biologic` 并不是「TNF 抑制剂」，它只是**包含** TNF 抑制剂。
+     *
+     * 不做这一步的后果（实测于批次 19）：`biologic` 同时登记了 TNF 药与 JAK 药，
+     * 于是**任何**挂在 TNF 类级键上的条目，其键空间都会带上 `biologic`，
+     * JAK 药单（`drugOf` 含 `biologic`）与之相交 → JAK 收到 TNF 专属的黑框警告。
+     * 这是「类级化」最隐蔽的一种失效：键越宽，警告递得越广，而**种子里的措辞没有跟着变宽**。
+     *
+     * ⚠️ 这**不是**说 JAK 没有该看的警告——是说那条警告该不该由哪个条目承载，属医学内容，
+     * 由维护者裁决（批次 18 回报的第三阶段提案表）。本批次只落 J-2 的裁决：
+     * itx-002（阿达木单抗 PI 黑框）不再递给 JAK；itx-010（活疫苗窗口）仍递给 JAK。
+     */
+    private val familyBoundedKeys = setOf("tnf_inhibitor_strict")
 
     /**
      * `food_calcium` 在药单侧对应哪些词。
@@ -311,6 +352,9 @@ internal object DrugInteractionKeys {
     private fun keySpace(key: String): Set<String> {
         val out = linkedSetOf<String>()
         for (t in coveredTokens(key)) out += drugOf(t)
+        // 家族内闭合：见 [familyBoundedKeys]。只对**类级键**有意义——
+        // 具体药键（如 `adalimumab`）本来就可以被同族药命中，剔不剔 `biologic` 无差别。
+        if (key in familyBoundedKeys) out -= "biologic"
         return out
     }
 

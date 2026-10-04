@@ -151,10 +151,10 @@
     "title": "发热预警阈值：38.5 ℃",
     "summary": "体温 ≥ 38.5 ℃ 时系统触发感染发热应急卡提示（生物制剂用户尤其重要）。",
     "severity_level": "medium",
-    "applicable_scene": "vitals.temperature 录入 ≥ 阈值；symptom_daily.feverish=1 且后续录体温；阈值设置页展示",
+    "applicable_scene": "vitals.temperature 录入 ≥ 阈值；symptom_daily.feverish=1 且后续录体温",
     "source_name": "系统内置阈值（参考感染发热应急流程通用医学口径；本条目为系统行为依据，非治疗建议）",
     "source_url": "",
-    "source_tier": "S2",
+    "source_tier": "SYS",
     "adapted_at": "2026-09-07",
     "review_due": "2027-03-07",
     "version": 1,
@@ -164,19 +164,19 @@
       "unit": "℃",
       "condition": "vitals.temperature >= value 触发 alert(symptom_abnormal, high) + 应急卡 infection_fever",
       "note": "用户可收紧（如 38.0）不可放宽——收紧即更敏感，放宽需咨询医生（裁决 G）",
-      "app_link": "我的-阈值设置页；alert_records 触发逻辑；应急中心 infection_fever 卡"
+      "app_link": "alert_records 触发逻辑；应急中心 infection_fever 卡"
     }
   },
   {
     "id": "edu-th-002",
     "category": "edu",
-    "title": "BASDAI 活动度预警阈值：≥4.0 持续 2 周",
-    "summary": "BASDAI 总分 ≥ 4.0 且持续 2 周时提示复诊（疾病活动度可能需要治疗调整——由医生判断）。",
+    "title": "BASDAI 活动度预警阈值：最近两次自评均 ≥4.0（间隔不限定）",
+    "summary": "最近**两次** BASDAI 自评均 ≥4.0 时提示复诊（疾病活动度可能需要治疗调整——由医生判断）。两次之间**不限定间隔**。",
     "severity_level": "medium",
-    "applicable_scene": "basdai_records 连续记录判定；阈值设置页展示",
-    "source_name": "系统内置阈值（BASDAI≥4 为临床常用疾病活动度界值口径；持续 2 周规则参考发作判定通行口径）",
+    "applicable_scene": "basdai_records 连续记录判定（最近两条）",
+    "source_name": "系统内置阈值（BASDAI≥4 为临床常用疾病活动度界值口径；「最近两次均 ≥4.0」是本 App 的产品口径，非指南条文）",
     "source_url": "",
-    "source_tier": "S2",
+    "source_tier": "SYS",
     "adapted_at": "2026-09-07",
     "review_due": "2027-03-07",
     "version": 1,
@@ -184,9 +184,9 @@
       "key": "threshold_basdai_flare",
       "value": 4.0,
       "unit": "分",
-      "condition": "连续 14 日内 ≥2 次 BASDAI 记录均 ≥4.0 → alert(basdai_high, medium) + 复诊建议卡",
-      "note": "收紧可调（如 3.5）；BASDAI 是患者自评工具，判定为提示性非诊断性",
-      "app_link": "我的-阈值设置页；basdai_records 趋势联动（数据 Tab 趋势页超阈值标记）"
+      "condition": "最近两次 BASDAI 记录均 ≥4.0（间隔不限定）→ alert(basdai_high, medium) + 复诊建议卡",
+      "note": "提示性非诊断性，BASDAI 是患者自评工具。口径变更记录：v1.1.2 移除了旧判据「连续 14 日内 ≥2 次」——BASDAI 提醒默认周期是 28 天，14 天窗口在默认配置下攒不出第二条记录，警报成了不可达的死分支；v1.1.3 同步本条目文案与实现",
+      "app_link": "basdai_records 趋势联动（数据 Tab 趋势页超阈值标记）"
     }
   }
 ]

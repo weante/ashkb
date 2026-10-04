@@ -33,18 +33,18 @@
   {
     "id": "itx-002",
     "category": "interaction",
-    "title": "阿达木单抗：严重感染与结核风险（黑框警告）",
+    "title": "TNF 抑制剂（以阿达木单抗 PI 为例）：严重感染与结核风险（黑框警告）",
     "summary": "TNF 抑制剂治疗可增加严重感染（含结核、机会性感染）风险；治疗前后需结核筛查与持续监测。",
     "severity_level": "high",
-    "applicable_scene": "新增阿达木单抗等生物制剂；发热或感染症状出现时；结核筛查到期提醒",
-    "source_name": "修美乐（阿达木单抗）中文处方信息（艾伯维）·警告：严重感染和恶性肿瘤；FDA HUMIRA 标签 Boxed Warning",
+    "applicable_scene": "新增 TNF 抑制剂（阿达木单抗 / 依那西普 / 英夫利西单抗等）；发热或感染症状出现时；结核筛查到期提醒",
+    "source_name": "修美乐（阿达木单抗）中文处方信息（艾伯维）·警告：严重感染和恶性肿瘤；FDA HUMIRA 标签 Boxed Warning（本条正文引文逐字取自该阿达木单抗 PI，类级适用见标题括注）",
     "source_url": "https://www.rxabbvie.com/content/dam/rxabbvie/pdf/humira_CHI.pdf",
     "source_tier": "S1",
     "adapted_at": "2026-09-04",
     "review_due": "2027-03-04",
     "version": 1,
     "payload": {
-      "drug_a": "adalimumab",
+      "drug_a": "tnf_inhibitor_strict",
       "drug_b": null,
       "risk_level": "high",
       "effect": "严重感染（包括结核、细菌性脓毒症、侵袭性真菌感染及其他机会性感染）风险升高，可致住院或死亡；儿童青少年中另有淋巴瘤等恶性肿瘤报告",
@@ -56,7 +56,7 @@
         "FDA Boxed Warning：HUMIRA should be discontinued if a patient develops a serious infection or sepsis during treatment."
       ],
       "action": [
-        "开始 / 续用生物制剂前完成结核筛查（T-SPOT 或 PPD）——对应 checkup_items 的 tb_screen 周期项",
+        "开始 / 续用 TNF 抑制剂前完成结核筛查（T-SPOT 或 PPD）——对应 checkup_items 的 tb_screen 周期项",
         "发热（≥38.5℃ 或持续发热）时暂停注射前先联系医生——联动应急流程 infection_fever",
         "出现持续咳嗽、盗汗、体重下降等结核可疑症状及时就医",
         "本 APP 在注射卡发热日自动弹「先联系医生」提示"
@@ -352,11 +352,11 @@
   {
     "id": "itx-012",
     "category": "interaction",
-    "title": "泼尼松 ≥20 mg/天 超过 2 周：活疫苗应暂缓",
-    "summary": "ACR 2022 分层：激素 ≥20 mg/天（≥14 天）时活疫苗 Defer；<20 mg/天 或短期 <2 周通常不构成活疫苗禁忌。",
+    "title": "ACR 2022：泼尼松 ≥20 mg/天应推迟除流感外的非活疫苗；活疫苗对免疫抑制治疗者一律有条件推迟",
+    "summary": "两件独立的事，别混：①「泼尼松 ≥20 mg/天」的剂量阈值只管**除流感外的非活疫苗**（减量至 <20 mg/天再种；流感疫苗照常给）；②**活疫苗**是**类别级**建议——对所有用免疫抑制药的 RMD 患者都建议推迟，**不分激素剂量**。",
     "severity_level": "medium",
-    "applicable_scene": "激素冲击 / 高剂量期间录入活疫苗计划；疫苗记录与药单激素剂量校验",
-    "source_name": "2022 ACR 疫苗指南（PMC10291822）",
+    "applicable_scene": "激素冲击 / 高剂量期间录入疫苗计划；疫苗记录与药单激素剂量校验",
+    "source_name": "2022 ACR 疫苗指南（PMC10291822）Table 4（非活疫苗剂量分层）+ Table 5 与正文（活疫苗类别级建议）",
     "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10291822/",
     "source_tier": "S1",
     "adapted_at": "2026-09-10",
@@ -366,18 +366,22 @@
       "drug_a": "glucocorticoid_high_dose",
       "drug_b": "live_vaccine",
       "risk_level": "medium",
-      "effect": "高剂量激素免疫抑制下活疫苗致播散风险；阈值：≥20 mg/天泼尼松等效 × ≥14 天",
-      "mechanism": "系统性免疫抑制阈值效应（ACR 剂量分层依据）",
+      "effect": "①（非活疫苗，剂量条件）：泼尼松等效 ≥20 mg/天时，除流感疫苗外的非活疫苗应推迟至减量至 <20 mg/天。②（活疫苗，类别条件）：对所有使用免疫抑制药物的风湿病患者，活疫苗（减毒株）有条件建议推迟——该建议不分激素剂量，激素 ≤10 mg/天者同样适用。",
+      "mechanism": "系统性免疫抑制下的疫苗应答与安全窗口（ACR Table 4 按激素剂量分层、Table 5 按药物类别给出活疫苗停药窗口）",
       "evidence": [
-        "ACR 2022：Prednisone ≥20 mg daily：非活疫苗 Give，活疫苗 Defer。",
-        "ACR 2022：Prednisone ≤10 mg 与 10–20 mg：Give（含活疫苗通常可给——以指南表格为准，具体遵医嘱）。"
+        "ACR 2022 Table 4 表题：Whether to give or defer non–live attenuated vaccinations in patients taking glucocorticoids regardless of disease activity（两列分别是 Influenza vaccination | Other non–live attenuated vaccinations）。",
+        "ACR 2022 Table 4：Prednisone ≥20 mg daily 行 = Give | Defer †；† = Defer vaccination until glucocorticoids are tapered to the equivalent of prednisone <20 mg daily.（Prednisone ≤10 mg 与 >10–<20 mg 两行均为 Give | Give）",
+        "ACR 2022 正文：For patients with RMD who are taking the equivalent of prednisone ≥20 mg daily, deferring non–live attenuated vaccinations, other than influenza vaccination, until glucocorticoids are tapered to the equivalent of prednisone <20 mg daily is conditionally recommended.",
+        "ACR 2022 正文（活疫苗 · 类别级）：For patients with RMD who are taking immunosuppressive medication, deferring live attenuated vaccines is conditionally recommended.",
+        "ACR 2022 正文：For patients with RMD, holding immunosuppressive medication for an appropriate period before and 4 weeks after live attenuated virus vaccination is conditionally recommended.（Table 5：Glucocorticoids 接种前 4 周 / 接种后 4 周）"
       ],
       "action": [
-        "APP 校验逻辑：medications 激素 current_dose ≥20 mg/天 且持续 ≥14 天 → vaccine_records 活疫苗录入弹本条 + 医生确认",
-        "剂量与时长自动从药单取（患者免算）；非活疫苗不受限",
-        "激素减量至 <20 mg 后由医生评估恢复接种"
+        "药单上有激素时录入非活疫苗（除流感外）→ 本条提示；是否已达「泼尼松等效 ≥20 mg/天」请与医生确认（本 APP 不解析剂量，见下方口径说明）",
+        "药单上有激素时录入活疫苗 → 本条提示 + 医生确认；这是类别级建议，与激素剂量无关",
+        "诚实口径：ACR 的「≥20 mg/天」是**纯剂量条件**，指南全文检索 \"14 days\" 为 0 命中——**没有「需连续用满 2 周」这回事**，本条已删除旧版标题里的「超过 2 周 / ≥14 天」",
+        "诚实口径：本 APP 不解析 mg/天，也无法换算等效剂量（旧版文案写「剂量与时长自动从药单取」与实现不符，已删）；ACR 的 * 脚注是 Or the equivalent dose of any other glucocorticoid formulation"
       ],
-      "app_link": "vaccine_records × medications 激素剂量联合校验；与 itx-010 组成疫苗组双条（生物制剂 / 高剂量激素两触发条件）"
+      "app_link": "vaccine_records × medications 激素联合校验（药单上有激素即提示，剂量由医生判断）；与 itx-010 组成疫苗组双条（生物制剂 / 激素两触发条件）"
     }
   },
   {

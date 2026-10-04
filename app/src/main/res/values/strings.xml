@@ -67,7 +67,7 @@
     <string name="backup_skipped_prefix">已跳过：</string>
     <string name="backup_to_dav">备份到 WebDAV</string>
     <string name="basdai_high_alert_note">BASDAI ≥ 4.0：疾病活动度高，复诊时请与医生讨论（edu-th-002）</string>
-    <string name="basdai_high_note_paren">（≥4.0：活动度偏高，两周内两次将提示复诊）</string>
+    <string name="basdai_high_note_paren">（≥4.0：活动度偏高，最近两次自评均 ≥4.0 将提示复诊）</string>
     <string name="basdai_intro_note">6 题自评（0–10），总分 (Q1+Q2+Q3+Q4+(Q5+Q6)/2)/5。建议每周固定同日自评一次，就诊时给医生看趋势。</string>
     <string name="basdai_q1_fatigue">Q1 整体疲乏程度</string>
     <string name="basdai_q2_spinal_pain">Q2 脊柱痛程度</string>
@@ -78,8 +78,8 @@
     <string name="basdai_self_high">自评偏高</string>
     <string name="basdai_title">BASDAI 疾病活动度自评</string>
     <string name="basdai_total_score">BASDAI 总分</string>
-    <string name="basdai_weekly_note">回顾最近一周的感受作答（0=无，10=最重）。未作答的题按 0（无症状）计入总分。</string>
-    <string name="basdai_default_zero_note">已作答 %1$d/6 题，未作答的按 0（无症状）计入总分</string>
+    <string name="basdai_weekly_note">回顾最近一周的感受作答（0=无，10=最重）。6 题全部作答后才会计算总分。</string>
+    <string name="basdai_incomplete_note">已作答 %1$d/6 题——6 题全部作答才会计算总分（BASDAI 需完整施测，缺题不计分）</string>
     <string name="checkup_add_item">添加项目</string>
     <string name="checkup_add_item_button">添加复诊项目</string>
     <string name="checkup_add_item_note">添加周期性检查项目（如血常规、眼科年检），系统将自动追踪</string>
@@ -686,6 +686,8 @@
     <string name="kb_tier_s2_full">S2 同行评审期刊的开放获取全文（如 PMC）</string>
     <string name="kb_tier_s3_full">S3 权威患者组织、医院或 NHS 的患者教育页</string>
     <string name="kb_tier_s4_full">S4 商业平台（用药助手、drugs.com 等），仅作备用参考</string>
+    <string name="kb_tier_sys_short">SYS 系统内置口径（无外部来源）</string>
+    <string name="kb_tier_sys_full">SYS 系统内置口径：没有外部文献或指南来源，是本 App 自己定的阈值/规则</string>
     <string name="knowledge_evidence_meta">证据层级 %1$s · 适配 %2$s · 复核 %3$s · v%4$s</string>
     <string name="knowledge_overdue_count">%1$s 条内容已过复核日</string>
     <string name="knowledge_source_line">来源：%1$s</string>

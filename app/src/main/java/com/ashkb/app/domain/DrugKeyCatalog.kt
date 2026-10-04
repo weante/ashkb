@@ -9,6 +9,25 @@ data class DrugKeyEntry(
     val brand: String? = null,
     val medClass: MedClass = MedClass.OTHER,
     val aliases: List<String> = emptyList(),
+    /**
+     * v1.1.3（批次 19 · J-7）：**选药时给患者看的一句提示**，目前只有一种用途——
+     * 「未检索到 AS（axSpA）适应症」。
+     *
+     * ### 这不是 Room 实体
+     * `DrugKeyEntry` 是**编译期目录常量**（`DrugKeyCatalog.entries`），不参与 Room 建表、
+     * 不落库、不进备份恢复。加这个字段**不构成改 schema**——它与 `MedClass` 枚举、
+     * `aliases` 列表一样，是纯内存里的检索元数据。真正会牵动迁移的是 `@Entity` 的构造参数。
+     *
+     * ### 为什么是「提示」而不是「不给选」
+     * 维护者裁决为 (b) 保留 + 标注。三支 IL-12/23 · IL-23 抑制剂（乌司奴 / 古塞奇尤 / 瑞莎珠）
+     * 在中国获批适应症里未检索到 axSpA，但**AS 患者合并银屑病关节炎或炎症性肠病时确可能使用**，
+     * 删除目录等于替医生做了一个临床决定。因此：留在目录、选中时如实说明、决定权交给医生与患者。
+     *
+     * ### 措辞刻意中性
+     * 写「未检索到 AS 适应症」而不是「你不该用」：前者陈述**检索结果**（可被新证据推翻），
+     * 后者是**用药结论**（我们没有资格下）。措辞过头就是新的失实。
+     */
+    val note: String? = null,
 )
 
 /**
@@ -18,6 +37,22 @@ data class DrugKeyEntry(
  */
 object DrugKeyCatalog {
 
+    /**
+     * v1.1.3（批次 19 · J-7）：IL-12/23 · IL-23 抑制剂（乌司奴 / 古塞奇尤 / 瑞莎珠）选中时的提示。
+     *
+     * 措辞逐字说明——为什么这么写：
+     *  · 「**未检索到**」而不是「没有」：这是**检索结果**陈述。适应症会变（新版说明书可能新增），
+     *    说成「没有」就是把一个有时间戳的结论说成永恒事实；
+     *  · 「AS（axSpA）」而不是只写「AS」：两个缩写指的是同一件事，写全免得患者以为是两种病；
+     *  · 「**是否使用由医生判断**」而不是「你不该用」：AS 患者合并银屑病关节炎 / 炎症性肠病时
+     *    确可能用到这类药，我们没有资格替医生下用药结论。
+     *
+     * ⚠️ 这条提示是**目录层面的事实说明**，不是新写的医学内容：它陈述的是「本次检索没找到
+     * AS 适应症」+「请医生判断」，两者都不超出「如实告知检索结果」的边界。
+     */
+    private const val IL23_NO_AS =
+        "未检索到该药的 AS（axSpA / 中轴型脊柱关节炎）适应症；合并银屑病关节炎或炎症性肠病时可能使用，是否使用由医生判断。"
+
     val entries = listOf(
         // ---- TNF 抑制剂 ----
         DrugKeyEntry("adalimumab", "阿达木单抗", "修美乐", MedClass.BIOLOGIC, listOf("humira", "阿达")),
@@ -26,11 +61,14 @@ object DrugKeyCatalog {
         DrugKeyEntry("golimumab", "戈利木单抗", "欣普尼", MedClass.BIOLOGIC),
         DrugKeyEntry("certolizumab", "培塞利珠单抗", "希敏佳", MedClass.BIOLOGIC),
         // ---- IL-17 / IL-12·23 / IL-23 ----
+        // v1.1.3（批次 19 · J-7）：三支 IL-12/23 · IL-23 抑制剂带 [DrugKeyEntry.note]，
+        // 选中时提示「未检索到 AS 适应症」。**留在目录是刻意的**（见 note 的文档）——
+        // AS 患者合并 PsA / IBD 时确可能使用，是否用由医生判断。
         DrugKeyEntry("secukinumab", "司库奇尤单抗", "可善挺", MedClass.BIOLOGIC, listOf("cosentyx")),
         DrugKeyEntry("ixekizumab", "依奇珠单抗", "拓咨", MedClass.BIOLOGIC, listOf("taltz")),
-        DrugKeyEntry("ustekinumab", "乌司奴单抗", "喜达诺", MedClass.BIOLOGIC, listOf("stelara")),
-        DrugKeyEntry("guselkumab", "古塞奇尤单抗", "特诺雅", MedClass.BIOLOGIC, listOf("tremfya")),
-        DrugKeyEntry("risankizumab", "瑞莎珠单抗", "利生奇珠", MedClass.BIOLOGIC, listOf("skyrizi")),
+        DrugKeyEntry("ustekinumab", "乌司奴单抗", "喜达诺", MedClass.BIOLOGIC, listOf("stelara"), IL23_NO_AS),
+        DrugKeyEntry("guselkumab", "古塞奇尤单抗", "特诺雅", MedClass.BIOLOGIC, listOf("tremfya"), IL23_NO_AS),
+        DrugKeyEntry("risankizumab", "利生奇珠单抗", "利生奇珠", MedClass.BIOLOGIC, listOf("skyrizi"), IL23_NO_AS),
         // ---- 传统 DMARD ----
         DrugKeyEntry("methotrexate", "甲氨蝶呤", null, MedClass.CSDMARD, listOf("mtx", "甲氨喋呤")),
         DrugKeyEntry("sulfasalazine", "柳氮磺吡啶", "维柳芬", MedClass.CSDMARD, listOf("sas", "ssz", "柳氮")),
@@ -47,8 +85,8 @@ object DrugKeyCatalog {
         DrugKeyEntry("acetaminophen", "对乙酰氨基酚", "泰诺林", MedClass.NSAID, listOf("扑热息痛", "paracetamol")),
         // ---- JAK 抑制剂 ----
         DrugKeyEntry("tofacitinib", "托法替布", "尚杰", MedClass.JAK, listOf("xeljanz")),
-        DrugKeyEntry("upadacitinib", "乌帕替尼", "艾乐明", MedClass.JAK, listOf("rinvoq")),
-        DrugKeyEntry("baricitinib", "巴瑞替尼", "艾乐铭", MedClass.JAK, listOf("olumiant")),
+        DrugKeyEntry("upadacitinib", "乌帕替尼", "瑞福", MedClass.JAK, listOf("rinvoq")),
+        DrugKeyEntry("baricitinib", "巴瑞替尼", "艾乐明", MedClass.JAK, listOf("olumiant")),
         // ---- 糖皮质激素 ----
         DrugKeyEntry("prednisone", "泼尼松", "强的松", MedClass.GLUCOCORTICOID),
         DrugKeyEntry("methylprednisolone", "甲泼尼龙", "美卓乐", MedClass.GLUCOCORTICOID, listOf("甲强龙")),

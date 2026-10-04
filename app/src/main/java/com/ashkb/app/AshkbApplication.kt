@@ -235,6 +235,11 @@ class AshkbApplication : Application() {
          * 1 = 旧实现（首启导入后永不再看）；2 = v1.0.44 起启用增量刷新；
          * 3 = v1.1.2（批次 18）**补闸**——把闸门补开到「当前内容」；
          * 4 = v1.1.2 修订 `exc-004` 的来源链接（站点更名致原 PDF 404）并同步机构名。
+         * 5 = v1.1.3（批次 19）落实维护者的医学内容裁决：`itx-002` 由品牌键改为
+         *     TNF 类级键（标题与 `source_name` 同步去掉品牌泛化）、`itx-012` 按 ACR 2022
+         *     原文拆成两条事实、`exc-001`/`exc-003` 补「诚实口径」说明、
+         *     `exb-004`/`fdg-004` 商业来源降 S4、`edu-th-001`/`edu-th-002` 无来源条目改标 SYS、
+         *     `edu-th-002` 文案与 v1.1.2 已实现的行为对齐。五个种子文件全部有改动。
          *
          * 为什么要补这一跳（3 那一跳）：`git log` 显示 v1.0.70 往 `kb_seed_edu.json` 加了 `edu-005`、
          * 另一次提交改写了 `exc-004` 的文案，两次都**没有**动这个常量。
@@ -251,13 +256,13 @@ class AshkbApplication : Application() {
          * ⚠️ 今后 bump 之后还必须同步 `KbSeedVersionGateTest.FINGERPRINTS`（那条断言会先红，
          * 提醒你登记新指纹）——两者是同一件事的两半，漏一个都会让已安装用户永久停在旧内容。
          */
-        internal const val KB_SEED_VERSION = 4
+        internal const val KB_SEED_VERSION = 5
 
         private const val PREFS = "app_prefs"
         private const val KEY_SEED_VERSION = "kb_seed_version"
 
         /**
-         * 种子文件清单（47 条 = itx 15 / exc 15（红10+黑5）/ fdg 6 / emr 5 / edu 6（含阈值 2））。
+         * 种子文件清单（48 条 = itx 15 / exc 15（红10+黑5）/ fdg 6 / emr 5 / edu 7（含阈值 2））。
          *
          * 内部可见（不是 `private`）：`KbSeedVersionGateTest` 的内容指纹**必须覆盖同一份清单**，
          * 否则「少改一个文件 / 改了一个没登记的文件」就能绕过那道门——这正是它要防的事。

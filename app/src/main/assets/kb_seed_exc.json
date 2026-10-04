@@ -32,7 +32,8 @@
       "action": [
         "泳姿：自由泳（身体延展含颈部）+ 每次包含仰泳（开胸）；蛙泳注意颈部对齐（颈椎受限者见 exb-004）",
         "起始温和短时长；发作期减量或暂停（exb-002 联动）",
-        "2025 指南优先地面运动的定位如实告知：地面 / 水中均可，按条件选择"
+        "2025 指南优先地面运动的定位如实告知：地面 / 水中均可，按条件选择",
+        "诚实口径：本条与快走（exc-003）同为 L2，但矩阵在控制期给本条 pause、给快走 downgrade（v1.1.3 批次 19 · J-3）。种子没有任何字段解释这个差异，NASS 原文只说「Start gently」。按维护者裁决**只补这句口径说明、不改矩阵**——既不把差异说成「有依据」，也不替它编一个依据"
       ],
       "alternative_hint": "无泳池条件 → 快走（exc-003）；水中运动科（康复科水疗）咨询",
       "app_link": "运动计划有氧类可选项目；发作期自动过滤（stage_fit）；与 exb-004 泳姿校验联动"
@@ -107,7 +108,8 @@
       "action": [
         "摆臂走（激活肩部）",
         "分段累积法：3 × 10 分钟也达标——通勤族友好",
-        "鞋子缓冲好、路线平坦（髋膝受累者）"
+        "鞋子缓冲好、路线平坦（髋膝受累者）",
+        "诚实口径：本条与游泳（exc-001）同为 L2，但矩阵在控制期给本条 downgrade、给游泳 pause（v1.1.3 批次 19 · J-3）。种子没有任何字段解释这个差异，NASS 原文也未按分期区分这两项。按维护者裁决**只补这句口径说明、不改矩阵**——差异本身是数据事实，成因未知，不要当成「有依据的分期规则」来读"
       ],
       "alternative_hint": "雨天 / 体能低 → 室内走廊快走（NASS 居家版原文支持）",
       "app_link": "运动计划默认有氧项；与 exc-002 总则联动计数"
@@ -474,9 +476,9 @@
     "summary": "蛙泳需要反复大幅颈椎屈伸，可能加重已僵硬的颈部；颈椎活动受限者建议改仰泳。",
     "severity_level": "medium",
     "applicable_scene": "选游泳为运动计划内容时；spine_mobility 含颈段受限用户",
-    "source_name": "myHealthcare AS Exercise and PT Protocol",
+    "source_name": "myHealthcare（商业健康内容平台）AS Exercise and PT Protocol —— 商业平台内容，非同行评审文献、非官方指南，仅作备用参考",
     "source_url": "https://www.myhealthcare.com/Diseases/Rheumatology/Ankylosing-Spondylitis/Exercise-and-PT-Protocol.html",
-    "source_tier": "S2",
+    "source_tier": "S4",
     "adapted_at": "2026-09-07",
     "review_due": "2027-03-07",
     "version": 1,
