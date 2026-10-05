@@ -70,6 +70,7 @@ class KbSeedVersionGateTest {
         8 to "21411c19043bfe991a4f794f30c6b0d19077b2830a7322b6e8f1afe411e466ca",
         9 to "ea5aa652392046ddb972899d182b3abe9fca722722bba207762ad0c19497abf6",
         10 to "63c974077bd5e5c1bb5dc536ee0ee3adacbe708aa623613063ce2b802da38d19",
+        11 to "9451c3c05fdcb3d2207cec9b5d7efe1d45f998ee72cfb74cd37331f5afd69e1b",
     )
 
     /** 单测工作目录是模块目录（`app/`），与 `MedicationInteractionChainTest` 同一约定。 */
