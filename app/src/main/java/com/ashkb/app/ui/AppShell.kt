@@ -100,7 +100,27 @@ import com.ashkb.app.ui.wellness.RecipesScreen
 import com.ashkb.app.ui.wellness.RecipesViewModel
 import com.ashkb.app.ui.wellness.WellnessScreen
 import com.ashkb.app.ui.wellness.WellnessViewModel
-
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import com.ashkb.app.ui.theme.Glass
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 /**
  * 应用骨架。
  *
@@ -179,6 +199,12 @@ fun AppShell() {
     // 多背两份构建成本与失败面；移入路由后，冷启动与它们彻底解耦。
 
     Scaffold(
+        // v1.1.6：**容器透明**。`Scaffold` 默认用 `colorScheme.background` 铺满整个区域
+        // （含 bottomBar 槽位下方那段系统手势区）。置零 contentWindowInsets 只去掉了
+        // "额外留白"，但**槽位本身仍被 background 铺满**——维护者截图里那条横带（实测
+        // y≈3087..3200，高 113px ≈ 41dp，正是手势区高度）就是它。
+        // 透明之后，页面背景由各页面自己提供，dock 下方露出的就是页面本色。
+        containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             AnimatedVisibility(
@@ -186,29 +212,124 @@ fun AppShell() {
                 enter = slideInVertically { it },
                 exit = slideOutVertically { it },
             ) {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
-                    tabs.forEach { t ->
-                        val selected = topTab == t
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = {
-                                if (!selected) {
-                                    nav.navigate(t.route) {
-                                        popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                }
-                            },
-                            icon = {
-                                Icon(
-                                    imageVector = if (selected) t.selectedIcon else t.icon,
-                                    contentDescription = null,   // 装饰性：label 已承载语义
-                                    modifier = Modifier.size(Size.iconMd),
+                // v1.1.6：导航栏改用「半透明底 + 顶部 1dp 高光」的玻璃表层。
+                // 为什么不是真 backdrop-blur：Compose 没有 backdrop-filter（Modifier.blur 模糊的是
+                // 自己），真模糊背后要 RenderEffect = API 31+，而本应用 minSdk 26 且维护者要求
+                // 顾及其他机型 —— 见 ui/theme/Color.kt 的 Glass 注释。
+                // 为什么导航栏合适：它是唯一**完全静止**的全宽表层（内容从它下面滚过、它自己不动），
+                // 半透明能让人看见"内容还在继续"，而它一帧都不用重算。
+                // 浅色 / 深色判定只算一次：两处表层色与高光色必须同源，各算一次可能不一致
+                val isLightSurface = MaterialTheme.colorScheme.background.luminance() > 0.5f
+                // v1.1.6：**iOS 式悬浮 dock**——不再全宽贴底，而是留出外边距的圆角矩形。
+                // 维护者原话：「需要向 iOS 一样圆角矩形，而不是像现在一样直接贴合在最底层无边框」。
+                // 三件套缺一不可：① 外侧留白（左右 + 底部）② 大圆角 ③ 柔和投影（浮起来）。
+                val barShape = RoundedCornerShape(Size.dockCorner)
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        // 手势区避让由这里承担（NavigationBar 的 windowInsets 已置零）：
+                        // 底部 10dp 比顶部 8dp 略多，让 dock 与屏幕下缘有呼吸感。
+                        // 底部 = 系统手势区高度 + 10dp 呼吸感（Scaffold 的 inset 已置零，
+                        // 这里成为唯一的底部避让点——置零而不补，dock 会压在手势条上）。
+                        .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.sm)
+                        .padding(bottom = 10.dp)
+                        .windowInsetsPadding(WindowInsets.navigationBars),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            // ⚠️ v1.1.6 定案：**不能用 `Modifier.shadow`**。
+                            //
+                            // 像素采样证明（维护者第五次反馈"横带还在"）：`elevation = 10dp`
+                            // 会在 dock 下方投出一条 y=3110..3140 的**渐变灰带**（采样 203→234、
+                            // 整宽均匀）。前四次我分别怀疑过 NavigationBar 的 windowInsets、
+                            // NavigationBar 自带高度、Scaffold 的 contentWindowInsets、Scaffold 的
+                            // containerColor —— 全错。定位靠的是**采样像素的渐变形**（底色带颜色
+                            // 均匀，投影才渐变），不是读代码推理。
+                            //
+                            // 附带事实：y=3140..3200 那段是**系统手势条**（dumpsys window 实测
+                            // `navigationBars frame=[0,3140][1440,3200]`），应用改不了它；
+                            // 能消的只有我们自己投影的这 30px。
+                            //
+                            // 替代：画一圈极淡轮廓代替真实投影——分层观感保留，下方不再有灰带。
+                            .drawBehind {
+                                drawRoundRect(
+                                    color = Color.Black.copy(alpha = 0.04f),
+                                    topLeft = Offset(0f, 1.dp.toPx()),
+                                    // ⚠️ 这里的 Size 是 Compose 几何类型，与项目 theme.Size
+                                    // （度量对象）同名，故用全限定名避免歧义。
+                                    size = androidx.compose.ui.geometry.Size(size.width, size.height),
+                                    cornerRadius = CornerRadius(
+                                        com.ashkb.app.ui.theme.Size.dockCorner.toPx(),
+                                        com.ashkb.app.ui.theme.Size.dockCorner.toPx(),
+                                    ),
                                 )
-                            },
-                            label = { Text(t.label) },
-                        )
+                            }
+                            .clip(barShape)
+                            .background(if (isLightSurface) Glass.surfaceLight else Glass.surfaceDark)
+                            .border(
+                                width = 1.dp,
+                                color = if (isLightSurface) Glass.borderLight else Glass.borderDark,
+                                shape = barShape,
+                            ),
+                    ) {
+                        // v1.1.6：**不再用 Material3 的 `NavigationBar`**，改用手写 Row。
+                        //
+                        // 为什么换掉（维护者截图："有个奇怪的阴影"）：`NavigationBar` **自带高度**
+                        // （80dp 容器 + 可被 windowInsets 撑高），它内部还有自己的占位与底色。
+                        // 外边再套圆角玻璃底时，两者高度对不齐 → 出现一条"上边缘硬、下边缘带阴影"
+                        // 的横带。关掉 windowInsets 只解决了它撑高的问题，**没解决容器自带留白**。
+                        // 手写 Row 后：高度由我们的内边距决定，圆角/边框/投影三者共用同一条边界，
+                        // 不再有任何"对不齐"的可能。
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(barShape)
+                                .padding(vertical = Spacing.xs),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            tabs.forEach { t ->
+                                val selected = topTab == t
+                                // 单 tab：图标 + 文字竖排；选中态是**内缩的胶囊**（iOS 那种），
+                                // 而不是 NavigationBarItem 默认的整格高亮 —— 整格高亮会一路顶到
+                                // dock 边缘，把圆角吃出一个方角。
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(Size.dockItemCorner))
+                                        .background(
+                                            if (selected) {
+                                                MaterialTheme.colorScheme.secondaryContainer
+                                            } else {
+                                                Color.Transparent
+                                            },
+                                        )
+                                        .clickable(enabled = !selected) {
+                                            nav.navigate(t.route) {
+                                                popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        }
+                                        .padding(vertical = Spacing.xs)
+                                        .heightIn(min = Size.touchMin),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = if (selected) t.selectedIcon else t.icon,
+                                        contentDescription = null,   // 装饰性：label 已承载语义
+                                        modifier = Modifier.size(Size.iconMd),
+                                    )
+                                    Spacer(Modifier.height(Spacing.xxs))
+                                    Text(
+                                        t.label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

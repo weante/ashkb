@@ -28,6 +28,19 @@ object Size {
     val iconLg = 28.dp
     val chipHeight = 28.dp
     val rowMinHeight = 44.dp    // 键值行
+
+    // v1.1.6：**悬浮 dock**（iOS 式圆角矩形）的两个度量。
+    // 为什么 20：dock 的实际高度约 80dp，iOS 那种观感是**约高度的 1/4**。第一版取 28
+    // （与 extraLarge 同值）在真机上显得像胶囊——维护者截图后改为 20。
+    val dockCorner = 20.dp
+    // 为什么 10：HTML 预览的 `--glass-shadow` 是 `0 8px 32px`，垂直偏移 8px →
+    // Compose 的 elevation 约取 8–10dp 才有同等的"浮起来"观感；太小看不出悬浮，
+    // 太大会在深色底上形成一圈灰晕。
+    val dockShadow = 10.dp
+
+    // v1.1.6：dock 内**选中态胶囊**的圆角。为什么 16：它是 dock（20）内部的一层，
+    // 圆角必须明显小于外框，否则选中胶囊会与 dock 圆角"同弧"而看不出层次。
+    val dockItemCorner = 16.dp
     // v1.0.94：键值行（KeyValueRow）**标签列**的最小宽度——短标签也占这么宽，数值因此从同一条 x 起排。
     //
     // 为什么是 128：本 App 把 bodyMedium 上调到 **15sp**、字距 0.25sp（见 `ui/theme/Type.kt`，

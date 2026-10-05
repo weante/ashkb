@@ -1,3 +1,17 @@
+## v1.1.6 — iOS 式悬浮 Dock、弹层回归原生、minSdk 提到 31
+
+维护者连续截图暴露的问题，逐个改用**像素采样**定位（此前五轮都是"读代码猜"，全错）。
+
+- **Dock**：从全宽贴底改为 iOS 式**圆角悬浮矩形**（左右 16dp 留白、20dp 圆角、1dp 玻璃边框、选中态内缩胶囊）。
+- **"横带"真凶**：`Modifier.shadow(elevation = 10dp)` 向下投出的渐变灰带（实测 `y=3110..3140`、采样 `203→234`）。
+  前四次分别怀疑过 `NavigationBar` 的 windowInsets / 自带高度 / `Scaffold` 的 contentWindowInsets /
+  containerColor —— 全错。改用 `drawBehind` 画极淡轮廓后实测 `250,250,250` 均匀。
+  ⚠️ 附带事实：`y=3140..3200` 是**系统手势条**（`navigationBars frame=[0,3140][1440,3200]`），应用改不了。
+- **弹层回归原生**：`GlassSheet` 连改四版（52% 玻璃 → 无遮罩 → 全黑 → 透明容器自绘）后确认
+  **原生 `ModalBottomSheet` 本来就是对的**，包装现在只做"直接调用、什么都不传"。
+- **minSdk 26 → 31**：维护者裁决。代价是 Android 8–11 无法安装 ⚠️。
+
+单测 822 条全绿。
 # Changelog
 
 ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面向强直性脊柱炎患者的离线优先个人健康管理应用。

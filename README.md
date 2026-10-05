@@ -54,7 +54,7 @@ Ankylosing Spondylitis Health Knowledge Base —— 一款面向强直性脊柱�
 | PDF | `android.graphics.pdf` 原生导出 |
 | 加密 | `javax.crypto` AES-256-GCM + PBKDF2（备份容器） |
 | 架构 | 单模块 MVVM（ViewModel + Repository），domain 层纯函数可测 |
-| SDK | compileSdk 34 · minSdk 26（Android 8.0+） · targetSdk 34 |
+| SDK | compileSdk 34 · minSdk 31（Android 12+） · targetSdk 34 |
 
 ## 构建
 
@@ -85,7 +85,7 @@ gradle testDebugUnitTest    # 单元测试
 
 ## 版本
 
-当前 `v1.1.5`（versionCode 107）。P0~P5 阶段开发完成，处于自用验证（dogfooding）阶段。
+当前 `v1.1.6`（versionCode 108）。P0~P5 阶段开发完成，处于自用验证（dogfooding）阶段。
 
 ## License
 

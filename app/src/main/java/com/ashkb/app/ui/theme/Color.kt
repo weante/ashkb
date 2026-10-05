@@ -116,6 +116,45 @@ val scrimDark = Color(0xFF000000)
 // 以下为手工装配区
 // ============================================================
 
+/**
+ * v1.1.6：**半透明表层（"毛玻璃"替代方案）** 的两个颜色。
+ *
+ * ### 为什么不用真的 backdrop-blur
+ * HTML 里的 `backdrop-filter` 在 Compose **没有等价物**：`Modifier.blur()` 模糊的是
+ * **这个元素自己**，不是它背后的内容。真正模糊背后需要 `RenderEffect`（**API 31+**），
+ * 而本应用 `minSdk = 26` —— 维护者明确要求**顾及其他机型**，所以不用它。
+ *
+ * ### 用的是什么
+ * 「**半透明底 + 一道高光分隔线**」：视觉上非常接近毛玻璃，代价近零，**全机型一致**。
+ * - [GlassSurfaceLight] / [GlassSurfaceDark]：表层底色（带 alpha，让下方内容微微透出来）
+ * - [GlassHighlightLight] / [GlassHighlightDark]：顶部那道高光（**模拟光从上方打在玻璃边缘**，
+ *   少了它，半透明底会显得"脏"而不是"玻璃"）
+ *
+ * ⚠️ **只在导航栏与弹层用**（维护者裁决）：这两处静止、面积小。**列表卡片不要用**——
+ * 滚动时每帧都要重新合成半透明层，是纯亏。**安全类信息（发热 / 漏服 / 相互作用 /
+ * 黑框警告 / 删除确认）绝对不用**：半透明会让对比度随背景变化，而医学警告不能
+ * "看背景运气"。
+ */
+object Glass {
+    // v1.1.6：**逐字对齐 HTML 预览的三件套**（此前我只做了"半透明"，漏了边框与投影，
+    // 所以看起来不像玻璃）。HTML 原值：
+    //   --glass:        rgba(255,255,255,.52)   →  52%（我原先用 95%，肉眼几乎看不出差别）
+    //   --glass-border: rgba(255,255,255,.75)   →  那道"玻璃边缘"
+    //   --glass-shadow: 0 8px 32px rgba(44,50,56,.10)  →  让它"浮起来"
+    // 半透明底本身是白，深色下换成深底；边框与投影同理各一套。
+    val surfaceLight = Color(0x85FFF8F4)   // 52% 白（0x85 ≈ 133/255）
+    val surfaceDark = Color(0x85151210)
+    val borderLight = Color(0xBFFFFFFF)    // 75% 白：玻璃边缘高光
+    val borderDark = Color(0x2EFFFFFF)
+    val highlightLight = Color(0x66FFFFFF) // 顶部 1dp 那道更亮的高光（边框之上再强调一次）
+    val highlightDark = Color(0x1FFFFFFF)
+
+    /** `0 8px 32px rgba(44,50,56,.10)` —— 悬浮感来源；对应 HTML 的垂直偏移 8px。 */
+    const val shadowDp = 8
+
+    /** 与 `--glass-shadow` 的模糊半径对应：投影要够软才像玻璃浮起来。 */
+    const val shadowSoftDp = 32
+}
 val LightColors = lightColorScheme(
     primary = primaryLight, onPrimary = onPrimaryLight,
     primaryContainer = primaryContainerLight, onPrimaryContainer = onPrimaryContainerLight,

@@ -78,6 +78,7 @@ import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
+import com.ashkb.app.ui.components.GlassSheet
 
 /**
  * 「营养与骨骼」主页（route `wellness`）。
@@ -874,7 +875,9 @@ private fun VitalsSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
         (sysVal == null || diaVal == null || sysVal > diaVal)
     val canSave = anyValue && rangesOk
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // v1.1.6（B'）：弹层玻璃表层——与底部导航栏同一套语言（半透明底 + 顶部 1dp 高光）。
+    // 不用真 backdrop-blur 的理由见 GlassSheet 的注释；内容区一字未改（SheetColumn 照旧）。
+    GlassSheet(onDismissRequest = onDismiss) {
         SheetColumn {
             Text(stringResource(R.string.vitals_record_action), style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(temp, { temp = it }, label = { Text(stringResource(R.string.vitals_temperature_field)) }, singleLine = true)
@@ -932,7 +935,9 @@ private fun WeightSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
     var weight by remember { mutableStateOf(current?.weightKg?.toString() ?: "") }
     var notes by remember { mutableStateOf(current?.notes ?: "") }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // v1.1.6（B'）：弹层玻璃表层——与底部导航栏同一套语言（半透明底 + 顶部 1dp 高光）。
+    // 不用真 backdrop-blur 的理由见 GlassSheet 的注释；内容区一字未改（SheetColumn 照旧）。
+    GlassSheet(onDismissRequest = onDismiss) {
         SheetColumn {
             Text(stringResource(R.string.vitals_record_weight), style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(weight, { weight = it }, label = { Text(stringResource(R.string.vitals_weight_field)) }, singleLine = true)
@@ -970,7 +975,9 @@ private fun BodyMeasureSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
     } else null
     LaunchedEffect(autoBmi) { if (autoBmi != null) bmi = autoBmi }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // v1.1.6（B'）：弹层玻璃表层——与底部导航栏同一套语言（半透明底 + 顶部 1dp 高光）。
+    // 不用真 backdrop-blur 的理由见 GlassSheet 的注释；内容区一字未改（SheetColumn 照旧）。
+    GlassSheet(onDismissRequest = onDismiss) {
         SheetColumn {
             Text(stringResource(R.string.vitals_body_measures), style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(height, { height = it }, label = { Text(stringResource(R.string.vitals_height_cm)) }, singleLine = true)
@@ -1026,7 +1033,9 @@ private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, 
     var category by remember { mutableStateOf(SupplementCategory.fromKey(current?.category)) }
     var notes by remember { mutableStateOf(current?.notes ?: "") }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // v1.1.6（B'）：弹层玻璃表层——与底部导航栏同一套语言（半透明底 + 顶部 1dp 高光）。
+    // 不用真 backdrop-blur 的理由见 GlassSheet 的注释；内容区一字未改（SheetColumn 照旧）。
+    GlassSheet(onDismissRequest = onDismiss) {
         SheetColumn {
             Text(
                 stringResource(if (current == null) R.string.nutrition_add_supplement else R.string.common_edit),
@@ -1099,7 +1108,9 @@ private fun DietSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
     var dairy by remember { mutableStateOf(current?.dairyTolerant ?: "yes") }
     var notes by remember { mutableStateOf(current?.notes ?: "") }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // v1.1.6（B'）：弹层玻璃表层——与底部导航栏同一套语言（半透明底 + 顶部 1dp 高光）。
+    // 不用真 backdrop-blur 的理由见 GlassSheet 的注释；内容区一字未改（SheetColumn 照旧）。
+    GlassSheet(onDismissRequest = onDismiss) {
         SheetColumn {
             Text(stringResource(R.string.nutrition_diet_profile), style = MaterialTheme.typography.titleLarge)
             Text(stringResource(R.string.nutrition_diet_pattern), style = MaterialTheme.typography.labelMedium)
@@ -1170,7 +1181,9 @@ private fun AvoidManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
     // v1.0.80（批次 6）：编辑目标（非空时列表切到表单并回填原值）
     var editing by remember { mutableStateOf<FoodAvoidItem?>(null) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // v1.1.6（B'）：弹层玻璃表层——与底部导航栏同一套语言（半透明底 + 顶部 1dp 高光）。
+    // 不用真 backdrop-blur 的理由见 GlassSheet 的注释；内容区一字未改（SheetColumn 照旧）。
+    GlassSheet(onDismissRequest = onDismiss) {
         val target = editing
         if (adding || target != null) {
             AvoidAddStep(
@@ -1335,7 +1348,9 @@ private fun ChipGroup(options: List<Pair<String, String>>, selected: String, onS
 private fun WeightManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
     val weightList by vm.weightRecent.collectAsStateWithLifecycle()
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // v1.1.6（B'）：弹层玻璃表层——与底部导航栏同一套语言（半透明底 + 顶部 1dp 高光）。
+    // 不用真 backdrop-blur 的理由见 GlassSheet 的注释；内容区一字未改（SheetColumn 照旧）。
+    GlassSheet(onDismissRequest = onDismiss) {
         SheetColumn {
             Text(stringResource(R.string.wellness_weight_manage_title), style = MaterialTheme.typography.titleLarge)
             if (weightList.isEmpty()) {

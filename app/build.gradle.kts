@@ -26,10 +26,10 @@ android {
 
     defaultConfig {
         applicationId = "com.ashkb.app"
-        minSdk = 26
+        minSdk = 31
         targetSdk = 34
-        versionCode = 107
-        versionName = "1.1.5"
+        versionCode = 108
+        versionName = "1.1.6"
         // 批次 2（测试安全网）：instrumented 测试（Room schema 漂移校验）需要 runner
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
