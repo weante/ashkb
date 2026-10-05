@@ -92,9 +92,9 @@
     "summary": "ACR/SAA/SPARTAN 指南有条件推荐反对自行停用与常规减量；停药研究显示 53% 患者在 24–104 周内复发——任何调整由风湿科医生评估。",
     "severity_level": "high",
     "applicable_scene": "medication_changes 停药 / 减量登记时（source=patient 自动弹）；知识库教育区；复诊议题",
-    "source_name": "ACR/SAA/SPARTAN 2019 建议；Front Med 2025 系统综述（停药 vs 减量）；ixekizumab 停药研究",
-    "source_url": "https://acrjournals.onlinelibrary.wiley.com/doi/full/10.1002/art.41042",
-    "source_tier": "S1",
+    "source_name": "ACR/SAA/SPARTAN 2019 学会建议（停用与常规减量，S1 级）；Front Med 2025 系统综述与 meta 分析（8 项 RCT / 1,384 人，西班牙风湿病学会指南更新依据，PMC12457669 —— **本条主引链接按 S2 计**，因其载体为期刊研究而非学会指南）；ixekizumab 停药研究",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12457669/",
+    "source_tier": "S2",
     "adapted_at": "2026-09-11",
     "review_due": "2027-03-11",
     "version": 1,
@@ -102,10 +102,10 @@
       "key": "no_self_discontinuation",
       "content": "指南有条件推荐反对停用生物制剂（也不建议常规减量）；系统综述示停药显著损害缓解维持，减量相对更安全但仍需医生指导。擅自停药可能导致病情反弹。",
       "evidence": [
-        "ACR/SAA/SPARTAN 2019：In adults receiving treatment with a biologic, we conditionally recommend against discontinuation of the biologic.",
-        "ACR/SAA/SPARTAN 2019：we conditionally recommend against tapering of the biologic dose as a standard approach.",
-        "Front Med 2025：withdrawal significantly compromises the ability to sustain remission, whereas tapering appears to be a potentially safer alternative.",
-        "Ixekizumab 研究：停药后 53% 患者 24–104 周内出现复发。"
+        "ACR/SAA/SPARTAN 2019（https://acrjournals.onlinelibrary.wiley.com/doi/full/10.1002/art.41042）：In adults receiving treatment with a biologic, we conditionally recommend against discontinuation of the biologic.",
+        "ACR/SAA/SPARTAN 2019（同一链接）：we conditionally recommend against tapering of the biologic dose as a standard approach.",
+        "Front Med 2025 系统综述与 meta 分析，8 项 RCT / 1,384 人（https://pmc.ncbi.nlm.nih.gov/articles/PMC12457669/）：withdrawal significantly compromises the ability to sustain remission, whereas tapering appears to be a potentially safer alternative. 原文结论：Treatment withdrawal reduces the likelihood of maintaining inactive or low disease activity. Tapering does not significantly compromise the maintenance of remission or low disease activity offering a safer alternative to complete treatment withdrawal.",
+        "ixekizumab 停药研究：停药后 53% 患者 24–104 周内出现复发。⚠️ 该数字出自既有摘录，本次未核对到原始出处，标为未取证。"
       ],
       "action": [
         "medication_changes(source=patient 且涉及生物制剂) → 强提示本条 + 引导联系医生",

@@ -507,8 +507,8 @@
     "summary": "颈椎受累或活动明显受限者应避免剧烈颈部动作；存在颈椎不稳等特异病理时活动应个体化（EULAR 框架）。",
     "severity_level": "high",
     "applicable_scene": "瑜伽 / 普拉提课程内容自建时（肩倒立 / 头倒立类）；颈部症状用户",
-    "source_name": "EULAR 2018 运动建议（个体化禁忌框架，德语验证文核验）；myHealthcare Protocol",
-    "source_url": "https://ard.bmj.com/content/77/9/1251",
+    "source_name": "EULAR 2018 运动建议（Ann Rheum Dis 2018;77(9):1251-1260，PMID 29997112）；德语通俗版（Z Rheumatol 2023;82 Suppl 1:22-29，PMID 34618207，PMC9832088）；myHealthcare Protocol（商业平台）",
+    "source_url": "https://doi.org/10.1136/annrheumdis-2018-213585",
     "source_tier": "S1",
     "adapted_at": "2026-09-07",
     "review_due": "2027-03-07",
@@ -524,7 +524,7 @@
       "block_rule": { "stage": ["controlled", "flare"], "cervical": true },
       "risk": "融合颈椎在冲击 / 极端活动下骨折而非缓冲（myHealthcare：A fused cervical spine fractures rather than flexes）；AS 颈椎骨折占比过半（Liu 2023）",
       "evidence": [
-        "EULAR 2018 框架：活动促进应个体化进行，当存在心脏受累、颈椎不稳等疾病特异性个体病理时（德语验证文表 1 核验）。",
+        "EULAR 2018 运动建议（PMID 29997112，https://doi.org/10.1136/annrheumdis-2018-213585）：活动促进应个体化进行，当存在心脏受累、颈椎不稳等疾病特异性个体病理时（该表述出自德语通俗版表 1，PMID 34618207，https://pmc.ncbi.nlm.nih.gov/articles/PMC9832088/）。",
         "myHealthcare：Contact sports — avoid entirely if cervical spine is involved. A fused cervical spine fractures rather than flexes under impact."
       ],
       "alternative_hint": "瑜伽 / 普拉提整体是红榜方向（2025 患者版指南支持）——仅避免颈部极端体位；课程前告知教练病情",

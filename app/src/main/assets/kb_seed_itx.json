@@ -71,7 +71,7 @@
     "summary": "华法林说明书将 NSAIDs 列入「增加出血风险的药物」；合用期间需密切监测 INR。",
     "severity_level": "high",
     "applicable_scene": "新增华法林或任何 NSAIDs 时核对；两药共存期间出现瘀斑、黑便、异常出血时",
-    "source_name": "FDA 华法林钠（warfarin sodium）标签 · Table 3: Drugs that Can Increase the Risk of Bleeding；COUMADIN 标签（2017）",
+    "source_name": "FDA 华法林钠（warfarin sodium）片标签 · Table 3: Drugs that Can Increase the Risk of Bleeding（DailyMed 通用名标签；实测该页 0 处 COUMADIN，故不称商品名标签）",
     "source_url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=2384f45e-ad8e-4367-b99d-a2c670f99d02",
     "source_tier": "S1",
     "adapted_at": "2026-09-05",
@@ -85,7 +85,7 @@
       "mechanism": "华法林抗凝 + NSAIDs 抑制血小板功能并损伤胃肠黏膜，两条路径叠加",
       "evidence": [
         "华法林钠标签 Table 3（Drugs that Can Increase the Risk of Bleeding）将 Nonsteroidal Anti-Inflammatory Agents 整类列入，具体提及 celecoxib、diclofenac、ibuprofen、naproxen、piroxicam 等。",
-        "COUMADIN 标签 Highlights：COUMADIN can cause major or fatal bleeding. Perform regular monitoring of INR in all treated patients."
+        "华法林钠标签 Highlights（原文用通用名表述）：WARFARIN SODIUM can cause major or fatal bleeding. Perform regular monitoring of INR in all treated patients."
       ],
       "action": [
         "两药共存期间按医嘱监测 INR（对应 checkup_items 的 lab 周期项）",
@@ -134,8 +134,8 @@
     "summary": "磺胺类成分：过敏者禁用；治疗初期每 2 周需查血常规；足量饮水防结晶尿。",
     "severity_level": "medium",
     "applicable_scene": "新增柳氮磺吡啶；血常规复查到期提醒；出现皮疹 / 咽痛 / 发热时（粒细胞缺乏警示症状）",
-    "source_name": "FDA AZULFIDINE EN-tabs（柳氮磺吡啶缓释片）标签；国内柳氮磺吡啶肠溶片说明书（东莞市人民医院页）",
-    "source_url": "https://dailymed.nlm.nih.gov/dailymed/archives/fdaDrugInfo.cfm?archiveid=119335",
+    "source_name": "FDA AZULFIDINE EN-TABS（柳氮磺吡啶迟释片）当前标签（DailyMed，实测 Revised: 4/2025）——⚠️ 原引 DailyMed 归档路径（archiveid=119335），已换为当前版；国内柳氮磺吡啶肠溶片说明书（东莞市人民医院页）",
+    "source_url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=b9ef541a-93c8-4428-ba45-398aa0b327d1",
     "source_tier": "S1",
     "adapted_at": "2026-09-05",
     "review_due": "2027-03-05",
@@ -182,8 +182,8 @@
       "effect": "不补叶酸方向：口腔溃疡、恶心等副作用风险升高（本条目为「配合补充」型警示，非风险叠加型）",
       "mechanism": "甲氨蝶呤拮抗叶酸代谢，补充叶酸可缓解其对增殖组织（黏膜 / 骨髓）的影响",
       "evidence": [
-        "3E Initiative Recommendation 3：Prescription of at least 5 mg folic acid per week with methotrexate therapy is strongly recommended.（证据等级 1a / A）",
-        "BSR 建议：patients on methotrexate are coprescribed a minimum dose of 5 mg folic acid once a week."
+        "3E Initiative Recommendation 3（Ann Rheum Dis 2009;68:758-764，PMID 19033291，https://pmc.ncbi.nlm.nih.gov/articles/PMC2689523/）：Prescription of at least 5 mg folic acid per week with methotrexate therapy is strongly recommended.（证据等级 1a / A）",
+        "BSR（英国风湿学会）建议：patients on methotrexate are coprescribed a minimum dose of 5 mg folic acid once a week. ⚠️ 本次未能核到 BSR 该建议的原始出处（PubMed 检索两次均无匹配），标为未取证；同一叶酸剂量建议已由上方 3E Initiative（PMID 19033291）支撑。"
       ],
       "action": [
         "录入甲氨蝶呤时，APP 建议在营养素中登记「叶酸」（剂量与服用日遵医嘱，常见为避开甲氨蝶呤服药日）",
@@ -324,8 +324,8 @@
     "summary": "低剂量 MTX（抗风湿用途）与 NSAIDs 合用常见且非绝对禁忌，但 FDA 说明书明确要求谨慎并监测；高剂量合用已有严重毒性报告。",
     "severity_level": "medium",
     "applicable_scene": "药单同时含 MTX 与 NSAIDs 时的核对提示；血常规 / 肝肾功能复查到期",
-    "source_name": "FDA 甲氨蝶呤注射液说明书（DailyMed 档案）；NHS SATH 甲氨蝶呤安全管理资料",
-    "source_url": "https://dailymed.nlm.nih.gov/dailymed/archives/fdaDrugInfo.cfm?archiveid=10507",
+    "source_name": "FDA METHOTREXATE injection（甲氨蝶呤注射液）当前标签（DailyMed，标题实测「METHOTREXATE injection」，Revised: 12/2025）——⚠️ 原引 DailyMed 归档路径（archiveid=10507），已换为当前版；并列 METHOTREXATE tablet 标签亦含同类 NSAID 警示；NHS SATH 甲氨蝶呤安全管理资料",
+    "source_url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=dd035a9f-cd40-4314-b9d8-2294b8a924e2",
     "source_tier": "S1",
     "adapted_at": "2026-09-10",
     "review_due": "2027-03-10",
@@ -337,8 +337,8 @@
       "effect": "NSAIDs 可减少 MTX 肾小管分泌、增强毒性（动物模型证据 + FDA 警告）；低剂量合用临床常见、按监测规范管理",
       "mechanism": "肾小管分泌竞争——低剂量下风险可控",
       "evidence": [
-        "FDA：Unexpectedly severe (sometimes fatal) bone marrow suppression, aplastic anemia, and gastrointestinal toxicity have been reported with concomitant administration of methotrexate (usually in high dosage) along with some NSAIDs.",
-        "FDA：Caution should be used when NSAIDs or salicylates are administered concomitantly with lower doses of methotrexate. These drugs have been reported to reduce the tubular secretion of methotrexate.",
+        "FDA METHOTREXATE injection 标签（DailyMed，https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=dd035a9f-cd40-4314-b9d8-2294b8a924e2，Revised 12/2025）：Unexpectedly severe (sometimes fatal) bone marrow suppression, aplastic anemia, and gastrointestinal toxicity have been reported with concomitant administration of methotrexate (usually in high dosage) along with some NSAIDs.",
+        "FDA METHOTREXATE injection 标签（同一 setid 链接）：Caution should be used when NSAIDs or salicylates are administered concomitantly with lower doses of methotrexate. These drugs have been reported to reduce the tubular secretion of methotrexate.",
         "NHS SATH：NSAIDs 与小剂量阿司匹林（<300mg）合用 unlikely to cause any clinically significant adverse effects and treatment can be continued。"
       ],
       "action": [
@@ -404,8 +404,8 @@
       "effect": "降压药效果减弱（血压升高）；特定人群肾功能恶化风险（possible acute renal failure）",
       "mechanism": "前列腺素抑制 → 血管舒张减弱 + 肾血流调节受损",
       "evidence": [
-        "FDA 萘普生标签：NSAIDs may diminish the antihypertensive effect of angiotensin converting enzyme (ACE) inhibitors, angiotensin receptor blockers (ARBs), or beta-blockers.",
-        "FDA 萘普生标签：In patients who are elderly, volume-depleted (including those on diuretic therapy), or have renal impairment, co-administration of an NSAID with ACE inhibitors or ARBs may result in deterioration of renal function, including possible acute renal failure.",
+        "FDA 萘普生标签（DailyMed，见本条 source_url）：NSAIDs may diminish the antihypertensive effect of angiotensin converting enzyme (ACE) inhibitors, angiotensin receptor blockers (ARBs), or beta-blockers.",
+        "FDA 萘普生标签（同一 DailyMed 来源）：In patients who are elderly, volume-depleted (including those on diuretic therapy), or have renal impairment, co-administration of an NSAID with ACE inhibitors or ARBs may result in deterioration of renal function, including possible acute renal failure.",
         "FDA 双氯芬酸标签：Monitor blood pressure (BP) during the initiation of NSAID treatment and throughout the course of therapy."
       ],
       "action": [
@@ -423,9 +423,9 @@
     "summary": "NSAID 相关溃疡高风险特征明确（高龄 / 既往溃疡 / 高剂量 / 合用抗凝或激素）；ACG 胃保护策略中 PPI 是选项之一——是否联用由医生判断。",
     "severity_level": "low",
     "applicable_scene": "NSAIDs 长期用户药单提示；护胃提示组联动（itx-009 多药 / itx-004 激素 / itx-008 SSRI 同组成员）",
-    "source_name": "ACG NSAID 溃疡防治指南（PMC11657060 综述引述）；AAFP PUD 综述",
-    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11657060/",
-    "source_tier": "S2",
+    "source_name": "ACG《Guidelines for prevention of NSAID-related ulcer complications》（Am J Gastroenterol 2009;104(3):728-38，PMID 19240698，DOI 10.1038/ajg.2009.115）——⚠️ 该指南为 2009 年版，其后未见 ACG 新版；AAFP PUD 综述；并列：PMC11657060 医师态度问卷调查研究（**非指南**，仅作现状参考）",
+    "source_url": "https://doi.org/10.1038/ajg.2009.115",
+    "source_tier": "S1",
     "adapted_at": "2026-09-11",
     "review_due": "2027-03-11",
     "version": 1,
@@ -437,8 +437,8 @@
       "effect": "正向联用：PPI 降低 NSAID 相关胃十二指肠溃疡风险（高危人群获益明确）",
       "mechanism": "抑酸 → NSAID 黏膜损伤修复环境改善",
       "evidence": [
-        "ACG 综述引述：Older age, previous upper gastrointestinal events, concurrent use of warfarin or corticosteroids, and high-dose NSAID therapy have been identified as high-risk characteristics.",
-        "AAFP：Recommended therapies for preventing PUD in these patients include misoprostol and proton pump inhibitors."
+        "ACG《Guidelines for prevention of NSAID-related ulcer complications》（Am J Gastroenterol 2009;104(3):728-38，PMID 19240698，https://doi.org/10.1038/ajg.2009.115）；另 PMC11657060 医师态度问卷调查研究引述：Older age, previous upper gastrointestinal events, concurrent use of warfarin or corticosteroids, and high-dose NSAID therapy have been identified as high-risk characteristics.",
+        "AAFP（American Academy of Family Physicians）PUD 综述 ⚠️ 未核到具体篇目的 URL，标为未取证：Recommended therapies for preventing PUD in these patients include misoprostol and proton pump inhibitors."
       ],
       "action": [
         "命中高危特征（年龄 / 溃疡史 / 合用激素抗凝 / 高剂量）→ 复诊议题自动生成「是否需要胃保护方案」",
@@ -455,8 +455,8 @@
     "summary": "AS 骨质疏松共病常用双膦酸盐——服用规则严格（空腹白水 / 直立 30 min / 食物钙剂间隔 30 min）；误服规则直接降低药效并增加食管刺激。",
     "severity_level": "medium",
     "applicable_scene": "新增阿仑膦酸盐时服药规则种子；打卡计划生成（晨起独立时段）；钙剂补充时间冲突检测",
-    "source_name": "FDA FOSAMAX 标签（患者信息节）",
-    "source_url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2004/20560slr030,21575slr002_fosamax_lbl.pdf",
+    "source_name": "FDA FOSAMAX（阿仑膦酸钠）当前标签 · Medication Guide（用药指南）节（DailyMed，实测 Revised: 2/2026）——⚠️ 原引 2004 年版标签，已换为当前版；该页用词是 Medication Guide，不是 Patient Information",
+    "source_url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=14e931fd-2c5f-4d90-b7db-5980706f4a56",
     "source_tier": "S1",
     "adapted_at": "2026-09-11",
     "review_due": "2027-03-11",

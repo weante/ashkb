@@ -6,7 +6,7 @@
     "summary": "AS 最常见眼并发症为急性前葡萄膜炎（眼红 / 眼痛 / 畏光 / 视物模糊）；需当天或次日眼科就诊，及时治疗防虹膜后粘连。",
     "severity_level": "high",
     "applicable_scene": "symptom_daily 眼部症状勾选；应急中心场景卡；checkup_items 眼科周期项到期未查提示",
-    "source_name": "Gupta A et al. Management of Uveitis in Spondyloarthropathy（PMC5741284）；Iatrox UKMLA Anterior Uveitis 临床资料",
+    "source_name": "Gupta N, Agarwal A. Management of Uveitis in Spondyloarthropathy: Current Trends（PMC5741284，The Permanente Journal）；Iatrox UKMLA Anterior Uveitis 临床资料",
     "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5741284/",
     "source_tier": "S2",
     "adapted_at": "2026-09-09",
