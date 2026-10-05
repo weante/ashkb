@@ -69,6 +69,7 @@ class KbSeedVersionGateTest {
         // v1.1.7（批次 21）：知识库审计「问题 6/7/8」修正——fdg-006 分级冲突、itx-005/itx-011/itx-015 归档旧版标签换当前版、itx-003/itx-014/emr-001 出处名不实更正
         8 to "21411c19043bfe991a4f794f30c6b0d19077b2830a7322b6e8f1afe411e466ca",
         9 to "ea5aa652392046ddb972899d182b3abe9fca722722bba207762ad0c19497abf6",
+        10 to "63c974077bd5e5c1bb5dc536ee0ee3adacbe708aa623613063ce2b802da38d19",
     )
 
     /** 单测工作目录是模块目录（`app/`），与 `MedicationInteractionChainTest` 同一约定。 */

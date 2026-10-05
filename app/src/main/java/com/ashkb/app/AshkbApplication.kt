@@ -256,7 +256,7 @@ class AshkbApplication : Application() {
          * ⚠️ 今后 bump 之后还必须同步 `KbSeedVersionGateTest.FINGERPRINTS`（那条断言会先红，
          * 提醒你登记新指纹）——两者是同一件事的两半，漏一个都会让已安装用户永久停在旧内容。
          */
-        internal const val KB_SEED_VERSION = 9
+        internal const val KB_SEED_VERSION = 10
 
         private const val PREFS = "app_prefs"
         private const val KEY_SEED_VERSION = "kb_seed_version"

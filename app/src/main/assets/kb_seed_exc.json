@@ -381,7 +381,7 @@
     "summary": "AS 患者多伴骨质疏松与脊柱僵硬 / 融合，对抗性运动的撞击可致骨折；颈椎骨折占 AS 脊柱骨折过半且后果严重。",
     "severity_level": "high",
     "applicable_scene": "运动库浏览；配置运动计划时误选拼抢类项目；颈椎活动明显受限用户（profile 联动提示）",
-    "source_name": "NASS（英国脊柱关节炎学会）Safety First；Liu B et al. Orthopaedic Surgery 2023（PMC10235179）",
+    "source_name": "NASS（英国脊柱关节炎学会）Safety First；Liu B et al.《A Novel Classification of Cervical Spine Trauma in Ankylosing Spondylitis》（Orthop Surg 2023 Jun，PMC10235179，DOI 10.1111/os.13747）",
     "source_url": "https://nass.co.uk/managing-my-as/exercise/safety-first/",
     "source_tier": "S3",
     "adapted_at": "2026-09-07",
