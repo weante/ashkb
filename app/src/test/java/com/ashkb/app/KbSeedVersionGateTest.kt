@@ -60,6 +60,9 @@ class KbSeedVersionGateTest {
         // exc（`exc-001`/`exc-003` 诚实口径、`exb-004` 降 S4）/ fdg（`fdg-004` 降 S4）/
         // edu（两条阈值条目改标 SYS、`edu-th-002` 文案对齐实现）；emr 字节未变。
         5 to "e593d2ad60ecf1d53a084ee7bd1cb3b195aa75db3d7dd962162bcf3c11c3036c",
+        // v1.1.4（批次 20）：分级重构——12 条 source_tier 按项目自定定义修正
+        // （11 条患者组织/NHS 教育页 S1/S2 → S3；emr-005 是 PMC 期刊文，S1 → S2）
+        6 to "1af5b57bc2c23b7b1e1bbe9cb8a0dd1c059103a938ccfbb62db3ca320a289b19",
     )
 
     /** 单测工作目录是模块目录（`app/`），与 `MedicationInteractionChainTest` 同一约定。 */

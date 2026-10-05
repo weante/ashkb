@@ -133,7 +133,7 @@
     "applicable_scene": "medication_changes 停药登记（激素类 source 非 hospital）；激素用户漏服 2 日以上警报",
     "source_name": "Aust Prescr 停用糖皮质激素实用指导（PMC12378006）；Endocrine Society 肾上腺功能不全指南资源",
     "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12378006/",
-    "source_tier": "S1",
+    "source_tier": "S2",
     "adapted_at": "2026-09-11",
     "review_due": "2027-03-11",
     "version": 1,
