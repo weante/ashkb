@@ -100,7 +100,7 @@
     "summary": "长期 AS 罕见但明确的神经并发症；出现下肢进行性麻木无力、大小便功能障碍、会阴部感觉异常（鞍区麻木）应尽快急诊评估——不等待不观察。",
     "severity_level": "high",
     "applicable_scene": "symptom_daily 神经症状勾选（新增红旗字段）；应急中心场景卡",
-    "source_name": "Ann Rheum Dis 神经并发症综述；J Rheumatol CES in AS 综述；BJR 病例报告",
+    "source_name": "J Rheumatol 综述《Cauda Equina Syndrome in Ankylosing Spondylitis: Challenges in Diagnosis, Management, and Pathogenesis》（2019;46(12):1582-1588，PMID 30936280，DOI 10.3899/jrheum.181259 —— 与本条链接的卷期页码**完全对应**）——⚠️ 原出处名首项写「Ann Rheum Dis 神经并发症综述」，但链接指向的是 J Rheumatol，**首项与链接不是同一篇**，已更正",
     "source_url": "https://www.jrheum.org/content/46/12/1582.long",
     "source_tier": "S2",
     "adapted_at": "2026-09-11",
