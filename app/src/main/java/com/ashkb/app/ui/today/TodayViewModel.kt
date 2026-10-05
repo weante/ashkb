@@ -109,8 +109,16 @@ class TodayViewModel(
      * 三个前置条件缺一不可：① 已建档；② 当前**不是**极简态（极简期间不再追问）；
      * ③ 今天还没问过。满足后再看近 [MinimalMode.THRESHOLD_DAYS] 天的症状记录是否连续缺失。
      */
+    /** 回答询问后自增，仅用于驱动 [minimalPrompt] 重算（答案落在 prefs，不是 Observable）。 */
+    private val answeredTick = MutableStateFlow(0)
+
     val minimalPrompt: StateFlow<Boolean> =
-        combine(todayDate, healthRepo.observeProfile()) { d, p -> d to p }
+        // v1.1.4：`answeredTick` 必须进 combine——`answerMinimalPrompt` 把答案写进
+        // **SharedPreferences**（不在任何 Observable 里），而这条流的其余输入是 todayDate 与
+        // profile。缺了它，点任意选项都只写库、**不触发重算**，弹窗当场不消失（维护者真机反馈
+        // 「点击其他原因没有反应」——实际已写入，下次进页面才生效）。
+        // ⚠️ 三个选项共用这个回调，所以「身体不适 / 住院」此前也有同样的"看着没反应"。
+        combine(todayDate, healthRepo.observeProfile(), answeredTick) { d, p, _ -> d to p }
             .map { (d, p) ->
                 if (p == null || p.uiMode == MinimalMode.MODE_MINIMAL) return@map false
                 if (MinimalPromptStore.lastAskedDate(app) == d.toString()) return@map false
@@ -142,6 +150,8 @@ class TodayViewModel(
             if (MinimalMode.entersMinimal(reason)) {
                 healthRepo.setMinimalMode(true, nowIso())
             }
+            // 主动让 minimalPrompt 重算（答案写在 prefs 里，不在流的依赖中——见该流的注释）
+            answeredTick.value = answeredTick.value + 1
         }
     }
 
