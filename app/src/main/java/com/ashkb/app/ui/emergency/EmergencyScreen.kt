@@ -347,19 +347,45 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                             )
                         } else {
                             medsSummary.ordered.forEach { e ->
-                                KeyValueRow(
-                                    label = e.name,
-                                    value = e.detail,
-                                    trailing = if (e.immunosuppressant) {
-                                        {
+                                // ⚠️ v1.2.2：这里**不能**用带 `trailing` 的 [KeyValueRow]。
+                                //
+                                // 实测（维护者截图）：药名「依那西普（恩利）」+ 剂量
+                                // 「25mg · 每周两次 · 每 14 天」+ 胶囊「免疫抑制」三者同排时，
+                                // 剂量列被压到**每行只剩 4–5 个字**（竖排成柱状），右侧却空着一大片。
+                                // `KeyValueRow` 的 KDoc 把「胶囊优先、极端情况下数值列可能被很长
+                                // 的标签吃到 0 宽」写成**有意的取舍**（v1.1.1），但那条是为
+                                // **320dp 窄屏 + 2.0× 字号**写的；这里在**正常字号**下就已不可读，
+                                // 说明它不是那个极端情形，而是这一行的**固有矛盾**：
+                                // 三个无界文本（药名 / 剂量 / 标记）塞不进一行。
+                                //
+                                // 改法：胶囊与**药名同行**（两者都短且有界），
+                                // 剂量**独占整行**并在必要时折行 —— 剂量是急救时真正要读的
+                                // 数字，它不该为布局让步。
+                                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                                    ) {
+                                        Text(
+                                            e.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        if (e.immunosuppressant) {
                                             StatusChip(
                                                 stringResource(R.string.emergency_meds_tag_immunosuppressant),
                                                 StatusTone.Warning,
                                                 Icons.Rounded.WarningAmber,
                                             )
                                         }
-                                    } else null,
-                                )
+                                    }
+                                    Text(
+                                        e.detail,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                }
                             }
                             if (medsSummary.hiddenCount > 0) {
                                 Text(
@@ -721,192 +747,5 @@ private data class ContactDraft(
         isDoctor = isDoctor,
         hospital = hospital.ifBlank { null },
         createdAt = existing?.createdAt ?: nowIso(), updatedAt = nowIso(),
-    )
-}
-
-// ===== 紧急事件表单（9 字段 + 单选 + 条件项，迁 ModalBottomSheet） =====
-
-/**
- * v1.0.80（批次 6）：[existing] 非空 = 编辑（回填原值、沿用主键与记录时间）。
- *
- * `resolvedDate` 由「已缓解」勾选驱动：勾上写今天、取消则清空——保持与新增时同一条口径，
- * 避免出现「已填缓解日期却仍显示进行中」这种自相矛盾的行。
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EmergencyEventSheet(
-    existing: EmergencyEvent? = null,
-    onSave: (EmergencyEvent) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val draft = EventDraft.of(existing)
-    var scene by remember(draft) { mutableStateOf(draft.scene) }
-    var date by remember(draft) { mutableStateOf(draft.date) }
-    var symptoms by remember(draft) { mutableStateOf(draft.symptoms) }
-    var actions by remember(draft) { mutableStateOf(draft.actions) }
-    var hospitalVisit by remember(draft) { mutableStateOf(draft.hospitalVisit) }
-    var hospitalName by remember(draft) { mutableStateOf(draft.hospitalName) }
-    var outcome by remember(draft) { mutableStateOf(draft.outcome) }
-    var resolved by remember(draft) { mutableStateOf(draft.resolved) }
-    var notes by remember(draft) { mutableStateOf(draft.notes) }
-    var attempted by remember { mutableStateOf(false) }
-    val dateOk = runCatching { LocalDate.parse(date.trim()) }.getOrNull() != null
-
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.lg)
-                .padding(bottom = Spacing.xl)
-                .imePadding(),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Text(
-                stringResource(
-                    if (existing == null) R.string.emergency_record_event else R.string.emergency_edit_event_title
-                ),
-                style = MaterialTheme.typography.titleLarge,
-            )
-
-            Text(stringResource(R.string.emergency_scenario), style = MaterialTheme.typography.labelLarge)
-            EmergencyScenePicker(selected = scene, onSelect = { scene = it })
-
-            OutlinedTextField(
-                date, { date = it }, label = { Text(stringResource(R.string.common_date)) }, singleLine = true,
-                isError = attempted && !dateOk,
-                supportingText = { if (attempted && !dateOk) Text(stringResource(R.string.common_date_format_hint2)) },
-            )
-            OutlinedTextField(symptoms, { symptoms = it }, label = { Text(stringResource(R.string.symptom_description)) })
-            OutlinedTextField(actions, { actions = it }, label = { Text(stringResource(R.string.emergency_actions_taken)) })
-
-            EventToggleRow(
-                label = stringResource(R.string.emergency_seek_care),
-                checked = hospitalVisit,
-                onChange = { hospitalVisit = it },
-            )
-            if (hospitalVisit) {
-                OutlinedTextField(hospitalName, { hospitalName = it }, label = { Text(stringResource(R.string.checkup_hospital_field)) }, singleLine = true)
-            }
-
-            EventToggleRow(
-                label = stringResource(R.string.symptom_outcome_recovered),
-                checked = resolved,
-                onChange = { resolved = it },
-            )
-            if (resolved) {
-                OutlinedTextField(outcome, { outcome = it }, label = { Text(stringResource(R.string.symptom_outcome_label)) }, singleLine = true)
-            }
-
-            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes)) })
-
-            Button(
-                onClick = {
-                    attempted = true
-                    if (dateOk) {
-                        onSave(
-                            EventDraft(
-                                scene, date, symptoms, actions, hospitalVisit, hospitalName, outcome, resolved, notes,
-                            ).toEvent(existing)
-                        )
-                    }
-                },
-                enabled = dateOk,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = Size.touchMin),
-            ) { Text(stringResource(R.string.common_save)) }
-        }
-    }
-}
-
-/**
- * 勾选行（从 [EmergencyEventSheet] 抽出）。触摸目标 ≥48dp、整行可点（不只是那个方块），
- * 与联系人表单里两个勾选项同款——急诊时手抖，点方块的容错太低。
- */
-@Composable
-private fun EventToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = Size.touchMin)
-            .toggleable(value = checked, role = Role.Checkbox, onValueChange = onChange),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Checkbox(checked = checked, onCheckedChange = null)
-        Spacer(Modifier.width(Spacing.xs))
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-    }
-}
-
-/** 应急场景单选（从 [EmergencyEventSheet] 抽出：表单要控制长度与圈复杂度）。 */
-@Composable
-private fun EmergencyScenePicker(selected: EmergencyScene, onSelect: (EmergencyScene) -> Unit) {
-    EmergencyScene.entries.forEach { s ->
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = Size.touchMin)
-                .selectable(selected = selected == s, role = Role.RadioButton, onClick = { onSelect(s) }),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RadioButton(selected = selected == s, onClick = null)
-            Spacer(Modifier.width(Spacing.xs))
-            Text(s.label, style = MaterialTheme.typography.bodyLarge)
-        }
-    }
-}
-
-/**
- * 紧急事件表单草稿 → 落库行（新增 / 编辑共用，理由同 [ContactDraft]）。
- *
- * `resolvedDate` 由「已缓解」勾选驱动：勾上写今天、取消则清空——与新增时同一口径，
- * 避免出现「填了缓解日期却仍显示进行中」这种自相矛盾的行。
- * 编辑时保留原有的 `severity` / `onsetTime`：它们不在表单里，不该被这次保存抹掉。
- */
-private data class EventDraft(
-    val scene: EmergencyScene,
-    val date: String,
-    val symptoms: String,
-    val actions: String,
-    val hospitalVisit: Boolean,
-    val hospitalName: String,
-    val outcome: String,
-    val resolved: Boolean,
-    val notes: String,
-) {
-    companion object {
-        /**
-         * 表单初值（新增给默认档、编辑回填原值）。
-         *
-         * 收进工厂而不是写在 Composable 里：九个字段的安全调用 + Elvis 会一条条叠加圈复杂度，
-         * 直接顶穿 detekt 的 `CyclomaticComplexMethod` 阈值（表单里本就有勾选 / 条件项的嵌套分支）。
-         */
-        fun of(existing: EmergencyEvent?): EventDraft = EventDraft(
-            // fromKey(null) 落到 INFECTION_FEVER，与新增时的默认场景一致
-            scene = EmergencyScene.fromKey(existing?.scene),
-            date = existing?.date ?: LocalDate.now().toString(),
-            symptoms = existing?.symptoms ?: "",
-            actions = existing?.actionsTaken ?: "",
-            hospitalVisit = existing?.hospitalVisit ?: false,
-            hospitalName = existing?.hospitalName ?: "",
-            outcome = existing?.outcome ?: "",
-            resolved = existing?.resolvedDate != null,
-            notes = existing?.notes ?: "",
-        )
-    }
-
-    fun toEvent(existing: EmergencyEvent?): EmergencyEvent = EmergencyEvent(
-        id = existing?.id ?: "", date = date.trim(),
-        recordedAt = existing?.recordedAt ?: nowIso(),
-        scene = scene.name, severity = existing?.severity ?: "high",
-        onsetTime = existing?.onsetTime,
-        symptoms = symptoms.ifBlank { null },
-        actionsTaken = actions.ifBlank { null },
-        hospitalVisit = hospitalVisit,
-        hospitalName = hospitalName.ifBlank { null },
-        outcome = outcome.ifBlank { null },
-        resolvedDate = if (resolved) LocalDate.now().toString() else null,
-        notes = notes.ifBlank { null },
     )
 }

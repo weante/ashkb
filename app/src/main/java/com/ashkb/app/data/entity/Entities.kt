@@ -24,15 +24,22 @@ enum class MedClass(val label: String) {
     }
 }
 
-enum class MedFrequency(val label: String) {
-    DAILY("每日"),
-    BID("每日两次"),
-    Q8H("每 8 小时"),
-    WEEKLY("每周一次（如甲氨蝶呤）"),
-    BIW("每周两次（如依那西普，选两个星期）"),
-    Q2W("每两周一次"),
-    PRN("按需服用"),
-    CUSTOM("自定义周期");
+enum class MedFrequency(val label: String, val plain: String) {
+    DAILY("每日", "每日"),
+    BID("每日两次", "每日两次"),
+    Q8H("每 8 小时", "每 8 小时"),
+    // `label` 里那半句「（如甲氨蝶呤）」/「（如依那西普，选两个星期）」是**给表单里的选择项**看的
+    // 操作提示（帮助用户知道该选哪个）；`plain` 是**同一条频次的纯名称**。
+    //
+    // v1.2.1：`EmergencyMeds` 原先读的是 `label`——于是急救卡上会印出
+    // 「25mg · 每周两次（如依那西普，选两个星期）· 每 14 天」（维护者截图发现）。
+    // 急救卡是给**医生/急救人员**看的，不该出现面向患者本人的表单提示。
+    // 两个字段并存而不是改 `label`：改 `label` 会让表单丢掉选哪个的提示。
+    WEEKLY("每周一次（如甲氨蝶呤）", "每周一次"),
+    BIW("每周两次（如依那西普，选两个星期）", "每周两次"),
+    Q2W("每两周一次", "每两周一次"),
+    PRN("按需服用", "按需服用"),
+    CUSTOM("自定义周期", "自定义周期");
 
     companion object {
         fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: DAILY

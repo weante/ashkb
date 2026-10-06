@@ -59,7 +59,7 @@
     <ID>LongMethod:CheckupLabImaging.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: () -&gt; Unit)</ID>
     <ID>LongMethod:CheckupScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CheckupScreen(vm: CheckupViewModel, onBack: () -&gt; Unit)</ID>
     <ID>LongMethod:EmergencyScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -&gt; Unit)</ID>
-    <ID>LongMethod:EmergencyScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun EmergencyEventSheet( onSave: (EmergencyEvent) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    
     <ID>LongMethod:ExercisePlansScreen.kt$@Composable private fun PlanCard( plan: ExercisePlan, progress: ExercisePlanProgress.Progress?, expanded: Boolean, onToggle: () -&gt; Unit, onActivate: () -&gt; Unit, onDeactivate: () -&gt; Unit, )</ID>
     <ID>LongMethod:ExerciseScreen.kt$@Composable private fun PrescriptionHero( ui: com.ashkb.app.ui.exercise.ExerciseUiState, yesterday: com.ashkb.app.data.entity.SymptomDaily?, warmup: com.ashkb.app.domain.MorningWarmup.Sequence?, )</ID>
     <ID>LongMethod:ExerciseScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -&gt; Unit, onBack: () -&gt; Unit)</ID>

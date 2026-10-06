@@ -79,7 +79,9 @@ object EmergencyMeds {
 
     private fun entry(m: Medication): Entry {
         val name = m.brandName?.takeIf { it.isNotBlank() }?.let { "${m.name}（$it）" } ?: m.name
-        val freq = MedFrequency.fromKey(m.frequency).label
+        // v1.2.1：读 `plain` 而非 `label`——`label` 含面向患者的表单提示（如「如甲氨蝶呤」），
+        // 会印到急救卡上（医生看的那张）。详见 MedFrequency 的注释。
+        val freq = MedFrequency.fromKey(m.frequency).plain
         val cycle = m.injCycleDays?.let { " · 每 $it 天" } ?: ""
         return Entry(
             name = name,
