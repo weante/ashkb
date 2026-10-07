@@ -62,7 +62,21 @@ $env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.7\bin\g
 
 ## 5. GitHub 同步（github.com 直连超时的绕行方案）
 
-> **v1.0.73 更新（2026-09-29，先看这条）**：**git 直推与资产上传其实可用——只要强制 HTTP/1.1**。
+> **v1.2.3 更新（2026-10-07，先看这条）**：⚠️ **推送前先确认代理是否开着，否则会静默失败**。
+> · 本机 git 配了 `http.proxy = http://127.0.0.1:7890`（全局 + 仓库级各一份），而**该代理经常是关着的**：
+>   代理不通时 `git push` 直接 `fatal: Failed to connect to github.com:443 over proxy 127.0.0.1`，
+>   而**直连是通的**（`curl --http1.1 https://api.github.com` → 200）。
+> · 因此**推送一律加 `-c http.proxy=` 显式禁用代理**：
+>   `git -c http.version=HTTP/1.1 -c http.proxy= -c https.proxy= push origin main`
+>   （`ls-remote` / `fetch` 同理，否则也会走死代理。）
+> · ⚠️ **v1.2.2 就是被这个坑到的**：发布时推送静默失败，而 `target_commitish='main'` 在服务端解析到
+>   **旧提交** `e159f8d`（v1.2.0 的），于是 **tag `v1.2.2` 指在了 v1.2.0 上**——源码与 APK 对不上，
+>   且**当时没有任何报错**。修法是删 tag ref 再按正确 SHA 重建。
+> · ⚠️ **连带坑**：**删掉 release 的 tag ref 会把该 release 自动变成 draft**（`draft=true`，`GET /releases/tags/<tag>` 返回 404）。
+>   重建 tag 后还要 `PATCH /releases/<id>` 传 `{"draft": false}` 才能恢复已发布状态，资产不受影响。
+> · **发版后必查**：`git ls-remote --tags origin` 的 SHA **是否等于本地该版本的 commit**，不要只看 push 有没有报错。
+
+> **v1.0.73 更新（2026-09-29）**：**git 直推与资产上传其实可用——只要强制 HTTP/1.1**。
 > · 直推：`git -c http.version=HTTP/1.1 push origin main` —— 默认 HTTP/2 会 Recv failure: Connection was reset（v1.0.73 首次推送即此报错，加该参数后一次通过）；
 >   ⚠️ `--dry-run` 在 HTTP/2 下**仍可能打印成功的 ref 更新行**，别被它骗过，要看 `ls-remote` 的实际 SHA。
 > · 资产上传：`curl.exe --http1.1 --retry 2 --retry-all-errors -X POST …` —— 不加 `--http1.1` 必 reset（v1.0.73 首次上传两个资产均 (35) Connection was reset）。
