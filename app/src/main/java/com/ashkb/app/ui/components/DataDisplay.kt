@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.TrendingDown
@@ -169,7 +170,15 @@ fun KeyValueRow(
                 // 药名（可能很长），右边还要放「免疫抑制」胶囊；再吃掉 128dp 后数值列会更窄。
                 // 该行改为按标签固有宽度，把宽度让给真正需要折行的剂量说明；代价是该行数值起点
                 // 不参与全局对齐（这一行本来就是"药名 + 剂量 + 风险标记"三元组，语义与其它行不同）。
-                modifier = if (trailing != null) Modifier else Modifier.widthIn(min = Size.labelColumnMin),
+                // v1.2.3：**固定宽度**（`width` 而非 `widthIn(min = …)`）。
+                //
+                // 维护者反馈「吸烟 从不 · 运动习惯 偶尔」那行与标签之间没有固定间隔。
+                // 根因：`widthIn(min = 128dp)` 只是**下限**——「骶髂关节影像分期」这类标签
+                // 天然比 128dp 宽，于是**它把整个标签列撑开**，所有行的值起点一起右移。
+                // 那本身还能忍；真正的问题是该行**看起来**与其它行的间隔不同（其实是被撑开
+                // 之后的同一列）。改成固定宽度后，标签列宽度不再受最长标签影响，
+                // 行与行之间的间隔恒定；过长的标签自己折行（标签短，通常折不到）。
+                modifier = if (trailing != null) Modifier else Modifier.width(Size.labelColumnMin),
             )
             Row(
                 // 权重（fill = true）：约束被收紧成"主体宽 − 标签宽 − 间距"，数值在其中折行。
@@ -187,7 +196,16 @@ fun KeyValueRow(
                         tint = valueColor,
                     )
                 }
-                Text(value, style = MaterialTheme.typography.bodyMedium, color = valueColor)
+                // v1.2.3：`textAlign = TextAlign.End`——值折行时**末行也贴右缘**。
+                // 只设容器的 `Arrangement.End` 管不到 `Text` 内部的换行：折行后最后一行
+                // 仍是左对齐（维护者截图里「偶尔」的「尔」孤零零挂在左边）。
+                Text(
+                    value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = valueColor,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
         // 胶囊：外层 Row 里唯一的非权重子项 → 第一遍测量就拿整行宽，固有宽度无条件成立。

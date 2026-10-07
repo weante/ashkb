@@ -43,6 +43,8 @@ import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
 import com.ashkb.app.ui.theme.accent
 import kotlin.math.roundToInt
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.layout.heightIn
 
 /**
  * 临床评分输入（疼痛 0–10、BASDAI 六题）。
@@ -241,5 +243,27 @@ fun DestructiveAction(
                 TextButton(onClick = { confirming = false }) { Text(stringResource(R.string.common_cancel)) }
             },
         )
+    }
+}
+
+
+/**
+ * 一行宽按钮（v1.2.3）：用于「批量填一个值」这类**一次声明**动作。
+ *
+ * ⚠️ 与 `ScoreInput` 两端标签的分工要分清：
+ *  · `ScoreInput` 底部的「无」「最严重」改的是**单题**的值（v1.0.18 起就有，本次未动）；
+ *  · 本组件批量补**未答的题**（BASDAI 弹窗顶部）。
+ * 二者语义不同 —— 合起来会让「系统替你答」与「你答了某题」在代码上无法区分。
+ *
+ * 抽成组件还有个现实原因：`BasdaiDialog` 已贴着 detekt `LongMethod` 阈值（78/80），
+ * 调用点因此必须只占**一行**。
+ */
+@Composable
+fun FillRemainingAction(label: String, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }

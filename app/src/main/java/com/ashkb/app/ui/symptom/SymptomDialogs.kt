@@ -44,6 +44,7 @@ import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import java.time.LocalDate
 import org.json.JSONArray
+import com.ashkb.app.ui.components.FillRemainingAction
 
 // ---------------------------------------------------------------------------
 // 弹窗：发作开始 / 缓解 / BASDAI 自评
@@ -287,6 +288,11 @@ internal fun BasdaiDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(Spacing.sm))
+                // 未答的题一次按「无」记（见 FillRemainingAction 的注释）。
+                FillRemainingAction(stringResource(R.string.basdai_fill_zeros)) {
+                    q1 = q1 ?: 0; q2 = q2 ?: 0; q3 = q3 ?: 0
+                    q4 = q4 ?: 0; q5 = q5 ?: 0; q6 = q6 ?: 0
+                }
                 ScoreRow(stringResource(R.string.basdai_q1_fatigue), q1) { q1 = it }
                 ScoreRow(stringResource(R.string.basdai_q2_spinal_pain), q2) { q2 = it }
                 ScoreRow(stringResource(R.string.basdai_q3_peripheral), q3) { q3 = it }

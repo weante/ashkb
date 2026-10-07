@@ -89,7 +89,15 @@ fun MeScreen(
                     KeyValueRow(stringResource(R.string.profile_disease_stage), stageLabel(p.diseaseStage))
                     KeyValueRow(stringResource(R.string.profile_spine_mobility), spineLabel(p.spineMobility))
                     KeyValueRow(stringResource(R.string.profile_sacroiliitis_field), Labels.sacroiliitisGrade(p.sacroiliitisGrade))
-                    KeyValueRow(stringResource(R.string.profile_lifestyle_title), lifestyleLabel(p.lifestyle))
+                    // v1.2.3：生活方式**逐项一行**（见 lifestyleItems 的注释）。
+            // 用现成的 KeyValueRow 逐项渲染：标签只在第一项显示，其余项标签留空——
+            // 这样值仍然从同一列起排，而每项各占一行、各自右对齐。
+            lifestyleItems(p.lifestyle).forEachIndexed { idx, item ->
+                KeyValueRow(
+                    label = if (idx == 0) stringResource(R.string.profile_lifestyle_title) else "",
+                    value = item,
+                )
+            }
                     KeyValueRow(stringResource(R.string.profile_allergy_history), p.allergies ?: stringResource(R.string.common_unfilled))
                     KeyValueRow(stringResource(R.string.profile_blood_type), p.emergencyBloodType ?: stringResource(R.string.common_unfilled))
                 }
@@ -196,11 +204,18 @@ private fun stageLabel(k: String?) = when (k) {
     else -> stringResource(R.string.stage_not_set_conservative)
 }
 
-/** v1.0.64 B13：生活方式一行摘要——只列已登记项，全空则显示「未填」。 */
+/**
+ * v1.0.64 B13：生活方式一行摘要——只列已登记项，全空则显示「未填」。
+ *
+ * v1.2.3：**改为返回逐项列表**（原先拼成一个 `·` 连接的长字符串）。
+ * 维护者反馈「吸烟 从不 · 运动习惯 偶尔」在窄列里折行后，第二行的「偶尔」孤零零挂在左边，
+ * 且与标签之间的间隔看着和别的行不一样——因为它是**一个被折行的长值**，而不是几行各占一行的短值。
+ * 拆成多行后：每项一行、各自右对齐，间隔也就自然一致了。
+ */
 @Composable
-private fun lifestyleLabel(raw: String?): String {
+private fun lifestyleItems(raw: String?): List<String> {
     val l = Lifestyle.fromJson(raw)
-    if (!LifestylePrescription.hasContent(l)) return stringResource(R.string.common_unfilled)
+    if (!LifestylePrescription.hasContent(l)) return listOf(stringResource(R.string.common_unfilled))
     return buildList {
         val smokingText = when (l.smoking) {
             Lifestyle.SMOKING_NEVER -> stringResource(R.string.profile_smoking_never)
@@ -218,7 +233,7 @@ private fun lifestyleLabel(raw: String?): String {
         }
         if (habitText != null) add("${stringResource(R.string.profile_habit_field)} $habitText")
         l.sleepHours?.let { add(stringResource(R.string.profile_sleep_short, it)) }
-    }.joinToString(" · ")
+    }
 }
 
 @Composable

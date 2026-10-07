@@ -40,6 +40,7 @@ import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
 import com.ashkb.app.ui.theme.colors
+import androidx.compose.ui.Alignment
 
 // ---------------------------------------------------------------------------
 // 警报 / 发作 / BASDAI 卡
@@ -217,6 +218,23 @@ internal fun BasdaiList(records: List<BasdaiRecord>, onDelete: (BasdaiRecord) ->
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        // v1.2.3：删除入口从「左侧 Column 内独占一行」移到**右侧、分数上方**。
+        // 维护者反馈「每天的的自评记录间隔偏大」——实测每行约 330px（屏高 3051 时一屏只
+        // 看得到 6 条），其中「删除」二字独占的一行占了近三分之一。移到右侧后行高由
+        // 两行文本（日期 + Q 值）决定，删除按钮与分数同列、竖直排列，不再撑行。
+        // v1.2.3：删除与总分**同一列、同右对齐**。
+        // 维护者反馈截图里两者错位——「删除」在右上、总分在右下，读起来像两列。
+        // 现在同处一个右对齐 Column，且删除在下（先读到分数，再决定是否删）。
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+        ) {
+            Text(
+                "%.1f".format(r.total),
+                style = MaterialTheme.typography.titleMedium,
+                color = if (ClinicalThresholds.basdaiHigh(r.total)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+            )
             DestructiveAction(
                 label = stringResource(R.string.common_delete),
                 confirmTitle = stringResource(R.string.basdai_delete_confirm, r.date),
@@ -225,10 +243,5 @@ internal fun BasdaiList(records: List<BasdaiRecord>, onDelete: (BasdaiRecord) ->
                 onConfirm = { onDelete(r) },
             )
         }
-        Text(
-            "%.1f".format(r.total),
-            style = MaterialTheme.typography.titleMedium,
-            color = if (ClinicalThresholds.basdaiHigh(r.total)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-        )
     }
 }

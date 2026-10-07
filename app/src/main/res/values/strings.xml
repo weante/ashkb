@@ -69,6 +69,7 @@
     <string name="basdai_high_alert_note">BASDAI ≥ 4.0：疾病活动度高，复诊时请与医生讨论（edu-th-002）</string>
     <string name="basdai_high_note_paren">（≥4.0：活动度偏高，最近两次自评均 ≥4.0 将提示复诊）</string>
     <string name="basdai_intro_note">6 题自评（0–10），总分 (Q1+Q2+Q3+Q4+(Q5+Q6)/2)/5。建议每周固定同日自评一次，就诊时给医生看趋势。</string>
+    <string name="basdai_fill_zeros">其余未答的题，按「无」记</string>
     <string name="basdai_q1_fatigue">Q1 整体疲乏程度</string>
     <string name="basdai_q2_spinal_pain">Q2 脊柱痛程度</string>
     <string name="basdai_q3_peripheral">Q3 外周关节痛程度</string>
@@ -796,6 +797,8 @@
     <string name="wellness_weight_manage_title">体重记录管理</string>
     <string name="wellness_weight_entry">%1$s　%2$s kg</string>
     <string name="wellness_clear_diet_profile">清除饮食画像</string>
+    <string name="forms_tap_to_answer">点此：%1$s</string>
+    <string name="forms_tap_to_answer_severe">点此：%1$s</string>
     <string name="forms_slider_a11y">%1$s 当前 %2$s 分，满分 %3$s</string>
     <string name="lab_parse_result">解析结果：%1$s 项</string>
     <string name="lab_parse_result_abnormal">解析结果：%1$s 项 · %2$s 项异常</string>

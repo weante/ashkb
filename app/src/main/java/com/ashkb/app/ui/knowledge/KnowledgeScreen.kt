@@ -1,6 +1,5 @@
 package com.ashkb.app.ui.knowledge
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -11,16 +10,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -42,7 +38,8 @@ import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.EmptyState
-import com.ashkb.app.ui.components.ScreenTopBar
+import com.ashkb.app.ui.components.ScreenTitleCard
+import com.ashkb.app.ui.components.TabChips
 import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
@@ -70,7 +67,11 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
     LaunchedEffect(Unit) { vm.refreshReviewCheck() }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenTopBar(title = stringResource(R.string.knowledge_title_count, ui.entries.size))
+        // v1.2.3：标题从 `ScreenTopBar`（铺在米色底上的裸标题）改为**圆角卡片**，
+        // 与下方那排白卡片同一套容器。见 PageChrome.kt 的说明。
+        Spacer(Modifier.height(Spacing.sm))
+        ScreenTitleCard(title = stringResource(R.string.knowledge_title_count, ui.entries.size))
+        Spacer(Modifier.height(Spacing.md))
 
         // 搜索 + 分类筛选固定吸顶，滚动不消失
         Column(Modifier.padding(horizontal = Spacing.lg)) {
@@ -82,19 +83,14 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
                 singleLine = true,
             )
             Spacer(Modifier.height(Spacing.sm))
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-            ) {
-                KB_CATEGORIES.forEach { (key, labelRes) ->
-                    FilterChip(
-                        selected = ui.category == key,
-                        onClick = { vm.setCategory(key) },
-                        label = { Text(stringResource(labelRes)) },
-                        modifier = Modifier.heightIn(min = Size.touchMin),
-                    )
-                }
-            }
+            // v1.2.3：分类标签从 `FilterChip`（浅琥珀选中，对比度低）改为与报表页签同一套
+            // 深青胶囊（`TabChips`）。维护者原话「要和其他页面一样……颜色对比度要高」——
+            // 报表页已经改过，这里跟着统一，两个页面的筛选/页签从此长得一样。
+            TabChips(
+                labels = KB_CATEGORIES.map { stringResource(it.second) },
+                selectedIndex = KB_CATEGORIES.indexOfFirst { it.first == ui.category }.coerceAtLeast(0),
+                onSelect = { i -> vm.setCategory(KB_CATEGORIES[i].first) },
+            )
             // B2：把「有备注」的条数放在筛选之后、到期告警之前——先看到自己积累的内容，再看到需要处理的异常
             if (noteCount > 0) {
                 Spacer(Modifier.height(Spacing.xs))

@@ -30,9 +30,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -60,9 +58,11 @@ import com.ashkb.app.ui.components.LoadingBlock
 import com.ashkb.app.ui.components.NavRow
 import com.ashkb.app.ui.components.DoseCompletionBlock
 import com.ashkb.app.ui.components.SectionCard
+import com.ashkb.app.ui.components.ScreenTitleCard
 import com.ashkb.app.ui.components.sharedWindow
 import com.ashkb.app.ui.components.SmallTrendChart
 import com.ashkb.app.ui.components.StatusChip
+import com.ashkb.app.ui.components.TabChips
 import com.ashkb.app.ui.components.TrendChart
 import com.ashkb.app.ui.components.TrendPoint
 import com.ashkb.app.ui.components.WeightedTrailingRow
@@ -112,26 +112,28 @@ fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
     LaunchedEffect(Unit) { vm.onEnterReport() }
 
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        // v1.2.3：标题从「裸 Row 铺在米色底上」改为**圆角卡片**，与知识库页、以及下方那些
+        // 数据卡片同一套容器。维护者反馈「要和其他页面一样圆角矩形」。
+        Spacer(Modifier.height(Spacing.sm))
+        ScreenTitleCard(
+            title = stringResource(R.string.me_report_nav),
+            subtitle = stringResource(R.string.report_subtitle),
         ) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.me_report_nav), style = MaterialTheme.typography.headlineSmall)
-                Text(stringResource(R.string.report_subtitle),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(onClick = { vm.refresh() }, enabled = !busy) {
+                Text(stringResource(R.string.common_refresh))
             }
-            OutlinedButton(onClick = { vm.refresh() }, enabled = !busy) { Text(stringResource(R.string.common_refresh)) }
         }
+        Spacer(Modifier.height(Spacing.md))
 
-        ScrollableTabRow(selectedTabIndex = pager.currentPage, edgePadding = 8.dp) {
-            tabs.forEachIndexed { i, t ->
-                Tab(selected = pager.currentPage == i, onClick = {
-                    scope.launch { pager.animateScrollToPage(i) }
-                }, text = { Text(t) })
-            }
-        }
+        // v1.2.3：页签从 `ScrollableTabRow`（下划线式）改为**胶囊**，依据是维护者自己的设计稿
+        // （`ASHKB-毛玻璃UI预览.html` 的 `.tchip`：未选中白底细描边、选中深青渐变底 + 白字）。
+        // 下划线式的未选中文字几乎与背景同色，维护者反馈「颜色需要对比度」。
+        TabChips(
+            labels = tabs,
+            selectedIndex = pager.currentPage,
+            onSelect = { i -> scope.launch { pager.animateScrollToPage(i) } },
+            modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.sm),
+        )
 
         HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
             when (page) {
