@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.2.6（i18n）：UI 层与 domain 层散落的患者可见文案（domain 侧以 @StringRes Int 返回，由 UI 层解析） -->
+<resources>
+
+    <!-- ===== 报告导入：发给 AI 的模板（患者可见，复制到剪贴板） ===== -->
+    <string name="ui_import_template_lab">【化验单整理】\n请根据我发送的检验报告照片，逐项提取数据并严格按以下格式输出（每项一行，报告里有多少项就输出多少项，没有的不要编造，看不清的用?代替）：\n\n日期: 2026-08-02\n医院: 医院名称\n项目, 结果, 单位, 参考范围, 标记\n血沉(ESR), 15, mm/h, 0-20, 正常\nC-反应蛋白(CRP), 5.2, mg/L, 0-8, 偏高\n白细胞计数(WBC), 6.1, 10^9/L, 3.5-9.5, 正常\n\n说明：\n- 「项目」用报告上的中文名，可带英文缩写\n- 「结果」只填数字（或 阴性/阳性/↑/↓ 等原文），不要带单位\n- 「参考范围」照抄报告原文（如 2.9-8.2 或 ≤5）\n- 「标记」按报告原标注：偏高/偏高↑、偏低、正常</string>
+    <string name="ui_import_template_imaging">【影像报告整理】\n请根据我发送的检查报告照片（MRI/CT/X线），提取信息并严格按以下格式输出：\n\n类型: MRI（按报告实际类型填 MRI / CT / X线）\n日期: 2026-07-31\n医院: 医院名称\n部位: 骶髂关节\n所见: 图像所见/检查所见的完整原文（可多行）\n结论: 诊断与印象的完整原文（可多行）\n对比: 报告中「对比前片」的变化描述（没有则填 无）</string>
+    <string name="ui_imaging_bodypart_unset">未注明部位</string>
+
+    <!-- ===== 运动处方：提示与反馈（ExerciseEngine 返回资源 id） ===== -->
+    <string name="ui_exercise_hint_unparsed">该条目的数据无法解析，已按「禁止」保守处理；请更新知识库种子（数据异常不应静默放行）。</string>
+    <string name="ui_exercise_hint_recommend">今日推荐。%1$s</string>
+    <string name="ui_exercise_hint_allow">可以做。%1$s</string>
+    <string name="ui_exercise_hint_downgrade">今日减量执行（幅度减半 / 时长缩短）。%1$s</string>
+    <string name="ui_exercise_hint_conditional">条件允许时做：仅轻柔体式，幅度以不痛为界。%1$s</string>
+    <string name="ui_exercise_hint_pause">当前分期暂停（降级为 L1 轻柔项替代）。</string>
+    <string name="ui_exercise_hint_advise_against">不建议：骨折与应力风险随强度上升。</string>
+    <string name="ui_exercise_hint_blocked">已拦截：%1$s</string>
+    <string name="ui_exercise_hint_blocked_default">已拦截：高强度高风险动作</string>
+    <string name="ui_exercise_hint_cervical">颈椎受累提示：%1$s</string>
+    <string name="ui_exercise_hint_cervical_default">颈椎受累提示：该类动作颈椎风险高</string>
+    <string name="ui_exercise_hint_alternative">替代方案：%1$s</string>
+    <string name="ui_exercise_feedback_soreness">运动后疼痛加重，但表现符合肌肉酸痛（延迟性酸痛）。观察 1–2 天；下次时长可暂不加量（exc-010 进展原则）。</string>
+    <string name="ui_exercise_feedback_worse">运动后疼痛加重且不符合单纯肌肉酸痛——按「运动后 2 小时疼痛规则」建议下次减量：时长 −20% 或强度降一档（exc-010）。连续 2 次加重建议咨询康复科。</string>
+    <string name="ui_exercise_feedback_stiffness">晨僵加重——可能提示炎症活动而非运动过量。建议当周维持低强度（L1），若持续加重请记录症状趋势并联系医生。</string>
+    <string name="ui_exercise_feedback_better">反馈良好。可按进展原则加量：先时长（每 1–2 周 +5–10 min），再频率，最后强度。</string>
+    <string name="ui_exercise_feedback_stable">反馈平稳。维持当前量，加量顺序：时长 → 频率 → 强度（exc-010）。</string>
+    <string name="ui_exercise_blocked_body">L3 · %1$s｜%2$s</string>
+    <string name="ui_exercise_today_suitable">今日适合：%1$s</string>
+
+    <!-- ===== 小米后台限制检查 ===== -->
+    <string name="ui_miui_switch_lockscreen">锁屏显示</string>
+    <string name="ui_miui_switch_background">后台弹出界面</string>
+    <string name="ui_miui_switch_autostart">自启动</string>
+
+    <!-- ===== 用药：注射周期 / 按需 / 空腹 ===== -->
+    <string name="ui_emergency_meds_inj_cycle">" · 每 %1$d 天"</string>
+    <string name="ui_med_prn_detail">按需 · %1$s</string>
+    <string name="ui_med_prn_backup">备用</string>
+    <string name="ui_schedule_empty_stomach">%1$s · 晨起空腹</string>
+
+    <!-- ===== 趋势图无障碍描述 ===== -->
+    <string name="ui_trend_a11y_summary">%1$s 趋势，共 %2$d 个数据点</string>
+    <string name="ui_trend_a11y_range">，从 %1$s%2$s %3$s %4$s%2$s</string>
+    <string name="ui_trend_a11y_avg">，均值 %1$s%2$s</string>
+    <string name="ui_trend_a11y_over">，其中 %1$d 次超过阈值 %2$s%3$s</string>
+
+    <!-- ===== 症状：发作 / 历史 / BASDAI ===== -->
+    <string name="ui_list_separator">"、"</string>
+    <string name="ui_flare_started_trigger">开始：%1$s · 诱因：%2$s</string>
+    <string name="ui_flare_actions_taken">已采取：%1$s</string>
+    <string name="ui_flare_date_range">%1$s 至 %2$s</string>
+    <string name="ui_flare_peak_suffix">" · 峰值 %1$d/10"</string>
+    <string name="ui_symptom_more_alerts">还有 %1$d 条未读警报</string>
+    <string name="ui_symptom_basdai_recorded">%1$s 已记录（总分 %2$.1f），可修改后重新提交，覆盖原记录。</string>
+    <string name="ui_symptom_form_recorded_at">已记录于 %1$s，再次保存将覆盖</string>
+    <string name="ui_basdai_total_prefix">总分：%1$.1f</string>
+
+    <!-- ===== 检查 / 报告 / 知识库 ===== -->
+    <string name="ui_checkup_lab_date_prefix">日期：%1$s</string>
+    <string name="ui_vaccine_doctor_confirm">医生确认：%1$s</string>
+    <string name="ui_report_stiffness_score">%1$.0f 分</string>
+    <string name="ui_med_kb_remaining">…其余 %1$d 条可在知识库查看</string>
+
+    <!-- ===== 今日 / 急诊 / 崩溃提示 ===== -->
+    <string name="ui_today_plan_prefix">计划 %1$s</string>
+    <string name="ui_today_target_injection_date">目标注射日：%1$s</string>
+    <string name="ui_emergency_view_all_events">查看全部 %1$d 条</string>
+    <string name="ui_crash_fatal_separator">\n===== 致命崩溃 =====\n</string>
+    <string name="ui_appshell_last_crash">上次异常：\n%1$s</string>
+
+</resources>

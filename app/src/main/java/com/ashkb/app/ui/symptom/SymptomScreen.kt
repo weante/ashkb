@@ -85,7 +85,7 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
                         }
                         if (alerts.size > 3) {
                             Text(
-                                "还有 ${alerts.size - 3} 条未读警报",
+                                stringResource(R.string.ui_symptom_more_alerts, alerts.size - 3),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -156,7 +156,11 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
                     val basdaiExisting = basdaiHistory.firstOrNull { it.date == selectedDate.toString() }
                     if (basdaiExisting != null) {
                         Text(
-                            "$selectedDate 已记录（总分 %.1f），可修改后重新提交，覆盖原记录。".format(basdaiExisting.total),
+                            stringResource(
+                                R.string.ui_symptom_basdai_recorded,
+                                selectedDate.toString(),
+                                basdaiExisting.total,
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                         )

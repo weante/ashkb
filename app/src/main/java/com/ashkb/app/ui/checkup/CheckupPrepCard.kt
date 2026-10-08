@@ -82,7 +82,7 @@ internal fun CheckupPrepCard(
                     plan.checkItems.forEach { PrepBullet(it) }
                 }
                 PrepBlockLabel(stringResource(R.string.checkup_prep_bring))
-                plan.bringItems.forEach { PrepBullet(it) }
+                plan.bringItems.forEach { PrepBullet(stringResource(it)) }
                 Text(
                     stringResource(R.string.checkup_prep_export_hint),
                     Modifier.padding(top = Spacing.md),

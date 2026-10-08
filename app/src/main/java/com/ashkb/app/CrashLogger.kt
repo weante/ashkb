@@ -65,7 +65,7 @@ object CrashLogger {
         val nonFatal = readAndClear(context, FILE_NONFATAL)
         return when {
             fatal != null && nonFatal != null ->
-                nonFatal + "\n===== 致命崩溃 =====\n" + fatal
+                nonFatal + context.getString(R.string.ui_crash_fatal_separator) + fatal
             fatal != null -> fatal
             else -> nonFatal
         }

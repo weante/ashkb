@@ -1,6 +1,7 @@
 package com.ashkb.app.domain
 
 import android.content.Context
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.Medication
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -38,7 +39,11 @@ class EmergencyMedsTest {
         meds: List<Medication>,
         today: String,
         maxLines: Int = EmergencyMeds.MAX_LINES,
-    ) = EmergencyMeds.summarize(meds, today, maxLines = maxLines, freqLabel = { ctx.getString(it.plainRes) })
+    ) = EmergencyMeds.summarize(
+        meds, today, maxLines = maxLines,
+        freqLabel = { ctx.getString(it.plainRes) },
+        injCycleLabel = { ctx.getString(R.string.ui_emergency_meds_inj_cycle, it) },
+    )
 
     private fun med(
         id: String = "med-test",

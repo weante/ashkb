@@ -427,7 +427,10 @@ internal fun VaccineList(vaccines: List<VaccineRecord>, onAdd: () -> Unit, onEdi
                     },
                 ) {
                     Text(
-                        "医生确认：${stringResource(DoctorConfirm.fromKey(vac.doctorConfirm).labelRes)}",
+                        stringResource(
+                            R.string.ui_vaccine_doctor_confirm,
+                            stringResource(DoctorConfirm.fromKey(vac.doctorConfirm).labelRes),
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = when (vac.doctorConfirm) {
                             "CONFIRMED" -> MaterialTheme.colorScheme.primary

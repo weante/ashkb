@@ -1,5 +1,7 @@
 package com.ashkb.app.domain
 
+import androidx.annotation.StringRes
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.KbEntry
 import org.json.JSONObject
 
@@ -14,12 +16,20 @@ object ExerciseEngine {
     fun cervicalInvolved(spineMobility: String?): Boolean =
         spineMobility == "moderate" || spineMobility == "severe"
 
+    /**
+     * 提示片段：资源 id + 参数。
+     *
+     * v1.2.6（i18n）：domain 层不再持有患者可见文案，由 UI 层按当前语言
+     * （`stringResource(part.res, …)`，见 `ExerciseScreen.hintText()`）渲染。
+     */
+    data class TextPart(@StringRes val res: Int, val args: List<String> = emptyList())
+
     data class ExerciseCard(
         val entry: KbEntry,
         /** matrix 判定：recommend / allow / downgrade / conditional / pause / block / advise_against */
         val verdict: String,
-        /** 给用户看的行动提示（剂量 / 减量 / 条件 / 拦截原因与替代） */
-        val hint: String,
+        /** 给用户看的行动提示片段（主提示恒为首项，颈椎提示次之，替代方案末位） */
+        val hintParts: List<TextPart>,
         val grade: String,
         val listType: String, // red / black
         val movements: List<String>,
@@ -61,7 +71,7 @@ object ExerciseEngine {
             return ExerciseCard(
                 entry = entry,
                 verdict = "block",
-                hint = "该条目的数据无法解析，已按「禁止」保守处理；请更新知识库种子（数据异常不应静默放行）。",
+                hintParts = listOf(TextPart(R.string.ui_exercise_hint_unparsed)),
                 grade = "L3",
                 listType = "black",
                 movements = emptyList(),
@@ -117,34 +127,56 @@ object ExerciseEngine {
             else -> raw
         }
 
-        val hint = buildString {
-            when (verdict) {
-                "recommend" -> append("今日推荐。${dose ?: ""}")
-                "allow" -> append("可以做。${dose ?: ""}")
-                "downgrade" -> append("今日减量执行（幅度减半 / 时长缩短）。${dose ?: ""}")
-                "conditional" -> append("条件允许时做：仅轻柔体式，幅度以不痛为界。${dose ?: ""}")
-                "pause" -> append("当前分期暂停（降级为 L1 轻柔项替代）。")
-                "advise_against" -> append("不建议：骨折与应力风险随强度上升。")
-                else -> append("已拦截：${p.optStr("risk") ?: "高强度高风险动作"}")
-            }
-            if (cervical && cervicalCondition in CERVICAL_HINT_CONDITIONS) {
-                append("\n颈椎受累提示：${p.optStr("risk") ?: "该类动作颈椎风险高"}")
-            }
-            if (verdict == "block" || verdict == "advise_against") {
-                alt?.let { append("\n替代方案：$it") }
-            }
-        }.trim()
+        val hintParts = hintPartsOf(verdict, dose, p.optStr("risk"), cervical, cervicalCondition, alt)
 
         return ExerciseCard(
             entry = entry,
             verdict = verdict,
-            hint = hint,
+            hintParts = hintParts,
             grade = grade,
             listType = listType,
             movements = movements(p),
             dose = dose,
         )
     }
+
+    /**
+     * 提示片段拼装（v1.2.6 i18n）：主提示恒为首项、颈椎提示次之、替代方案末位。
+     * 资源里不再带前导换行，行与行由 UI 层用 `\n` 连接。
+     */
+    private fun hintPartsOf(
+        verdict: String,
+        dose: String?,
+        risk: String?,
+        cervical: Boolean,
+        cervicalCondition: String,
+        alt: String?,
+    ): List<TextPart> = buildList {
+        add(mainHintPart(verdict, dose, risk))
+        if (cervical && cervicalCondition in CERVICAL_HINT_CONDITIONS) {
+            add(cervicalHintPart(risk))
+        }
+        if (verdict == "block" || verdict == "advise_against") {
+            alt?.let { add(TextPart(R.string.ui_exercise_hint_alternative, listOf(it))) }
+        }
+    }
+
+    /** 主提示（判定 → 行动）：`block`（含未知判定）走「已拦截」，风险原因可选。 */
+    private fun mainHintPart(verdict: String, dose: String?, risk: String?): TextPart = when (verdict) {
+        "recommend" -> TextPart(R.string.ui_exercise_hint_recommend, listOf(dose.orEmpty()))
+        "allow" -> TextPart(R.string.ui_exercise_hint_allow, listOf(dose.orEmpty()))
+        "downgrade" -> TextPart(R.string.ui_exercise_hint_downgrade, listOf(dose.orEmpty()))
+        "conditional" -> TextPart(R.string.ui_exercise_hint_conditional, listOf(dose.orEmpty()))
+        "pause" -> TextPart(R.string.ui_exercise_hint_pause)
+        "advise_against" -> TextPart(R.string.ui_exercise_hint_advise_against)
+        else -> risk?.let { TextPart(R.string.ui_exercise_hint_blocked, listOf(it)) }
+            ?: TextPart(R.string.ui_exercise_hint_blocked_default)
+    }
+
+    /** 颈椎受累追加提示（风险原因可选）。 */
+    private fun cervicalHintPart(risk: String?): TextPart =
+        risk?.let { TextPart(R.string.ui_exercise_hint_cervical, listOf(it)) }
+            ?: TextPart(R.string.ui_exercise_hint_cervical_default)
 
     /** 当日处方：红榜按矩阵过滤（pause 不出现），黑榜全部进拦截区 */
     fun todayPlan(
@@ -172,21 +204,17 @@ object ExerciseEngine {
         "always", "amplitude_half", // v1.0.77：种子在用、此前被静默忽略的两个键
     )
 
-    /** R21 / exc-010 判读：worse → 建议下次减量；区分肌肉酸痛与炎症加重 */
+    /** R21 / exc-010 判读：worse → 建议下次减量；区分肌肉酸痛与炎症加重。v1.2.6：返回资源 id。 */
+    @StringRes
     fun interpretFeedback(
         painChange: String?,
         stiffnessChange: String?,
         isMuscleSoreness: Boolean?,
-    ): String = when {
-        painChange == "worse" && isMuscleSoreness == true ->
-            "运动后疼痛加重，但表现符合肌肉酸痛（延迟性酸痛）。观察 1–2 天；下次时长可暂不加量（exc-010 进展原则）。"
-        painChange == "worse" ->
-            "运动后疼痛加重且不符合单纯肌肉酸痛——按「运动后 2 小时疼痛规则」建议下次减量：时长 −20% 或强度降一档（exc-010）。连续 2 次加重建议咨询康复科。"
-        stiffnessChange == "worse" && isMuscleSoreness != true ->
-            "晨僵加重——可能提示炎症活动而非运动过量。建议当周维持低强度（L1），若持续加重请记录症状趋势并联系医生。"
-        painChange == "better" || stiffnessChange == "better" ->
-            "反馈良好。可按进展原则加量：先时长（每 1–2 周 +5–10 min），再频率，最后强度。"
-        else ->
-            "反馈平稳。维持当前量，加量顺序：时长 → 频率 → 强度（exc-010）。"
+    ): Int = when {
+        painChange == "worse" && isMuscleSoreness == true -> R.string.ui_exercise_feedback_soreness
+        painChange == "worse" -> R.string.ui_exercise_feedback_worse
+        stiffnessChange == "worse" && isMuscleSoreness != true -> R.string.ui_exercise_feedback_stiffness
+        painChange == "better" || stiffnessChange == "better" -> R.string.ui_exercise_feedback_better
+        else -> R.string.ui_exercise_feedback_stable
     }
 }

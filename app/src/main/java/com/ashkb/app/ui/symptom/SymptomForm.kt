@@ -83,7 +83,7 @@ internal fun SymptomFormCard(
     SectionCard(title = if (existing == null) stringResource(R.string.symptom_form_title_unrecorded, dateLabel) else stringResource(R.string.symptom_form_title, dateLabel)) {
         if (existing != null) {
             Text(
-                "已记录于 ${existing.recordedAt.take(16).replace("T", " ")}，再次保存将覆盖",
+                stringResource(R.string.ui_symptom_form_recorded_at, existing.recordedAt.take(16).replace("T", " ")),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

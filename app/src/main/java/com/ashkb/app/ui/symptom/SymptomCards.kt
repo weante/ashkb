@@ -128,7 +128,11 @@ internal fun FlareStatusCard(
             )
             Spacer(Modifier.height(Spacing.sm))
             Text(
-                "开始：${flare.startDate} · 诱因：${stringResource(FlareTrigger.fromKey(flare.trigger).labelRes)}" +
+                stringResource(
+                    R.string.ui_flare_started_trigger,
+                    flare.startDate,
+                    stringResource(FlareTrigger.fromKey(flare.trigger).labelRes),
+                ) +
                     (flare.severityPeak?.let { stringResource(R.string.symptom_peak_pain_suffix, it) } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -142,7 +146,10 @@ internal fun FlareStatusCard(
                     // 调 `@Composable` 的 stringResource；先用 inline 的 map 解析成文案再拼接。
                     val actedLabels = acts.map { stringResource(FlareAction.fromKey(it).labelRes) }
                     Text(
-                        "已采取：${actedLabels.joinToString("、")}",
+                        stringResource(
+                            R.string.ui_flare_actions_taken,
+                            actedLabels.joinToString(stringResource(R.string.ui_list_separator)),
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = Spacing.xxs),
@@ -179,11 +186,16 @@ internal fun FlareHistoryList(
     DividerList(items = events, key = { it.id }) { f ->
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
             Text(
-                "${f.startDate} 至 ${f.endDate ?: stringResource(R.string.symptom_until_now)}",
+                stringResource(
+                    R.string.ui_flare_date_range,
+                    f.startDate,
+                    f.endDate ?: stringResource(R.string.symptom_until_now),
+                ),
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(
-                "${stringResource(FlareTrigger.fromKey(f.trigger).labelRes)}${f.severityPeak?.let { " · 峰值 $it/10" } ?: ""}",
+                stringResource(FlareTrigger.fromKey(f.trigger).labelRes) +
+                    (f.severityPeak?.let { stringResource(R.string.ui_flare_peak_suffix, it) } ?: ""),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

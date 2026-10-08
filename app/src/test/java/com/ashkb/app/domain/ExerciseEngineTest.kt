@@ -1,10 +1,15 @@
 package com.ashkb.app.domain
 
+import android.content.Context
 import com.ashkb.app.data.entity.KbEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 /**
  * P5 运动分级矩阵单测（R27 安全核心）：
@@ -12,8 +17,20 @@ import org.junit.Test
  * 发作期红榜只出 L1、黑榜 stage 条件拦截、颈椎受累全期拦截、
  * 停用项不进当日处方、反馈判读（exc-010）。
  * 矩阵判定错误会直接把高危动作放给发作期患者——任何一条失败都不应定版。
+ *
+ * v1.2.6（i18n）：`ExerciseCard.hintParts` 与 `interpretFeedback` 只产出资源 id，
+ * 断言措辞的用例经 `ctx.getString` 落地成中文文本；`@Config(qualifiers = "zh-rCN")`
+ * 不可省（`values-en` 已存在，Robolectric 默认跟随 JVM locale）。
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "zh-rCN")
 class ExerciseEngineTest {
+
+    private val ctx: Context get() = RuntimeEnvironment.getApplication()
+
+    /** 把提示片段按 UI 层的规则拼成文本（片段之间用换行连接）。 */
+    private fun hintText(c: ExerciseEngine.ExerciseCard): String =
+        c.hintParts.joinToString("\n") { ctx.getString(it.res, *it.args.toTypedArray()) }
 
     private fun entry(payload: String, category: String = "exercise") = KbEntry(
         id = "exb-test", category = category, title = "测试条目", summary = "测试",
@@ -30,7 +47,7 @@ class ExerciseEngineTest {
             "grade_matrix":{"stable":"recommend","active":"allow"}}""")
         val c = ExerciseEngine.evaluate(e, diseaseStage = "stable", spineMobility = null)
         assertEquals("recommend", c.verdict)
-        assertTrue(c.hint.contains("今日推荐"))
+        assertTrue(hintText(c).contains("今日推荐"))
     }
 
     @Test
@@ -39,7 +56,7 @@ class ExerciseEngineTest {
             "grade_matrix":{"stable":"recommend","controlled":"downgrade"}}""")
         val c = ExerciseEngine.evaluate(e, diseaseStage = "controlled", spineMobility = null)
         assertEquals("downgrade", c.verdict)
-        assertTrue(c.hint.contains("减量"))
+        assertTrue(hintText(c).contains("减量"))
     }
 
     @Test
@@ -105,7 +122,7 @@ class ExerciseEngineTest {
         val c = ExerciseEngine.evaluate(e, "stable", null)
         assertEquals("block", c.verdict)
         assertEquals("black", c.listType)
-        assertTrue("提示语要说明是数据问题", c.hint.contains("无法解析"))
+        assertTrue("提示语要说明是数据问题", hintText(c).contains("无法解析"))
     }
 
     @Test
@@ -130,7 +147,7 @@ class ExerciseEngineTest {
         assertEquals("recommend", ExerciseEngine.evaluate(e, "stable", null).verdict)
         val c = ExerciseEngine.evaluate(e, "stable", "moderate")
         assertEquals("downgrade", c.verdict)
-        assertTrue("提示语要提到颈椎", c.hint.contains("颈椎受累提示"))
+        assertTrue("提示语要提到颈椎", hintText(c).contains("颈椎受累提示"))
     }
 
     @Test
@@ -167,7 +184,7 @@ class ExerciseEngineTest {
         val e = entry("""{"list_type":"black","grade":"L2","risk":"倒立类"}""")
         val c = ExerciseEngine.evaluate(e, "stable", null)
         assertEquals("block", c.verdict)
-        assertTrue(c.hint.contains("已拦截"))
+        assertTrue(hintText(c).contains("已拦截"))
     }
 
     // ======================= 颈椎受累（R27 §3） =======================
@@ -209,7 +226,7 @@ class ExerciseEngineTest {
     fun `颈椎受累提示附加在 hint`() {
         val e = entry("""{"list_type":"black","risk":"颈椎过伸","cervical_condition":"cervical_only"}""")
         val c = ExerciseEngine.evaluate(e, "stable", "moderate")
-        assertTrue(c.hint.contains("颈椎受累提示"))
+        assertTrue(hintText(c).contains("颈椎受累提示"))
     }
 
     @Test
@@ -226,8 +243,8 @@ class ExerciseEngineTest {
         val e = entry("""{"list_type":"black","risk":"仰卧起坐",
             "block_rule":{"stage":["controlled","flare","stable"]},"alternative_hint":"改为平板支撑 30 秒"}""")
         val c = ExerciseEngine.evaluate(e, "flare", null)
-        assertTrue(c.hint.contains("替代方案"))
-        assertTrue(c.hint.contains("平板支撑"))
+        assertTrue(hintText(c).contains("替代方案"))
+        assertTrue(hintText(c).contains("平板支撑"))
     }
 
     // ======================= 当日处方 =======================
@@ -274,34 +291,34 @@ class ExerciseEngineTest {
 
     @Test
     fun `疼痛加重且符合肌肉酸痛 观察不加量`() {
-        val msg = ExerciseEngine.interpretFeedback("worse", null, true)
+        val msg = ctx.getString(ExerciseEngine.interpretFeedback("worse", null, true))
         assertTrue(msg.contains("延迟性酸痛"))
         assertFalse(msg.contains("减量"))
     }
 
     @Test
     fun `疼痛加重非肌肉酸痛 建议减量 20 percent`() {
-        val msg = ExerciseEngine.interpretFeedback("worse", null, false)
+        val msg = ctx.getString(ExerciseEngine.interpretFeedback("worse", null, false))
         assertTrue(msg.contains("减量"))
         assertTrue(msg.contains("20%"))
     }
 
     @Test
     fun `晨僵加重提示炎症活动降 L1`() {
-        val msg = ExerciseEngine.interpretFeedback(null, "worse", false)
+        val msg = ctx.getString(ExerciseEngine.interpretFeedback(null, "worse", false))
         assertTrue(msg.contains("晨僵"))
         assertTrue(msg.contains("L1"))
     }
 
     @Test
     fun `反馈良好按进展原则加量`() {
-        val msg = ExerciseEngine.interpretFeedback("better", null, null)
+        val msg = ctx.getString(ExerciseEngine.interpretFeedback("better", null, null))
         assertTrue(msg.contains("加量"))
     }
 
     @Test
     fun `反馈平稳维持当前量`() {
-        val msg = ExerciseEngine.interpretFeedback(null, null, null)
+        val msg = ctx.getString(ExerciseEngine.interpretFeedback(null, null, null))
         assertTrue(msg.contains("维持"))
     }
 }

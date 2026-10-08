@@ -67,18 +67,23 @@ object EmergencyMeds {
      * （`MedFrequency.plainRes` 是资源 id）——本对象因此**继续保持无 Android 依赖**，
      * Compose 侧传 `stringResource`、非 Compose 侧传 `context::getString` 即可。
      *
+     * v1.2.6（i18n）：注射周期（「 · 每 N 天」）同样改为注入 [injCycleLabel]（资源
+     * `ui_emergency_meds_inj_cycle`），本对象不再持有患者可见文案。
+     *
      * @param freqLabel 把频次枚举解析成当前语言文案；急救卡必须用 `plainRes`（不是 `labelRes`）。
+     * @param injCycleLabel 把注射周期天数（`injCycleDays`）解析成「 · 每 N 天」形式的文案。
      */
     fun summarize(
         meds: List<Medication>,
         today: String,
         freqLabel: (MedFrequency) -> String,
+        injCycleLabel: (Int) -> String,
         maxLines: Int = MAX_LINES,
     ): Summary {
         val active = meds.filter { isActive(it, today) }
         val (immuno, rest) = active.partition { isImmunosuppressant(it.medClass) }
-        val head = immuno.map { entry(it, freqLabel) }
-        val tail = rest.map { entry(it, freqLabel) }
+        val head = immuno.map { entry(it, freqLabel, injCycleLabel) }
+        val tail = rest.map { entry(it, freqLabel, injCycleLabel) }
         val kept = (head + tail).take(maxLines.coerceAtLeast(0))
         val keptHead = kept.count { it.immunosuppressant }
         return Summary(
@@ -88,13 +93,17 @@ object EmergencyMeds {
         )
     }
 
-    private fun entry(m: Medication, freqLabel: (MedFrequency) -> String): Entry {
+    private fun entry(
+        m: Medication,
+        freqLabel: (MedFrequency) -> String,
+        injCycleLabel: (Int) -> String,
+    ): Entry {
         val name = m.brandName?.takeIf { it.isNotBlank() }?.let { "${m.name}（$it）" } ?: m.name
         // v1.2.1：读 `plainRes` 而非 `labelRes`——`labelRes` 含面向患者的表单提示（如「如甲氨蝶呤」），
         // 会印到急救卡上（医生看的那张）。详见 MedFrequency 的注释。
         // v1.2.5（i18n）：解析交给调用方注入的 `freqLabel`，本对象不碰 Android 资源。
         val freq = freqLabel(MedFrequency.fromKey(m.frequency))
-        val cycle = m.injCycleDays?.let { " · 每 $it 天" } ?: ""
+        val cycle = m.injCycleDays?.let(injCycleLabel) ?: ""
         return Entry(
             name = name,
             detail = "${m.dose} · $freq$cycle",

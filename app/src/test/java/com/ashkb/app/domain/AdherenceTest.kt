@@ -1,10 +1,15 @@
 package com.ashkb.app.domain
 
+import android.content.Context
 import com.ashkb.app.data.entity.MedicationLog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 /**
  * v1.0.48：依从口径的唯一实现（[AdherenceCalc]）。
@@ -16,8 +21,19 @@ import org.junit.Test
  * v1.0.76（批次 3a）：指标改称「记录内完成度」，这里锁三件事——① 分母是**已记录条数**
  * （不是计划剂量数）；② 零分母**没有**百分比、也没有 90/70 判定；③ 按需（PRN）记录
  * 整体移出该指标，只单独计数。
+ *
+ * i18n（v1.2.6）：`ClinicalThresholds.completionLabel` 改为返回 `@StringRes Int?`，
+ * 三档断言改为**渲染后的中文文本**，故整类走 Robolectric。
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "zh-rCN")
 class AdherenceTest {
+
+    private val ctx: Context get() = RuntimeEnvironment.getApplication()
+
+    /** 与界面同口径：先取资源 id，再渲染成当前语言文本。 */
+    private fun label(ratePct: Int?): String? =
+        ClinicalThresholds.completionLabel(ratePct)?.let { ctx.getString(it) }
 
     /** 造一条用药记录：默认是计划打卡（`prnFlag = false`），`prn = true` 即按需用药的打卡。 */
     private fun log(status: String, prn: Boolean = false, id: String = "mlog-test") = MedicationLog(
@@ -88,8 +104,8 @@ class AdherenceTest {
     @Test
     fun `零分母时不给判定`() {
         // 90/70 的判定必须由「有记录」打底，没有数据就没有达标 / 需关注可谈
-        assertNull(ClinicalThresholds.completionLabel(AdherenceCalc.completion(emptyList()).ratePct))
-        assertNull(ClinicalThresholds.completionLabel(null))
+        assertNull(label(AdherenceCalc.completion(emptyList()).ratePct))
+        assertNull(label(null))
     }
 
     @Test
@@ -178,19 +194,30 @@ class AdherenceTest {
 
     @Test
     fun `刚好 90 分判达标`() {
-        assertEquals("达标", ClinicalThresholds.completionLabel(90))
+        assertEquals("达标", label(90))
     }
 
     @Test
     fun `刚好 70 分判待改善`() {
-        assertEquals("待改善", ClinicalThresholds.completionLabel(70))
+        assertEquals("待改善", label(70))
     }
 
     @Test
     fun `89 分与 69 分各降一档`() {
-        assertEquals("待改善", ClinicalThresholds.completionLabel(89))
-        assertEquals("需干预", ClinicalThresholds.completionLabel(69))
-        assertEquals("需干预", ClinicalThresholds.completionLabel(0))
+        assertEquals("待改善", label(89))
+        assertEquals("需干预", label(69))
+        assertEquals("需干预", label(0))
+    }
+
+    /**
+     * i18n 新增守卫：三档必须落在**三条不同**的资源上。
+     *
+     * 改成资源 id 后把三档误指向同一条资源编译器不报错，界面会静默退化成「怎么算都是同一句话」。
+     */
+    @Test
+    fun `三档判定指向三条不同资源`() {
+        val resIds = listOf(90, 70, 0).map { ClinicalThresholds.completionLabel(it) }
+        assertEquals("三档不得重复指向同一资源", resIds.size, resIds.toSet().size)
     }
 
     @Test

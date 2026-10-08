@@ -557,7 +557,10 @@ private fun ImagingRow(
             }
             rec.conclusion?.let { c ->
                 Text(
-                    "结论：${c.lineSequence().firstOrNull { it.isNotBlank() } ?: ""}",
+                    stringResource(
+                        R.string.checkup_conclusion_line,
+                        c.lineSequence().firstOrNull { it.isNotBlank() } ?: "",
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
                 )
@@ -676,7 +679,7 @@ private fun SkippedLinesHint(importedCount: Int, lines: List<String>) {
 @Composable
 internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: () -> Unit) {
     val clipboard = LocalClipboardManager.current
-    val template = if (kind == ImportKind.LAB) ImportTemplates.LAB else ImportTemplates.IMAGING
+    val template = stringResource(if (kind == ImportKind.LAB) ImportTemplates.LAB else ImportTemplates.IMAGING)
     var pasted by remember { mutableStateOf("") }
     var copied by remember { mutableStateOf(false) }
     var labImport by remember { mutableStateOf<LabImport?>(null) }
@@ -684,6 +687,9 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
     var error by remember { mutableStateOf<String?>(null) }
     val labParseEmpty = stringResource(R.string.lab_parse_empty)
     val imagingParseEmpty = stringResource(R.string.imaging_parse_empty)
+    // v1.2.6（i18n）：解析兜底文案与多部位分隔符在 Composable 作用域取好，再传给纯函数的 parser。
+    val imagingBodyPartUnset = stringResource(R.string.ui_imaging_bodypart_unset)
+    val listSeparator = stringResource(R.string.ui_list_separator)
 
     fun tryParse() {
         error = null
@@ -697,7 +703,11 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
                 labImport = parsed
             }
         } else {
-            val parsed = ReportImportParser.parseImaging(pasted)
+            val parsed = ReportImportParser.parseImaging(
+                pasted,
+                imagingBodyPartUnset,
+                listSeparator,
+            )
             if (parsed == null) {
                 error = imagingParseEmpty
             } else {
@@ -773,7 +783,12 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
                 )
                 Text(
                     buildString {
-                        append("日期：${imp.date ?: stringResource(R.string.symptom_unrecognized_today)}")
+                        append(
+                            stringResource(
+                                R.string.ui_checkup_lab_date_prefix,
+                                imp.date ?: stringResource(R.string.symptom_unrecognized_today),
+                            ),
+                        )
                         imp.hospital?.let { append(stringResource(R.string.lab_hospital_suffix, it)) }
                     },
                     style = MaterialTheme.typography.bodySmall,

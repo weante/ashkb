@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  i18n 分片：domain/ 包的文案资源化（Labels / MissedDose / EmergencyLockscreen /
+  LifestylePrescription / ClinicalThresholds / MorningWarmup / CheckupPrep / Disclaimer /
+  PostureAdvice / LabIndicator）。
+  英文见 values-en/strings_domain.xml，**条目名顺序必须完全一致**（EnglishStringsParityTest 守着）。
+  命名约定：dom_<组>_<语义>；组前缀 lbl / missed / lock / life / thr / warm / prep / disc / posture / lab。
+  注意：domain 层里被当作**匹配键**的字符串（药名 / 化验项目名 / 量纲等）刻意不在此文件，见各对象 KDoc。
+-->
+<resources>
+
+    <!-- ===== Labels.kt：枚举 key → 展示标签 ===== -->
+    <string name="dom_lbl_hla_positive">阳性</string>
+    <string name="dom_lbl_hla_negative">阴性</string>
+    <string name="dom_lbl_hla_unknown">未知</string>
+    <string name="dom_lbl_stage_stable">缓解期</string>
+    <string name="dom_lbl_stage_controlled">控制中</string>
+    <string name="dom_lbl_stage_flare">发作期</string>
+    <string name="dom_lbl_stage_unknown">未评估</string>
+    <string name="dom_lbl_sacro_0">0 正常</string>
+    <string name="dom_lbl_sacro_1">I 可疑</string>
+    <string name="dom_lbl_sacro_2">II 轻度</string>
+    <string name="dom_lbl_sacro_3">III 中度</string>
+    <string name="dom_lbl_sacro_4">IV 重度</string>
+    <string name="dom_lbl_sacro_unknown">未评估</string>
+    <string name="dom_lbl_diet_mediterranean">地中海式</string>
+    <string name="dom_lbl_diet_paleo">旧石器式</string>
+    <string name="dom_lbl_diet_vegan">纯素</string>
+    <string name="dom_lbl_diet_vegetarian">素食</string>
+    <string name="dom_lbl_diet_low_starch">低淀粉</string>
+    <string name="dom_lbl_diet_omnivore">杂食</string>
+    <string name="dom_lbl_seafood_never">不吃</string>
+    <string name="dom_lbl_seafood_rare">偶尔</string>
+    <string name="dom_lbl_seafood_weekly">每周</string>
+    <string name="dom_lbl_seafood_frequent">经常</string>
+    <string name="dom_lbl_seafood_unset">未设置</string>
+    <string name="dom_lbl_dairy_yes">耐受</string>
+    <string name="dom_lbl_dairy_no">不耐受</string>
+    <string name="dom_lbl_dairy_lactose_free">仅无乳糖</string>
+    <string name="dom_lbl_dairy_unset">未设置</string>
+    <string name="dom_lbl_avoid_allergy">过敏</string>
+    <string name="dom_lbl_avoid_intolerance">不耐受</string>
+    <string name="dom_lbl_avoid_doctor_advice">医嘱</string>
+    <string name="dom_lbl_avoid_personal">个人体验</string>
+    <string name="dom_lbl_avoid_drug_interaction">药效冲突</string>
+    <string name="dom_lbl_severity_high">高风险</string>
+    <string name="dom_lbl_severity_medium">中</string>
+    <string name="dom_lbl_severity_low">低</string>
+
+    <!-- ===== MissedDose.kt：漏服 / 延迟处理指引 ===== -->
+    <string name="dom_missed_head_oral_soon">可尽快补服</string>
+    <string name="dom_missed_head_oral_skip">建议跳过本次</string>
+    <string name="dom_missed_head_inj_window">窗口期内可尽快补注</string>
+    <string name="dom_missed_head_inj_overdue">已超窗，请先联系医生</string>
+    <string name="dom_missed_oral_soon_1_min">距计划时间不久（约 %1$d 分钟），想起后尽快补服即可。</string>
+    <string name="dom_missed_oral_soon_1_hour">距计划时间不久（约 %1$s 小时），想起后尽快补服即可。</string>
+    <string name="dom_missed_oral_soon_2">若已接近下一次服药时间，则跳过本次，**不要一次服两份剂量**。</string>
+    <string name="dom_missed_oral_soon_3">补服后照常在今日打卡里记录，便于依从统计。</string>
+    <string name="dom_missed_oral_skip_1_min">已超过计划时间约 %1$d 分钟，建议跳过本次、按原计划服下一次。</string>
+    <string name="dom_missed_oral_skip_1_hour">已超过计划时间约 %1$s 小时，建议跳过本次、按原计划服下一次。</string>
+    <string name="dom_missed_oral_skip_2">**切勿加倍剂量**补回——加倍会升高副作用风险。</string>
+    <string name="dom_missed_oral_skip_3">若频繁漏服（如每周多次），请与医生沟通调整方案或改用提醒更密的剂型。</string>
+    <string name="dom_missed_inj_window_1_min">距计划时间约 %1$d 分钟，仍在常见补注窗口（%2$d 小时内）内。</string>
+    <string name="dom_missed_inj_window_1_hour">距计划时间约 %1$s 小时，仍在常见补注窗口（%2$d 小时内）内。</string>
+    <string name="dom_missed_inj_window_2">尽快补注，之后按**原注射周期**顺延安排下一次，不要提前。</string>
+    <string name="dom_missed_inj_window_3_immuno">免疫抑制 / 生物制剂类：若已漏注多日或不确定是否补注，先电话咨询风湿科医生。</string>
+    <string name="dom_missed_inj_window_3_other">如补注后出现不适，及时联系医生。</string>
+    <string name="dom_missed_inj_overdue_1_min">距计划时间已超过 %1$d 小时（约 %2$d 分钟），超出常规补注窗口。</string>
+    <string name="dom_missed_inj_overdue_1_hour">距计划时间已超过 %1$d 小时（约 %2$s 小时），超出常规补注窗口。</string>
+    <string name="dom_missed_inj_overdue_2">**请先联系风湿科医生**确认补注方案（是否需要补注、何时补注、是否调整周期）。</string>
+    <string name="dom_missed_inj_overdue_3">在医生确认前不要自行加倍或缩短间隔注射。</string>
+    <string name="dom_missed_inj_overdue_4_immuno">生物制剂 / 免疫抑制剂中断可能影响病情控制，越早与医生沟通越好。</string>
+    <string name="dom_missed_inj_overdue_4_other">任何调整以主治医师医嘱为准。</string>
+
+    <!-- 时间跨度：< 1 小时报分钟，否则报小时（保留一位小数）——MissedDose.fmt 的口径 -->
+    <string name="dom_duration_minutes">%1$d 分钟</string>
+    <string name="dom_duration_hours">%1$s 小时</string>
+
+    <!-- ===== EmergencyLockscreen.kt：锁屏紧急信息 ===== -->
+    <string name="dom_lock_title">紧急信息</string>
+    <string name="dom_lock_blood">血型 %1$s ｜ 诊断 %2$s</string>
+    <string name="dom_lock_blood_unfilled">血型 未填 ｜ 诊断 %1$s</string>
+    <string name="dom_lock_allergy">过敏 %1$s</string>
+    <string name="dom_lock_meds">用药 %1$s</string>
+    <string name="dom_lock_meds_immuno">用药（含免疫抑制，注意感染风险） %1$s</string>
+    <string name="dom_lock_meds_more">用药 %1$s 等 %2$d 种</string>
+    <string name="dom_lock_meds_immuno_more">用药（含免疫抑制，注意感染风险） %1$s 等 %2$d 种</string>
+    <string name="dom_lock_family">家属 %1$s %2$s</string>
+    <string name="dom_lock_doctor">医生 %1$s %2$s</string>
+    <string name="dom_lock_unspecified">未填</string>
+    <string name="dom_lock_list_separator">"、"</string>
+
+    <!-- ===== LifestylePrescription.kt：生活方式 → 运动处方个性化提示 ===== -->
+    <string name="dom_life_smoking_current">吸烟是 axSpA 脊柱炎症与疾病进展的风险因素，建议戒烟（可请医生协助制定戒烟方案）。诚实口径：指南明确戒烟是基于吸烟的已知健康风险推荐，其对 axSpA 结局的专项获益尚无正式研究。</string>
+    <string name="dom_life_smoking_former">已戒烟是明确的加分项——继续保持，戒烟同时降低心血管风险（AS 患者心血管风险本身偏高）。</string>
+    <string name="dom_life_sedentary">每日久坐约 %1$d 小时：建议每 30–45 分钟起身活动 2–3 分钟，比一次性长时间运动更有效对抗僵硬。</string>
+    <string name="dom_life_sleep">平均睡眠约 %1$d 小时偏少：睡眠不足会放大疼痛与晨僵，今日强度不宜过量，以规律为先。</string>
+    <string name="dom_life_habit_none">当前无运动习惯：从 L1 轻柔项起步，先建立「每周 3–5 次」的频率，再谈时长与强度。</string>
+    <string name="dom_life_habit_regular">已有规律运动习惯：可按进展原则稳步加量——先时长（每 1–2 周 +5–10 分钟）→ 再频率 → 最后强度。</string>
+
+    <!-- ===== ClinicalThresholds.kt：三档标签 ===== -->
+    <string name="dom_thr_pain_severe">重度</string>
+    <string name="dom_thr_pain_moderate">中度</string>
+    <string name="dom_thr_pain_mild">轻度</string>
+    <string name="dom_thr_adherence_good">达标</string>
+    <string name="dom_thr_adherence_fair">待改善</string>
+    <string name="dom_thr_adherence_poor">需干预</string>
+
+    <!-- ===== MorningWarmup.kt：晨僵驱动的起床热身序列 ===== -->
+    <string name="dom_warm_headline">晨僵 %1$d 分钟</string>
+    <string name="dom_warm_headline_prolonged">晨僵 %1$d 分钟（明显延长）</string>
+    <string name="dom_warm_note">起床后先做一轮轻柔项，等僵硬缓解再进入当日处方。</string>
+    <string name="dom_warm_note_prolonged">晨僵超过 30 分钟常提示炎症活动。起床后先做一轮轻柔项再进入当日处方，并留意该项的趋势；若连续多日如此，复诊时告知医生。</string>
+
+    <!-- ===== CheckupPrep.kt：复诊携带清单 ===== -->
+    <string name="dom_prep_bring_reports">既往化验单 / 影像报告（纸质或本应用附件归档）</string>
+    <string name="dom_prep_bring_meds">当前用药清单（本应用可导出紧急卡 / 复诊报告 PDF）</string>
+    <string name="dom_prep_bring_insurance">医保卡 / 就诊卡</string>
+    <string name="dom_prep_bring_lab_fasting">如当日需抽血：请空腹（前一晚起禁食 8–12 小时，可少量饮水；具体以医院要求为准）</string>
+    <string name="dom_prep_bring_image">如当日需影像检查：去除金属饰品，携带既往片子以便对比</string>
+
+    <!-- ===== Disclaimer.kt：合规底线文案 ===== -->
+    <string name="dom_disc_prefix">仅供参考，以主治医师医嘱为准。</string>
+    <string name="dom_disc_not_advice">本应用是个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。</string>
+    <string name="dom_disc_follow_doctor">用药与治疗方案请始终遵从主治医师医嘱，任何调整以医嘱为准。</string>
+    <string name="dom_disc_data_local">所有健康数据仅存于本机，不上传任何服务器。</string>
+    <string name="dom_disc_not_device">本应用不是医疗器械，记录与提示均不用于诊断或治疗决策。</string>
+
+    <!-- ===== PostureAdvice.kt：姿势 / 睡姿建议（知识库 edu-005） ===== -->
+    <string name="dom_posture_daily_1">保持脊柱中立位，避免长时间维持同一屈曲姿势（如含胸驼背久坐、低头看手机）。</string>
+    <string name="dom_posture_daily_2">坐姿用有靠背的硬椅，必要时腰后垫小枕维持腰椎前凸；站立时重心均匀、目视前方。</string>
+    <string name="dom_posture_sleep_1">优先仰卧或侧卧；枕头不宜过高（侧卧约与单侧肩宽相当，仰卧用薄枕）。</string>
+    <string name="dom_posture_sleep_2">床垫以较硬、支撑性好为宜，避免过软弹簧床。</string>
+    <string name="dom_posture_sleep_3">不建议俯卧（趴睡）——需扭转颈部且不利于脊柱伸展，AS 患者尤应避免。</string>
+
+    <!-- ===== LabIndicator.kt：指标展示名（匹配键 / 单位不在此，见 KDoc） ===== -->
+    <string name="dom_lab_esr">血沉</string>
+    <string name="dom_lab_crp">C反应蛋白</string>
+
+</resources>

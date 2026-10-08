@@ -1,10 +1,16 @@
 package com.ashkb.app.domain
 
+import androidx.annotation.StringRes
+import com.ashkb.app.R
+
 /**
  * 临床阈值集中来源。
  *
  * 改版前这些字面量散落在 3 个 UI 文件里（`4.0` 被重写多遍、依从率 `80/50` 硬编码），
  * UI 只负责展示，阈值一律从这里取。
+ *
+ * i18n：三档标签返回 `@StringRes Int`，由调用方 `stringResource` / `context.getString` 落地。
+ * 阈值常量本身与语言无关，一律不动。
  */
 object ClinicalThresholds {
 
@@ -69,17 +75,17 @@ object ClinicalThresholds {
     fun basdaiHigh(total: Double): Boolean = total >= BASDAI_HIGH
 
     /** 疼痛三档标签。 */
-    fun painLabel(score: Int): String = when {
-        score >= PAIN_SEVERE -> "重度"
-        score >= PAIN_MODERATE -> "中度"
-        else -> "轻度"
+    fun painLabel(score: Int): Int = when {
+        score >= PAIN_SEVERE -> R.string.dom_thr_pain_severe
+        score >= PAIN_MODERATE -> R.string.dom_thr_pain_moderate
+        else -> R.string.dom_thr_pain_mild
     }
 
     /** 依从率三档标签（补剂仍用这条：它有记录才显示，无记录由界面走「暂无」分支）。 */
-    fun adherenceLabel(rate: Int): String = when {
-        rate >= ADHERENCE_GOOD -> "达标"
-        rate >= ADHERENCE_FAIR -> "待改善"
-        else -> "需干预"
+    fun adherenceLabel(rate: Int): Int = when {
+        rate >= ADHERENCE_GOOD -> R.string.dom_thr_adherence_good
+        rate >= ADHERENCE_FAIR -> R.string.dom_thr_adherence_fair
+        else -> R.string.dom_thr_adherence_poor
     }
 
     /**
@@ -89,5 +95,5 @@ object ClinicalThresholds {
      * 于是「一条记录都没有」被标成「需干预」；把「无数据」编码进类型，调用方**无法**顺手给出
      * 达标 / 需关注这类判定，只能显式去显示「—（暂无记录）」。
      */
-    fun completionLabel(ratePct: Int?): String? = ratePct?.let { adherenceLabel(it) }
+    fun completionLabel(ratePct: Int?): Int? = ratePct?.let { adherenceLabel(it) }
 }

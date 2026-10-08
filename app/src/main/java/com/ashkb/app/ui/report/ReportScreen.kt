@@ -222,7 +222,7 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
                                 )
                             }
                         },
-                        trailing = { StatusChip(ClinicalThresholds.adherenceLabel(rate), tone) },
+                        trailing = { StatusChip(stringResource(ClinicalThresholds.adherenceLabel(rate)), tone) },
                     )
                     Spacer(Modifier.height(Spacing.sm))
                     LinearProgressIndicator(
@@ -250,7 +250,9 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     StatCell(stringResource(R.string.report_record_days), "${o.symptom.daysRecorded}/30", Modifier.weight(1f))
                     StatCell(stringResource(R.string.report_avg_pain), o.symptom.avgPain?.let { "%.1f/10".format(it) } ?: "—", Modifier.weight(1f))
-                    StatCell(stringResource(R.string.report_avg_stiffness), o.symptom.avgStiffnessMin?.let { "%.0f 分".format(it) } ?: "—", Modifier.weight(1f))
+                    val stiffness = o.symptom.avgStiffnessMin
+                        ?.let { stringResource(R.string.ui_report_stiffness_score, it) } ?: "—"
+                    StatCell(stringResource(R.string.report_avg_stiffness), stiffness, Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -406,9 +408,9 @@ private fun TrendCharts(t: ReportRepository.Trends) {
     val labSeries = t.labs.map { lab ->
         MiniSeries(
             key = "lab-${lab.indicator.code}",
-            title = lab.indicator.label,
+            title = stringResource(lab.indicator.labelRes),
             unit = " ${lab.indicator.canonicalUnit}",
-            sheetTitle = "${lab.indicator.label} ${lab.indicator.abbr}",
+            sheetTitle = "${stringResource(lab.indicator.labelRes)} ${lab.indicator.abbr}",
             points = lab.points.map { TrendPoint(it.date, it.value) },
             threshold = lab.threshold,
             accent = cs.tertiary,

@@ -1,5 +1,7 @@
 package com.ashkb.app.domain
 
+import androidx.annotation.StringRes
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.Medication
 
 /**
@@ -11,7 +13,11 @@ import com.ashkb.app.data.entity.Medication
  * 本对象只做**通用安全提示**，不针对具体药品给出个体化剂量决策——具体是否补服、
  * 补多少，始终以药品说明书与主治医师医嘱为准。这是医疗类应用的边界（v2 §1.7 不做诊断决策）。
  *
- * 纯函数、无 Android 依赖，可单测。
+ * i18n：本对象不再拼文案，只给**资源 id + 参数**（[ResText]）。时间跨度在中英里的语序与量词
+ * 都不同（「约 1.5 小时」/ "about 1.5 hours"），故按「< 1 小时报分钟，否则报小时（一位小数）」
+ * 的口径在域层选好条目（`…_1_min` / `…_1_hour`），而不是让调用方自己拼 `"$n 分钟"`。
+ *
+ * 纯函数、无 Android 依赖（只用 `@StringRes Int` 标注，不碰 Context），可单测。
  */
 object MissedDose {
 
@@ -22,10 +28,10 @@ object MissedDose {
     const val INJECTION_WINDOW_HOURS = 48L
 
     data class Guidance(
-        /** 一句话结论，如「可以尽快补服」 */
-        val headline: String,
-        /** 分步说明（2–4 条） */
-        val steps: List<String>,
+        /** 一句话结论（无插值） */
+        @StringRes val headlineRes: Int,
+        /** 分步说明（2–4 条；首条含时间跨度插值） */
+        val steps: List<ResText>,
         /** true = 需联系医生（注射超窗 / 免疫抑制类） */
         val contactDoctor: Boolean,
     )
@@ -51,65 +57,97 @@ object MissedDose {
         else oral(minutesLate)
     }
 
-    private fun oral(minutesLate: Long): Guidance {
-        val hours = minutesLate / 60L
-        return if (minutesLate <= ORAL_CATCH_UP_MIN) {
-            Guidance(
-                headline = "可尽快补服",
-                steps = listOf(
-                    "距计划时间不久（约 ${fmt(hours, minutesLate)}），想起后尽快补服即可。",
-                    "若已接近下一次服药时间，则跳过本次，**不要一次服两份剂量**。",
-                    "补服后照常在今日打卡里记录，便于依从统计。",
-                ),
-                contactDoctor = false,
-            )
-        } else {
-            Guidance(
-                headline = "建议跳过本次",
-                steps = listOf(
-                    "已超过计划时间约 ${fmt(hours, minutesLate)}，建议跳过本次、按原计划服下一次。",
-                    "**切勿加倍剂量**补回——加倍会升高副作用风险。",
-                    "若频繁漏服（如每周多次），请与医生沟通调整方案或改用提醒更密的剂型。",
-                ),
-                contactDoctor = false,
-            )
-        }
-    }
+    private fun oral(minutesLate: Long): Guidance =
+        if (minutesLate <= ORAL_CATCH_UP_MIN) oralCatchUp(minutesLate) else oralSkip(minutesLate)
+
+    private fun oralCatchUp(minutesLate: Long): Guidance = Guidance(
+        headlineRes = R.string.dom_missed_head_oral_soon,
+        steps = listOf(
+            span(minutesLate, R.string.dom_missed_oral_soon_1_min, R.string.dom_missed_oral_soon_1_hour),
+            ResText(R.string.dom_missed_oral_soon_2),
+            ResText(R.string.dom_missed_oral_soon_3),
+        ),
+        contactDoctor = false,
+    )
+
+    private fun oralSkip(minutesLate: Long): Guidance = Guidance(
+        headlineRes = R.string.dom_missed_head_oral_skip,
+        steps = listOf(
+            span(minutesLate, R.string.dom_missed_oral_skip_1_min, R.string.dom_missed_oral_skip_1_hour),
+            ResText(R.string.dom_missed_oral_skip_2),
+            ResText(R.string.dom_missed_oral_skip_3),
+        ),
+        contactDoctor = false,
+    )
 
     private fun injection(minutesLate: Long, immunosuppressant: Boolean): Guidance {
-        val hours = minutesLate / 60L
         // 用分钟直接比较：若先整除成小时再比，48h+1min 会被截断成 48h 而误判仍在窗口内
         val inWindow = minutesLate <= INJECTION_WINDOW_HOURS * 60L
         return if (inWindow) {
             Guidance(
-                headline = "窗口期内可尽快补注",
+                headlineRes = R.string.dom_missed_head_inj_window,
                 steps = listOf(
-                    "距计划时间约 ${fmt(hours, minutesLate)}，仍在常见补注窗口（${INJECTION_WINDOW_HOURS} 小时内）内。",
-                    "尽快补注，之后按**原注射周期**顺延安排下一次，不要提前。",
-                    if (immunosuppressant) "免疫抑制 / 生物制剂类：若已漏注多日或不确定是否补注，先电话咨询风湿科医生。"
-                    else "如补注后出现不适，及时联系医生。",
+                    // 这两条里「48 小时」是常量、时间跨度是变量，故参数顺序与 span 的默认相反
+                    span(
+                        minutesLate,
+                        R.string.dom_missed_inj_window_1_min,
+                        R.string.dom_missed_inj_window_1_hour,
+                        extra = listOf(INJECTION_WINDOW_HOURS.toInt()),
+                    ),
+                    ResText(R.string.dom_missed_inj_window_2),
+                    ResText(
+                        if (immunosuppressant) R.string.dom_missed_inj_window_3_immuno
+                        else R.string.dom_missed_inj_window_3_other
+                    ),
                 ),
                 contactDoctor = immunosuppressant,
             )
         } else {
             Guidance(
-                headline = "已超窗，请先联系医生",
+                headlineRes = R.string.dom_missed_head_inj_overdue,
                 steps = listOf(
-                    "距计划时间已超过 ${INJECTION_WINDOW_HOURS} 小时（约 ${fmt(hours, minutesLate)}），超出常规补注窗口。",
-                    "**请先联系风湿科医生**确认补注方案（是否需要补注、何时补注、是否调整周期）。",
-                    "在医生确认前不要自行加倍或缩短间隔注射。",
-                    if (immunosuppressant) "生物制剂 / 免疫抑制剂中断可能影响病情控制，越早与医生沟通越好。"
-                    else "任何调整以主治医师医嘱为准。",
+                    span(
+                        minutesLate,
+                        R.string.dom_missed_inj_overdue_1_min,
+                        R.string.dom_missed_inj_overdue_1_hour,
+                        extra = listOf(INJECTION_WINDOW_HOURS.toInt()),
+                        extraFirst = true,
+                    ),
+                    ResText(R.string.dom_missed_inj_overdue_2),
+                    ResText(R.string.dom_missed_inj_overdue_3),
+                    ResText(
+                        if (immunosuppressant) R.string.dom_missed_inj_overdue_4_immuno
+                        else R.string.dom_missed_inj_overdue_4_other
+                    ),
                 ),
                 contactDoctor = true,
             )
         }
     }
 
+    /**
+     * 时间跨度资源二选一：`minRes` 吃分钟数（`%1$d`），`hourRes` 吃小时串（`%1$s`）。
+     *
+     * @param extra      该条目里除时间跨度之外还要填的参数（如补注窗口的 48 小时）
+     * @param extraFirst true = [extra] 排在时间跨度之前（「已超过 48 小时（约 20 分钟）」的语序）
+     */
+    private fun span(
+        minutesLate: Long,
+        @StringRes minRes: Int,
+        @StringRes hourRes: Int,
+        extra: List<Any> = emptyList(),
+        extraFirst: Boolean = false,
+    ): ResText {
+        val useHours = minutesLate / 60L >= 1L
+        val value: Any = if (useHours) hoursText(minutesLate) else minutesLate.toInt()
+        return ResText(
+            res = if (useHours) hourRes else minRes,
+            args = if (extraFirst) extra + value else listOf(value) + extra,
+        )
+    }
+
     /** 人话化的时间跨度：< 1 小时报分钟，否则报小时（保留一位小数）。 */
-    private fun fmt(hours: Long, minutes: Long): String =
-        if (hours < 1L) "$minutes 分钟"
-        else "%.1f 小时".format(minutes / 60.0)
+    private fun hoursText(minutesLate: Long): String = "%.1f".format(minutesLate / 60.0)
 
     /** 从「现在」与计划时刻算已过分钟数（同一归属日内）。计划时刻非法 / 未到点返回 0。 */
     fun minutesLate(scheduledTime: String?, nowMinutesOfDay: Int): Long {

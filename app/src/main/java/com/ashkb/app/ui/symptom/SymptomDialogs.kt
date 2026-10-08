@@ -314,7 +314,7 @@ internal fun BasdaiDialog(
                 if (total != null) {
                     Spacer(Modifier.height(Spacing.sm))
                     Text(
-                        "总分：%.1f".format(total) +
+                        stringResource(R.string.ui_basdai_total_prefix, total) +
                         if (ClinicalThresholds.basdaiHigh(total)) stringResource(R.string.basdai_high_note_paren) else "",
                         style = MaterialTheme.typography.titleMedium,
                         color = if (ClinicalThresholds.basdaiHigh(total)) MaterialTheme.colorScheme.error

@@ -10,6 +10,13 @@ import org.junit.Test
  */
 class ReportImportParserTest {
 
+    /**
+     * v1.2.6（i18n）：`parseImaging` 的「部位」兜底文案与多部位分隔符改由调用方注入
+     * （domain 层不再硬编码中文），测试用中文侧字面量。
+     */
+    private val unsetBodyPart = "未注明部位"
+    private val listSeparator = "、"
+
     // ---- 化验单 ----
 
     @Test
@@ -151,7 +158,7 @@ class ReportImportParserTest {
             部位: 骶髂关节
             结论: 双侧骶髂关节炎性改变。
         """.trimIndent()
-        val imp = ReportImportParser.parseImaging(text)!!
+        val imp = ReportImportParser.parseImaging(text, unsetBodyPart, listSeparator)!!
         assertEquals(listOf("【影像报告整理】", "报告编号 20260731001"), imp.skippedLines)
         assertEquals("骶髂关节", imp.bodyPart)
     }
@@ -188,7 +195,7 @@ class ReportImportParserTest {
             结论: 双侧骶髂关节炎性改变（符合axSpA表现）。
             对比: 较2025-07-30前片，炎症范围略有扩大。
         """.trimIndent()
-        val imp = ReportImportParser.parseImaging(text)!!
+        val imp = ReportImportParser.parseImaging(text, unsetBodyPart, listSeparator)!!
         assertEquals("MRI", imp.modality)
         assertEquals("2026-07-31", imp.date)
         assertEquals("南方医院", imp.hospital)
@@ -203,26 +210,26 @@ class ReportImportParserTest {
     @Test
     fun parseImaging_ctXray() {
         val ct = "类型: CT\n日期: 2026-08-05\n部位: 髋关节\n所见: 双侧髋关节未见明显异常。\n结论: 未见明显异常。"
-        val impCt = ReportImportParser.parseImaging(ct)!!
+        val impCt = ReportImportParser.parseImaging(ct, unsetBodyPart, listSeparator)!!
         assertEquals("CT", impCt.modality)
         assertNull(impCt.compare)
 
         val xray = "类型: X线\n日期: 2026/1/15\n医院: 宝安中医院\n部位: 腰椎正侧位\n结论: 腰椎生理曲度存在。"
-        val impX = ReportImportParser.parseImaging(xray)!!
+        val impX = ReportImportParser.parseImaging(xray, unsetBodyPart, listSeparator)!!
         assertEquals("XRAY", impX.modality)
         assertEquals("2026-01-15", impX.date)
     }
 
     @Test
     fun parseImaging_missingModalityReturnsNull() {
-        assertNull(ReportImportParser.parseImaging("日期: 2026-07-31\n部位: 骶髂关节\n结论: 无类型行"))
-        assertNull(ReportImportParser.parseImaging(""))
+        assertNull(ReportImportParser.parseImaging("日期: 2026-07-31\n部位: 骶髂关节\n结论: 无类型行", unsetBodyPart, listSeparator))
+        assertNull(ReportImportParser.parseImaging("", unsetBodyPart, listSeparator))
     }
 
     @Test
     fun parseImaging_compareNoneTreatedAsBlank() {
         val text = "类型: MRI\n日期: 2026-07-31\n部位: 骶髂关节\n所见: 所见文本。\n结论: 结论文本。\n对比: 无"
-        val imp = ReportImportParser.parseImaging(text)!!
+        val imp = ReportImportParser.parseImaging(text, unsetBodyPart, listSeparator)!!
         assertEquals("无", imp.compare) // 原样保留，入库时由仓库过滤「无」
     }
 

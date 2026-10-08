@@ -1,5 +1,7 @@
 package com.ashkb.app.domain
 
+import androidx.annotation.StringRes
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.CheckupItem
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.data.entity.CheckupType
@@ -25,18 +27,20 @@ object CheckupPrep {
         val fasting: Boolean,
         /** 需要做的检查项目名（来自在用复诊项目） */
         val checkItems: List<String>,
-        /** 需要携带的材料（固定项 + 条件项） */
-        val bringItems: List<String>,
+        /** 需要携带的材料（固定项 + 条件项）。i18n：`@StringRes`，文案见 `values/strings_domain.xml` 的 `dom_prep_bring_*`。 */
+        @StringRes
+        val bringItems: List<Int>,
     ) {
         val hasPlan: Boolean get() = nextDate != null
         val isSoon: Boolean get() = daysLeft != null && daysLeft in 0..3
     }
 
     /** 固定携带项——任何复诊都建议带。 */
+    @StringRes
     private val BASE_BRING = listOf(
-        "既往化验单 / 影像报告（纸质或本应用附件归档）",
-        "当前用药清单（本应用可导出紧急卡 / 复诊报告 PDF）",
-        "医保卡 / 就诊卡",
+        R.string.dom_prep_bring_reports,
+        R.string.dom_prep_bring_meds,
+        R.string.dom_prep_bring_insurance,
     )
 
     /**
@@ -64,9 +68,9 @@ object CheckupPrep {
 
         val bring = buildList {
             addAll(BASE_BRING)
-            if (hasLab) add("如当日需抽血：请空腹（前一晚起禁食 8–12 小时，可少量饮水；具体以医院要求为准）")
+            if (hasLab) add(R.string.dom_prep_bring_lab_fasting)
             if (active.any { CheckupType.fromKey(it.checkType) == CheckupType.IMAGE }) {
-                add("如当日需影像检查：去除金属饰品，携带既往片子以便对比")
+                add(R.string.dom_prep_bring_image)
             }
         }
 

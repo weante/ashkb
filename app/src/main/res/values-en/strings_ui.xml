@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.2.6 (i18n): patient-visible text that used to be hardcoded in the UI and domain layers (domain returns a @StringRes Int, resolved by the UI layer) -->
+<resources>
+
+    <!-- ===== Report import: prompts to copy for the AI assistant ===== -->
+    <string name="ui_import_template_lab">[Lab report organizer]\nBased on the photo of my lab report — extract every test item and output strictly in this format (one line per item — never invent values — use ? for anything illegible):\n\nDate: 2026-08-02\nHospital: Hospital name\nItem, Result, Unit, Reference range, Flag\nESR, 15, mm/h, 0-20, Normal\nCRP, 5.2, mg/L, 0-8, High\nWBC, 6.1, 10^9/L, 3.5-9.5, Normal\n\nNotes:\n- Item is the name printed on the report (an English abbreviation may follow)\n- Result is the value as printed (a number or Negative/Positive) with no unit\n- Reference range copies the report verbatim (such as 2.9-8.2 or ≤5)\n- Flag follows the report marking (High, High↑, Low, Normal)</string>
+    <string name="ui_import_template_imaging">[Imaging report organizer]\nBased on the photo of my exam report (MRI/CT/X-ray) — extract the information and output strictly in this format:\n\nType: MRI (use the actual type reported — MRI / CT / X-ray)\nDate: 2026-07-31\nHospital: Hospital name\nSite: Sacroiliac joints\nFindings: the full text of the imaging findings (may span several lines)\nConclusion: the full text of the diagnosis and impression (may span several lines)\nComparison: the change described against the previous scan (write None if absent)</string>
+    <string name="ui_imaging_bodypart_unset">Not specified</string>
+
+    <!-- ===== Exercise prescription: hints and feedback (ExerciseEngine returns resource ids) ===== -->
+    <string name="ui_exercise_hint_unparsed">This entry could not be parsed, so it was conservatively blocked. Please update the knowledge base seed data — bad data must not pass silently.</string>
+    <string name="ui_exercise_hint_recommend">Recommended today. %1$s</string>
+    <string name="ui_exercise_hint_allow">You can do this. %1$s</string>
+    <string name="ui_exercise_hint_downgrade">Do a reduced session today (half the range / shorter duration). %1$s</string>
+    <string name="ui_exercise_hint_conditional">Do this only if your condition allows: gentle poses only, and keep the range pain-free. %1$s</string>
+    <string name="ui_exercise_hint_pause">Paused at your current stage (replaced by an L1 gentle item).</string>
+    <string name="ui_exercise_hint_advise_against">Not advised: fracture and stress risk rise with intensity.</string>
+    <string name="ui_exercise_hint_blocked">Blocked: %1$s</string>
+    <string name="ui_exercise_hint_blocked_default">Blocked: high-intensity, high-risk movement</string>
+    <string name="ui_exercise_hint_cervical">Cervical spine involvement: %1$s</string>
+    <string name="ui_exercise_hint_cervical_default">Cervical spine involvement: this movement carries a high cervical risk</string>
+    <string name="ui_exercise_hint_alternative">Alternative: %1$s</string>
+    <string name="ui_exercise_feedback_soreness">Pain worsened after exercise, but this fits muscle soreness (delayed onset). Watch it for 1–2 days; you may hold the duration steady next session (exc-010 progression rule).</string>
+    <string name="ui_exercise_feedback_worse">Pain worsened after exercise and does not fit simple muscle soreness. By the 2-hour post-exercise pain rule, reduce the next session: cut the duration by 20% or drop the intensity one level (exc-010). If it worsens twice in a row, consider seeing a rehabilitation specialist.</string>
+    <string name="ui_exercise_feedback_stiffness">Morning stiffness worsened — this may point to inflammatory activity rather than overexertion. Keep intensity low (L1) this week; if it keeps worsening, log your symptom trend and contact your doctor.</string>
+    <string name="ui_exercise_feedback_better">Good feedback. You can progress as planned: duration first (add 5–10 min every 1–2 weeks), then frequency, and intensity last.</string>
+    <string name="ui_exercise_feedback_stable">Steady feedback. Keep the current amount. Progression order: duration → frequency → intensity (exc-010).</string>
+    <string name="ui_exercise_blocked_body">L3 · %1$s | %2$s</string>
+    <string name="ui_exercise_today_suitable">Good for today: %1$s</string>
+
+    <!-- ===== Xiaomi background-restriction check ===== -->
+    <string name="ui_miui_switch_lockscreen">Show on lock screen</string>
+    <string name="ui_miui_switch_background">Pop-up in background</string>
+    <string name="ui_miui_switch_autostart">Autostart</string>
+
+    <!-- ===== Medication: injection cycle / as needed / empty stomach ===== -->
+    <string name="ui_emergency_meds_inj_cycle">" · Every %1$d days"</string>
+    <string name="ui_med_prn_detail">As needed · %1$s</string>
+    <string name="ui_med_prn_backup">Backup</string>
+    <string name="ui_schedule_empty_stomach">%1$s · Empty stomach</string>
+
+    <!-- ===== Trend chart accessibility description ===== -->
+    <string name="ui_trend_a11y_summary">%1$s trend, %2$d data points</string>
+    <string name="ui_trend_a11y_range">, from %1$s%2$s %3$s %4$s%2$s</string>
+    <string name="ui_trend_a11y_avg">, average %1$s%2$s</string>
+    <string name="ui_trend_a11y_over">, %1$d above the threshold of %2$s%3$s</string>
+
+    <!-- ===== Symptoms: flare / history / BASDAI ===== -->
+    <string name="ui_list_separator">", "</string>
+    <string name="ui_flare_started_trigger">Started: %1$s · Trigger: %2$s</string>
+    <string name="ui_flare_actions_taken">Actions taken: %1$s</string>
+    <string name="ui_flare_date_range">%1$s to %2$s</string>
+    <string name="ui_flare_peak_suffix">" · peak %1$d/10"</string>
+    <string name="ui_symptom_more_alerts">%1$d more unread alerts</string>
+    <string name="ui_symptom_basdai_recorded">%1$s is already recorded (total %2$.1f). You can edit and resubmit to overwrite it.</string>
+    <string name="ui_symptom_form_recorded_at">Recorded at %1$s. Saving again will overwrite it.</string>
+    <string name="ui_basdai_total_prefix">Total: %1$.1f</string>
+
+    <!-- ===== Checkup / report / knowledge base ===== -->
+    <string name="ui_checkup_lab_date_prefix">Date: %1$s</string>
+    <string name="ui_vaccine_doctor_confirm">Doctor confirmed: %1$s</string>
+    <string name="ui_report_stiffness_score">%1$.0f min</string>
+    <string name="ui_med_kb_remaining">…%1$d more in the knowledge base</string>
+
+    <!-- ===== Today / emergency / crash notice ===== -->
+    <string name="ui_today_plan_prefix">Planned %1$s</string>
+    <string name="ui_today_target_injection_date">Target injection date: %1$s</string>
+    <string name="ui_emergency_view_all_events">View all %1$d</string>
+    <string name="ui_crash_fatal_separator">\n===== Fatal crash =====\n</string>
+    <string name="ui_appshell_last_crash">Last error:\n%1$s</string>
+
+</resources>

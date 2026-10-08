@@ -215,14 +215,14 @@ fun ProfileEditScreen(
                 FilterChip(
                     selected = sacroGrade == null,
                     onClick = { sacroGrade = null },
-                    label = { Text(Labels.sacroiliitisGrade(null)) },
+                    label = { Text(stringResource(Labels.sacroiliitisGrade(null))) },
                     modifier = Modifier.heightIn(min = Size.touchMin),
                 )
                 Labels.SACROILIITIS_KEYS.forEach { k ->
                     FilterChip(
                         selected = sacroGrade == k,
                         onClick = { sacroGrade = k },
-                        label = { Text(Labels.sacroiliitisGrade(k)) },
+                        label = { Text(stringResource(Labels.sacroiliitisGrade(k))) },
                         modifier = Modifier.heightIn(min = Size.touchMin),
                     )
                 }

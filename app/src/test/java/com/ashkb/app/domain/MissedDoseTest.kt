@@ -1,5 +1,6 @@
 package com.ashkb.app.domain
 
+import android.content.Context
 import com.ashkb.app.data.entity.MedClass
 import com.ashkb.app.data.entity.Medication
 import org.junit.Assert.assertEquals
@@ -7,9 +8,29 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
-/** v10（C7）漏服 / 延迟处理指引——纯函数单测。 */
+/**
+ * v10（C7）漏服 / 延迟处理指引——纯函数单测。
+ *
+ * i18n（v1.2.6）：`Guidance` 的标题与步骤改为资源 id + 参数，断言的是**渲染后的中文文本**，
+ * 故整类走 Robolectric；`@Config(qualifiers = "zh-rCN")` 不可省（`values-en` 存在）。
+ * 步骤文本里的 `**` 是加粗标记，界面渲染时会去掉，这里同样去掉后再断言。
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "zh-rCN")
 class MissedDoseTest {
+
+    private val ctx: Context get() = RuntimeEnvironment.getApplication()
+
+    private fun headline(g: MissedDose.Guidance): String = ctx.getString(g.headlineRes)
+
+    /** 与界面同口径：渲染资源后去掉 `**` 加粗标记。 */
+    private fun steps(g: MissedDose.Guidance): List<String> =
+        g.steps.map { ctx.getString(it.res, *it.args.toTypedArray()).replace("**", "") }
 
     private fun med(route: String, medClass: MedClass = MedClass.NSAID) = Medication(
         id = "med-test",
@@ -39,7 +60,7 @@ class MissedDoseTest {
     @Test
     fun `oral within catch-up window suggests taking soon`() {
         val g = MissedDose.guidance("oral", 60L, isPrn = false)!!
-        assertTrue(g.headline.contains("补服"))
+        assertTrue(headline(g).contains("补服"))
         assertFalse(g.contactDoctor)
     }
 
@@ -47,22 +68,22 @@ class MissedDoseTest {
     @Test
     fun `oral at exactly the catch-up boundary still catches up`() {
         val g = MissedDose.guidance("oral", MissedDose.ORAL_CATCH_UP_MIN, isPrn = false)!!
-        assertTrue(g.headline.contains("补服"))
+        assertTrue(headline(g).contains("补服"))
     }
 
     @Test
     fun `oral beyond window suggests skipping and never doubling`() {
         val g = MissedDose.guidance("oral", MissedDose.ORAL_CATCH_UP_MIN + 1, isPrn = false)!!
-        assertTrue(g.headline.contains("跳过"))
+        assertTrue(headline(g).contains("跳过"))
         // 「切勿加倍剂量」是这条指引存在的核心理由
-        assertTrue(g.steps.any { it.contains("加倍") })
+        assertTrue(steps(g).any { it.contains("加倍") })
         assertFalse(g.contactDoctor)
     }
 
     @Test
     fun `injection within 48h window suggests catching up`() {
         val g = MissedDose.guidance("injection", 24L * 60, isPrn = false)!!
-        assertTrue(g.headline.contains("补注"))
+        assertTrue(headline(g).contains("补注"))
         assertFalse(g.contactDoctor)
     }
 
@@ -70,14 +91,14 @@ class MissedDoseTest {
     @Test
     fun `injection at exactly 48h is still in window`() {
         val g = MissedDose.guidance("injection", MissedDose.INJECTION_WINDOW_HOURS * 60, isPrn = false)!!
-        assertTrue(g.headline.contains("补注"))
+        assertTrue(headline(g).contains("补注"))
         assertFalse(g.contactDoctor)
     }
 
     @Test
     fun `injection beyond window requires contacting doctor`() {
         val g = MissedDose.guidance("injection", MissedDose.INJECTION_WINDOW_HOURS * 60 + 1, isPrn = false)!!
-        assertTrue(g.headline.contains("联系医生"))
+        assertTrue(headline(g).contains("联系医生"))
         assertTrue(g.contactDoctor)
     }
 

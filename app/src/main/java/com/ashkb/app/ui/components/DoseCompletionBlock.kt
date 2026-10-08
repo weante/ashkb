@@ -85,7 +85,7 @@ fun DoseCompletionBlock(
                 },
                 trailing = {
                     // 有计划快照才有判定：completionLabel 对 null 恒为 null（无快照上面已拦掉）
-                    ClinicalThresholds.completionLabel(rate)?.let { StatusChip(it, tone) }
+                    ClinicalThresholds.completionLabel(rate)?.let { StatusChip(stringResource(it), tone) }
                 },
             )
             // 数字与进度条必须同色（同 tone）——曾出现过「数字红、进度条绿」的矛盾观感

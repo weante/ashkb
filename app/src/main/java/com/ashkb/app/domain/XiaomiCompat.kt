@@ -1,5 +1,8 @@
 package com.ashkb.app.domain
 
+import androidx.annotation.StringRes
+import com.ashkb.app.R
+
 /**
  * v1.0.72：小米 / Redmi / POCO（MIUI、HyperOS）专属权限的判定（纯函数、无 Android 依赖，可单测）。
  *
@@ -35,16 +38,24 @@ object XiaomiCompat {
      * 小米「权限管理 → 其他权限」里与本应用相关的开关（指引文案逐条列出，用户照着点即可）。
      *
      * 名称取自 MIUI / HyperOS 权限管理页的实际条目；顺序即重要性。
+     *
+     * v1.2.6（i18n）：返回资源 id（`ui_miui_switch_*`），文案由 UI 层按当前语言解析。
      */
-    fun requiredSwitches(): List<String> = listOf(
+    @StringRes
+    fun requiredSwitches(): List<Int> = listOf(
         SWITCH_LOCKSCREEN,   // MIUIOP(10020)：锁屏显示——强提醒全屏与锁屏紧急卡都需要
         SWITCH_BACKGROUND,   // MIUIOP(10021)：后台弹出界面——末级强提醒要从后台拉起全屏 Activity
         SWITCH_AUTOSTART,    // 开机 / 广播拉起（BootReceiver 重排闹钟）
     )
 
-    const val SWITCH_LOCKSCREEN = "锁屏显示"
-    const val SWITCH_BACKGROUND = "后台弹出界面"
-    const val SWITCH_AUTOSTART = "自启动"
+    @StringRes
+    val SWITCH_LOCKSCREEN = R.string.ui_miui_switch_lockscreen
+
+    @StringRes
+    val SWITCH_BACKGROUND = R.string.ui_miui_switch_background
+
+    @StringRes
+    val SWITCH_AUTOSTART = R.string.ui_miui_switch_autostart
 
     private val XIAOMI_KEYS = listOf("xiaomi", "redmi", "poco")
 }

@@ -1,5 +1,6 @@
 package com.ashkb.app.domain
 
+import android.content.Context
 import com.ashkb.app.data.entity.CheckupItem
 import com.ashkb.app.data.entity.CheckupRecord
 import java.time.LocalDate
@@ -8,9 +9,22 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
-/** v10（C4）复诊前准备清单——纯函数单测。 */
+/**
+ * v10（C4）复诊前准备清单——纯函数单测。
+ *
+ * i18n（v1.2.6）：携带项已改成 `@StringRes Int`，断言**措辞**的用例改读中文资源。
+ * `@Config(qualifiers = "zh-rCN")` 不可省（`values-en` 存在，Robolectric 默认走 en-rUS）。
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "zh-rCN")
 class CheckupPrepTest {
+
+    private val ctx: Context get() = RuntimeEnvironment.getApplication()
 
     private val today = LocalDate.of(2026, 9, 21)
 
@@ -76,20 +90,20 @@ class CheckupPrepTest {
     fun `lab item requires fasting`() {
         val p = CheckupPrep.plan(listOf(item("血常规", "LAB")), emptyList(), today)
         assertTrue(p.fasting)
-        assertTrue(p.bringItems.any { it.contains("空腹") })
+        assertTrue(p.bringItems.any { ctx.getString(it).contains("空腹") })
     }
 
     @Test
     fun `non-lab item does not require fasting`() {
         val p = CheckupPrep.plan(listOf(item("眼科检查", "EYE")), emptyList(), today)
         assertFalse(p.fasting)
-        assertFalse(p.bringItems.any { it.contains("空腹") })
+        assertFalse(p.bringItems.any { ctx.getString(it).contains("空腹") })
     }
 
     @Test
     fun `image item adds imaging prep note`() {
         val p = CheckupPrep.plan(listOf(item("骶髂关节 MRI", "IMAGE")), emptyList(), today)
-        assertTrue(p.bringItems.any { it.contains("影像") })
+        assertTrue(p.bringItems.any { ctx.getString(it).contains("影像") })
     }
 
     @Test
@@ -106,6 +120,6 @@ class CheckupPrepTest {
     fun `base bring items always present`() {
         val p = CheckupPrep.plan(emptyList(), emptyList(), today)
         assertEquals(3, p.bringItems.size)
-        assertTrue(p.bringItems.any { it.contains("医保") })
+        assertTrue(p.bringItems.any { ctx.getString(it).contains("医保") })
     }
 }

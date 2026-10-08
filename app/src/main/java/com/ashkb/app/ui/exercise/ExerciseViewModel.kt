@@ -39,8 +39,8 @@ data class ExerciseUiState(
     val blocked: List<ExerciseEngine.ExerciseCard> = emptyList(),
     val stage: String = "unknown",
     val cervicalInvolved: Boolean = false,
-    /** v1.0.64 B13：生活方式画像驱动的个性化提示（不改处方本身，只随处方展示）。 */
-    val lifestyleNotes: List<String> = emptyList(),
+    /** v1.0.64 B13：生活方式画像驱动的个性化提示（不改处方本身，只随处方展示）。i18n：`ResText` 由 UI 落地。 */
+    val lifestyleNotes: List<com.ashkb.app.domain.ResText> = emptyList(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)

@@ -541,9 +541,9 @@ private fun DietProfileCard(vm: WellnessViewModel, onEdit: () -> Unit) {
     ) {
         val d = diet
         if (d != null) {
-            KeyValueRow(stringResource(R.string.nutrition_diet_pattern), Labels.dietPattern(d.dietPattern))
-            KeyValueRow(stringResource(R.string.nutrition_fish_intake), Labels.seafoodFreq(d.seafoodFreq))
-            KeyValueRow(stringResource(R.string.nutrition_dairy), Labels.dairyTolerance(d.dairyTolerant))
+            KeyValueRow(stringResource(R.string.nutrition_diet_pattern), stringResource(Labels.dietPattern(d.dietPattern)))
+            KeyValueRow(stringResource(R.string.nutrition_fish_intake), stringResource(Labels.seafoodFreq(d.seafoodFreq)))
+            KeyValueRow(stringResource(R.string.nutrition_dairy), stringResource(Labels.dairyTolerance(d.dairyTolerant)))
         } else {
             EmptyState(
                 icon = Icons.Rounded.Restaurant,

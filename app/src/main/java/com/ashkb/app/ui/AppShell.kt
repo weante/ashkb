@@ -169,7 +169,10 @@ fun AppShell() {
     val appContext = LocalContext.current.applicationContext
     LaunchedEffect(Unit) {
         CrashLogger.takeLast(appContext)?.let { log ->
-            snackbar.showSnackbar("上次异常：\n" + CrashLogger.summary(log).take(600))
+            // v1.2.6（i18n）：LaunchedEffect 内不是 Composable 作用域，故用 appContext.getString
+            snackbar.showSnackbar(
+                appContext.getString(R.string.ui_appshell_last_crash, CrashLogger.summary(log).take(600)),
+            )
         }
     }
 

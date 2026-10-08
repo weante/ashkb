@@ -24,10 +24,11 @@ fun DisclaimerNote(
     detailRes: Int? = null,
     modifier: Modifier = Modifier,
 ) {
+    val prefix = stringResource(Disclaimer.PREFIX)
     val text = if (detailRes == null) {
-        Disclaimer.PREFIX
+        prefix
     } else {
-        Disclaimer.PREFIX + stringResource(detailRes)
+        prefix + stringResource(detailRes)
     }
     Text(
         text = text,

@@ -76,7 +76,7 @@ fun FirstLaunchDisclaimer(onAccept: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Text("·", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
-                    Text(point, style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(point), style = MaterialTheme.typography.bodyMedium)
                 }
             }
 

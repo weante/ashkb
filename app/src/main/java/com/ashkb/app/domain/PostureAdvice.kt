@@ -1,5 +1,8 @@
 package com.ashkb.app.domain
 
+import androidx.annotation.StringRes
+import com.ashkb.app.R
+
 /**
  * v1.0.70 C8c：姿势 / 睡姿建议（对应知识库条目 `edu-005`）。
  *
@@ -16,21 +19,24 @@ object PostureAdvice {
     /** 对应的知识库条目 id（见 kb_seed_edu.json）。 */
     const val KB_POSTURE = "edu-005"
 
-    /** 日常姿势要点（逐条短句，UI 逐行渲染）。 */
-    val DAILY: List<String> = listOf(
-        "保持脊柱中立位，避免长时间维持同一屈曲姿势（如含胸驼背久坐、低头看手机）。",
-        "坐姿用有靠背的硬椅，必要时腰后垫小枕维持腰椎前凸；站立时重心均匀、目视前方。",
+    /** 日常姿势要点（逐条短句，UI 逐行渲染）。i18n：文案见 `values/strings_domain.xml` 的 `dom_posture_daily_*`。 */
+    @StringRes
+    val DAILY: List<Int> = listOf(
+        R.string.dom_posture_daily_1,
+        R.string.dom_posture_daily_2,
     )
 
     /** 睡姿 / 卧具要点。 */
-    val SLEEP: List<String> = listOf(
-        "优先仰卧或侧卧；枕头不宜过高（侧卧约与单侧肩宽相当，仰卧用薄枕）。",
-        "床垫以较硬、支撑性好为宜，避免过软弹簧床。",
-        "不建议俯卧（趴睡）——需扭转颈部且不利于脊柱伸展，AS 患者尤应避免。",
+    @StringRes
+    val SLEEP: List<Int> = listOf(
+        R.string.dom_posture_sleep_1,
+        R.string.dom_posture_sleep_2,
+        R.string.dom_posture_sleep_3,
     )
 
     /** 全部要点（日常 + 睡姿），顺序稳定，供概览展示。 */
-    val ALL: List<String> = DAILY + SLEEP
+    @StringRes
+    val ALL: List<Int> = DAILY + SLEEP
 
     /** 是否应展示姿势 / 睡姿提示块——运动处方有效即展示（与分期无关，属通用体位建议）。 */
     fun shouldShow(plan: List<ExerciseEngine.ExerciseCard>): Boolean = plan.isNotEmpty()

@@ -164,11 +164,11 @@ object ReportPdfWriter {
                 context.getString(R.string.pdf_label_diagnose_year),
                 p.diagnoseYear?.toString() ?: context.getString(R.string.pdf_value_not_filled)
             )
-            d.kv("HLA-B27", Labels.hlaB27(p.hlaB27))
+            d.kv("HLA-B27", context.getString(Labels.hlaB27(p.hlaB27)))
             d.kv(context.getString(R.string.pdf_label_disease_stage), stage(context, p.diseaseStage))
             d.kv(
                 context.getString(R.string.profile_sacroiliitis_field),
-                Labels.sacroiliitisGrade(p.sacroiliitisGrade),
+                context.getString(Labels.sacroiliitisGrade(p.sacroiliitisGrade)),
             )
             p.allergies?.let { d.kv(context.getString(R.string.pdf_label_allergies), it) }
             p.emergencyBloodType?.let { d.kv(context.getString(R.string.pdf_label_blood_type), it) }
@@ -334,7 +334,7 @@ object ReportPdfWriter {
         if (p == null) d.line(context.getString(R.string.pdf_no_profile))
         else {
             d.bigLine("${p.displayName} · ${p.diagnosis}")
-            d.kv("HLA-B27", Labels.hlaB27(p.hlaB27))
+            d.kv("HLA-B27", context.getString(Labels.hlaB27(p.hlaB27)))
             d.kv(context.getString(R.string.pdf_label_disease_stage), stage(context, p.diseaseStage))
             p.allergies?.let { d.kv(context.getString(R.string.pdf_label_allergies), it) }
             p.emergencyBloodType?.let { d.kv(context.getString(R.string.pdf_label_blood_type), it) }

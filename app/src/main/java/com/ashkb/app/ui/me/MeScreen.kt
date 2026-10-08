@@ -85,10 +85,13 @@ fun MeScreen(
                     KeyValueRow(stringResource(R.string.profile_display_name), p.displayName)
                     KeyValueRow(stringResource(R.string.profile_diagnosis), p.diagnosis)
                     KeyValueRow(stringResource(R.string.profile_diagnosis_year), p.diagnoseYear?.toString() ?: stringResource(R.string.common_unfilled))
-                    KeyValueRow("HLA-B27", Labels.hlaB27(p.hlaB27))
+                    KeyValueRow("HLA-B27", stringResource(Labels.hlaB27(p.hlaB27)))
                     KeyValueRow(stringResource(R.string.profile_disease_stage), stageLabel(p.diseaseStage))
                     KeyValueRow(stringResource(R.string.profile_spine_mobility), spineLabel(p.spineMobility))
-                    KeyValueRow(stringResource(R.string.profile_sacroiliitis_field), Labels.sacroiliitisGrade(p.sacroiliitisGrade))
+                    KeyValueRow(
+                        stringResource(R.string.profile_sacroiliitis_field),
+                        stringResource(Labels.sacroiliitisGrade(p.sacroiliitisGrade)),
+                    )
                     // v1.2.3：生活方式**逐项一行**（见 lifestyleItems 的注释）。
             // 用现成的 KeyValueRow 逐项渲染：标签只在第一项显示，其余项标签留空——
             // 这样值仍然从同一列起排，而每项各占一行、各自右对齐。

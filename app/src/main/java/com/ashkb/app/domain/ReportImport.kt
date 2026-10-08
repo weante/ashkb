@@ -1,9 +1,15 @@
 package com.ashkb.app.domain
 
+import androidx.annotation.StringRes
+import com.ashkb.app.R
+
 /**
  * M6 检查数据「AI 导入」：
  * 用户把【模板】发给任意 AI 助手并附报告照片，AI 按模板格式输出，
  * 粘贴回 App 由本解析器转成结构化数据。纯函数、无 Android 依赖。
+ *
+ * v1.2.6（i18n）：[ImportTemplates] 改为返回资源 id（患者可见文案）；
+ * 解析键保留中文原值，并**增量**接受英文键——英文模板回填的报告同样能解析。
  *
  * 报告格式参照用户真实病历（南方医院放射/磁共振报告单、深圳宝安中医院生化检验单）。
  */
@@ -68,9 +74,9 @@ object ReportImportParser {
         for (line in lines) {
             val l = norm(line)
             when {
-                l.startsWith("日期") -> date = afterColon(l)
-                l.startsWith("医院") -> hospital = afterColon(l)
-                l.startsWith("备注") -> note = afterColon(l)
+                l.startsWith("日期") || l.startsWith("Date") -> date = afterColon(l)
+                l.startsWith("医院") || l.startsWith("Hospital") -> hospital = afterColon(l)
+                l.startsWith("备注") || l.startsWith("Note") -> note = afterColon(l)
                 else -> {
                     val row = parseLabRow(l)
                     if (row != null) rows.add(row) else skipped.add(line)
@@ -81,19 +87,26 @@ object ReportImportParser {
         return LabImport(normalizeDate(date), hospital?.takeIf { it.isNotBlank() }, note?.takeIf { it.isNotBlank() }, rows, skipped)
     }
 
+    /** 表头/说明行的整词（中英文键都算，AI 可能复读模板说明）。 */
+    private val HEADER_WORDS = listOf("项目", "Item")
+
+    /** 表头/说明行/项目符号的前缀。 */
+    private val HEADER_PREFIXES = listOf("#", "例", "-", "—", "·", "说明", "备注", "Note")
+
+    /** 该行是否明显不是数据行（表头 / 说明 / 项目符号）。 */
+    private fun isHeaderLikeName(name: String): Boolean =
+        name in HEADER_WORDS || HEADER_PREFIXES.any { name.startsWith(it) }
+
     private fun parseLabRow(line: String): LabImportRow? {
         val parts = FIELD_SPLIT.split(norm(line)).map { it.trim() }
         if (parts.size < 2) return null
         val name = parts[0]
         // 指标名与结果都为空、或明显是表头/说明/项目符号的行跳过（AI 可能复读模板说明）
-        if (name.isBlank() || name == "项目" || name.startsWith("#") || name.startsWith("例") ||
-            name.startsWith("-") || name.startsWith("—") || name.startsWith("·") ||
-            name.startsWith("说明") || name.startsWith("备注")
-        ) return null
+        if (name.isBlank() || isHeaderLikeName(name)) return null
         val valueText = parts[1]
-        if (valueText.isBlank() || valueText == "结果") return null
+        if (valueText.isBlank() || valueText == "结果" || valueText == "Result") return null
         val unit = parts.getOrNull(2)?.takeIf { it.isNotBlank() }
-        val ref = parts.getOrNull(3)?.takeIf { it.isNotBlank() && it != "参考范围" }
+        val ref = parts.getOrNull(3)?.takeIf { it.isNotBlank() && it != "参考范围" && it != "Reference range" }
         val mark = parts.getOrNull(4)?.takeIf { it.isNotBlank() }
         val (refLow, refHigh) = parseRange(ref)
         // v1.0.78（批次 4 收尾）：AI 标记**同时写两处**——
@@ -127,10 +140,12 @@ object ReportImportParser {
     }
 
     private fun markAbnormal(mark: String?): String? {
-        if (mark.isNullOrBlank() || mark == "正常") return if (mark == "正常") "normal" else null
+        if (mark.isNullOrBlank()) return null
+        // v1.2.6（i18n）：英文模板回填的标记（Normal / High / Low）与中文标记等价
+        if (mark == "正常" || mark.equals("Normal", true)) return "normal"
         return when {
-            mark.contains("高") || mark.contains("↑") || mark.equals("H", true) -> "high"
-            mark.contains("低") || mark.contains("↓") || mark.equals("L", true) -> "low"
+            mark.contains("高") || mark.contains("↑") || mark.equals("H", true) || mark.contains("High", true) -> "high"
+            mark.contains("低") || mark.contains("↓") || mark.equals("L", true) || mark.contains("Low", true) -> "low"
             else -> null
         }
     }
@@ -144,10 +159,33 @@ object ReportImportParser {
      */
     private fun normalizeDate(raw: String?): String? = DateInput.normalizeOrNull(raw)
 
-    private val IMAGING_KEYS = listOf("类型", "日期", "医院", "部位", "所见", "结论", "对比", "备注")
+    /** 中文键 → 英文别名（v1.2.6：英文模板回填的报告同样能解析；canonical 仍取中文键） */
+    private val IMAGING_KEYS = listOf(
+        "类型" to listOf("Type"),
+        "日期" to listOf("Date"),
+        "医院" to listOf("Hospital"),
+        "部位" to listOf("Site"),
+        "所见" to listOf("Findings"),
+        "结论" to listOf("Conclusion"),
+        "对比" to listOf("Comparison"),
+        "备注" to listOf("Note"),
+    )
 
-    /** R4：首个键值行之前无法归入任何字段的行不再静默丢弃——原文进 [ImagingImport.skippedLines]。 */
-    fun parseImaging(text: String): ImagingImport? {
+    /** 命中的字段键（返回 canonical 中文键）；中英文键都要求紧跟半角/全角冒号。 */
+    private fun imagingKeyOf(l: String): String? = IMAGING_KEYS.firstNotNullOfOrNull { (canonical, aliases) ->
+        (listOf(canonical) + aliases).firstOrNull { name ->
+            l.startsWith(name) && (l.getOrNull(name.length) == ':' || l.getOrNull(name.length) == '：')
+        }?.let { canonical }
+    }
+
+    /**
+     * R4：首个键值行之前无法归入任何字段的行不再静默丢弃——原文进 [ImagingImport.skippedLines]。
+     *
+     * v1.2.6（i18n）：[unsetBodyPart] 由调用方传入（资源 `ui_imaging_bodypart_unset`），
+     * [bodyPartSeparator] 由调用方传入（资源 `ui_list_separator`，中文「、」/英文「, 」），
+     * domain 层不再硬编码中文。
+     */
+    fun parseImaging(text: String, unsetBodyPart: String, bodyPartSeparator: String): ImagingImport? {
         val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
         if (lines.isEmpty()) return null
         val fields = linkedMapOf<String, MutableList<String>>()
@@ -155,7 +193,7 @@ object ReportImportParser {
         var current: String? = null
         for (line in lines) {
             val l = norm(line)
-            val key = IMAGING_KEYS.firstOrNull { k -> l.startsWith(k) && (l.getOrNull(k.length) == ':' || l.getOrNull(k.length) == '：') }
+            val key = imagingKeyOf(l)
             if (key != null) {
                 current = key
                 val v = afterColon(l)
@@ -168,7 +206,8 @@ object ReportImportParser {
         }
         val modality = modalityOf(fields["类型"]?.joinToString(" ") ?: "") ?: return null
         val date = normalizeDate(fields["日期"]?.joinToString(" "))
-        val bodyPart = fields["部位"]?.joinToString("、")?.takeIf { it.isNotBlank() } ?: "未注明部位"
+        val bodyPart = fields["部位"]?.joinToString(bodyPartSeparator)?.takeIf { it.isNotBlank() }
+            ?: unsetBodyPart
         if (date == null && fields.isEmpty()) return null
         return ImagingImport(
             date = date,
@@ -182,13 +221,14 @@ object ReportImportParser {
         )
     }
 
-    /** MRI/磁共振/MR → MRI；CT → CT；X线/X光/X光片/DR/放射 → XRAY */
+    /** MRI/磁共振/MR → MRI；CT → CT；X线/X光/X光片/DR/放射/X-ray → XRAY */
     fun modalityOf(raw: String): String? {
         val s = raw.trim().uppercase()
         return when {
             s.contains("MRI") || s.contains("MR") || raw.contains("磁共振") || raw.contains("核磁") -> "MRI"
             s.contains("CT") -> "CT"
-            raw.contains("X线") || raw.contains("X光") || raw.contains("X线") || s.contains("XR") || raw.contains("DR") || raw.contains("放射") || raw.contains("平片") -> "XRAY"
+            s.contains("X-RAY") || raw.contains("X线") || raw.contains("X光") ||
+                s.contains("XR") || raw.contains("DR") || raw.contains("放射") || raw.contains("平片") -> "XRAY"
             else -> null
         }
     }
@@ -199,33 +239,17 @@ object ReportImportParser {
     }
 }
 
-/** 发给 AI 的模板（复制到剪贴板，连同报告照片一起发给任意 AI 助手） */
+/**
+ * 发给 AI 的模板（复制到剪贴板，连同报告照片一起发给任意 AI 助手）。
+ *
+ * v1.2.6（i18n）：改为返回**资源 id**（`ui_import_template_lab` / `_imaging`），
+ * 模板正文按当前语言渲染；[ReportImportParser] 同时接受中英文键，故英文模板回填也能解析。
+ */
 object ImportTemplates {
 
-    const val LAB = """【化验单整理】
-请根据我发送的检验报告照片，逐项提取数据并严格按以下格式输出（每项一行，报告里有多少项就输出多少项，没有的不要编造，看不清的用?代替）：
+    @StringRes
+    val LAB = R.string.ui_import_template_lab
 
-日期: 2026-08-02
-医院: 医院名称
-项目, 结果, 单位, 参考范围, 标记
-血沉(ESR), 15, mm/h, 0-20, 正常
-C-反应蛋白(CRP), 5.2, mg/L, 0-8, 偏高
-白细胞计数(WBC), 6.1, 10^9/L, 3.5-9.5, 正常
-
-说明：
-- 「项目」用报告上的中文名，可带英文缩写
-- 「结果」只填数字（或 阴性/阳性/↑/↓ 等原文），不要带单位
-- 「参考范围」照抄报告原文（如 2.9-8.2 或 ≤5）
-- 「标记」按报告原标注：偏高/偏高↑、偏低、正常"""
-
-    const val IMAGING = """【影像报告整理】
-请根据我发送的检查报告照片（MRI/CT/X线），提取信息并严格按以下格式输出：
-
-类型: MRI（按报告实际类型填 MRI / CT / X线）
-日期: 2026-07-31
-医院: 医院名称
-部位: 骶髂关节
-所见: 图像所见/检查所见的完整原文（可多行）
-结论: 诊断与印象的完整原文（可多行）
-对比: 报告中「对比前片」的变化描述（没有则填 无）"""
+    @StringRes
+    val IMAGING = R.string.ui_import_template_imaging
 }

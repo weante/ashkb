@@ -221,12 +221,9 @@ fun TrendChart(
         }
     }
 
-    val dirRise = stringResource(R.string.trend_up_to)
-    val dirFall = stringResource(R.string.trend_down_to)
-    val dirFlat = stringResource(R.string.trend_flat)
-    val a11y = remember(points, threshold, summary) {
-        summarize(label, points, unit, threshold, dirRise, dirFall, dirFlat, summary)
-    }
+    // v1.2.6（i18n）：摘要里的「升至/降至/持平于」与整句文案都在 summarize 内按当前语言解析
+    // （该函数已改为 @Composable，故不能再放进 remember 的 lambda 里）。
+    val a11y = summarize(label, points, unit, threshold, summary)
 
     Column(modifier) {
         ReadoutRow(summary = summary, unit = unit, threshold = threshold, accent = accent)
@@ -639,29 +636,37 @@ internal fun selectionText(
     dateTick(firstDate, lastDate, date) + " · " +
         values.sortedDescending().joinToString(" / ") { fmtValue(it) } + unit
 
+/** v1.2.6（i18n）：整句读屏摘要按当前语言拼装（@Composable，参数从 8 个降到 5 个）。 */
+@Composable
 private fun summarize(
     label: String,
     points: List<TrendPoint>,
     unit: String,
     threshold: Float?,
-    dirRise: String,
-    dirFall: String,
-    dirFlat: String,
     summary: TrendSummary,
 ): String {
     val first = points.first().value
-    val dir = when {
-        summary.last > first + 0.05f -> dirRise
-        summary.last < first - 0.05f -> dirFall
-        else -> dirFlat
-    }
+    val dir = stringResource(
+        when {
+            summary.last > first + 0.05f -> R.string.trend_up_to
+            summary.last < first - 0.05f -> R.string.trend_down_to
+            else -> R.string.trend_flat
+        },
+    )
     return buildString {
-        append("$label 趋势，共 ${summary.total} 个数据点")
-        if (summary.total > 1) append("，从 ${fmtValue(first)}$unit $dir ${fmtValue(summary.last)}$unit")
-        append("，均值 ${fmtValue(summary.avg)}$unit")
+        append(stringResource(R.string.ui_trend_a11y_summary, label, summary.total))
+        if (summary.total > 1) {
+            append(
+                stringResource(
+                    R.string.ui_trend_a11y_range,
+                    fmtValue(first), unit, dir, fmtValue(summary.last),
+                ),
+            )
+        }
+        append(stringResource(R.string.ui_trend_a11y_avg, fmtValue(summary.avg), unit))
         threshold?.let { th ->
             if (summary.overCount > 0) {
-                append("，其中 ${summary.overCount} 次超过阈值 ${fmtValue(th)}$unit")
+                append(stringResource(R.string.ui_trend_a11y_over, summary.overCount, fmtValue(th), unit))
             }
         }
     }

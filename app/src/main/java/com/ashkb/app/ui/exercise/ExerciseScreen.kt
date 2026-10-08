@@ -51,6 +51,7 @@ import com.ashkb.app.data.entity.ExerciseLog
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.ExerciseEngine
 import com.ashkb.app.domain.PostureAdvice
+import com.ashkb.app.domain.ResText
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.DisclaimerNote
 import com.ashkb.app.ui.components.DividerList
@@ -100,7 +101,11 @@ fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -> Unit, onBack: () ->
                     tone = StatusTone.Danger,
                     icon = Icons.Rounded.Block,
                     title = card.entry.title,
-                    body = "L3 · ${card.movements.joinToString("、")}｜${card.hint}",
+                    body = stringResource(
+                        R.string.ui_exercise_blocked_body,
+                        card.movements.joinToString(stringResource(R.string.ui_list_separator)),
+                        card.hintText(),
+                    ),
                     actionLabel = stringResource(R.string.knowledge_view_entry),
                     onAction = { kbDetail = card.entry },
                 )
@@ -285,7 +290,10 @@ private fun PrescriptionHero(
                 )
                 Text(
                     if (ui.plan.isEmpty()) stringResource(R.string.exercise_no_recommendation)
-                    else "今日适合：${ui.plan.take(2).joinToString("、") { it.entry.title }}",
+                    else stringResource(
+                        R.string.ui_exercise_today_suitable,
+                        ui.plan.take(2).joinToString(stringResource(R.string.ui_list_separator)) { it.entry.title },
+                    ),
                     style = MaterialTheme.typography.headlineMedium,
                     color = fg,
                     maxLines = 2,
@@ -355,7 +363,10 @@ private fun PrescriptionHero(
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(top = Spacing.sm),
             )
-            Text(warmup.headline, style = MaterialTheme.typography.titleSmall)
+            Text(
+                resTextOf(warmup.headline),
+                style = MaterialTheme.typography.titleSmall,
+            )
             if (warmup.steps.isEmpty()) {
                 Text(
                     stringResource(R.string.exercise_warmup_no_l1),
@@ -366,7 +377,7 @@ private fun PrescriptionHero(
                     Text("${i + 1}. $s", style = MaterialTheme.typography.bodySmall)
                 }
             }
-            Text(warmup.note, style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(warmup.noteRes), style = MaterialTheme.typography.bodySmall)
         }
 
         // v1.0.64 B13：生活方式画像驱动的个性化提示——随处方展示，不改处方本身
@@ -378,7 +389,7 @@ private fun PrescriptionHero(
                 modifier = Modifier.padding(top = Spacing.sm),
             )
             ui.lifestyleNotes.forEach { note ->
-                Text("· $note", style = MaterialTheme.typography.bodySmall)
+                Text("· ${resTextOf(note)}", style = MaterialTheme.typography.bodySmall)
             }
             DisclaimerNote()
         }
@@ -395,12 +406,12 @@ private fun PrescriptionHero(
                 stringResource(R.string.exercise_posture_daily),
                 style = MaterialTheme.typography.titleSmall,
             )
-            PostureAdvice.DAILY.forEach { Text("· $it", style = MaterialTheme.typography.bodySmall) }
+            PostureAdvice.DAILY.forEach { Text("· ${stringResource(it)}", style = MaterialTheme.typography.bodySmall) }
             Text(
                 stringResource(R.string.exercise_posture_sleep),
                 style = MaterialTheme.typography.titleSmall,
             )
-            PostureAdvice.SLEEP.forEach { Text("· $it", style = MaterialTheme.typography.bodySmall) }
+            PostureAdvice.SLEEP.forEach { Text("· ${stringResource(it)}", style = MaterialTheme.typography.bodySmall) }
             Text(
                 stringResource(R.string.exercise_posture_source),
                 style = MaterialTheme.typography.bodySmall,
@@ -444,7 +455,7 @@ private fun PlanCard(
             )
         },
     ) {
-        Text(card.hint, style = MaterialTheme.typography.bodySmall)
+        Text(card.hintText(), style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(Spacing.sm))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Button(onClick = onCheckIn) { Text(stringResource(R.string.exercise_checkin_short)) }
@@ -559,7 +570,7 @@ private fun FeedbackSheet(
             )
             if (pain != null && stiffness != null) {
                 Text(
-                    ExerciseEngine.interpretFeedback(pain, stiffness, soreness),
+                    stringResource(ExerciseEngine.interpretFeedback(pain, stiffness, soreness)),
                     style = MaterialTheme.typography.bodyMedium,
                     color = StatusTone.Info.accent(),
                 )
@@ -590,3 +601,28 @@ private fun FeedbackRadio(label: String, value: String?, onChange: (String) -> U
         }
     }
 }
+
+/**
+ * v1.2.6（i18n）：domain 层只给「资源 id + 参数」的片段，语言在 UI 层解析。
+ * 片段最多 3 个参数，故显式展开（`*args.toTypedArray()` 会触发 detekt SpreadOperator）。
+ */
+@Composable
+private fun resTextOf(r: ResText): String = when (r.args.size) {
+    0 -> stringResource(r.res)
+    1 -> stringResource(r.res, r.args[0])
+    2 -> stringResource(r.res, r.args[0], r.args[1])
+    else -> stringResource(r.res, r.args[0], r.args[1], r.args[2])
+}
+
+/**
+ * 运动提示片段（[ExerciseEngine.TextPart]）：`map` 是 inline 参数，故可在里面调 `stringResource`；
+ * 行与行用 `\n` 连接。
+ */
+@Composable
+private fun ExerciseEngine.ExerciseCard.hintText(): String =
+    hintParts.map { textPartOf(it) }.joinToString("\n")
+
+/** 单个运动提示片段落地（本工程的片段最多 1 个参数）。 */
+@Composable
+private fun textPartOf(part: ExerciseEngine.TextPart): String =
+    if (part.args.isEmpty()) stringResource(part.res) else stringResource(part.res, part.args.first())

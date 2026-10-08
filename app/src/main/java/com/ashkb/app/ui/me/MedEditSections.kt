@@ -506,7 +506,7 @@ internal fun MedVerifySection(
                 )
             }
             if (h.size > 5) {
-                Text("…其余 ${h.size - 5} 条可在知识库查看", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.ui_med_kb_remaining, h.size - 5), style = MaterialTheme.typography.bodySmall)
             }
         }
     }

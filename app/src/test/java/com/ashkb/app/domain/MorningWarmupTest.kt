@@ -1,15 +1,33 @@
 package com.ashkb.app.domain
 
+import android.content.Context
 import com.ashkb.app.data.entity.KbEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 /**
  * v1.0.69 C8b：晨僵时长驱动起床热身序列回归。
+ *
+ * i18n（v1.2.6）：`Sequence.headline` 是 `ResText`、`note` 是 `@StringRes Int`，
+ * 断言**措辞**的用例改为读中文资源落地后的文本。`@Config(qualifiers = "zh-rCN")` 不可省
+ * （`values-en` 存在，Robolectric 默认走 en-rUS，英文里没有「炎症活动」）。
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "zh-rCN")
 class MorningWarmupTest {
+
+    private val ctx: Context get() = RuntimeEnvironment.getApplication()
+
+    private fun headline(s: MorningWarmup.Sequence): String =
+        ctx.getString(s.headline.res, *s.headline.args.toTypedArray())
+
+    private fun note(s: MorningWarmup.Sequence): String = ctx.getString(s.noteRes)
 
     private fun entry(id: String, title: String) = KbEntry(
         id = id, category = "exercise", title = title, summary = "",
@@ -20,7 +38,7 @@ class MorningWarmupTest {
 
     private fun card(id: String, title: String, grade: String) =
         ExerciseEngine.ExerciseCard(
-            entry = entry(id, title), verdict = "allow", hint = "", grade = grade,
+            entry = entry(id, title), verdict = "allow", hintParts = emptyList(), grade = grade,
             listType = "red", movements = emptyList(), dose = null,
         )
 
@@ -43,22 +61,22 @@ class MorningWarmupTest {
     @Test
     fun `刚好 15 分钟开始提示`() {
         val s = MorningWarmup.build(15, plan)!!
-        assertEquals("晨僵 15 分钟", s.headline)
-        assertTrue("15 分钟档不该说炎症活动", !s.note.contains("炎症活动"))
+        assertEquals("晨僵 15 分钟", headline(s))
+        assertTrue("15 分钟档不该说炎症活动", !note(s).contains("炎症活动"))
     }
 
     @Test
     fun `刚好 30 分钟升级为明显延长`() {
         val s = MorningWarmup.build(30, plan)!!
-        assertEquals("晨僵 30 分钟（明显延长）", s.headline)
-        assertTrue(s.note.contains("炎症活动"))
-        assertTrue("应提示复诊告知医生", s.note.contains("医生"))
+        assertEquals("晨僵 30 分钟（明显延长）", headline(s))
+        assertTrue(note(s).contains("炎症活动"))
+        assertTrue("应提示复诊告知医生", note(s).contains("医生"))
     }
 
     @Test
     fun `29 与 30 是分档边界`() {
-        assertTrue(MorningWarmup.build(29, plan)!!.headline.endsWith("分钟"))
-        assertTrue(MorningWarmup.build(30, plan)!!.headline.endsWith("（明显延长）"))
+        assertTrue(headline(MorningWarmup.build(29, plan)!!).endsWith("分钟"))
+        assertTrue(headline(MorningWarmup.build(30, plan)!!).endsWith("（明显延长）"))
     }
 
     @Test
@@ -79,13 +97,13 @@ class MorningWarmupTest {
     fun `处方里没有 L1 时 steps 为空但仍有解释`() {
         val s = MorningWarmup.build(40, listOf(l2, l3))!!
         assertTrue("无 L1 项时 steps 为空，UI 自行兜底文案", s.steps.isEmpty())
-        assertTrue(s.note.isNotBlank())
+        assertTrue(note(s).isNotBlank())
     }
 
     @Test
     fun `空处方不崩`() {
         val s = MorningWarmup.build(60, emptyList())!!
         assertTrue(s.steps.isEmpty())
-        assertTrue(s.headline.contains("60"))
+        assertTrue(headline(s).contains("60"))
     }
 }

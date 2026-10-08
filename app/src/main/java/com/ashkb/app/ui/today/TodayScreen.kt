@@ -69,6 +69,7 @@ import com.ashkb.app.data.repo.TodayItem
 import com.ashkb.app.domain.MinimalMode
 import com.ashkb.app.domain.MissedDose
 import com.ashkb.app.domain.PendingDoses
+import com.ashkb.app.domain.ResText
 import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.DisclaimerNote
@@ -761,7 +762,7 @@ private fun medStatusOf(item: TodayItem, missed: Boolean): MedStatus = when {
         chip = stringResource(R.string.med_status_pending),
         tone = StatusTone.Info,
         icon = Icons.Rounded.Schedule,
-        detail = "计划 ${item.slotTime ?: stringResource(R.string.med_prn_short)}",
+        detail = stringResource(R.string.ui_today_plan_prefix, item.slotTime ?: stringResource(R.string.med_prn_short)),
         actionable = true,
     )
 }
@@ -1026,7 +1027,7 @@ private fun PostponeDialog(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "目标注射日：${target.format(fmt)}",
+                    stringResource(R.string.ui_today_target_injection_date, target.format(fmt)),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -1073,13 +1074,14 @@ private fun MissedDoseDialog(item: TodayItem, onDismiss: () -> Unit) {
                     Text(
                         stringResource(
                             R.string.missed_dose_late,
-                            if (late < 60) "$late 分钟" else "%.1f 小时".format(late / 60.0),
+                            if (late < 60) stringResource(R.string.dom_duration_minutes, late)
+                            else stringResource(R.string.dom_duration_hours, "%.1f".format(late / 60.0)),
                         ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        guide.headline,
+                        stringResource(guide.headlineRes),
                         style = MaterialTheme.typography.titleMedium,
                         color = if (guide.contactDoctor) MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.primary,
@@ -1093,7 +1095,7 @@ private fun MissedDoseDialog(item: TodayItem, onDismiss: () -> Unit) {
                     }
                     guide.steps.forEach { s ->
                         Text(
-                            "· ${s.replace("**", "")}",
+                            "· " + resTextOf(s).replace("**", ""),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -1104,4 +1106,16 @@ private fun MissedDoseDialog(item: TodayItem, onDismiss: () -> Unit) {
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) } },
     )
+}
+
+/**
+ * v1.2.6（i18n）：domain 层的 [ResText] 只给「资源 id + 参数」，语言在 UI 层落地。
+ * 本工程的片段最多 3 个参数，故显式展开（`*args.toTypedArray()` 会触发 detekt SpreadOperator）。
+ */
+@Composable
+private fun resTextOf(r: ResText): String = when (r.args.size) {
+    0 -> stringResource(r.res)
+    1 -> stringResource(r.res, r.args[0])
+    2 -> stringResource(r.res, r.args[0], r.args[1])
+    else -> stringResource(r.res, r.args[0], r.args[1], r.args[2])
 }

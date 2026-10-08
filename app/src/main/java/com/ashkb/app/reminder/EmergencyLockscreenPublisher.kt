@@ -1,10 +1,12 @@
 package com.ashkb.app.reminder
 
 import android.content.Context
+import com.ashkb.app.R
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.repo.EmergencyLockscreenStore
 import com.ashkb.app.domain.EmergencyLockscreen
 import com.ashkb.app.domain.EmergencyMeds
+import com.ashkb.app.domain.ResText
 import java.time.LocalDate
 import kotlinx.coroutines.flow.first
 
@@ -36,13 +38,23 @@ object EmergencyLockscreenPublisher {
             val meds = EmergencyMeds.summarize(
                 db.medicationDao().listActive(), LocalDate.now().toString(),
                 freqLabel = { context.getString(it.plainRes) },
+                // v1.2.6（i18n）：注射周期文案同样按系统语言解析
+                injCycleLabel = { context.getString(R.string.ui_emergency_meds_inj_cycle, it) },
             )
-            val content = EmergencyLockscreen.build(profile, contacts, meds)
+            val content = EmergencyLockscreen.build(
+                profile, contacts, meds,
+                listSeparator = context.getString(R.string.dom_lock_list_separator),
+            )
             if (content.lines.isEmpty()) {
                 // 无可显示内容（如未建档且无用药与联系人）→ 不留空卡
                 NotificationHelper.cancelLockscreenEmergencyCard(context)
             } else {
-                NotificationHelper.postLockscreenEmergencyCard(context, content.title, content.lines)
+                // i18n：domain 层只给资源 id + 参数，落地在这里（本对象非 Composable，故用 getString）
+                NotificationHelper.postLockscreenEmergencyCard(
+                    context,
+                    context.getString(content.titleRes),
+                    content.lines.map { context.resTextOf(it) },
+                )
             }
         }
     }
@@ -51,5 +63,16 @@ object EmergencyLockscreenPublisher {
     suspend fun disable(context: Context) {
         EmergencyLockscreenStore.setEnabled(context, false)
         runCatching { NotificationHelper.cancelLockscreenEmergencyCard(context) }
+    }
+
+    /**
+     * v1.2.6（i18n）：domain 层的 [ResText] 只给「资源 id + 参数」，语言在这里落地。
+     * 本工程的片段最多 3 个参数，故显式展开（`*args.toTypedArray()` 会触发 detekt SpreadOperator）。
+     */
+    private fun Context.resTextOf(r: ResText): String = when (r.args.size) {
+        0 -> getString(r.res)
+        1 -> getString(r.res, r.args[0])
+        2 -> getString(r.res, r.args[0], r.args[1])
+        else -> getString(r.res, r.args[0], r.args[1], r.args[2])
     }
 }

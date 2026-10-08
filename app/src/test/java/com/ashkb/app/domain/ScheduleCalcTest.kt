@@ -252,10 +252,10 @@ class ScheduleCalcTest {
     }
 
     @Test
-    fun `空腹药槽位标签带晨起空腹提示`() {
+    fun `空腹药槽位标签同样只有计划时刻（晨起空腹提示由 UI 层拼接）`() {
         val m = med(takeWithFood = "empty_stomach")
         val slots = ScheduleCalc.slotsFor(m, LocalDate.parse("2026-08-30"))
-        assertTrue(slots[0].label.contains("晨起空腹"))
+        assertEquals("08:00", slots[0].label)
     }
 
     @Test

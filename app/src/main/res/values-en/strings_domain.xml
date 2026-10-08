@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  English counterpart of values/strings_domain.xml; entry name order must stay identical.
+  Naming: dom_<group>_<meaning>; group prefixes lbl / missed / lock / life / thr / warm / prep / disc / posture / lab.
+  Strings used as MATCHING KEYS in the domain layer (drug names, lab test names, units) are deliberately absent here.
+-->
+<resources>
+
+    <!-- ===== Labels.kt: enum key -> display label ===== -->
+    <string name="dom_lbl_hla_positive">Positive</string>
+    <string name="dom_lbl_hla_negative">Negative</string>
+    <string name="dom_lbl_hla_unknown">Unknown</string>
+    <string name="dom_lbl_stage_stable">Remission</string>
+    <string name="dom_lbl_stage_controlled">Controlled</string>
+    <string name="dom_lbl_stage_flare">Flare</string>
+    <string name="dom_lbl_stage_unknown">Not assessed</string>
+    <string name="dom_lbl_sacro_0">0 Normal</string>
+    <string name="dom_lbl_sacro_1">I Suspicious</string>
+    <string name="dom_lbl_sacro_2">II Mild</string>
+    <string name="dom_lbl_sacro_3">III Moderate</string>
+    <string name="dom_lbl_sacro_4">IV Severe</string>
+    <string name="dom_lbl_sacro_unknown">Not assessed</string>
+    <string name="dom_lbl_diet_mediterranean">Mediterranean</string>
+    <string name="dom_lbl_diet_paleo">Paleo</string>
+    <string name="dom_lbl_diet_vegan">Vegan</string>
+    <string name="dom_lbl_diet_vegetarian">Vegetarian</string>
+    <string name="dom_lbl_diet_low_starch">Low starch</string>
+    <string name="dom_lbl_diet_omnivore">Omnivore</string>
+    <string name="dom_lbl_seafood_never">Never</string>
+    <string name="dom_lbl_seafood_rare">Occasionally</string>
+    <string name="dom_lbl_seafood_weekly">Weekly</string>
+    <string name="dom_lbl_seafood_frequent">Often</string>
+    <string name="dom_lbl_seafood_unset">Not set</string>
+    <string name="dom_lbl_dairy_yes">Tolerated</string>
+    <string name="dom_lbl_dairy_no">Not tolerated</string>
+    <string name="dom_lbl_dairy_lactose_free">Lactose-free only</string>
+    <string name="dom_lbl_dairy_unset">Not set</string>
+    <string name="dom_lbl_avoid_allergy">Allergy</string>
+    <string name="dom_lbl_avoid_intolerance">Intolerance</string>
+    <string name="dom_lbl_avoid_doctor_advice">Doctor\'s advice</string>
+    <string name="dom_lbl_avoid_personal">Personal experience</string>
+    <string name="dom_lbl_avoid_drug_interaction">Drug interaction</string>
+    <string name="dom_lbl_severity_high">High</string>
+    <string name="dom_lbl_severity_medium">Moderate</string>
+    <string name="dom_lbl_severity_low">Low</string>
+
+    <!-- ===== MissedDose.kt: missed / late dose guidance ===== -->
+    <string name="dom_missed_head_oral_soon">Take it as soon as you remember</string>
+    <string name="dom_missed_head_oral_skip">Best to skip this dose</string>
+    <string name="dom_missed_head_inj_window">Still inside the window — inject as soon as you can</string>
+    <string name="dom_missed_head_inj_overdue">Past the window — contact your doctor first</string>
+    <string name="dom_missed_oral_soon_1_min">It is only about %1$d minutes past the scheduled time, so take it as soon as you remember.</string>
+    <string name="dom_missed_oral_soon_1_hour">It is only about %1$s hours past the scheduled time, so take it as soon as you remember.</string>
+    <string name="dom_missed_oral_soon_2">If your next dose is nearly due, skip this one — **never take two doses at once**.</string>
+    <string name="dom_missed_oral_soon_3">Log the catch-up dose in today\'s check-in as usual, so your adherence record stays accurate.</string>
+    <string name="dom_missed_oral_skip_1_min">It is about %1$d minutes past the scheduled time; best to skip this dose and take the next one as planned.</string>
+    <string name="dom_missed_oral_skip_1_hour">It is about %1$s hours past the scheduled time; best to skip this dose and take the next one as planned.</string>
+    <string name="dom_missed_oral_skip_2">**Never double the dose** to make up for it — doubling raises the risk of side effects.</string>
+    <string name="dom_missed_oral_skip_3">If you miss doses often (several times a week, for example), talk to your doctor about adjusting the plan or switching to a form with more frequent reminders.</string>
+    <string name="dom_missed_inj_window_1_min">About %1$d minutes past the scheduled time — still inside the usual catch-up window (%2$d hours).</string>
+    <string name="dom_missed_inj_window_1_hour">About %1$s hours past the scheduled time — still inside the usual catch-up window (%2$d hours).</string>
+    <string name="dom_missed_inj_window_2">Inject as soon as possible, then shift the next injection to keep the **original interval** — do not bring it forward.</string>
+    <string name="dom_missed_inj_window_3_immuno">Immunosuppressants / biologics: if the injection is several days late, or you are unsure whether to catch up, phone your rheumatology team first.</string>
+    <string name="dom_missed_inj_window_3_other">If you feel unwell after the catch-up injection, contact your doctor promptly.</string>
+    <string name="dom_missed_inj_overdue_1_min">It is more than %1$d hours past the scheduled time (about %2$d minutes), beyond the usual catch-up window.</string>
+    <string name="dom_missed_inj_overdue_1_hour">It is more than %1$d hours past the scheduled time (about %2$s hours), beyond the usual catch-up window.</string>
+    <string name="dom_missed_inj_overdue_2">**Contact your rheumatology team first** to confirm the catch-up plan (whether to catch up, when to do it, and whether the interval changes).</string>
+    <string name="dom_missed_inj_overdue_3">Do not double the dose or shorten the interval yourself before your doctor confirms.</string>
+    <string name="dom_missed_inj_overdue_4_immuno">Interrupting biologics / immunosuppressants may affect disease control, so the sooner you talk to your doctor the better.</string>
+    <string name="dom_missed_inj_overdue_4_other">Any adjustment must follow your treating physician\'s instructions.</string>
+
+    <!-- Time span: report minutes below 1 hour, otherwise hours (one decimal) — MissedDose.fmt -->
+    <string name="dom_duration_minutes">%1$d min</string>
+    <string name="dom_duration_hours">%1$s hours</string>
+
+    <!-- ===== EmergencyLockscreen.kt: lock screen emergency card ===== -->
+    <string name="dom_lock_title">Emergency information</string>
+    <string name="dom_lock_blood">Blood type %1$s | Diagnosis %2$s</string>
+    <string name="dom_lock_blood_unfilled">Blood type not provided | Diagnosis %1$s</string>
+    <string name="dom_lock_allergy">Allergies: %1$s</string>
+    <string name="dom_lock_meds">Medication: %1$s</string>
+    <string name="dom_lock_meds_immuno">Medication (includes immunosuppressants — infection risk): %1$s</string>
+    <string name="dom_lock_meds_more">Medication: %1$s, %2$d in total</string>
+    <string name="dom_lock_meds_immuno_more">Medication (includes immunosuppressants — infection risk): %1$s, %2$d in total</string>
+    <string name="dom_lock_family">Family: %1$s %2$s</string>
+    <string name="dom_lock_doctor">Doctor: %1$s %2$s</string>
+    <string name="dom_lock_unspecified">Not provided</string>
+    <string name="dom_lock_list_separator">", "</string>
+
+    <!-- ===== LifestylePrescription.kt: lifestyle -> exercise prescription tips ===== -->
+    <string name="dom_life_smoking_current">Smoking is a risk factor for spinal inflammation and disease progression in axSpA, so stopping is advised (your doctor can help you plan how). An honest note: guidelines recommend stopping because of the known health risks of smoking; dedicated evidence that it improves axSpA outcomes is still lacking.</string>
+    <string name="dom_life_smoking_former">Having stopped smoking is a clear plus — keep it up; it also lowers cardiovascular risk (which is already higher in people with AS).</string>
+    <string name="dom_life_sedentary">You sit for about %1$d hours a day: get up and move for 2–3 minutes every 30–45 minutes, which counters stiffness better than one long session.</string>
+    <string name="dom_life_sleep">You sleep about %1$d hours on average, which is on the short side: too little sleep amplifies pain and morning stiffness, so keep today\'s intensity moderate and put regularity first.</string>
+    <string name="dom_life_habit_none">No exercise habit at present: start with the L1 gentle items and build up to 3–5 times a week first, then talk about duration and intensity.</string>
+    <string name="dom_life_habit_regular">You already exercise regularly: progress steadily — duration first (add 5–10 minutes every 1–2 weeks), then frequency, then intensity.</string>
+
+    <!-- ===== ClinicalThresholds.kt: three-tier labels ===== -->
+    <string name="dom_thr_pain_severe">Severe</string>
+    <string name="dom_thr_pain_moderate">Moderate</string>
+    <string name="dom_thr_pain_mild">Mild</string>
+    <string name="dom_thr_adherence_good">On target</string>
+    <string name="dom_thr_adherence_fair">Needs improvement</string>
+    <string name="dom_thr_adherence_poor">Needs intervention</string>
+
+    <!-- ===== MorningWarmup.kt: morning stiffness driven warm-up ===== -->
+    <string name="dom_warm_headline">Morning stiffness %1$d min</string>
+    <string name="dom_warm_headline_prolonged">Morning stiffness %1$d min (markedly prolonged)</string>
+    <string name="dom_warm_note">Do one round of gentle items after getting up, and start the day\'s plan once the stiffness eases.</string>
+    <string name="dom_warm_note_prolonged">Morning stiffness lasting more than 30 minutes often points to active inflammation. Do one round of gentle items after getting up before starting the day\'s plan, and watch that trend; if it lasts several days in a row, tell your doctor at the next appointment.</string>
+
+    <!-- ===== CheckupPrep.kt: what to bring to a follow-up visit ===== -->
+    <string name="dom_prep_bring_reports">Previous lab reports / imaging reports (paper copies, or the attachments archived in this app)</string>
+    <string name="dom_prep_bring_meds">Current medication list (this app can export an emergency card / follow-up report PDF)</string>
+    <string name="dom_prep_bring_insurance">Health insurance card / hospital card</string>
+    <string name="dom_prep_bring_lab_fasting">If blood is being taken that day: come fasting (no food for 8–12 hours beforehand; a little water is fine — follow the hospital\'s requirements)</string>
+    <string name="dom_prep_bring_image">If imaging is planned that day: remove metal jewellery and bring previous scans for comparison</string>
+
+    <!-- ===== Disclaimer.kt: compliance wording ===== -->
+    <string name="dom_disc_prefix">For reference only; follow your treating physician\'s instructions.</string>
+    <string name="dom_disc_not_advice">This app is a personal health record tool. It does not constitute medical advice and cannot replace diagnosis or treatment by a doctor.</string>
+    <string name="dom_disc_follow_doctor">Always follow your treating physician\'s instructions on medication and treatment; any adjustment is subject to those instructions.</string>
+    <string name="dom_disc_data_local">All health data stays on this device and is never uploaded to any server.</string>
+    <string name="dom_disc_not_device">This app is not a medical device; its records and prompts are not used for diagnosis or treatment decisions.</string>
+
+    <!-- ===== PostureAdvice.kt: posture / sleep advice (knowledge base edu-005) ===== -->
+    <string name="dom_posture_daily_1">Keep the spine in a neutral position and avoid holding the same flexed posture for long periods (slumped sitting, looking down at a phone).</string>
+    <string name="dom_posture_daily_2">Sit on a firm chair with a backrest; if needed, put a small cushion behind the lower back to keep the lumbar curve. When standing, keep your weight even and look straight ahead.</string>
+    <string name="dom_posture_sleep_1">Lie on your back or on your side; keep the pillow low (side-lying: about the width of one shoulder; back-lying: a thin pillow).</string>
+    <string name="dom_posture_sleep_2">A firm, supportive mattress is best; avoid one that is too soft.</string>
+    <string name="dom_posture_sleep_3">Lying face down is not advised — it twists the neck and does not help the spine extend; people with AS should especially avoid it.</string>
+
+    <!-- ===== LabIndicator.kt: display names (match keys / units are not here, see KDoc) ===== -->
+    <string name="dom_lab_esr">Erythrocyte sedimentation rate</string>
+    <string name="dom_lab_crp">C-reactive protein</string>
+
+</resources>

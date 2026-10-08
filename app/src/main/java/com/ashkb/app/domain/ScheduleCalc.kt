@@ -106,7 +106,7 @@ object ScheduleCalc {
         // 注射只对周期类频次出卡（每日/每日两次等在注射下不出卡，沿用旧口径）
         if (med.route == "injection") return if (cycleGated) listOf(injectionSlot(med)) else emptyList()
 
-        return takeTimesOf(med).map { PlanSlot(it, it, slotLabel(it, med)) }
+        return takeTimesOf(med).map { PlanSlot(it, it, it) }
     }
 
     /** 该频次 + 该给药途径是否按「周期日」出卡（见 [isCycleDay]）。 */
@@ -120,7 +120,7 @@ object ScheduleCalc {
         else listOfNotNull(med.weeklyWeekday)
         if (wds.isEmpty() || date.dayOfWeek.value !in wds) return emptyList()
         if (med.route == "injection") return listOf(injectionSlot(med))
-        return takeTimesOf(med).map { PlanSlot(it, it, slotLabel(it, med)) }
+        return takeTimesOf(med).map { PlanSlot(it, it, it) }
     }
 
     /** 注射槽位：key 固定 "inj"，时刻取首选计划时刻（缺省 [DEFAULT_PLAN_TIME]）。 */
@@ -129,11 +129,9 @@ object ScheduleCalc {
         return PlanSlot("inj", t, t)
     }
 
-    /** 晨起空腹药（itx-015 双膦酸盐类）槽位标签加提示 */
-    private fun slotLabel(time: String, med: Medication): String {
-        if (med.takeWithFood == "empty_stomach") return "$time · 晨起空腹"
-        return time
-    }
+    // v1.2.6（i18n）：槽位 label 一律是计划时刻（见 [slotsFor] 的 KDoc）；
+    // 「晨起空腹」提示改由 UI 层按当前语言拼接（`MedicationRepository.buildTodayItems`
+    // 取 `ui_schedule_empty_stomach`），domain 层不再硬编码中文。
 
     /** late 判定：实际执行晚于计划时刻 + 容差（分钟） */
     const val LATE_TOLERANCE_MIN = 30L

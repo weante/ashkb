@@ -317,7 +317,7 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                         profile?.let { p ->
                             KeyValueRow(stringResource(R.string.profile_name), p.displayName)
                             KeyValueRow(stringResource(R.string.profile_diagnosis), p.diagnosis)
-                            KeyValueRow("HLA-B27", Labels.hlaB27(p.hlaB27))
+                            KeyValueRow("HLA-B27", stringResource(Labels.hlaB27(p.hlaB27)))
                             p.allergies?.let {
                                 KeyValueRow(stringResource(R.string.profile_allergy_history), it, valueTone = StatusTone.Danger)
                             }
@@ -336,6 +336,8 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                             EmergencyMeds.summarize(
                                 meds, today.toString(),
                                 freqLabel = { context.getString(it.plainRes) },
+                                // v1.2.6（i18n）：注射周期文案同样按系统语言解析
+                                injCycleLabel = { context.getString(R.string.ui_emergency_meds_inj_cycle, it) },
                             )
                         }
                         Spacer(Modifier.height(Spacing.xs))
@@ -452,7 +454,7 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                                 TextButton(
                                     onClick = { showAllEvents = true },
                                     modifier = Modifier.padding(top = Spacing.xs),
-                                ) { Text("查看全部 ${events.size} 条") }
+                                ) { Text(stringResource(R.string.ui_emergency_view_all_events, events.size)) }
                             }
                         }
                     }

@@ -173,7 +173,7 @@ fun ReminderCheckScreen(onBack: () -> Unit) {
                     Text(
                         stringResource(
                             R.string.reminder_miui_hint,
-                            XiaomiCompat.requiredSwitches().joinToString(" / "),
+                            XiaomiCompat.requiredSwitches().map { stringResource(it) }.joinToString(" / "),
                         ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -2,6 +2,7 @@ package com.ashkb.app.data.repo
 
 import android.content.Context
 import androidx.room.withTransaction
+import com.ashkb.app.R
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.db.Ids
 import com.ashkb.app.data.entity.KbEntry
@@ -222,13 +223,24 @@ class MedicationRepository(private val context: Context) {
                 if (com.ashkb.app.data.entity.MedFrequency.fromKey(med.frequency) ==
                     com.ashkb.app.data.entity.MedFrequency.PRN
                 ) {
-                    items.add(TodayItem(med, null, null, "按需 · ${med.prnReason ?: "备用"}", null))
+                    // v1.2.6（i18n）：按需用药的明细行按当前语言解析
+                    val prnDetail = context.getString(
+                        R.string.ui_med_prn_detail,
+                        med.prnReason ?: context.getString(R.string.ui_med_prn_backup),
+                    )
+                    items.add(TodayItem(med, null, null, prnDetail, null))
                 }
                 continue
             }
             for (slot in slots) {
                 val log = logs.firstOrNull { it.medId == med.id && it.slotKey == slot.key }
-                items.add(TodayItem(med, slot.key, slot.time, slot.label, log))
+                // v1.2.6（i18n）：「晨起空腹」提示由本层拼接（domain 的 slot.label 只含计划时刻）
+                val label = if (med.takeWithFood == "empty_stomach") {
+                    context.getString(R.string.ui_schedule_empty_stomach, slot.label)
+                } else {
+                    slot.label
+                }
+                items.add(TodayItem(med, slot.key, slot.time, label, log))
             }
         }
         return items.sortedWith(compareBy({ !it.done && !it.skipped }, { it.slotTime ?: "99:99" }))

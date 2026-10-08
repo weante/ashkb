@@ -1,5 +1,7 @@
 package com.ashkb.app.domain
 
+import androidx.annotation.StringRes
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.EmergencyContact
 import com.ashkb.app.data.entity.Profile
 
@@ -17,57 +19,89 @@ import com.ashkb.app.data.entity.Profile
  * **隐私**：健康信息上锁屏属敏感操作，故**默认关闭**，由用户在紧急卡页显式开启
  * （见 [com.ashkb.app.data.repo.EmergencyLockscreenStore]）。
  *
- * 纯函数、无 Android 依赖，可单测。
+ * i18n：本对象只给**资源 id + 参数**（[ResText]）。两处并列项的分隔符（中文「、」/
+ * 英文「, 」）由调用方从资源取出后**注入**，本对象因此仍是纯函数、不碰 Context。
+ * 用药行按「是否含免疫抑制」×「是否截断」四种组合各有一条资源——把标志位拼进正文
+ * 会让两种语言各自的括号与语序无处安放。
  */
 object EmergencyLockscreen {
 
     /** 锁屏通知最多列出的用药条数——锁屏可读长度有限，只保关键项。 */
     const val MAX_MED_LINES = 4
 
-    /** 锁屏通知的标题（不含用户数据，避免标题栏泄露）。 */
-    const val TITLE = "紧急信息"
+    /** 锁屏通知的标题资源（不含用户数据，避免标题栏泄露）。 */
+    @StringRes
+    val TITLE_RES: Int = R.string.dom_lock_title
 
-    data class Content(val title: String, val lines: List<String>)
+    data class Content(
+        /** 通知标题资源 */
+        @StringRes val titleRes: Int,
+        /** 正文各行（资源 id + 参数） */
+        val lines: List<ResText>,
+    )
 
+    /**
+     * 组装锁屏内容。
+     *
+     * @param listSeparator 并列项的分隔符——由调用方从资源取（`dom_lock_list_separator`），
+     *   故本对象保持纯函数、不依赖 Context。
+     */
     fun build(
         profile: Profile?,
         contacts: List<EmergencyContact>,
         meds: EmergencyMeds.Summary,
+        listSeparator: String,
     ): Content {
         val lines = buildList {
             profile?.let { p ->
-                val blood = p.emergencyBloodType?.takeIf { it.isNotBlank() } ?: "未填"
-                add("血型 $blood ｜ 诊断 ${p.diagnosis}")
-                cleanJsonArray(p.allergies)?.let { add("过敏 $it") }
+                val blood = p.emergencyBloodType?.takeIf { it.isNotBlank() }
+                add(
+                    if (blood == null) ResText(R.string.dom_lock_blood_unfilled, listOf(p.diagnosis))
+                    else ResText(R.string.dom_lock_blood, listOf(blood, p.diagnosis))
+                )
+                cleanJsonArray(p.allergies, listSeparator)?.let { add(ResText(R.string.dom_lock_allergy, listOf(it))) }
             }
 
             if (!meds.isEmpty) {
                 val head = meds.ordered.map { it.name }
-                val shown = head.take(MAX_MED_LINES).joinToString("、")
-                val suffix = if (head.size > MAX_MED_LINES) " 等 ${head.size} 种" else ""
-                val flag = if (meds.hasImmunosuppressant) "（含免疫抑制，注意感染风险）" else ""
-                add("用药$flag $shown$suffix")
+                val shown = head.take(MAX_MED_LINES).joinToString(listSeparator)
+                val truncated = head.size > MAX_MED_LINES
+                val immuno = meds.hasImmunosuppressant
+                add(
+                    ResText(
+                        res = when {
+                            immuno && truncated -> R.string.dom_lock_meds_immuno_more
+                            immuno -> R.string.dom_lock_meds_immuno
+                            truncated -> R.string.dom_lock_meds_more
+                            else -> R.string.dom_lock_meds
+                        },
+                        // 截断时多一个「共 N 种」参数；两条 _more 资源的占位符顺序都是「名单, 总数」
+                        args = if (truncated) listOf(shown, head.size) else listOf(shown),
+                    )
+                )
             }
 
             // 家属优先，医生次之——急救时先找能到场的人
             contacts.firstOrNull { it.isEmergency && !it.isDoctor }
-                ?.let { add("家属 ${it.name} ${it.phone}") }
+                ?.let { add(ResText(R.string.dom_lock_family, listOf(it.name, it.phone))) }
             contacts.firstOrNull { it.isDoctor }
-                ?.let { add("医生 ${it.name} ${it.phone}") }
+                ?.let { add(ResText(R.string.dom_lock_doctor, listOf(it.name, it.phone))) }
         }
-        return Content(TITLE, lines)
+        return Content(TITLE_RES, lines)
     }
 
     /**
      * `["青霉素","磺胺"]` → `青霉素、磺胺`。
      *
      * 这几列在库里是 JSON 数组字符串，但紧急卡此前各处都直接原样展示（含方括号引号）。
-     * 锁屏上可读性更重要，故在此做一次「展平为顿号连接」；解析失败返回 null（宁可不显示）。
+     * 锁屏上可读性更重要，故在此做一次「展平为分隔符连接」；解析失败返回 null（宁可不显示）。
+     *
+     * @param listSeparator 连接符由调用方从资源注入（同 [build]）——中文是「、」、英文是「, 」。
      */
-    fun cleanJsonArray(raw: String?): String? {
+    fun cleanJsonArray(raw: String?, listSeparator: String): String? {
         val s = raw?.trim()?.takeIf { it.isNotBlank() } ?: return null
         val inner = s.removeSurrounding("[", "]")
         val items = inner.split(",").map { it.trim().removeSurrounding("\"") }.filter { it.isNotBlank() }
-        return items.takeIf { it.isNotEmpty() }?.joinToString("、")
+        return items.takeIf { it.isNotEmpty() }?.joinToString(listSeparator)
     }
 }

@@ -1,5 +1,8 @@
 package com.ashkb.app.domain
 
+import androidx.annotation.StringRes
+import com.ashkb.app.R
+
 /**
  * v1.0.69 C8b：**晨僵时长驱动的起床热身序列**。
  *
@@ -30,12 +33,13 @@ object MorningWarmup {
     const val MAX_STEPS = 4
 
     data class Sequence(
-        /** 醒目结论行，如「晨僵 35 分钟（明显延长）」。 */
-        val headline: String,
+        /** 醒目结论行，如「晨僵 35 分钟（明显延长）」——带分钟数插值，故用 [ResText]。 */
+        val headline: ResText,
         /** 来自当日处方的 L1 动作名（可能为空——见 [build]）。 */
         val steps: List<String>,
-        /** 解释与行动提示。 */
-        val note: String,
+        /** 解释与行动提示。i18n：文案见 `values/strings_domain.xml` 的 `dom_warm_note*`。 */
+        @StringRes
+        val noteRes: Int,
     )
 
     /**
@@ -47,17 +51,12 @@ object MorningWarmup {
         val m = minutes ?: return null
         if (m < MIN_REPORTABLE) return null
         val steps = plan.filter { it.grade == "L1" }.take(MAX_STEPS).map { it.entry.title }
-        val headline = if (m >= PROLONGED) {
-            "晨僵 $m 分钟（明显延长）"
-        } else {
-            "晨僵 $m 分钟"
-        }
-        val note = if (m >= PROLONGED) {
-            "晨僵超过 30 分钟常提示炎症活动。起床后先做一轮轻柔项再进入当日处方，" +
-                "并留意该项的趋势；若连续多日如此，复诊时告知医生。"
-        } else {
-            "起床后先做一轮轻柔项，等僵硬缓解再进入当日处方。"
-        }
-        return Sequence(headline, steps, note)
+        val prolonged = m >= PROLONGED
+        val headline = ResText(
+            res = if (prolonged) R.string.dom_warm_headline_prolonged else R.string.dom_warm_headline,
+            args = listOf(m),
+        )
+        val noteRes = if (prolonged) R.string.dom_warm_note_prolonged else R.string.dom_warm_note
+        return Sequence(headline, steps, noteRes)
     }
 }

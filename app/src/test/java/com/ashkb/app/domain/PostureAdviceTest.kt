@@ -1,18 +1,30 @@
 package com.ashkb.app.domain
 
+import android.content.Context
 import com.ashkb.app.data.entity.KbEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 /**
  * v1.0.70 C8c：姿势 / 睡姿建议回归。
  *
  * 本对象只是 `kb_seed_edu.json` 的 `edu-005` 条目的展示位拆分，
  * 测试锁住「条目 id 一致」「要点非空且不重复」「编排顺序稳定」三件事。
+ *
+ * i18n（v1.2.6）：要点已改成 `@StringRes Int`，凡断言**措辞**的用例改读中文资源；
+ * `@Config(qualifiers = "zh-rCN")` 不可省（`values-en` 存在，Robolectric 默认走 en-rUS）。
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "zh-rCN")
 class PostureAdviceTest {
+
+    private val ctx: Context get() = RuntimeEnvironment.getApplication()
 
     private fun card(id: String, grade: String) = ExerciseEngine.ExerciseCard(
         entry = KbEntry(
@@ -21,7 +33,7 @@ class PostureAdviceTest {
             sourceUrl = "", sourceTier = "S4", adaptedAt = "2026-01-01",
             reviewDue = "2027-01-01", version = 1, payload = "{}",
         ),
-        verdict = "allow", hint = "", grade = grade,
+        verdict = "allow", hintParts = emptyList(), grade = grade,
         listType = "red", movements = emptyList(), dose = null,
     )
 
@@ -49,7 +61,7 @@ class PostureAdviceTest {
 
     @Test
     fun `睡姿要点明确包含避免俯卧`() {
-        assertTrue(PostureAdvice.SLEEP.any { it.contains("俯卧") })
+        assertTrue(PostureAdvice.SLEEP.any { ctx.getString(it).contains("俯卧") })
     }
 
     @Test

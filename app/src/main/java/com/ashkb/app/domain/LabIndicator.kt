@@ -1,5 +1,8 @@
 package com.ashkb.app.domain
 
+import androidx.annotation.StringRes
+import com.ashkb.app.R
+
 /**
  * 客观炎症指标目录（趋势页方案 C）。
  *
@@ -20,8 +23,10 @@ package com.ashkb.app.domain
 enum class LabIndicator(
     /** 稳定标识：用于持久化 / 内部比对，**不要跟着文案改** */
     val code: String,
-    /** 中文名（与 `SkipReason` / `StopReason` 的枚举文案惯例一致，直接内联中文） */
-    val label: String,
+    /** 展示名资源 id（i18n：文案见 `values/strings_domain.xml` 的 `dom_lab_*`）。
+     *  ⚠️ [aliases] 里的中文是**匹配键**（比对用户导入的化验单原文），与展示名无关，不参与翻译。 */
+    @StringRes
+    val labelRes: Int,
     /** 英文缩写（化验单上常见，展示时与中文名并列，便于对上报告） */
     val abbr: String,
     /** 规范单位 */
@@ -30,10 +35,10 @@ enum class LabIndicator(
     val defaultRefHigh: Float,
 ) {
     /** 血沉：男性 0–15、女性 0–20 mm/h 为常见界值，随访多以 <20 为「不活动」。 */
-    ESR("esr", "血沉", "ESR", "mm/h", ClinicalThresholds.ESR_HIGH),
+    ESR("esr", R.string.dom_lab_esr, "ESR", "mm/h", ClinicalThresholds.ESR_HIGH),
 
     /** C 反应蛋白：常规上限多写作 <8 mg/L（部分实验室写 <5）。 */
-    CRP("crp", "C反应蛋白", "CRP", "mg/L", ClinicalThresholds.CRP_HIGH);
+    CRP("crp", R.string.dom_lab_crp, "CRP", "mg/L", ClinicalThresholds.CRP_HIGH);
 
     /** 该指标接受的指标名写法（**已归一**的形态）。要支持新的化验单写法就往这里加。 */
     val aliases: Set<String>

@@ -1,6 +1,7 @@
 package com.ashkb.app.data.repo
 
 import android.content.Context
+import com.ashkb.app.R
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.entity.BasdaiRecord
 import com.ashkb.app.data.entity.CheckupRecord
@@ -323,6 +324,8 @@ class ReportRepository(private val context: Context) {
         val meds = EmergencyMeds.summarize(
             db.medicationDao().listActive(), LocalDate.now().toString(),
             freqLabel = { context.getString(it.plainRes) },
+            // v1.2.6（i18n）：注射周期文案同样按系统语言解析
+            injCycleLabel = { context.getString(R.string.ui_emergency_meds_inj_cycle, it) },
         )
         EmergencyCard(
             profile = db.profileDao().get(),
