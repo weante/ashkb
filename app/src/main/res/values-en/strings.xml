@@ -321,7 +321,7 @@
     <string name="med_add_time">+ Add time</string>
     <string name="med_edit_time">Edit time</string>
     <string name="med_remove_time">Remove this time</string>
-    <string name="med_empty_hint">No medications added yet</string>
+    <string name="med_empty_hint">No medications in use right now</string>
     <string name="med_fasting">Fasting</string>
     <string name="med_freq_fixed_weekday">Fixed weekday each week (e.g. methotrexate)</string>
     <string name="med_freq_weekly">Weekly</string>
@@ -338,7 +338,7 @@
     <string name="med_manage_title">Medication list</string>
     <string name="med_name_field">Drug name (required, e.g. adalimumab)</string>
     <string name="med_next_verify">Next · Verify</string>
-    <string name="med_not_added">No medications added yet</string>
+    <string name="med_not_added">No medications in use right now</string>
     <string name="med_postpone">Postpone</string>
     <string name="med_postpone_anchor_note">After postponing, the new date becomes the cycle anchor</string>
     <string name="med_postpone_infection_warning">If you are delaying an injection because of fever or infection, contact your doctor before postponing — infections during biologic treatment need a doctor\'s assessment.</string>
@@ -1196,6 +1196,7 @@
     <string name="disclaimer_gate_accept">I have read and understood</string>
     <string name="profile_lifestyle_title">Lifestyle</string>
     <string name="profile_lifestyle_note">Used only to generate general tips and ordering; it does not take part in diagnosis or medication decisions.</string>
+    <string name="profile_field_value">%1$s: %2$s</string>
     <string name="profile_smoking_field">Smoking</string>
     <string name="profile_smoking_never">Never</string>
     <string name="profile_smoking_former">Former</string>

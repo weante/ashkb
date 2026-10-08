@@ -1,18 +1,32 @@
 package com.ashkb.app.domain
 
+import android.content.Context
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 /**
  * v1.0.39：B3 食谱出处编号台账（界面只显示编号，题录在详情展开）。
  *
  * v1.1.2：编号由 `S1`…`S9` 改为 `R1`…`R9`——与知识库的 `S1`–`S4` 证据层级语义不同，
  * 同一个应用里都显示裸 `S1` 会让患者分不清「等级」还是「第 1 篇文献」。
+ *
+ * v1.2.6：中文备注 `note` 改成 `@StringRes`，断言改走 Robolectric 渲染；
+ * `citation`（文献题录）与语言无关，仍按原样比对。
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "zh-rCN")
 class RecipeSourcesTest {
+
+    private val ctx: Context get() = RuntimeEnvironment.getApplication()
+
+    private fun note(id: String): String? = RecipeSources.noteRes(id)?.let { ctx.getString(it) }
 
     @Test
     fun `nine sources with unique ids`() {
@@ -43,10 +57,10 @@ class RecipeSourcesTest {
     fun `citation and note resolve per id`() {
         RecipeSources.ALL.forEach {
             assertNotNull(RecipeSources.citation(it.id))
-            assertNotNull(RecipeSources.note(it.id))
+            assertNotNull(RecipeSources.noteRes(it.id))
         }
         assertNull(RecipeSources.citation("nope"))
-        assertNull(RecipeSources.note("nope"))
+        assertNull(RecipeSources.noteRes("nope"))
     }
 
     /**
@@ -63,7 +77,7 @@ class RecipeSourcesTest {
                 source.citation,
                 RecipeSources.citation(legacy),
             )
-            assertEquals(source.note, RecipeSources.note(legacy))
+            assertEquals(note(source.id), note(legacy))
         }
         assertEquals(
             listOf("R2", "R1"),
@@ -87,7 +101,8 @@ class RecipeSourcesTest {
     /** 免责声明必须明确「非医疗建议」——这是本功能的合规底线。 */
     @Test
     fun `disclaimer states not medical advice`() {
-        assertTrue(RecipeSources.DISCLAIMER.contains("非医疗建议"))
-        assertTrue(RecipeSources.DISCLAIMER.contains("不能替代药物"))
+        val disclaimer = ctx.getString(RecipeSources.DISCLAIMER)
+        assertTrue(disclaimer.contains("非医疗建议"))
+        assertTrue(disclaimer.contains("不能替代药物"))
     }
 }

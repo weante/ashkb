@@ -6,6 +6,9 @@
     <string name="ui_import_template_lab">【化验单整理】\n请根据我发送的检验报告照片，逐项提取数据并严格按以下格式输出（每项一行，报告里有多少项就输出多少项，没有的不要编造，看不清的用?代替）：\n\n日期: 2026-08-02\n医院: 医院名称\n项目, 结果, 单位, 参考范围, 标记\n血沉(ESR), 15, mm/h, 0-20, 正常\nC-反应蛋白(CRP), 5.2, mg/L, 0-8, 偏高\n白细胞计数(WBC), 6.1, 10^9/L, 3.5-9.5, 正常\n\n说明：\n- 「项目」用报告上的中文名，可带英文缩写\n- 「结果」只填数字（或 阴性/阳性/↑/↓ 等原文），不要带单位\n- 「参考范围」照抄报告原文（如 2.9-8.2 或 ≤5）\n- 「标记」按报告原标注：偏高/偏高↑、偏低、正常</string>
     <string name="ui_import_template_imaging">【影像报告整理】\n请根据我发送的检查报告照片（MRI/CT/X线），提取信息并严格按以下格式输出：\n\n类型: MRI（按报告实际类型填 MRI / CT / X线）\n日期: 2026-07-31\n医院: 医院名称\n部位: 骶髂关节\n所见: 图像所见/检查所见的完整原文（可多行）\n结论: 诊断与印象的完整原文（可多行）\n对比: 报告中「对比前片」的变化描述（没有则填 无）</string>
     <string name="ui_imaging_bodypart_unset">未注明部位</string>
+    <!-- 导入落库时并入备注的前缀（患者可见） -->
+    <string name="ui_import_hospital_prefix">医院：%1$s</string>
+    <string name="ui_import_compare_prefix">对比：%1$s</string>
 
     <!-- ===== 运动处方：提示与反馈（ExerciseEngine 返回资源 id） ===== -->
     <string name="ui_exercise_hint_unparsed">该条目的数据无法解析，已按「禁止」保守处理；请更新知识库种子（数据异常不应静默放行）。</string>

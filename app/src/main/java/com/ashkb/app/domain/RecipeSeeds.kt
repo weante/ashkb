@@ -1,5 +1,8 @@
 package com.ashkb.app.domain
 
+import androidx.annotation.StringRes
+import com.ashkb.app.R
+
 /**
  * B3（v1.0.39）：推荐食谱**种子内容**（10 条）。
  *
@@ -8,6 +11,11 @@ package com.ashkb.app.domain
  *  - 标签：抗炎 / 胃肠友好 / 控热量；第 6 条按用户要求**弱化**为「减少精制淀粉」，
  *    不写成「低淀粉疗法」（R2 明确指出 AS 膳食证据极为有限且不确定）
  *  - 幂等：种子 id 固定（`rec-s01`…），已存在即跳过，用户自建食谱不受影响
+ *
+ * i18n（v1.2.6）：标题 / 配料 / 做法改为 `@StringRes`，**由仓储在种入时按当前语言取词**
+ * 再写进数据库——`Recipe.title` 等列存的是文本，不是资源 id（用户可编辑，且要能导出备份）。
+ * 因此改语言后已种下的行仍是旧语言，重种逻辑见 `RecipeRepository.seedIfMissing`。
+ * `id` / `tags` / `sources` 是**匹配键与编号**，与语言无关，一律不动。
  */
 object RecipeSeeds {
 
@@ -17,92 +25,92 @@ object RecipeSeeds {
 
     data class Seed(
         val id: String,
-        val title: String,
+        @StringRes val titleRes: Int,
         val tags: List<String>,
-        val ingredients: String,
-        val steps: String,
+        @StringRes val ingredientsRes: Int,
+        @StringRes val stepsRes: Int,
         val sources: List<String>,
     )
 
     val ALL: List<Seed> = listOf(
         Seed(
             id = "rec-s01",
-            title = "橄榄油烤三文鱼配西兰花",
+            titleRes = R.string.recipe_seed_s01_title,
             tags = listOf(TAG_ANTI),
-            ingredients = "三文鱼排 150g\n西兰花 200g\n特级初榨橄榄油 1 汤匙\n蒜末、柠檬汁、黑胡椒 适量",
-            steps = "三文鱼抹橄榄油、蒜末与黑胡椒，静置 10 分钟\n西兰花切小朵，沸水焯 1 分钟后捞出\n烤箱 200℃ 预热，鱼与西兰花同盘烤 12–15 分钟\n出锅淋柠檬汁即可",
+            ingredientsRes = R.string.recipe_seed_s01_ingredients,
+            stepsRes = R.string.recipe_seed_s01_steps,
             sources = listOf(RecipeSources.R1, RecipeSources.R4, RecipeSources.R8),
         ),
         Seed(
             id = "rec-s02",
-            title = "地中海杂蔬鹰嘴豆沙拉",
+            titleRes = R.string.recipe_seed_s02_title,
             tags = listOf(TAG_ANTI, TAG_GUT),
-            ingredients = "熟鹰嘴豆 150g\n番茄 1 个\n黄瓜 半根\n彩椒 半个\n紫洋葱 少许\n橄榄油 1 汤匙\n柠檬汁、欧芹、黑胡椒 适量",
-            steps = "蔬菜洗净切丁\n与鹰嘴豆拌匀\n淋橄榄油与柠檬汁，撒欧芹与黑胡椒\n冷藏 10 分钟风味更佳",
+            ingredientsRes = R.string.recipe_seed_s02_ingredients,
+            stepsRes = R.string.recipe_seed_s02_steps,
             sources = listOf(RecipeSources.R1, RecipeSources.R8),
         ),
         Seed(
             id = "rec-s03",
-            title = "姜黄姜末藜麦饭",
+            titleRes = R.string.recipe_seed_s03_title,
             tags = listOf(TAG_ANTI),
-            ingredients = "藜麦 80g\n姜末 1 小勺\n姜黄粉 1/4 小勺\n橄榄油 1 小勺\n黑胡椒、葱花 适量",
-            steps = "藜麦淘洗后按 1:2 加水煮 15 分钟\n另起锅用橄榄油炒香姜末\n拌入藜麦与姜黄粉翻匀\n撒黑胡椒与葱花（黑胡椒有助姜黄素吸收）",
+            ingredientsRes = R.string.recipe_seed_s03_ingredients,
+            stepsRes = R.string.recipe_seed_s03_steps,
             sources = listOf(RecipeSources.R3, RecipeSources.R8),
         ),
         Seed(
             id = "rec-s04",
-            title = "核桃亚麻籽酸奶杯",
+            titleRes = R.string.recipe_seed_s04_title,
             tags = listOf(TAG_ANTI),
-            ingredients = "无糖酸奶 150g\n核桃碎 15g\n亚麻籽粉 1 小勺\n蓝莓或当季水果 50g",
-            steps = "酸奶盛入杯中\n撒核桃碎与亚麻籽粉\n铺上水果即可",
+            ingredientsRes = R.string.recipe_seed_s04_ingredients,
+            stepsRes = R.string.recipe_seed_s04_steps,
             sources = listOf(RecipeSources.R7, RecipeSources.R8),
         ),
         Seed(
             id = "rec-s05",
-            title = "番茄橄榄油炖白豆",
+            titleRes = R.string.recipe_seed_s05_title,
             tags = listOf(TAG_ANTI, TAG_GUT),
-            ingredients = "熟白豆 200g\n番茄 2 个\n洋葱 半个\n蒜 2 瓣\n橄榄油 1 汤匙\n罗勒或欧芹、少盐 适量",
-            steps = "洋葱与蒜末用橄榄油炒软\n加番茄丁炒出汁\n放入白豆小火炖 10 分钟\n撒香草、少盐调味",
+            ingredientsRes = R.string.recipe_seed_s05_ingredients,
+            stepsRes = R.string.recipe_seed_s05_steps,
             sources = listOf(RecipeSources.R1, RecipeSources.R8),
         ),
         Seed(
             id = "rec-s06",
-            title = "蔬菜鸡蛋饼（减少精制淀粉）",
+            titleRes = R.string.recipe_seed_s06_title,
             tags = listOf(TAG_GUT),
-            ingredients = "鸡蛋 2 个\n西葫芦丝、胡萝卜丝 各 50g\n全麦粉 1 汤匙\n橄榄油 少许",
-            steps = "蔬菜擦丝后略挤去水分\n与蛋液、全麦粉拌匀\n平底锅少油小火，两面煎熟\n切块食用",
+            ingredientsRes = R.string.recipe_seed_s06_ingredients,
+            stepsRes = R.string.recipe_seed_s06_steps,
             sources = listOf(RecipeSources.R2, RecipeSources.R5, RecipeSources.R6),
         ),
         Seed(
             id = "rec-s07",
-            title = "燕麦南瓜粥",
+            titleRes = R.string.recipe_seed_s07_title,
             tags = listOf(TAG_GUT),
-            ingredients = "燕麦片 40g\n南瓜 150g\n水或低脂奶 300ml\n肉桂粉 少许",
-            steps = "南瓜蒸熟压成泥\n燕麦加水煮 5 分钟\n拌入南瓜泥再煮 2 分钟\n撒少许肉桂粉",
+            ingredientsRes = R.string.recipe_seed_s07_ingredients,
+            stepsRes = R.string.recipe_seed_s07_steps,
             sources = listOf(RecipeSources.R4, RecipeSources.R5),
         ),
         Seed(
             id = "rec-s08",
-            title = "清蒸鳕鱼配胡萝卜泥",
+            titleRes = R.string.recipe_seed_s08_title,
             tags = listOf(TAG_GUT),
-            ingredients = "鳕鱼 150g\n胡萝卜 150g\n姜片、葱段 适量\n橄榄油 1 小勺",
-            steps = "鳕鱼铺姜片葱段，大火蒸 8 分钟\n胡萝卜蒸熟压成泥\n鱼淋少许橄榄油与蒸出的汤汁\n配胡萝卜泥同食",
+            ingredientsRes = R.string.recipe_seed_s08_ingredients,
+            stepsRes = R.string.recipe_seed_s08_steps,
             sources = listOf(RecipeSources.R1, RecipeSources.R5),
         ),
         Seed(
             id = "rec-s09",
-            title = "鸡胸时蔬大拌菜",
+            titleRes = R.string.recipe_seed_s09_title,
             tags = listOf(TAG_CALORIE),
-            ingredients = "鸡胸肉 120g\n生菜、番茄、黄瓜、紫甘蓝 共 250g\n橄榄油 1 小勺\n柠檬汁、黑胡椒 适量",
-            steps = "鸡胸水煮或空气炸至熟，切片\n蔬菜洗净撕成适口大小\n混合后淋橄榄油与柠檬汁\n撒黑胡椒拌匀",
+            ingredientsRes = R.string.recipe_seed_s09_ingredients,
+            stepsRes = R.string.recipe_seed_s09_steps,
             sources = listOf(RecipeSources.R1, RecipeSources.R8),
         ),
         Seed(
             id = "rec-s10",
-            title = "杂豆蔬菜汤",
+            titleRes = R.string.recipe_seed_s10_title,
             tags = listOf(TAG_CALORIE, TAG_GUT),
-            ingredients = "混合豆类（红豆 / 鹰嘴豆 / 扁豆）80g\n番茄 1 个\n洋葱、芹菜、胡萝卜 各 50g\n香草、黑胡椒、少盐 适量",
-            steps = "豆类提前泡发\n蔬菜切丁下锅炒香\n加水与豆类，小火煮约 30 分钟\n少盐调味、撒香草",
+            ingredientsRes = R.string.recipe_seed_s10_ingredients,
+            stepsRes = R.string.recipe_seed_s10_steps,
             sources = listOf(RecipeSources.R1, RecipeSources.R8),
         ),
     )
@@ -110,12 +118,18 @@ object RecipeSeeds {
     /** 尚未种入的条目（按 id 幂等去重）。 */
     fun pending(existingIds: Set<String>): List<Seed> = ALL.filter { it.id !in existingIds }
 
-    /** 标签 → 中文（界面展示用）。 */
-    fun tagLabel(tag: String): String = when (tag) {
-        TAG_ANTI -> "抗炎"
-        TAG_GUT -> "胃肠友好"
-        TAG_CALORIE -> "控热量"
-        else -> tag
+    /**
+     * 标签 → 资源 id（界面展示用）。
+     *
+     * 未知标签返回 `null` 而不是「返回 tag 本身」：调用方据此回退成原始 tag，
+     * 与改版前 `else -> tag` 的行为逐字一致。
+     */
+    @StringRes
+    fun tagLabelRes(tag: String): Int? = when (tag) {
+        TAG_ANTI -> R.string.recipe_tag_anti
+        TAG_GUT -> R.string.recipe_tag_gut
+        TAG_CALORIE -> R.string.recipe_tag_calorie
+        else -> null
     }
 
     val ALL_TAGS: List<String> = listOf(TAG_ANTI, TAG_GUT, TAG_CALORIE)

@@ -316,7 +316,7 @@
     <string name="med_add_time">＋ 添加时刻</string>
     <string name="med_edit_time">修改时刻</string>
     <string name="med_remove_time">删除该时刻</string>
-    <string name="med_empty_hint">还没有添加药品</string>
+    <string name="med_empty_hint">当前没有在用药品</string>
     <string name="med_fasting">空腹</string>
     <string name="med_freq_fixed_weekday">每周固定星期（如甲氨蝶呤）</string>
     <string name="med_freq_weekly">每周</string>
@@ -333,7 +333,7 @@
     <string name="med_manage_title">药单管理</string>
     <string name="med_name_field">药品名（必填，如：阿达木单抗）</string>
     <string name="med_next_verify">下一步 · 核对</string>
-    <string name="med_not_added">尚未添加药品</string>
+    <string name="med_not_added">当前没有在用药品</string>
     <string name="med_postpone">顺延</string>
     <string name="med_postpone_anchor_note">顺延后以新日期为周期锚点</string>
     <string name="med_postpone_infection_warning">如因发热 / 感染延迟注射，请先联系医生再顺延——生物制剂治疗期间感染需医生评估。</string>
@@ -1248,6 +1248,9 @@
     <!-- v1.0.64 B13：生活方式画像 -->
     <string name="profile_lifestyle_title">生活方式</string>
     <string name="profile_lifestyle_note">仅用于生成通用提示与排序，不参与诊断或用药决策。</string>
+    <!-- v1.2.6：字段与取值的连接符走资源——中文用全角冒号，英文用半角冒号+空格。
+         原先硬编码一个空格（"吸烟 从不"），英文下变成 "Smoking Never"，看起来像一个词。 -->
+    <string name="profile_field_value">%1$s：%2$s</string>
     <string name="profile_smoking_field">吸烟</string>
     <string name="profile_smoking_never">从不</string>
     <string name="profile_smoking_former">已戒</string>

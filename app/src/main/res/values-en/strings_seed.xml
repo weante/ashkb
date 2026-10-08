@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Seed content copy, English (recipes / source notes / screening items / plan templates).
+
+  Must stay in lockstep with values/strings_seed.xml: same names, same order.
+  lint MissingTranslation fails the build if an entry is missing here.
+-->
+<resources>
+
+
+    <!-- ===== Recipe seeds (domain/RecipeSeeds.kt) ===== -->
+    <string name="recipe_seed_s01_title">Olive oil roasted salmon with broccoli</string>
+    <string name="recipe_seed_s01_ingredients">Salmon fillet 150g\nBroccoli 200g\nExtra virgin olive oil 1 tablespoon\nMinced garlic, lemon juice, black pepper, to taste</string>
+    <string name="recipe_seed_s01_steps">Rub the salmon with olive oil, minced garlic and black pepper; let it rest for 10 minutes\nCut the broccoli into small florets, blanch in boiling water for 1 minute, then drain\nPreheat the oven to 200℃ and roast the fish and broccoli on the same tray for 12–15 minutes\nDrizzle with lemon juice before serving</string>
+    <string name="recipe_seed_s02_title">Mediterranean mixed vegetable and chickpea salad</string>
+    <string name="recipe_seed_s02_ingredients">Cooked chickpeas 150g\nTomato 1\nCucumber half\nBell pepper half\nRed onion a little\nOlive oil 1 tablespoon\nLemon juice, parsley, black pepper, to taste</string>
+    <string name="recipe_seed_s02_steps">Wash the vegetables and dice them\nMix with the chickpeas\nDrizzle with olive oil and lemon juice, sprinkle with parsley and black pepper\nChill for 10 minutes for better flavor</string>
+    <string name="recipe_seed_s03_title">Turmeric and ginger quinoa rice</string>
+    <string name="recipe_seed_s03_ingredients">Quinoa 80g\nMinced ginger 1 teaspoon\nTurmeric powder 1/4 teaspoon\nOlive oil 1 teaspoon\nBlack pepper, chopped scallion, to taste</string>
+    <string name="recipe_seed_s03_steps">Rinse the quinoa and cook it in water at a 1:2 ratio for 15 minutes\nIn another pan, sauté the minced ginger in olive oil until fragrant\nFold in the quinoa and turmeric powder and stir until even\nSprinkle with black pepper and chopped scallion (black pepper helps with curcumin absorption)</string>
+    <string name="recipe_seed_s04_title">Walnut and flaxseed yogurt cup</string>
+    <string name="recipe_seed_s04_ingredients">Unsweetened yogurt 150g\nChopped walnuts 15g\nGround flaxseed 1 teaspoon\nBlueberries or seasonal fruit 50g</string>
+    <string name="recipe_seed_s04_steps">Spoon the yogurt into a cup\nSprinkle with chopped walnuts and ground flaxseed\nTop with the fruit</string>
+    <string name="recipe_seed_s05_title">White beans stewed with tomato and olive oil</string>
+    <string name="recipe_seed_s05_ingredients">Cooked white beans 200g\nTomato 2\nOnion half\nGarlic 2 cloves\nOlive oil 1 tablespoon\nBasil or parsley, a little salt, to taste</string>
+    <string name="recipe_seed_s05_steps">Sauté the onion and minced garlic in olive oil until soft\nAdd diced tomato and cook until it releases its juices\nAdd the white beans and simmer over low heat for 10 minutes\nSprinkle with herbs and season with a little salt</string>
+    <string name="recipe_seed_s06_title">Vegetable egg pancake (less refined starch)</string>
+    <string name="recipe_seed_s06_ingredients">Eggs 2\nGrated zucchini, grated carrot 50g each\nWhole wheat flour 1 tablespoon\nOlive oil a little</string>
+    <string name="recipe_seed_s06_steps">Grate the vegetables and squeeze out some of the water\nMix with the beaten eggs and whole wheat flour\nCook in a non-stick pan with a little oil over low heat until both sides are set\nCut into pieces and serve</string>
+    <string name="recipe_seed_s07_title">Oat and pumpkin porridge</string>
+    <string name="recipe_seed_s07_ingredients">Rolled oats 40g\nPumpkin 150g\nWater or low-fat milk 300ml\nCinnamon powder a little</string>
+    <string name="recipe_seed_s07_steps">Steam the pumpkin and mash it\nCook the oats in water for 5 minutes\nStir in the mashed pumpkin and cook for another 2 minutes\nSprinkle with a little cinnamon powder</string>
+    <string name="recipe_seed_s08_title">Steamed cod with mashed carrot</string>
+    <string name="recipe_seed_s08_ingredients">Cod 150g\nCarrot 150g\nGinger slices, scallion sections, to taste\nOlive oil 1 teaspoon</string>
+    <string name="recipe_seed_s08_steps">Top the cod with ginger slices and scallion sections and steam over high heat for 8 minutes\nSteam the carrot and mash it\nDrizzle the fish with a little olive oil and the steaming juices\nServe with the mashed carrot</string>
+    <string name="recipe_seed_s09_title">Chicken breast with fresh vegetables</string>
+    <string name="recipe_seed_s09_ingredients">Chicken breast 120g\nLettuce, tomato, cucumber, purple cabbage 250g total\nOlive oil 1 teaspoon\nLemon juice, black pepper, to taste</string>
+    <string name="recipe_seed_s09_steps">Boil the chicken breast or cook it in an air fryer until done, then slice it\nWash the vegetables and tear them into bite-sized pieces\nCombine and drizzle with olive oil and lemon juice\nSprinkle with black pepper and toss</string>
+    <string name="recipe_seed_s10_title">Mixed bean and vegetable soup</string>
+    <string name="recipe_seed_s10_ingredients">Mixed beans (red beans / chickpeas / lentils) 80g\nTomato 1\nOnion, celery, carrot 50g each\nHerbs, black pepper, a little salt, to taste</string>
+    <string name="recipe_seed_s10_steps">Soak the beans in advance\nDice the vegetables and sauté them until fragrant\nAdd water and the beans and simmer over low heat for about 30 minutes\nSeason with a little salt and sprinkle with herbs</string>
+
+    <!-- ===== Recipe tags ===== -->
+    <string name="recipe_tag_anti">Anti-inflammatory</string>
+    <string name="recipe_tag_gut">Gut-friendly</string>
+    <string name="recipe_tag_calorie">Calorie-controlled</string>
+
+    <!-- ===== Source notes (citations stay untranslated) ===== -->
+    <string name="recipe_src_r1_note">Review: a Mediterranean diet may reduce inflammation and symptoms; a low-calorie diet and weight loss may help people who are overweight / obese; processed foods / saturated fat / refined sugar may make things worse</string>
+    <string name="recipe_src_r2_note">Systematic review: dietary evidence in AS is extremely limited and uncertain (mostly small-sample, single-arm studies)</string>
+    <string name="recipe_src_r3_note">Systematic review: evidence in axSpA is limited; ω-3 (PUFA) supplementation may be beneficial; spices such as ginger / turmeric have anti-inflammatory evidence</string>
+    <string name="recipe_src_r4_note">Cross-sectional study: low marine ω-3 intake is associated with higher disease activity; low dietary fiber density is associated with more severe inflammation</string>
+    <string name="recipe_src_r5_note">Review: eating more fiber helps maintain the gut environment; the low-starch diet mechanism exists but clinical evidence is limited; a low-fructose diet is a potential direction</string>
+    <string name="recipe_src_r6_note">Mechanistic review: gut microbiota and the HLA-B27 molecular mimicry hypothesis (explains \"why diet may be related to AS\")</string>
+    <string name="recipe_src_r7_note">Review: low-starch diet and Mediterranean diet are the two main directions; vitamin D and bone health</string>
+    <string name="recipe_src_r8_note">Patient organization practical guidance: ≥4 servings of vegetables + 2 servings of fruit every day; calcium about 700mg/day; ω-3 ≥2g/day; less salt and sugar, use more spices; the Mediterranean diet is a balanced pattern worth following; be wary of diet claims that can \"cure AS\"</string>
+    <string name="recipe_src_r9_note">Note: this direction is still being verified in randomized controlled trials and there is no conclusion yet</string>
+    <string name="recipe_disclaimer">Reference recipes, not medical advice; diet cannot replace medication. The available evidence overall is limited (especially for ankylosing spondylitis); before changing your diet, please confirm with your rheumatologist or dietitian.</string>
+
+    <!-- ===== Biologic screening seeds (domain/ScreeningSeeds.kt) ===== -->
+    <string name="screen_seed_1_name">Tuberculosis screening (T-SPOT / PPD)</string>
+    <string name="screen_seed_1_notes">Required before starting biologics; during treatment, recheck periodically as advised by your doctor</string>
+    <string name="screen_seed_2_name">Hepatitis B screening (HBV panel + DNA)</string>
+    <string name="screen_seed_2_notes">Required before starting biologics; hepatitis B carriers need monitoring as advised by their doctor</string>
+    <string name="screen_seed_3_name">Hepatitis C screening (HCV antibody)</string>
+    <string name="screen_seed_3_notes">Required before starting biologics</string>
+    <string name="screen_seed_4_name">Biologic prescription renewal / outpatient follow-up</string>
+    <string name="screen_seed_4_notes">Book your outpatient appointment ahead of the renewal to avoid a gap in medication</string>
+
+    <!-- ===== Cycle plan templates (domain/ExercisePlanTemplates.kt) ===== -->
+    <string name="eplan_seed_4w_title">4-week starter plan (active phase → remission transition)</string>
+    <string name="eplan_seed_8w_title">8-week intensive plan</string>
+    <string name="eplan_seed_12w_title">12-week maintenance plan (long-term in remission)</string>
+    <string name="eplan_note_01">Gentle maintenance only (breathing / stretching / mobility); do not chase volume</string>
+    <string name="eplan_note_02">Stay at L1, gradually add days</string>
+    <string name="eplan_note_03">Add low-impact cardio / bodyweight strength, starting at half the volume</string>
+    <string name="eplan_note_04">Mostly L2; if pain worsens, go back to L1 (exc-010 two-hour rule)</string>
+    <string name="eplan_note_05">Adaptation phase: mainly gentle maintenance</string>
+    <string name="eplan_note_06">Increase frequency, still limited to L1</string>
+    <string name="eplan_note_07">Introduce L2, watch next-day feedback</string>
+    <string name="eplan_note_08">Mostly L2, keep 48 hours between strength sessions</string>
+    <string name="eplan_note_09">Stable week: keep last week\'s prescription</string>
+    <string name="eplan_note_10">Stable week: fine-tune the movements based on feedback</string>
+    <string name="eplan_note_11">Consolidation week: watch morning stiffness and pain trends</string>
+    <string name="eplan_note_12">Step-back week: reduce total volume to recover for the next cycle</string>
+    <string name="eplan_note_13">Restart: gentle maintenance only</string>
+    <string name="eplan_note_14">Increase frequency</string>
+    <string name="eplan_note_15">Introduce L2, starting at half the volume</string>
+    <string name="eplan_note_16">L2 maintenance: cardio 3–5 times/week, keep 48 hours between strength sessions</string>
+    <string name="eplan_note_17">Maintenance week: fine-tune based on next-day feedback</string>
+    <string name="eplan_note_18">Step-back week: reduce volume to recover, then start the next cycle</string>
+
+</resources>

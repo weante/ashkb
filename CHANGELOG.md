@@ -1,3 +1,95 @@
+# Changelog
+
+ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面向强直性脊柱炎患者的离线优先个人健康管理应用。
+
+> ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
+
+## [v1.2.6] — 2026-10-09
+
+**英文支持第三层：domain 文案层 + 散落 UI 文案 + 种子内容。** 无库结构变更，可覆盖安装。
+
+维护者诉求（m00655）：「新增对英文的支持，并增加英文README，简体中文为默认页」。
+前两层（v1.2.4 界面字符串、v1.2.5 知识库正文 + 枚举 + 备份层）之后，本版清掉最后三处中文来源。
+
+### 一、domain 文案层 105 条（`values/strings_domain.xml` / `values-en/strings_domain.xml`）
+
+`Labels` / `MissedDose` / `EmergencyLockscreen` / `LifestylePrescription` / `ClinicalThresholds` /
+`MorningWarmup` / `CheckupPrep` / `Disclaimer` / `PostureAdvice` / `LabIndicator` 十个文件。
+
+- **API 形态变了**：这些函数现在返回 `@StringRes Int` 而非 `String`，由调用方 `stringResource` / `context.getString` 落地。
+  带插值或成组传递的走 `domain/Labels.kt` 的 `data class ResText(@StringRes val res: Int, val args: List<Any> = emptyList())`。
+- ⚠️ `MissedDose.Guidance` 字段是 **`headlineRes`**（不是 `headline`）；`MorningWarmup.Sequence` 是 `headline: ResText` + `noteRes`。
+- ⚠️ `MissedDose` 资源里**保留字面 `**`**（加粗标记），UI 侧必须继续 `.replace("**", "")`。
+- ⚠️ **`Disclaimer` 的 `const val` 全部改成 `val`**——AGP 8 起 `R` 字段不是编译期常量，`const val` 编译不过。
+- ⚠️ **匹配键一律不翻译**：`LabIndicator.aliases`（「血沉」「c反应蛋白」）、`QUALIFIERS`、`ReportImport.kt` 的中文解析键、
+  `SupplementTiming.kt` 的药名关键词、`DateInput.kt:23` 的正则——它们比对的是**用户导入的原文**，翻译了就再也匹配不上。
+
+### 二、散落 UI 文案 51 条（`values/strings_ui.xml` / `values-en/strings_ui.xml`）
+
+`ReportImport` / `ExerciseEngine` / `SupplementTiming` / `TrendChart` / `SymptomCards` / `TodayScreen` /
+`XiaomiCompat` / `MedicationRepository` / `ScheduleCalc` / `CrashLogger` / `NotificationHelper` 等。
+`ExerciseEngine.ExerciseCard.hint: String` → `hintParts: List<TextPart>`。
+`ScheduleCalc.slotLabel()` 删除，「 · 晨起空腹」改由 `MedicationRepository.buildTodayItems` 拼接。
+
+### 三、种子内容 72 条（`values/strings_seed.xml` / `values-en/strings_seed.xml`）
+
+食谱 30 + 标签 3 + 出处说明 9 + 免责声明 1 + 筛查项 8 + 周期模板 21。
+
+这四条内容会**写进数据库**（`recipes.title` / `checkup_items.name` / `exercise_plans.week_structure`），
+所以另开一对文件，与界面文案分开演进。
+
+- `RecipeSeeds.Seed` → `titleRes` / `ingredientsRes` / `stepsRes`；`tagLabelRes(tag): Int?`（未知 tag 返回 `null`，调用方回退原文）。
+- `RecipeSources.Source` → `noteRes`；`DISCLAIMER` → `@StringRes`。
+  ⚠️ **`citation`（文献题录）不翻译**——翻译后无法按题名检索。
+- `ScreeningSeeds.Seed` → `nameRes` / `notesRes`；`pending` 必须**比对所有已知语言**，否则中文用户切英文会被重复种入一份。
+- `ExercisePlanTemplates` 拆成 `WeekSpecRes`（模板定义，文案是资源 id）与 `WeekSpec`（落库形态，文案是文本），
+  由新增的 `materialize(template, note)` 连接；`toJson` / `parse` / `targetDays` / `pending` 签名与行为一字未改。
+
+### 四、语言感知重种
+
+新增 `data/repo/SeedLocales.kt`（`ALL = [SIMPLIFIED_CHINESE, ENGLISH]`，用 `createConfigurationContext` 取词，
+**不改进程 Locale**——项目多处刻意锁 `Locale.US` 防小数点变逗号）。三个仓储在种入后按语言刷新**用户没编辑过的**种子行。
+
+- ⚠️ **判据是内容比对，不是时间戳**——`updated_at` 会被「收藏」这类非内容操作顶掉。
+- ⚠️ `checkup_items` **没有 `isSeed` 列**，只能按「名称 + 备注与某一已知语言逐字相同」认定未编辑。
+
+### 五、新守卫（改资源 id 时把多条指向同一资源，编译器不报错，界面只会静默退化）
+
+`i18n/SeedStringsParityTest`（条数 / 顺序 / 英文侧零 CJK）、`LabelsTest`「五个分期 key 指向五条不同资源」、
+`AdherenceTest`「三档判定指向三条不同资源」、`DisclaimerTest`「四条要点必须互不相同」、
+`RecipeSeedsTest`「30 个资源 id 互不相同」、`ScreeningSeedsTest`「跨语言判重」、
+`ExercisePlanTemplatesTest`「标题互不相同 + 周说明合计 18 条」。
+
+### 六、顺带修掉的三处旧文案问题
+
+- 影像 / 化验导入落库时并入备注的 `"医院：$it"` / `"对比：$it"` 改走资源（患者可见）。
+- 药单空态「还没有添加药品」→「**当前没有在用药品**」——有**已停用**药品时原措辞不成立。
+- 生活方式行的字段与取值连接符改走 `profile_field_value`（中文全角冒号 / 英文半角冒号+空格）——
+  原先硬编码一个空格，英文下成了 `Smoking Never`，读起来像一个词。
+
+单测 **865 条 / 98 个文件全绿**；detekt 干净、lint 0 error。
+
+## 补记：v1.1.2 – v1.2.5（此前条目缺失，2026-10-09 补齐）
+
+逐版细节见 `HANDOFF.md` 的「最新版 / 上一版」链与 `release-tooling/release-bodies/`。
+
+| 版本 | versionCode | 一句话 |
+|---|---|---|
+| v1.1.2 | 110 | 食谱出处编号 `S1`…`S9` → `R1`…`R9`（与知识库证据层级 `S1`–`S4` 撞名） |
+| v1.1.3 | 111 | 5 条医学裁决 + 3 个商品名更正；BASDAI 六题未答不出分（J-6） |
+| v1.1.4 | — | 极简模式提示答完后不刷新（`answeredTick` 参与 `combine`） |
+| v1.1.5 | — | 知识库 12 条来源分级（S1–S4）重定 |
+| v1.1.6 | — | iOS 式悬浮 Dock、弹层回归原生 `ModalBottomSheet`、**minSdk 26 → 31** |
+| v1.1.7 | — | 知识库审计问题 5/6/7/8 收口 |
+| v1.1.8 | — | 知识库审计问题 2：20 条链接补齐第二来源 |
+| v1.1.9 | — | 36 条外部链接全部真机可打开（`exc-008` 的 NASS 路径 404 → 换 EULAR 2018） |
+| v1.2.0 | 112 | 知识库审计 10/10 全部关闭 |
+| v1.2.1 | 113 | `ReportScreen` / `EmergencyScreen` 拆屏，并**还掉一处 detekt 基线豁免** |
+| v1.2.2 | 114 | 急救卡「依那西普 25mg · 每周两次（如依那西普，选两个星期）」文案 + 剂量被挤压 |
+| v1.2.3 | 115 | 自评列表行高压缩 + 生活方式拆行 + `PageChrome`（标题卡片 / 胶囊页签）+ BASDAI「其余按无记」 |
+| v1.2.4 | 116 | 英文支持第一层：`values-en` 1289 条 + `locale_config`（简中默认）+ `README.en.md`；另含提醒频次修正与补剂每日提醒 |
+| v1.2.5 | 117 | 英文支持第二层：知识库 48 条正文英文种子 + 语言感知载入闸门 + 19 个枚举 113 条 + 备份层 87 条 |
+
 ## v1.1.6 — iOS 式悬浮 Dock、弹层回归原生、minSdk 提到 31
 
 维护者连续截图暴露的问题，逐个改用**像素采样**定位（此前五轮都是"读代码猜"，全错）。
@@ -12,11 +104,6 @@
 - **minSdk 26 → 31**：维护者裁决。代价是 Android 8–11 无法安装 ⚠️。
 
 单测 822 条全绿。
-# Changelog
-
-ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面向强直性脊柱炎患者的离线优先个人健康管理应用。
-
-> ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
 ## [v1.1.1] — 2026-10-03
 

@@ -214,7 +214,14 @@ private fun stageLabel(k: String?) = when (k) {
  * 维护者反馈「吸烟 从不 · 运动习惯 偶尔」在窄列里折行后，第二行的「偶尔」孤零零挂在左边，
  * 且与标签之间的间隔看着和别的行不一样——因为它是**一个被折行的长值**，而不是几行各占一行的短值。
  * 拆成多行后：每项一行、各自右对齐，间隔也就自然一致了。
+ *
+ * v1.2.6：「字段 取值」之间的连接符改走 [R.string.profile_field_value]——
+ * 原先硬编码一个空格，中文「吸烟 从不」尚可，英文下成了 `Smoking Never`，读起来像一个词。
  */
+@Composable
+private fun fieldValue(fieldRes: Int, value: String): String =
+    stringResource(R.string.profile_field_value, stringResource(fieldRes), value)
+
 @Composable
 private fun lifestyleItems(raw: String?): List<String> {
     val l = Lifestyle.fromJson(raw)
@@ -226,7 +233,7 @@ private fun lifestyleItems(raw: String?): List<String> {
             Lifestyle.SMOKING_CURRENT -> stringResource(R.string.profile_smoking_current)
             else -> null
         }
-        if (smokingText != null) add("${stringResource(R.string.profile_smoking_field)} $smokingText")
+        if (smokingText != null) add(fieldValue(R.string.profile_smoking_field, smokingText))
         l.sedentaryHours?.let { add(stringResource(R.string.profile_sedentary_short, it)) }
         val habitText = when (l.exerciseHabit) {
             Lifestyle.HABIT_NONE -> stringResource(R.string.profile_habit_none)
@@ -234,7 +241,7 @@ private fun lifestyleItems(raw: String?): List<String> {
             Lifestyle.HABIT_REGULAR -> stringResource(R.string.profile_habit_regular)
             else -> null
         }
-        if (habitText != null) add("${stringResource(R.string.profile_habit_field)} $habitText")
+        if (habitText != null) add(fieldValue(R.string.profile_habit_field, habitText))
         l.sleepHours?.let { add(stringResource(R.string.profile_sleep_short, it)) }
     }
 }

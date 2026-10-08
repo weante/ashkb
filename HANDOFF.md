@@ -3,7 +3,32 @@
 > 本文档面向接手本仓库开发的 AI 会话（TraeWork Code 模式 / TraeCode）或人类工程师。
 > 记录截至 **v1.0.73**（versionCode 78，2026-09-29）的全部工程知识。
 > 应用本身介绍见 `README.md`，版本历史见 `CHANGELOG.md`。
-> **v1.2.5 更新（2026-10-09，先看这条）——英文支持第二层：知识库正文 + 枚举 + 备份层**：
+> **v1.2.6 更新（2026-10-09，先看这条）——英文支持第三层：domain 文案层 + 散落 UI 文案 + 种子内容**：
+> · **domain 文案层 105 条**（`values/strings_domain.xml` / `values-en/strings_domain.xml`，`dom_` 前缀）：
+>   `Labels` / `MissedDose` / `EmergencyLockscreen` / `LifestylePrescription` / `ClinicalThresholds` /
+>   `MorningWarmup` / `CheckupPrep` / `Disclaimer` / `PostureAdvice` / `LabIndicator` 十个文件。
+>   ⚠️ **API 形态变了**：这些函数现在返回 `@StringRes Int` 而不是 `String`，调用方负责落地；
+>   带插值/成组传递的用 `domain/Labels.kt` 里的 `data class ResText(@StringRes val res: Int, val args: List<Any> = emptyList())`。
+>   ⚠️ `MissedDose.Guidance` 的字段是 **`headlineRes`**（不是 `headline`）；`MorningWarmup.Sequence` 是 `headline: ResText` + `noteRes`。
+>   ⚠️ `MissedDose` 资源里**保留了字面 `**`**（加粗标记），UI 侧必须继续 `.replace("**", "")`。
+>   ⚠️ **`Disclaimer` 的 `const val` 全部改成了 `val`**——AGP 8 起 `R` 字段不是编译期常量，`const val` 编译不过。
+> · **散落 UI 文案 51 条**（`values/strings_ui.xml` / `values-en/strings_ui.xml`，`ui_` 前缀）。
+>   ⚠️ **匹配键一律不翻译**：`ReportImport.kt` 的中文解析键（日期/医院/项目/结果/参考范围…）、
+>   `SupplementTiming.kt` 的药名关键词、`DateInput.kt:23` 的正则、`LabIndicator.aliases`（「血沉」「c反应蛋白」）——
+>   它们比对的是**用户导入的原文**，翻译了就再也匹配不上。
+> · **种子内容 72 条**（`values/strings_seed.xml` / `values-en/strings_seed.xml`）：食谱 30 + 标签 3 + 出处说明 9 +
+>   免责声明 1 + 筛查项 8 + 周期模板 21。这四条会**写进数据库**，所以另开一对文件与界面文案分开演进。
+>   ⚠️ `RecipeSources.citation`（文献题录）**不翻译**——翻译后无法按题名检索。
+> · **语言感知重种**：新增 `data/repo/SeedLocales.kt`（`ALL = [SIMPLIFIED_CHINESE, ENGLISH]`，用
+>   `createConfigurationContext` 取词，**不改进程 Locale**）。三个仓储在种入后按语言刷新**用户没编辑过的**种子行。
+>   ⚠️ **判据是内容比对，不是时间戳**——`updated_at` 会被「收藏」这类非内容操作顶掉。
+>   ⚠️ `checkup_items` **没有 `isSeed` 列**，只能按「名称 + 备注与某一已知语言逐字相同」认定未编辑。
+>   ⚠️ `ScreeningSeeds.pending` 必须**比对所有已知语言**，否则中文用户切英文会被重复种入一份。
+> · **新守卫**：`i18n/SeedStringsParityTest`（条数/顺序/英文侧零 CJK）、`LabelsTest`「五个分期 key 指向五条不同资源」、
+>   `AdherenceTest`「三档判定指向三条不同资源」、`DisclaimerTest`「四条要点必须互不相同」、
+>   `RecipeSeedsTest`「30 个资源 id 互不相同」——**改资源 id 时把多条指向同一资源编译器不报错，界面只会静默退化**。
+> · 单测 **865 条 / 98 个文件全绿**；detekt 干净、lint 0 error。
+> **v1.2.5 更新（2026-10-09）——英文支持第二层：知识库正文 + 枚举 + 备份层**：
 > · **知识库正文真正翻译了**：新增 `app/src/main/assets/en/kb_seed_{itx,exc,fdg,emr,edu}.json`
 >   （15 / 15 / 6 / 5 / 7 条，与中文 5 份一一对应）。`KB_SEED_VERSION` 12 → **13**。
 > · **载入闸门纳入语言**：`AshkbApplication.importKbSeedIfNeeded` 原来只看版本号，切成英文后
@@ -93,7 +118,7 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）：面向强直性脊柱�
 $env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.7\bin\gradle.bat" -p patient-health-app assembleDebug assembleRelease testDebugUnitTest
 ```
 
-- 全量构建约 2~3 分钟；**855 条单测**必须全过才算交付（其中 31 条用 Robolectric，见 §8 S1）
+- 全量构建约 2~3 分钟；**865 条单测**必须全过才算交付（其中 31 条用 Robolectric，见 §8 S1）
 - **⚠️ 构建前先看可用内存（v1.0.48 踩到）**：本机 Gradle 守护进程在**物理内存不足**时会直接
   死于原生分配失败（`Native memory allocation (malloc) failed ... Chunk::new` → 
   `Gradle build daemon disappeared unexpectedly`），**且此时 assemble 任务可能已经拷出了旧 APK**——
@@ -325,7 +350,8 @@ app/src/main/java/com/ashkb/app/
 
 ## 8. 当前状态与下一步
 
-- **最新版**：**v1.2.5（versionCode 117）· 英文支持第二层**——`values-en` 再加 113 条枚举 + 87 条备份文案，知识库 48 条正文全部译成英文种子，载入闸门纳入语言（版本或语言变化即重灌，个人备注保留）✅
+- **最新版**：**v1.2.6（versionCode 118）· 英文支持第三层**——domain 文案层 105 条（10 个文件改 `@StringRes`）+ 散落 UI 文案 51 条 + **种子内容 72 条**（食谱 / 标签 / 出处 / 筛查项 / 周期模板）+ **语言感知重种**（`SeedLocales`，按内容比对认定「用户没编辑过」）+ 5 类新守卫测试 ✅
+- **上一版**：**v1.2.5（versionCode 117）· 英文支持第二层**——`values-en` 再加 113 条枚举 + 87 条备份文案，知识库 48 条正文全部译成英文种子，载入闸门纳入语言（版本或语言变化即重灌，个人备注保留）✅
 - **上一版**：**v1.2.4（versionCode 116）· 英文支持（i18n）+ 提醒频次修正 + 补剂每日提醒**——维护者 m00655 一次提了 6 条，全部落地 ✅ **① BASDAI 自评间隔**：原 5 档（7/14/28/56/84 天）→ **每日 / 每周 / 每月** 三档 ✅ 读取时**归一历史存值并写回**，不留隐形旧值 ✅。**② 删「每 8 小时」**：该频次**没有任何药物规则引用**（全仓只有枚举定义 + PDF 文案）✅ 但**枚举必须保留**——删掉会让 `fromKey` 退回 DAILY，把历史「每 8 小时」静默改成「每日」⚠️ → 加 `hidden = true`，**仅当当前值就是它时才显示** ✅ 同时删掉频次标签里的括号提示（`label` 改纯名称；`plain` 字段保留给急救卡）✅。**③ 自定义周期可自定义日期**：`cycleAnchorVisible` 原**只放行注射途径** ⚠️ 于是**口服 + 自定义周期静默等同于每日** ✅ 改为口服也能填周期天数与锚点日期 ✅。**④ 新增「每月 1 次」**：`ScheduleCalc.isMonthlyDay`（按锚点日号数，月末夹到当月最后一天）✅。**⑤ 补剂每日提醒**：新增 `SupplementReminderScheduler` / `SupplementReminderReceiver` / `CHANNEL_SUPPLEMENT`（**刻意与用药通道分开**——合成一个会让用户为了关补剂而不得不连用药一起关）✅ `SupplementSheet` 增时刻输入 ✅。**⑥ 英文支持**：`values-en/strings.xml`（1289 条）+ `locale_config.xml`（**简中为默认**）+ `rememberDateFormatter()` + `README.en.md` + `EnglishStringsParityTest` 对等守卫 ✅。
 - **上一版**：**v1.2.3（versionCode 115）· 自评列表行高压缩 + 生活方式拆行 + 页面级外壳统一**——本轮全部来自维护者真机截图反馈 ✅ 共 4 项：**① 自评记录间隔偏大**：`BasdaiList` 里「删除」原本在左侧 Column 内**独占一行** ✅ 每行约 430px ✅ 一屏只看 6 条 ⚠️ → 移到**右侧、与总分同列** ✅ 行高降到约 360px ✅ 一屏 8 条 ✅。**② 删除与总分对齐**：改前「删除」在右上、总分在右下 ✅ 读起来像两列 ⚠️ → **同一右对齐 Column** ✅ 且**总分在上、删除在下**（先读到分数再决定是否删 ✅）。**③ 生活方式折行末行贴左**：`KeyValueRow` 的值列虽设了 `Arrangement.End` ✅ 但**管不到 `Text` 内部换行** ✅ 折行后末行仍左对齐（截图里「偶尔」的「尔」孤零零挂左边 ⚠️）→ 给值文本加 **`textAlign = TextAlign.End`** ✅。**④ 生活方式拆行**：维护者选「拆成两行、各自右对齐」✅ —— 原先 `lifestyleLabel` 把各项拼成**一个 `·` 连接的长字符串** ✅ 于是它是一行**被折行的长值** ✅ 拆成 `lifestyleItems` 返回**逐项列表** ✅ 每项一行 ✅ 间隔因此与其它行一致 ✅。⭐ **另加一件工具**：`PageChrome.kt`（**页面级外壳**）—— **标题卡片** `ScreenTitleCard` + **胶囊页签** `TabChips`，依据是维护者自己的设计稿 `ASHKB-毛玻璃UI预览.html` 的 `.tchip`（未选中白底细描边、选中**深青渐变底 + 白字** ✅）。知识库标题、报表标题从此**装进与数据卡片同一套圆角容器** ✅ 报表页签与知识库分类标签**统一为高对比胶囊** ✅ —— 渐变末端**不新增色板项** ✅ 由主题 primary 向黑 lerp 22% 得到（设计稿 `--primary-deep` = `#2c4a5a` ✅ lerp 结果 ≈ `#324E5C` ✅）✅ 好处是**深色主题自动跟着变** ✅。**BASDAI 弹窗顶部另加「其余未答的题，按「无」记」** ✅ —— 维护者原话「大部分时间没有晨僵，但要手动先点 1 再点回 0」✅ 但**不能**把六题初值设成 0 ✅ 那会产出「打开即提交」的假 0.0 分 ✅ 正是 v1.1.3（J-6）要拦的东西 ✅ —— 差别在**谁做的声明**：默认 0 是**系统替患者答** ✅ 本按钮是**患者一次显式声明** ✅ 语义等价于逐题点「无」 ✅。⚠️ **并记录三次我自己的文件操作事故**（详见 §事故）：一次**用目测行号把整个文件截断**（`git diff` 显示删 912 行，只想删 167 ✅）✅ 一次**写文件时参数用错**导致编码/换行错乱（detekt 报 12 条 ✅）✅ 一次**在已改多轮的文件上反复做文本替换、越改越糟**（7 条 ✅）—— **三次都靠 `git checkout --` 完整恢复** ✅ **无实际损失** ✅ 但累计多花约 40 分钟 ✅。**还原**：`ScoreInput` 两端那对「点此：无 / 点此：最严重」按钮已按维护者要求**移除** ✅ 回到 v1.0.18 的纯文字可点标签 ✅（**功能保留** ✅ 那两个文字**仍可点** ✅ 是 W3 为「滑杆点当前值零回调」留的可靠兜底 ✅）。单测 **822 条全绿** ✅。
 - **上一版**：**v1.0.73（versionCode 78）· 批次 1「看不见的失效」**（依据三份外部审查报告 + 维护者 2026-09-29 的 9 项裁决）：闹钟注册失败不再静默（`AlarmRegister` + `ReminderHealth` + 自检页第 5 项）／活疫苗安全警报的**默认值反转**（表单默认 `CONFIRMED → PENDING`，判定抽到 `domain/VaccineSafety`，补 7 条回归测试）／末级强提醒投递前检查 `canUseFullScreenIntent()` 并明确降级为常驻提醒／升级链认可 `skipped`／「稍后」真排 snooze（15 分钟、不上链）／`WAKE_LOCK` 兜住 goAsync 协程／**跨零点身份锚回槽位所属日**（`EXTRA_SLOT_DATE` 全链透传 + `cancelAllFuture` 扫 `today-1` + requestCode 改 SHA-256 派生）／PDF 生成下 IO／体征保存门禁／口令与恢复码页禁截屏。**519 条单测全绿**。**已发布为 GitHub 正式版（Latest）**：`git -c http.version=HTTP/1.1 push`（远端 main = `adb296b`）→ `gh api -X POST releases --input rel-v1073.json`（`make_latest=true`）→ 两资产 `curl --http1.1` 上传 → `gh api …/assets` 摘要与本地 `Get-FileHash` **逐字节一致**；v1.0.72 已加「已被 v1.0.73 取代」横幅。详见 `CHANGELOG.md` v1.0.73。
@@ -419,7 +445,7 @@ M8 家属协作全部（家属端 / 共享子集 / 设备令牌 / 命令协议 /
   - VM / 通知 / PDF 硬编码文案（v1.0.10 §遗留）——v1.0.24 三层共 124 条下沉 strings.xml（`notif_` / `vm_` / `pdf_` 前缀）。**边界**：`data/` 与 `domain/` 层的异常消息与领域标签保持硬编码——domain 层按设计纯 JVM 无 Context，且那些是数据/提示词而非界面文案
   - **规划缺口 A1：紧急卡缺「当前用药」**——v1.0.26 落地。放弃闲置的 `Profile.emergency_med_summary`（无读写），改为纯函数 `domain/EmergencyMeds.kt` 从在用药单自动汇总：未归档 + 结束日期口径筛选 → 免疫抑制类（BIOLOGIC / JAK / CSDMARD / GLUCOCORTICOID）置顶标注 → 12 条封顶；紧急卡页面（`EmergencyScreen`，刻意放在 `profile?.let` 之外，未建档也显示）与打印版 PDF（`EmergencyCard.meds` 字段）两处同源。单测 +16 条
    - **规划缺口 A2：备份恢复码**——v1.0.27 落地。备份文件格式升级 **v2 信封（magic `ASHKBAK2`）**：随机 256-bit DEK 加密内容，DEK 再被口令/恢复码分别包装进两个密钥槽（类 LUKS keyslot），任一可解；槽 id 进 AAD 防槽交换。恢复码 160-bit Base32（32 字符 8 组，`domain/RecoveryCode.kt` 纯函数），Keystore 加密落盘（`vault_config` prefs）。**解密归一化兜底**：先按原样逐槽尝试，输入形似恢复码再按归一化形态重试（任意抄写形态可解；口令第一轮命中不受影响）。`ASHKBAK1` 旧格式永久兼容读取（`encryptLegacy` 仅测试用）；未设恢复码也用 v2 单槽（格式不分裂）。pre-restore 快照同带恢复码槽。**A3 决策**：不引入 Argon2id（Android 无内置 / BC 冲突史 / native +1MB），v2 槽自带 KDF 参数可将来无破坏升级
-- **测试基线**：**855 条单测全绿**；新增功能须同步补测（`app/src/test/.../`，**97 个测试文件**覆盖 backup / 加密（v2+v3）/ 附件路径与远端比对 / PROPFIND 解析 / 停药警示与三态 / 化验单位分组 / 筛查种子 / 补剂上限与错开 / 食谱种子与出处台账 / 计划模板编解码 / 计划完成度 / 通用名键 / 运动分级 / 导入解析 / 排程计算 / 知识库检索 / 紧急卡用药汇总 / 恢复码 / 复诊准备 / 漏服 / 体重目标 / **服药依从口径与用药记录修正不变量 / 注射部位存库键稳定性 / ISO 时刻与时间选择器口径（`hhmm`、`timeParts`、槽位标签 = 计划时刻）/ 崩溃留档凭据脱敏 / 源码正则花括号静态守卫 / 提醒链「取消-重建」语义（Robolectric，含末级强提醒判定）/ 测试提醒排程（Robolectric：延迟换算 / 幂等 / 取消）/ 免打扰时段判定（跨午夜 / 同日 / 左闭右开边界）/ 免责声明措辞 / 生活方式画像编解码与置顶挂点 / 生活方式→处方提示 / 极简模式状态机（连续缺失封顶 / 阈值边界 / 原因映射 / 成对不变式）/ 锁屏紧急卡文案（JSON 展平 / 免疫抑制标注 / 封顶报总数 / 联系人优先级）/ 档案标签映射（骶髂关节分期 0–IV 与未评估兜底）/ 久坐提醒时刻计算（网格 / 窗口边界 / 次日续排 / 非法窗口）/ 晨僵热身序列（阈值分档边界 15/30 / 只取 L1 / 封顶 4 条 / 无 L1 与空处方）/ 姿势睡姿建议（条目 id 一致性 / 要点去重 / 避免俯卧 / 睡眠画像置顶）/ 炎症指标名称归一与单位换算 / 化验行→序列的三类口径 / 小多图共享时间轴 / 趋势图选中读数（同日多值全取 + 气泡从大到小）**）
+- **测试基线**：**865 条单测全绿**；新增功能须同步补测（`app/src/test/.../`，**98 个测试文件**覆盖 backup / 加密（v2+v3）/ 附件路径与远端比对 / PROPFIND 解析 / 停药警示与三态 / 化验单位分组 / 筛查种子 / 补剂上限与错开 / 食谱种子与出处台账 / 计划模板编解码 / 计划完成度 / 通用名键 / 运动分级 / 导入解析 / 排程计算 / 知识库检索 / 紧急卡用药汇总 / 恢复码 / 复诊准备 / 漏服 / 体重目标 / **服药依从口径与用药记录修正不变量 / 注射部位存库键稳定性 / ISO 时刻与时间选择器口径（`hhmm`、`timeParts`、槽位标签 = 计划时刻）/ 崩溃留档凭据脱敏 / 源码正则花括号静态守卫 / 提醒链「取消-重建」语义（Robolectric，含末级强提醒判定）/ 测试提醒排程（Robolectric：延迟换算 / 幂等 / 取消）/ 免打扰时段判定（跨午夜 / 同日 / 左闭右开边界）/ 免责声明措辞 / 生活方式画像编解码与置顶挂点 / 生活方式→处方提示 / 极简模式状态机（连续缺失封顶 / 阈值边界 / 原因映射 / 成对不变式）/ 锁屏紧急卡文案（JSON 展平 / 免疫抑制标注 / 封顶报总数 / 联系人优先级）/ 档案标签映射（骶髂关节分期 0–IV 与未评估兜底）/ 久坐提醒时刻计算（网格 / 窗口边界 / 次日续排 / 非法窗口）/ 晨僵热身序列（阈值分档边界 15/30 / 只取 L1 / 封顶 4 条 / 无 L1 与空处方）/ 姿势睡姿建议（条目 id 一致性 / 要点去重 / 避免俯卧 / 睡眠画像置顶）/ 炎症指标名称归一与单位换算 / 化验行→序列的三类口径 / 小多图共享时间轴 / 趋势图选中读数（同日多值全取 + 气泡从大到小）**）
   - ⚠️ **测试条数有三处副本**：本节、§2「必须全过才算交付」、`README.md` 的「测试」段。**改一处必须三处同改**——README 曾同时写着 114 / 205 两个互相矛盾的数（N2），本节也曾长期停在 264 而 §2/README 已到 339。**交付前用 `app\build\test-results\testDebugUnitTest\*.xml` 汇总实际条数再回填。**
 
 ## 8b. 新维护者须知：不能「顺手改」的九个区域

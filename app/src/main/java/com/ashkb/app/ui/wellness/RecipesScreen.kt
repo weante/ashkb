@@ -105,7 +105,7 @@ fun RecipesScreen(vm: RecipesViewModel, onBack: () -> Unit) {
                 modifier = Modifier.heightIn(min = Size.touchMin),
             )
             RecipeSeeds.ALL_TAGS.forEach { tag ->
-                val label = RecipeSeeds.tagLabel(tag)
+                val label = tagLabelOf(tag)
                 FilterChip(
                     selected = filterTag == tag,
                     // 再点同一标签 = 取消筛选，回到「全部」
@@ -196,6 +196,18 @@ private fun tagTone(tag: String): StatusTone = when (tag) {
     else -> StatusTone.Neutral
 }
 
+/**
+ * 标签 → 展示文本（按当前语言取词）。
+ *
+ * 未知标签回退成原始 tag 本身——与改版前 `RecipeSeeds.tagLabel` 的 `else -> tag` 逐字一致，
+ * 保证脏数据（历史遗留标签）仍能显示而不是空白。
+ */
+@Composable
+private fun tagLabelOf(tag: String): String {
+    val res = RecipeSeeds.tagLabelRes(tag)
+    return if (res == null) tag else stringResource(res)
+}
+
 /** 列表卡：标题 + 标签 chip + 内置 / 自建徽标 + 收藏按钮（不展示出处正文）。 */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -238,7 +250,7 @@ private fun RecipeCard(
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
                 view.tags.forEach { tag ->
-                    StatusChip(text = RecipeSeeds.tagLabel(tag), tone = tagTone(tag))
+                    StatusChip(text = tagLabelOf(tag), tone = tagTone(tag))
                 }
             }
             // 收藏按钮形变不换文案语义：未收藏显示「收藏」，已收藏显示「取消收藏」
@@ -290,7 +302,7 @@ private fun RecipeDetailSheet(
                     tone = if (recipe.isSeed) StatusTone.Info else StatusTone.Neutral,
                 )
                 view.tags.forEach { tag ->
-                    StatusChip(text = RecipeSeeds.tagLabel(tag), tone = tagTone(tag))
+                    StatusChip(text = tagLabelOf(tag), tone = tagTone(tag))
                 }
             }
 
@@ -318,7 +330,7 @@ private fun RecipeDetailSheet(
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
-                        stringResource(R.string.recipes_source_note, source.note),
+                        stringResource(R.string.recipes_source_note, stringResource(source.noteRes)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -327,7 +339,7 @@ private fun RecipeDetailSheet(
 
             // 免责声明固定展示：种子与自建一视同仁
             Text(
-                RecipeSources.DISCLAIMER,
+                stringResource(RecipeSources.DISCLAIMER),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -397,7 +409,7 @@ private fun RecipeFormSheet(
                         selected = tag in tags,
                         // 多选：点一下加入、再点移出
                         onClick = { tags = if (tag in tags) tags - tag else tags + tag },
-                        label = { Text(RecipeSeeds.tagLabel(tag)) },
+                        label = { Text(tagLabelOf(tag)) },
                         modifier = Modifier.heightIn(min = Size.touchMin),
                     )
                 }

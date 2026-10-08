@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  种子内容文案（食谱 / 出处说明 / 筛查项 / 周期计划模板）。
+
+  为什么这些内容不在 values/strings.xml 里：它们是**种子内容**，会被写进数据库
+  （recipes.title / checkup_items.name / exercise_plans.week_structure），
+  而 strings.xml 那一套是界面文案。分开是为了让「内容」与「界面」各自演进：
+  内容改了要配一次重种，界面文案改了不需要。
+
+  命名：recipe_seed_* / recipe_tag_* / recipe_src_* / recipe_disclaimer /
+  screen_seed_* / eplan_*。en 侧必须逐条对应（lint MissingTranslation 会拦）。
+-->
+<resources>
+
+    <!-- ===== 推荐食谱种子（domain/RecipeSeeds.kt）===== -->
+    <string name="recipe_seed_s01_title">橄榄油烤三文鱼配西兰花</string>
+    <string name="recipe_seed_s01_ingredients">三文鱼排 150g\n西兰花 200g\n特级初榨橄榄油 1 汤匙\n蒜末、柠檬汁、黑胡椒 适量</string>
+    <string name="recipe_seed_s01_steps">三文鱼抹橄榄油、蒜末与黑胡椒，静置 10 分钟\n西兰花切小朵，沸水焯 1 分钟后捞出\n烤箱 200℃ 预热，鱼与西兰花同盘烤 12–15 分钟\n出锅淋柠檬汁即可</string>
+    <string name="recipe_seed_s02_title">地中海杂蔬鹰嘴豆沙拉</string>
+    <string name="recipe_seed_s02_ingredients">熟鹰嘴豆 150g\n番茄 1 个\n黄瓜 半根\n彩椒 半个\n紫洋葱 少许\n橄榄油 1 汤匙\n柠檬汁、欧芹、黑胡椒 适量</string>
+    <string name="recipe_seed_s02_steps">蔬菜洗净切丁\n与鹰嘴豆拌匀\n淋橄榄油与柠檬汁，撒欧芹与黑胡椒\n冷藏 10 分钟风味更佳</string>
+    <string name="recipe_seed_s03_title">姜黄姜末藜麦饭</string>
+    <string name="recipe_seed_s03_ingredients">藜麦 80g\n姜末 1 小勺\n姜黄粉 1/4 小勺\n橄榄油 1 小勺\n黑胡椒、葱花 适量</string>
+    <string name="recipe_seed_s03_steps">藜麦淘洗后按 1:2 加水煮 15 分钟\n另起锅用橄榄油炒香姜末\n拌入藜麦与姜黄粉翻匀\n撒黑胡椒与葱花（黑胡椒有助姜黄素吸收）</string>
+    <string name="recipe_seed_s04_title">核桃亚麻籽酸奶杯</string>
+    <string name="recipe_seed_s04_ingredients">无糖酸奶 150g\n核桃碎 15g\n亚麻籽粉 1 小勺\n蓝莓或当季水果 50g</string>
+    <string name="recipe_seed_s04_steps">酸奶盛入杯中\n撒核桃碎与亚麻籽粉\n铺上水果即可</string>
+    <string name="recipe_seed_s05_title">番茄橄榄油炖白豆</string>
+    <string name="recipe_seed_s05_ingredients">熟白豆 200g\n番茄 2 个\n洋葱 半个\n蒜 2 瓣\n橄榄油 1 汤匙\n罗勒或欧芹、少盐 适量</string>
+    <string name="recipe_seed_s05_steps">洋葱与蒜末用橄榄油炒软\n加番茄丁炒出汁\n放入白豆小火炖 10 分钟\n撒香草、少盐调味</string>
+    <string name="recipe_seed_s06_title">蔬菜鸡蛋饼（减少精制淀粉）</string>
+    <string name="recipe_seed_s06_ingredients">鸡蛋 2 个\n西葫芦丝、胡萝卜丝 各 50g\n全麦粉 1 汤匙\n橄榄油 少许</string>
+    <string name="recipe_seed_s06_steps">蔬菜擦丝后略挤去水分\n与蛋液、全麦粉拌匀\n平底锅少油小火，两面煎熟\n切块食用</string>
+    <string name="recipe_seed_s07_title">燕麦南瓜粥</string>
+    <string name="recipe_seed_s07_ingredients">燕麦片 40g\n南瓜 150g\n水或低脂奶 300ml\n肉桂粉 少许</string>
+    <string name="recipe_seed_s07_steps">南瓜蒸熟压成泥\n燕麦加水煮 5 分钟\n拌入南瓜泥再煮 2 分钟\n撒少许肉桂粉</string>
+    <string name="recipe_seed_s08_title">清蒸鳕鱼配胡萝卜泥</string>
+    <string name="recipe_seed_s08_ingredients">鳕鱼 150g\n胡萝卜 150g\n姜片、葱段 适量\n橄榄油 1 小勺</string>
+    <string name="recipe_seed_s08_steps">鳕鱼铺姜片葱段，大火蒸 8 分钟\n胡萝卜蒸熟压成泥\n鱼淋少许橄榄油与蒸出的汤汁\n配胡萝卜泥同食</string>
+    <string name="recipe_seed_s09_title">鸡胸时蔬大拌菜</string>
+    <string name="recipe_seed_s09_ingredients">鸡胸肉 120g\n生菜、番茄、黄瓜、紫甘蓝 共 250g\n橄榄油 1 小勺\n柠檬汁、黑胡椒 适量</string>
+    <string name="recipe_seed_s09_steps">鸡胸水煮或空气炸至熟，切片\n蔬菜洗净撕成适口大小\n混合后淋橄榄油与柠檬汁\n撒黑胡椒拌匀</string>
+    <string name="recipe_seed_s10_title">杂豆蔬菜汤</string>
+    <string name="recipe_seed_s10_ingredients">混合豆类（红豆 / 鹰嘴豆 / 扁豆）80g\n番茄 1 个\n洋葱、芹菜、胡萝卜 各 50g\n香草、黑胡椒、少盐 适量</string>
+    <string name="recipe_seed_s10_steps">豆类提前泡发\n蔬菜切丁下锅炒香\n加水与豆类，小火煮约 30 分钟\n少盐调味、撒香草</string>
+
+    <!-- ===== 食谱标签（RecipeSeeds.tagLabel）===== -->
+    <string name="recipe_tag_anti">抗炎</string>
+    <string name="recipe_tag_gut">胃肠友好</string>
+    <string name="recipe_tag_calorie">控热量</string>
+
+    <!-- ===== 出处说明（domain/RecipeSources.kt，题录 citation 不翻译）===== -->
+    <string name="recipe_src_r1_note">综述：地中海饮食可能减轻炎症与症状；超重 / 肥胖者低热量饮食与减重可获益；加工食品 / 饱和脂肪 / 精制糖可能加重</string>
+    <string name="recipe_src_r2_note">系统综述：AS 膳食证据**极为有限且不确定**（多为小样本、单臂研究）</string>
+    <string name="recipe_src_r3_note">系统综述：axSpA 证据有限；ω-3（PUFA）补充有潜在获益；姜 / 姜黄等香辛料有抗炎证据</string>
+    <string name="recipe_src_r4_note">横断面研究：海洋 ω-3 摄入低与疾病活动度高相关；膳食纤维密度低与炎症更重相关</string>
+    <string name="recipe_src_r5_note">综述：增加纤维摄入有助维持肠道环境；低淀粉饮食机制存在但临床证据有限；低果糖饮食为潜在方向</string>
+    <string name="recipe_src_r6_note">机制综述：肠道菌群与 HLA-B27 分子模拟假说（解释「为什么饮食可能与 AS 相关」）</string>
+    <string name="recipe_src_r7_note">综述：低淀粉饮食与地中海饮食为两大方向；维生素 D 与骨健康</string>
+    <string name="recipe_src_r8_note">患者组织实操口径：每日 ≥4 份蔬菜 + 2 份水果；钙约 700mg/日；ω-3 ≥2g/日；少盐少糖、多用香辛料；地中海饮食为值得遵循的均衡模式；警惕「能治愈 AS」的饮食宣称</string>
+    <string name="recipe_src_r9_note">提示：该方向仍在随机对照试验验证中，**尚无定论**</string>
+    <string name="recipe_disclaimer">参考食谱，非医疗建议；膳食不能替代药物。现有证据整体有限（尤其强直专项），调整饮食前请与风湿科医生或营养师确认。</string>
+
+    <!-- ===== 生物制剂筛查 / 续方种子（domain/ScreeningSeeds.kt）===== -->
+    <string name="screen_seed_1_name">结核筛查（T-SPOT / PPD）</string>
+    <string name="screen_seed_1_notes">生物制剂用药前必查；用药期间按医嘱定期复查</string>
+    <string name="screen_seed_2_name">乙肝筛查（HBV 三系 + DNA）</string>
+    <string name="screen_seed_2_notes">生物制剂用药前必查；乙肝携带者需按医嘱监测</string>
+    <string name="screen_seed_3_name">丙肝筛查（HCV 抗体）</string>
+    <string name="screen_seed_3_notes">生物制剂用药前必查</string>
+    <string name="screen_seed_4_name">生物制剂续方 / 门诊随访</string>
+    <string name="screen_seed_4_notes">续方前提前预约门诊，避免断药</string>
+
+    <!-- ===== 周期计划模板（domain/ExercisePlanTemplates.kt）===== -->
+    <string name="eplan_seed_4w_title">4 周起步计划（活动期 → 缓解期过渡）</string>
+    <string name="eplan_seed_8w_title">8 周强化计划</string>
+    <string name="eplan_seed_12w_title">12 周维持计划（缓解期长期）</string>
+    <string name="eplan_note_01">只做轻柔维持（呼吸 / 拉伸 / 活动度），不追求量</string>
+    <string name="eplan_note_02">保持 L1，逐步增加天数</string>
+    <string name="eplan_note_03">加入低冲击有氧 / 自重力量，量从半量起</string>
+    <string name="eplan_note_04">以 L2 为主；疼痛加重即退回 L1（exc-010 两小时规则）</string>
+    <string name="eplan_note_05">适应期：轻柔维持为主</string>
+    <string name="eplan_note_06">增加频次，仍限 L1</string>
+    <string name="eplan_note_07">引入 L2，留意次日反馈</string>
+    <string name="eplan_note_08">L2 为主，力量间隔 48 小时</string>
+    <string name="eplan_note_09">稳定周：保持上周处方</string>
+    <string name="eplan_note_10">稳定周：按反馈微调动作</string>
+    <string name="eplan_note_11">巩固周：关注晨僵与疼痛趋势</string>
+    <string name="eplan_note_12">回落周：降低总量，为下一周期恢复</string>
+    <string name="eplan_note_13">重新起步：只做轻柔维持</string>
+    <string name="eplan_note_14">增加频次</string>
+    <string name="eplan_note_15">引入 L2，量从半量起</string>
+    <string name="eplan_note_16">L2 维持：有氧 3–5 次/周，力量间隔 48 小时</string>
+    <string name="eplan_note_17">维持周：按次日反馈微调</string>
+    <string name="eplan_note_18">回落周：降量恢复，进入下一周期</string>
+
+</resources>

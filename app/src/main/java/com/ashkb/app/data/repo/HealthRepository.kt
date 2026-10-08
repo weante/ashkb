@@ -2,6 +2,7 @@ package com.ashkb.app.data.repo
 
 import android.content.Context
 import androidx.room.withTransaction
+import com.ashkb.app.R
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.db.Ids
 import com.ashkb.app.data.entity.Alert
@@ -35,6 +36,7 @@ import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.LabImport
 import com.ashkb.app.domain.MinimalMode
+import com.ashkb.app.domain.ScreeningSeeds
 import com.ashkb.app.domain.SupplementHistory
 import com.ashkb.app.domain.VaccineSafety
 import java.time.LocalDate
@@ -379,29 +381,80 @@ class HealthRepository(private val context: Context) {
 
     fun observeActiveExercisePlan(): Flow<com.ashkb.app.data.entity.ExercisePlan?> = exercisePlanDao.observeActive()
 
-    /** 幂等种入 4 / 8 / 12 周模板。@return 本次新增条数 */
+    /**
+     * 幂等种入 4 / 8 / 12 周模板，并把**未被用户编辑过**的种子计划刷新到当前语言。
+     *
+     * 与 `RecipeRepository.seedIfMissing` 同一个道理：`week_structure` 里存的是展开后的
+     * **文本**（JSON），语言在种入那一刻就定死了。判定「没被编辑过」同样是内容比对。
+     *
+     * @return 本次新增条数（刷新不算新增）
+     */
     suspend fun seedExercisePlans(): Int = db.withTransaction {
-        val existing = exercisePlanDao.seedIds().toSet()
-        val pending = com.ashkb.app.domain.ExercisePlanTemplates.pending(existing)
+        val pending = com.ashkb.app.domain.ExercisePlanTemplates.pending(
+            exercisePlanDao.seedIds().toSet()
+        )
         val now = nowIso()
         pending.forEach { t ->
-            exercisePlanDao.upsert(
-                com.ashkb.app.data.entity.ExercisePlan(
-                    id = t.id,
-                    title = t.title,
-                    weeks = t.weeks,
-                    stageMode = t.stageMode,
-                    weekStructure = com.ashkb.app.domain.ExercisePlanTemplates.toJson(t.spec),
-                    isActive = false,
-                    isSeed = true,
-                    startDate = null,
-                    notes = null,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-            )
+            exercisePlanDao.upsert(seedPlanRow(t, now))
         }
+        refreshExercisePlanLanguage(now)
         pending.size
+    }
+
+    /** 把一个模板展开成可落库的种子行（文案按当前语言取词）。 */
+    private fun seedPlanRow(
+        t: com.ashkb.app.domain.ExercisePlanTemplates.Template,
+        now: String,
+    ): com.ashkb.app.data.entity.ExercisePlan {
+        val templates = com.ashkb.app.domain.ExercisePlanTemplates
+        return com.ashkb.app.data.entity.ExercisePlan(
+            id = t.id,
+            title = context.getString(t.titleRes),
+            weeks = t.weeks,
+            stageMode = t.stageMode,
+            weekStructure = templates.toJson(
+                templates.materialize(t) { res -> context.getString(res) }
+            ),
+            isActive = false,
+            isSeed = true,
+            startDate = null,
+            notes = null,
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /** 把仍是「原封不动的种子」的计划改写成当前语言；用户编辑过的原样保留。 */
+    private suspend fun refreshExercisePlanLanguage(now: String) {
+        val rows = exercisePlanDao.listAll().filter { it.isSeed }
+        val byId = rows.associateBy { it.id }
+        com.ashkb.app.domain.ExercisePlanTemplates.ALL.forEach { t ->
+            val row = byId[t.id] ?: return@forEach
+            val title = context.getString(t.titleRes)
+            val structure = com.ashkb.app.domain.ExercisePlanTemplates.toJson(
+                com.ashkb.app.domain.ExercisePlanTemplates.materialize(t) { context.getString(it) }
+            )
+            if (title == row.title && structure == row.weekStructure) return@forEach
+            if (!isUntouchedSeedPlan(t, row)) return@forEach
+            exercisePlanDao.upsert(row.copy(title = title, weekStructure = structure, updatedAt = now))
+        }
+    }
+
+    /**
+     * 该计划是否仍是「原封不动的种子」：标题与周结构都与**某一已知语言**的种子逐字相同。
+     *
+     * 必须比对所有已知语言——库里那行是**种入当时**的语言写的。
+     */
+    private fun isUntouchedSeedPlan(
+        t: com.ashkb.app.domain.ExercisePlanTemplates.Template,
+        row: com.ashkb.app.data.entity.ExercisePlan,
+    ): Boolean {
+        val templates = com.ashkb.app.domain.ExercisePlanTemplates
+        return SeedLocales.ALL.any { locale ->
+            val c = SeedLocales.contextIn(context, locale)
+            c.getString(t.titleRes) == row.title &&
+                templates.toJson(templates.materialize(t) { c.getString(it) }) == row.weekStructure
+        }
     }
 
     /** 启用某计划（同一时刻只允许一个；重新启用即重新起算周次） */
@@ -656,31 +709,59 @@ class HealthRepository(private val context: Context) {
 
     /**
      * C10（v1.0.37）：一键种入生物制剂筛查 / 续方节点（结核 / 乙肝 / 丙肝筛查 + 续方随访）。
-     * 幂等：按 name 去重，已存在的不重复建。
-     * @return 本次新增条数
+     * 幂等：按 name 去重（**所有已知语言**，见 [ScreeningSeeds.pending]），已存在的不重复建。
+     * @return 本次新增条数（刷新不算新增）
      */
     suspend fun seedBiologicScreeningItems(): Int = db.withTransaction {
-        val existing = checkupItemDao.listActive().map { it.name }.toSet()
-        val pending = com.ashkb.app.domain.ScreeningSeeds.pending(existing)
+        val items = checkupItemDao.listActive()
+        val pending = ScreeningSeeds.pending(items.map { it.name }.toSet(), ::knownSeedNames)
         val now = nowIso()
         pending.forEach { s ->
             checkupItemDao.upsert(
                 CheckupItem(
                     id = Ids.new("cki"),
-                    name = s.name,
+                    name = context.getString(s.nameRes),
                     checkType = s.checkType,
                     cycleDays = s.cycleDays,
                     linkedMedId = null,
                     kbRef = null,
                     isActive = true,
-                    notes = s.notes,
+                    notes = context.getString(s.notesRes),
                     createdAt = now,
                     updatedAt = now,
                 )
             )
         }
+        refreshScreeningLanguage(items, now)
         pending.size
     }
+
+    /** 一条筛查种子在**所有已知语言**下的名称（判重要用它，不能只比当前语言）。 */
+    private fun knownSeedNames(s: ScreeningSeeds.Seed): List<String> =
+        SeedLocales.ALL.map { SeedLocales.contextIn(context, it).getString(s.nameRes) }
+
+    /**
+     * 把仍是「原封不动的种子」的筛查项改写成当前语言；用户改过名或备注的一律不碰。
+     *
+     * ⚠️ `checkup_items` **没有 `is_seed` 列**（`name` 既是展示文案又是幂等键，用户可改名），
+     * 所以「没被编辑过」只能按「名称 + 备注与某一已知语言的种子逐字相同」认定。
+     */
+    private suspend fun refreshScreeningLanguage(items: List<CheckupItem>, now: String) {
+        ScreeningSeeds.BIOLOGIC.forEach { s ->
+            val row = items.firstOrNull { it.name in knownSeedNames(s) } ?: return@forEach
+            val name = context.getString(s.nameRes)
+            val notes = context.getString(s.notesRes)
+            if (name == row.name && notes == row.notes) return@forEach
+            if (!isUntouchedSeedItem(s, row)) return@forEach
+            checkupItemDao.upsert(row.copy(name = name, notes = notes, updatedAt = now))
+        }
+    }
+
+    private fun isUntouchedSeedItem(s: ScreeningSeeds.Seed, row: CheckupItem): Boolean =
+        SeedLocales.ALL.any { locale ->
+            val c = SeedLocales.contextIn(context, locale)
+            c.getString(s.nameRes) == row.name && c.getString(s.notesRes) == row.notes
+        }
 
     // ---- 复诊记录 ----
     fun observeCheckupRecent(limit: Int = 20): Flow<List<CheckupRecord>> = checkupRecordDao.observeRecent(limit)
@@ -813,7 +894,7 @@ class HealthRepository(private val context: Context) {
         val date = import.date ?: LocalDate.now().toString()
         val backfill = date != LocalDate.now().toString()
         val note = listOfNotNull(
-            import.hospital?.let { "医院：$it" },
+            import.hospital?.let { context.getString(R.string.ui_import_hospital_prefix, it) },
             import.note,
         ).joinToString(" · ").ifBlank { null }
         import.rows.forEach { row ->
@@ -835,7 +916,8 @@ class HealthRepository(private val context: Context) {
     suspend fun importImagingReport(import: ImagingImport) {
         val examDate = import.date ?: LocalDate.now().toString()
         val notesParts = buildList {
-            import.compare?.takeIf { it.isNotBlank() && it != "无" }?.let { add("对比：$it") }
+            import.compare?.takeIf { it.isNotBlank() && it != "无" }
+                ?.let { add(context.getString(R.string.ui_import_compare_prefix, it)) }
         }
         imagingDao.upsert(
             ImagingRecord(
