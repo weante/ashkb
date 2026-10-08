@@ -188,11 +188,18 @@ class AshkbApplication : Application() {
      */
     private suspend fun importKbSeedIfNeeded(context: Context) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (prefs.getInt(KEY_SEED_VERSION, 0) >= KB_SEED_VERSION) return
+        // v1.2.5：闸门从「版本一致」升级为「版本一致 **且** 语言一致」。
+        // 语言变了必须重新核对一遍，否则英文用户会一直看到中文种子——
+        // 而且和旧版本闸门一样是完全静默的。`KbSeedRefresh` 会逐条 diff，
+        // 换语言后每条内容都不同 → 整批走 revise 分支，`user_note` 照旧被拷回。
+        val language = seedLanguage(context)
+        val recordedVersion = prefs.getInt(KEY_SEED_VERSION, 0)
+        val recordedLanguage = prefs.getString(KEY_SEED_LANG, null)
+        if (!kbSeedNeedsImport(recordedVersion, recordedLanguage, language)) return
 
         val dao = AppDatabase.get(context).kbEntryDao()
         val existing = dao.listAll().associateBy { it.id }
-        val seeds = SEED_FILES.flatMap { parseSeed(context, it) }
+        val seeds = seedFiles(language).flatMap { parseSeed(context, it) }
         // 解析整体失败（assets 缺失 / JSON 损坏）时**不写闸门**，留给下次启动重试——
         // 否则一次瞬时失败会让种子永久停在旧版本，且无从察觉。
         if (seeds.isEmpty()) return
@@ -201,40 +208,37 @@ class AshkbApplication : Application() {
         val plan = KbSeedRefresh.plan(existing, seeds)
         if (plan.fresh.isNotEmpty()) dao.insertAll(plan.fresh)
         if (plan.revised.isNotEmpty()) dao.updateAll(plan.revised)
-        prefs.edit().putInt(KEY_SEED_VERSION, KB_SEED_VERSION).apply()
+        prefs.edit()
+            .putInt(KEY_SEED_VERSION, KB_SEED_VERSION)
+            .putString(KEY_SEED_LANG, language)
+            .apply()
+    }
+
+    /**
+     * 当前应用语言该用哪一份种子。
+     *
+     * 判定口径与资源解析**必须一致**：`values/`（无语言限定）就是简体中文，
+     * 所以只有明确 `en` 才走英文目录；zh、以及其他任何未支持的语言都落中文。
+     * 若这里改成「非 zh 即 en」，就会出现「界面中文、知识库英文」这类半截状态。
+     */
+    private fun seedFiles(language: String): List<String> =
+        if (language == LANG_EN) SEED_FILES_EN else SEED_FILES
+
+    /**
+     * 应用语言。取 `resources.configuration` 而**不是** `Locale.getDefault()`：
+     * 前者是本应用资源实际解析所用的配置（应用级语言改的正是它，`stringResource` 也读它），
+     * 后者是进程级默认值，改应用语言时未必同步 → 会出现「界面英文、知识库中文」。
+     */
+    private fun seedLanguage(context: Context): String {
+        val locales = context.resources.configuration.locales
+        return if (locales.isEmpty) LANG_ZH else locales[0].language
     }
 
     private fun parseSeed(context: Context, file: String): List<KbEntry> {
         val json = runCatching {
             context.assets.open(file).bufferedReader().use { it.readText() }
         }.getOrNull() ?: return emptyList()
-        return runCatching {
-            val arr = JSONArray(json)
-            (0 until arr.length()).mapNotNull { i ->
-                val o = arr.getJSONObject(i)
-                if (o.getString("id").isBlank()) return@mapNotNull null
-                val title = o.getString("title")
-                val summary = o.getString("summary")
-                val payload = o.getJSONObject("payload").toString()
-                KbEntry(
-                    id = o.getString("id"),
-                    category = o.getString("category"),
-                    title = title,
-                    summary = summary,
-                    severityLevel = o.getString("severity_level"),
-                    applicableScene = o.getString("applicable_scene"),
-                    sourceName = o.getString("source_name"),
-                    sourceUrl = o.getString("source_url"),
-                    sourceTier = o.getString("source_tier"),
-                    adaptedAt = o.getString("adapted_at"),
-                    reviewDue = o.getString("review_due"),
-                    version = o.optInt("version", 1),
-                    payload = payload,
-                    // v9：检索列与迁移 v8→v9 / KbSearch.searchText 同一口径
-                    searchText = KbSearch.searchText(title, summary, payload),
-                )
-            }
-        }.getOrDefault(emptyList())
+        return parseSeedJson(json)
     }
 
     /**
@@ -267,11 +271,28 @@ class AshkbApplication : Application() {
          *
          * ⚠️ 今后 bump 之后还必须同步 `KbSeedVersionGateTest.FINGERPRINTS`（那条断言会先红，
          * 提醒你登记新指纹）——两者是同一件事的两半，漏一个都会让已安装用户永久停在旧内容。
+         *
+         * 13 = v1.2.5 英文支持：新增 `assets/en/` 下 5 个英文种子，并让闸门同时看语言
+         * （见 [KEY_SEED_LANG]）。中文种子**一个字节都没改**，bump 到 13 是为了让
+         * 英文设备首次拿到英文内容；中文设备则会因为语言没变而照常跳过——
+         * 这正是 `KbSeedVersionGateTest` 的指纹要**同时**覆盖中英两份清单的原因。
          */
-        internal const val KB_SEED_VERSION = 12
+        internal const val KB_SEED_VERSION = 13
 
         private const val PREFS = "app_prefs"
         private const val KEY_SEED_VERSION = "kb_seed_version"
+
+        /**
+         * 上次导入种子时所使用的应用语言（v1.2.5）。
+         *
+         * 与 [KEY_SEED_VERSION] 一起构成闸门：**两者都一致**才跳过核对。
+         * 只存版本 → 中文用户切到英文后永远拿不到英文种子；只存语言 → 种子内容更新推不下去。
+         */
+        private const val KEY_SEED_LANG = "kb_seed_lang"
+
+        /** 只有明确 `en` 才走英文种子；其余一切语言落中文那套（口径见 [seedFiles]）。 */
+        private const val LANG_EN = "en"
+        private const val LANG_ZH = "zh"
 
         /**
          * 种子文件清单（48 条 = itx 15 / exc 15（红10+黑5）/ fdg 6 / emr 5 / edu 7（含阈值 2））。
@@ -283,5 +304,70 @@ class AshkbApplication : Application() {
             "kb_seed_itx.json", "kb_seed_exc.json", "kb_seed_fdg.json",
             "kb_seed_emr.json", "kb_seed_edu.json",
         )
+
+        /**
+         * 英文种子清单（`assets/en/` 下同名文件，v1.2.5）。
+         *
+         * **由 [SEED_FILES] 派生，不另写一遍字面量**：两份清单一旦漂移，后果是
+         * 「某个文件永远不被英文用户看到」——静默，且只对一部分用户生效。
+         * `assets/en/` 缺失时 [parseSeed] 返回空表，条目会落回中文；此处刻意不做存在性检查，
+         * 因为「文件缺失」应当由 `KbSeedVersionGateTest` 在构建期喊出来，而不是运行时兜底。
+         */
+        internal val SEED_FILES_EN = SEED_FILES.map { "en/$it" }
+
+        /**
+         * 闸门判定（纯函数，可单测）：**需要**重新核对种子时返回 true。
+         *
+         * 抽出来是因为这是「静默缺口」的唯一防线，写在 `importKbSeedIfNeeded` 里就没法单测。
+         * 两个分句各自对应一个真实发生过的失败模式：
+         *  · 漏版本判断 → 种子更新永远推不到已装设备（v1.0.70 的 `edu-005` 就是这么丢的）；
+         *  · 漏语言判断 → 切到英文后永远看到中文内容（v1.2.5 新增）。
+         */
+        internal fun kbSeedNeedsImport(
+            recordedVersion: Int,
+            recordedLanguage: String?,
+            currentLanguage: String,
+        ): Boolean = recordedVersion < KB_SEED_VERSION || recordedLanguage != currentLanguage
+
+        /**
+         * 种子 JSON 文本 → 条目列表（纯函数，可单测）。
+         *
+         * 从 [parseSeed] 里抽出来，只因为**解析失败是静默的**：
+         * [importKbSeedIfNeeded] 见 `seeds.isEmpty()` 就直接 return 且不写闸门，
+         * 不抛异常、不留日志。原先解析发生在 `context.assets.open()` 之后，测试够不到，
+         * 于是「英文种子漏了一个 `getString` 要读的字段」这种错会表现为
+         * **英文用户永远看到中文知识库**，没有任何信号。
+         * `KbSeedEnglishParityTest` 现在把真实文件内容直接喂进来，让这件事变成一条会红的断言。
+         *
+         * ⚠️ 契约与旧实现逐字一致：`getString` 读不到字段就抛，**整个文件退化为空表**；
+         * 新增字段必须用 `opt*`，否则旧种子会整份失效。
+         */
+        internal fun parseSeedJson(json: String): List<KbEntry> = runCatching {
+            val arr = JSONArray(json)
+            (0 until arr.length()).mapNotNull { i ->
+                val o = arr.getJSONObject(i)
+                if (o.getString("id").isBlank()) return@mapNotNull null
+                val title = o.getString("title")
+                val summary = o.getString("summary")
+                val payload = o.getJSONObject("payload").toString()
+                KbEntry(
+                    id = o.getString("id"),
+                    category = o.getString("category"),
+                    title = title,
+                    summary = summary,
+                    severityLevel = o.getString("severity_level"),
+                    applicableScene = o.getString("applicable_scene"),
+                    sourceName = o.getString("source_name"),
+                    sourceUrl = o.getString("source_url"),
+                    sourceTier = o.getString("source_tier"),
+                    adaptedAt = o.getString("adapted_at"),
+                    reviewDue = o.getString("review_due"),
+                    version = o.optInt("version", 1),
+                    payload = payload,
+                    // v9：检索列与迁移 v8→v9 / KbSearch.searchText 同一口径
+                    searchText = KbSearch.searchText(title, summary, payload),
+                )
+            }
+        }.getOrDefault(emptyList())
     }
 }

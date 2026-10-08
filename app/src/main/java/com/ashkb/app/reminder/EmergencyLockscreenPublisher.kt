@@ -32,8 +32,10 @@ object EmergencyLockscreenPublisher {
             val db = AppDatabase.get(context)
             val profile = db.profileDao().get()
             val contacts = db.contactDao().observeAll().first()
+            // v1.2.5（i18n）：频次文案按系统语言解析（急救卡用 plainRes，见 EmergencyMeds KDoc）
             val meds = EmergencyMeds.summarize(
                 db.medicationDao().listActive(), LocalDate.now().toString(),
+                freqLabel = { context.getString(it.plainRes) },
             )
             val content = EmergencyLockscreen.build(profile, contacts, meds)
             if (content.lines.isEmpty()) {

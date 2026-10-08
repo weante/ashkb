@@ -330,8 +330,13 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
 
                         // 当前用药：自动从药单汇总（不依赖用户手工维护），免疫抑制类置顶并标注。
                         // 刻意放在档案之外——用药与健康档案相互独立，未建档时也必须显示（急救场景尤甚）
-                        val medsSummary = remember(meds, today) {
-                            EmergencyMeds.summarize(meds, today.toString())
+                        val medsSummary = remember(meds, today, context) {
+                            // v1.2.5（i18n）：remember 的 lambda 不是 @Composable，取不到 stringResource，
+                            // 故注入 context::getString（急救卡按 KDoc 用 plainRes）
+                            EmergencyMeds.summarize(
+                                meds, today.toString(),
+                                freqLabel = { context.getString(it.plainRes) },
+                            )
                         }
                         Spacer(Modifier.height(Spacing.xs))
                         Text(
@@ -529,7 +534,7 @@ private fun RowScope.EventRow(
     Column(Modifier.weight(1f)) {
         Text(event.date, style = MaterialTheme.typography.titleSmall)
         Text(
-            EmergencyScene.fromKey(event.scene).label,
+            stringResource(EmergencyScene.fromKey(event.scene).labelRes),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

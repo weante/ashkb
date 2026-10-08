@@ -1,0 +1,186 @@
+[
+  {
+    "id": "fdg-001",
+    "category": "food_drug",
+    "title": "Avoid alcohol while taking NSAIDs (gastrointestinal bleeding)",
+    "summary": "Combining NSAIDs with alcohol markedly increases the risk of stomach bleeding; avoid use within 8–10 hours before and after drinking.",
+    "severity_level": "high",
+    "applicable_scene": "Adding an NSAID medication; food-avoidance list initialization (seed supply); prompt when a meal containing alcohol is selected in diet logging",
+    "source_name": "American College of Gastroenterology (ACG) patient education material ⚠️ (gi.org returned 403 this time, so it could not be verified directly; marked as unverified)",
+    "source_url": "https://wsjkw.sh.gov.cn/jtyx/20210429/5bcfe9992bb6481fa073eaf33cec6e24.html",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-04",
+    "review_due": "2027-03-04",
+    "version": 1,
+    "payload": {
+      "food": "alcohol",
+      "drug_or_class": "nsaid",
+      "risk": "Both damage the gastric mucosa; together they increase the risk of gastrointestinal bleeding",
+      "timing": "Avoid NSAIDs within 8–10 hours before and after drinking alcohol",
+      "evidence": [
+        "Shanghai Municipal Health Commission: NSAIDs should be avoided in the 8–10 hours before and after drinking alcohol, so as not to increase the risk of gastrointestinal bleeding.",
+        "ACG patient material: They should not be taken with alcohol, as the combination can increase the risk of GI bleeding."
+      ],
+      "action": [
+        "For long-term NSAID users: the food-avoidance list includes \"alcohol (strict)\" by default",
+        "On days with social drinking: switch that dose of pain relief to the doctor-approved alternative; do not add an extra NSAID on the spot",
+        "After alcohol is marked in diet logging, that day's medication card shows a staggered-timing prompt"
+      ],
+      "app_link": "food_avoid_items(seed: alcohol×strict); diet_logs.avoid_hit_keys linked prompt"
+    }
+  },
+  {
+    "id": "fdg-002",
+    "category": "food_drug",
+    "title": "During steroid therapy: limit salt, supplement potassium and calcium, watch grapefruit",
+    "summary": "During steroid treatment such as prednisone, your doctor may recommend a low-salt, high-potassium / high-calcium diet and calcium supplements; ask your doctor before drinking grapefruit juice.",
+    "severity_level": "medium",
+    "applicable_scene": "Adding a glucocorticoid; diet-logging reference during long-term steroid therapy; nutrient plan suggestions",
+    "source_name": "MedlinePlus prednisone patient medication information (U.S. National Library of Medicine)",
+    "source_url": "https://medlineplus.gov/druginfo/meds/a601102.html",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-06",
+    "review_due": "2027-03-06",
+    "version": 1,
+    "payload": {
+      "food": "sodium",
+      "drug_or_class": "glucocorticoid",
+      "risk": "Without limiting sodium: risk of edema and elevated blood pressure; calcium loss (long term)",
+      "timing": "Throughout the steroid course",
+      "evidence": [
+        "MedlinePlus: Your doctor may instruct you to follow a low-salt, high potassium, or high calcium diet. Your doctor may also prescribe or recommend a calcium or potassium supplement.",
+        "MedlinePlus: Talk to your doctor about eating grapefruit and drinking grapefruit juice while you are taking this medication."
+      ],
+      "action": [
+        "Low-salt diet (bland flavors; cut back on pickled foods / heavily salted takeout meals)",
+        "Add high-potassium foods (bananas / oranges / spinach, etc.) and high-calcium foods (dairy / soy products) as recipe tags",
+        "Grapefruit / grapefruit juice: ask your doctor before consuming while taking steroids",
+        "Nutrient plan and follow-up confirmation: whether calcium + vitamin D supplementation is needed follows the doctor's orders"
+      ],
+      "app_link": "recipes tag system (high_calcium / low_salt); supplements (calcium / vitamin D) suggestions; grapefruit (avoid) can be added to the food-avoidance list"
+    }
+  },
+  {
+    "id": "fdg-003",
+    "category": "food_drug",
+    "title": "Avoid alcohol while taking methotrexate",
+    "summary": "Both methotrexate and alcohol are hepatotoxic, and combining them compounds the risk; patient education advises people taking MTX to stop drinking, and to discuss any intake with their doctor.",
+    "severity_level": "high",
+    "applicable_scene": "Food-avoidance list seed supply when methotrexate is added; prompt when alcohol is marked in diet logging",
+    "source_name": "EMA methotrexate oral solution product information ⚠️ (the EMA site connection was reset this time, the referrals path returned 404 in testing, and no accessible link could be verified; marked as unverified)",
+    "source_url": "https://www.clinexprheumatol.org/article.asp?a=4149",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "food": "alcohol",
+      "drug_or_class": "methotrexate",
+      "risk": "Additive hepatotoxicity (both cause liver injury); the literature indicates that with >100g of alcohol per week the risk of severe liver disease is about 3%, and higher when other liver-disease risk factors are present",
+      "timing": "Throughout treatment",
+      "evidence": [
+        "Clin Exp Rheumatol: Hepatotoxicity is associated with both alcohol and methotrexate.",
+        "GoodRx patient education: It's a standard recommendation to stop drinking alcohol if you've been prescribed methotrexate.",
+        "EMA product information: the most serious adverse reactions of methotrexate include hepatotoxicity, with abnormal liver function tests commonly seen."
+      ],
+      "action": [
+        "The food-avoidance list includes \"alcohol (strict)\" by default (displayed merged with fdg-001)",
+        "If complete abstinence is not possible, discuss an acceptable amount with your doctor (UK rheumatologists' recommendations vary — individualize)",
+        "Liver function monitoring (linked to checkup_items lab)"
+      ],
+      "app_link": "food_avoid_items(seed: alcohol×strict); cross-linked within the itx-001 once-weekly item group"
+    }
+  },
+  {
+    "id": "fdg-004",
+    "category": "food_drug",
+    "title": "During leflunomide treatment: the label advises stopping alcohol, with regular liver enzyme monitoring",
+    "summary": "The Chinese leflunomide label states clearly \"stop drinking alcohol during treatment\"; check ALT every 2 weeks for the first 6 months, then every 8 weeks.",
+    "severity_level": "high",
+    "applicable_scene": "Prompt when leflunomide is added; reminder when liver enzyme retesting is due",
+    "source_name": "Chinese-language leflunomide tablet label (indexed by **Yaozhi Data (药智数据), a commercial drug database**; the link for this entry is that index page — a commercial platform); parallel citations: EMA Leflunomide Mylan product information ⚠️ (that EMA EPAR path returned 404 in testing) and Health Canada Product Monograph ⚠️ (not checked); the latter two are both marked as unverified",
+    "source_url": "https://db.yaozh.com/instruct/7716935030000034.html",
+    "source_tier": "S4",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "food": "alcohol",
+      "drug_or_class": "leflunomide",
+      "risk": "Additive hepatotoxic effects (as stated in the label); if ALT stays above 2 times the limit / exceeds 3 times the limit, the drug must be stopped + a washout procedure is required",
+      "timing": "Throughout treatment (monitoring: q2w for the first 6 months → q8w thereafter)",
+      "evidence": [
+        "Chinese-language label: because additive hepatotoxic effects are possible, it is recommended to stop drinking alcohol during leflunomide treatment.",
+        "EMA: ALT (SGPT) must be checked before initiation... every two weeks during the first six months of treatment and every 8 weeks thereafter.",
+        "Health Canada: contraindicated in patients with hepatic impairment; not recommended for patients who are HBV/HCV positive or have pre-existing liver disease."
+      ],
+      "action": [
+        "Adding leflunomide → checkup_items automatically suggests ALT monitoring items (q2w × 6 months → q8w)",
+        "The food-avoidance list includes alcohol (strict) by default",
+        "When a history of liver disease / positive hepatitis B or C is entered, this entry raises a red_flag for the doctor"
+      ],
+      "app_link": "checkup_items (automatic ALT interval suggestion); food_avoid_items(seed: alcohol×strict); together with the itx-005 sulfasalazine entry, part of the csDMARD medication key-points group"
+    }
+  },
+  {
+    "id": "fdg-005",
+    "category": "food_drug",
+    "title": "Grapefruit interactions with some medications: check before you take them",
+    "summary": "Grapefruit juice blocks the intestinal CYP3A4 enzyme and can raise blood levels of some drugs abnormally high; for JAK inhibitors and others that explicitly say to avoid it, and for other drugs follow the label.",
+    "severity_level": "medium",
+    "applicable_scene": "When adding a JAK inhibitor / a CYP3A4 substrate drug such as tacrolimus; food-avoidance list seed supply",
+    "source_name": "FDA consumer information \"Grapefruit Juice and Some Drugs Don't Mix\" (2021); Upadacitinib patient education (NCBI Bookshelf) (all evidence quotes in this entry come from this source: https://www.fda.gov/consumers/consumer-updates/grapefruit-juice-and-some-drugs-dont-mix)",
+    "source_url": "https://www.fda.gov/consumers/consumer-updates/grapefruit-juice-and-some-drugs-dont-mix",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "food": "grapefruit",
+      "drug_or_class": "cyp3a4_substrates",
+      "risk": "Grapefruit blocks intestinal CYP3A4 → increased absorption and higher blood levels of some oral drugs (too much drug in your body); Seville oranges / pomelos / tangelos carry the same risk",
+      "timing": "Throughout the period of taking the relevant drug (not only at the moment of dosing)",
+      "evidence": [
+        "FDA: Grapefruit juice can block the action of intestinal CYP3A4, so instead of being metabolized, more of the drug enters the blood and stays in the body longer.",
+        "FDA: Seville oranges, pomelos, and tangelos might have the same effect as grapefruit juice.",
+        "Upadacitinib patient education: Patients should avoid consuming grapefruit or grapefruit-containing products during upadacitinib treatment."
+      ],
+      "action": [
+        "Adding a JAK inhibitor (upadacitinib, etc.) → the food-avoidance list includes grapefruit (strict) by default",
+        "Other drugs: check the \"Interactions\" section of the label / ask a pharmacist (do not assume every rheumatology drug is affected)",
+        "Also watch foods containing pomelo/citrus ingredients (pomelo tea / jam)"
+      ],
+      "app_link": "medications(risk_tags) cyp3a4-tagged drug addition trigger; food_avoid_items seed supply; displayed merged with the fdg-002 steroid grapefruit prompt"
+    }
+  },
+  {
+    "id": "fdg-006",
+    "category": "food_drug",
+    "title": "Long-term glucocorticoids: watch protein and calcium intake together",
+    "summary": "With long-term steroid therapy, protein breakdown increases and calcium loss accelerates — dietary high-quality protein and calcium intake both need attention (a supplementary layer to the MedlinePlus dietary advice).",
+    "severity_level": "low",
+    "applicable_scene": "Recipe recommendation tags for users on long-term steroid therapy (>3 months); nutrient plan suggestions",
+    "source_name": "MedlinePlus prednisone patient medication information (U.S. National Library of Medicine, NLM, a government agency page; same URL as fdg-002); the second source is a nutrition review (journal; the specific article could not be verified, marked as unverified)",
+    "source_url": "https://medlineplus.gov/druginfo/meds/a601102.html",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "food": "calcium_protein",
+      "drug_or_class": "glucocorticoid",
+      "risk": "Long-term steroids: protein breakdown / calcium loss (osteoporosis direction) — not a contraindication warning but a supplementation direction",
+      "timing": "Long-term treatment (>3 months)",
+      "evidence": [
+        "MedlinePlus prednisone patient medication information (https://medlineplus.gov/druginfo/meds/a601102.html, an NLM government agency page; same source as fdg-002): Your doctor may also prescribe or recommend a calcium or potassium supplement. (linked to fdg-002)",
+        "⚠️ unverified: an existing excerpt in this entry states \"nutrition review summary: for people on long-term glucocorticoids, optimizing calcium intake to 1000–1200 mg/day and vitamin D to 600–800 IU/day is recommended\"; the specific article and source of that review could not be verified this time, so it is not treated as a traceable citation. 1000–1200 mg/day, vitamin D 600–800 IU/day, and maintain adequate protein intake."
+      ],
+      "action": [
+        "Recipe tags: prioritize high_calcium / high_protein recommendations (for long-term steroid users)",
+        "Nutrient plan: whether to supplement calcium + vitamin D follows the doctor's orders (a follow-up visit topic)",
+        "Weight management in parallel (linked to weight_logs)"
+      ],
+      "app_link": "recipes tag linkage; supplements (calcium / vitamin D) suggestion items; cross-linked within the fdg-002 group"
+    }
+  }
+]

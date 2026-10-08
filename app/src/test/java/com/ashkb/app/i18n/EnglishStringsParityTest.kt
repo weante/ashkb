@@ -9,10 +9,16 @@ import org.junit.Test
 /**
  * v1.2.4（i18n）：**英文资源必须与中文资源逐条对齐**。
  *
+ * ### 覆盖范围
+ * 扫的是**整个 `src/main/res/values/` 目录**，而不是某一个文件：凡是含 `<string>` 的 XML，
+ * 都必须在 `src/main/res/values-en/` 里有**同名文件**，且条目名、顺序、占位符、引号包裹全部一致。
+ * 这样后续把字符串拆到 `strings_domain.xml` / `strings_backup.xml` 之类的分片文件里时，
+ * 守卫会自动跟上，不需要改测试。
+ *
  * ### 为什么要有这条守卫
- * `values-en/strings.xml` 是一份**手工维护**的平行文件（1289 条）。它坏掉的方式都是静默的：
+ * `values-en/` 是一份**手工维护**的平行资源。它坏掉的方式都是静默的：
  *  · 漏一条 → 该处回退中文，英文界面里突然冒出中文，但构建照样通过；
- *  · 多一条 / 重名 → `ExtraTranslation` 之类的问题要等 lint 才报；
+ *  · 多一条 / 重名 → `ExtraTranslation` 或 aapt 的重复资源错误；
  *  · 占位符对不上（`%1$d` 写成 `%2$d`、少一个 `%s`）→ 运行时 `String.format` 抛异常或串错数字；
  *  · 首尾空格丢了 → 拼接处「在用 3 种 ·」变成「在用3 种·」，只有肉眼看界面才发现；
  *  · 留了中文 → 半英半中的界面。
@@ -24,45 +30,51 @@ import org.junit.Test
  */
 class EnglishStringsParityTest {
 
-    private fun resourceFile(relative: String): File =
-        listOf(File(relative), File("app/$relative")).firstOrNull { it.isFile }
-            ?: error("未找到资源文件 $relative（工作目录=${File(".").absolutePath}）")
+    /** `values/` 下所有「含 `<string>`」的文件，按文件名排序，与 `values-en/` 里的同名文件配成对。 */
+    private fun pairs(): List<Triple<String, List<Pair<String, String>>, List<Pair<String, String>>>> {
+        val zhDir = resourceDir("src/main/res/values")
+        val enDir = resourceDir("src/main/res/values-en")
+        val files = zhDir.listFiles { f -> f.isFile && f.extension == "xml" }?.sortedBy { it.name }.orEmpty()
+        val out = mutableListOf<Triple<String, List<Pair<String, String>>, List<Pair<String, String>>>>()
+        for (f in files) {
+            val zh = parse(f)
+            if (zh.isEmpty()) continue // colors.xml / themes.xml 之类没有字符串
+            val en = enDir.resolve(f.name)
+            assertTrue("英文资源缺少同名文件 values-en/${f.name}（中文有 ${zh.size} 条）", en.isFile)
+            out += Triple(f.name, zh, parse(en))
+        }
+        return out
+    }
 
-    private val zh: List<Pair<String, String>> by lazy { parse(resourceFile("src/main/res/values/strings.xml")) }
-    private val en: List<Pair<String, String>> by lazy { parse(resourceFile("src/main/res/values-en/strings.xml")) }
+    private fun resourceDir(relative: String): File =
+        listOf(File(relative), File("app/$relative")).firstOrNull { it.isDirectory }
+            ?: error("未找到资源目录 $relative（工作目录=${File(".").absolutePath}）")
 
     private fun parse(f: File): List<Pair<String, String>> =
-        f.readLines().mapNotNull { line ->
-            LINE.find(line)?.let { it.groupValues[1] to it.groupValues[2] }
-        }
+        f.readLines().mapNotNull { line -> LINE.find(line)?.let { it.groupValues[1] to it.groupValues[2] } }
 
-    private fun values(pairs: List<Pair<String, String>>): Map<String, String> =
-        pairs.toMap().also { m ->
-            assertEquals("资源文件里有重名的 <string>", pairs.size, m.size)
-        }
+    private fun values(pairs: List<Pair<String, String>>, where: String): Map<String, String> =
+        pairs.toMap().also { m -> assertEquals("$where 里有重名的 <string>", pairs.size, m.size) }
 
     /** 英文里不得出现的字符：CJK 统一表意文字、CJK 标点、全角形式。 */
     @Test
     fun `english resources contain no Chinese characters`() {
-        val bad = en.filter { (_, v) -> CJK.containsMatchIn(v) }
-        assertTrue(
-            "英文资源里残留中文（半英半中的界面）: " + bad.take(10).joinToString { it.first },
-            bad.isEmpty(),
-        )
+        val bad = mutableListOf<String>()
+        for ((name, _, en) in pairs()) {
+            en.filter { (_, v) -> CJK.containsMatchIn(v) }.forEach { bad += "$name:${it.first}=${it.second}" }
+        }
+        assertTrue("英文资源里残留中文（半英半中的界面）: " + bad.take(10), bad.isEmpty())
     }
 
-    /** 条目名集合与顺序必须与中文资源完全一致——顺序一致，diff 才有意义。 */
+    /** 每个文件里，条目名集合与顺序必须与中文侧完全一致——顺序一致，diff 才有意义。 */
     @Test
     fun `english resources declare exactly the same names in the same order`() {
-        assertEquals("条目数不一致", zh.size, en.size)
-        val zhNames = zh.map { it.first }
-        val enNames = en.map { it.first }
-        assertEquals("条目名或顺序不一致", zhNames, enNames)
-        // 顺序一致本身已蕴含集合一致，但把缺失项单独报出来更利于排查
-        assertTrue(
-            "中文有、英文没有: " + zhNames.filterNot { it in enNames }.take(10),
-            zhNames.all { it in enNames },
-        )
+        for ((name, zh, en) in pairs()) {
+            assertEquals("values-en/$name 条目数不一致", zh.size, en.size)
+            val zhNames = zh.map { it.first }
+            val enNames = en.map { it.first }
+            assertEquals("values-en/$name 条目名或顺序不一致", zhNames, enNames)
+        }
     }
 
     /**
@@ -74,16 +86,16 @@ class EnglishStringsParityTest {
      */
     @Test
     fun `english resources keep the same format placeholders`() {
-        val zhMap = values(zh)
-        val enMap = values(en)
-        val bad = enMap.filter { (name, v) ->
-            val expected = placeholders(zhMap[name].orEmpty()).sorted()
-            expected != placeholders(v).sorted()
+        val bad = mutableListOf<String>()
+        for ((name, zh, en) in pairs()) {
+            val zhMap = values(zh, "values/$name")
+            for ((k, v) in values(en, "values-en/$name")) {
+                if (placeholders(zhMap[k].orEmpty()).sorted() != placeholders(v).sorted()) {
+                    bad += "$name:$k=$v"
+                }
+            }
         }
-        assertTrue(
-            "占位符不一致: " + bad.entries.take(10).joinToString { "${it.key}=${it.value}" },
-            bad.isEmpty(),
-        )
+        assertTrue("占位符不一致: " + bad.take(10), bad.isEmpty())
     }
 
     /**
@@ -96,27 +108,30 @@ class EnglishStringsParityTest {
      */
     @Test
     fun `english resources preserve the whitespace-keeping quote wrapping`() {
-        val zhMap = values(zh)
-        val enMap = values(en)
-        // 白名单自身不能腐烂：列进去的名字必须两边都还在
-        val stale = QUOTE_WRAP_EXCEPTIONS.filterNot { zhMap.containsKey(it) && enMap.containsKey(it) }
-        assertTrue("引号白名单里有已不存在的条目，应删除: $stale", stale.isEmpty())
-        val bad = enMap
-            .filterKeys { it !in QUOTE_WRAP_EXCEPTIONS }
-            .filter { (name, v) -> wrapped(zhMap[name].orEmpty()) != wrapped(v) }
-        assertTrue(
-            "引号包裹不一致（会丢掉首尾空格）: " +
-                bad.entries.take(10).joinToString { "${it.key}=${it.value}" },
-            bad.isEmpty(),
-        )
+        val bad = mutableListOf<String>()
+        val seen = mutableSetOf<String>()
+        for ((name, zh, en) in pairs()) {
+            val zhMap = values(zh, "values/$name")
+            val enMap = values(en, "values-en/$name")
+            for ((k, v) in enMap) {
+                if (k in QUOTE_WRAP_EXCEPTIONS) { seen += k; continue }
+                if (wrapped(zhMap[k].orEmpty()) != wrapped(v)) bad += "$name:$k=$v"
+            }
+        }
+        // 白名单自身不能腐烂：列进去的名字必须真的还在资源里
+        assertTrue("引号白名单里有已不存在的条目，应删除: ${QUOTE_WRAP_EXCEPTIONS - seen}", QUOTE_WRAP_EXCEPTIONS == seen)
+        assertTrue("引号包裹不一致（会丢掉首尾空格）: " + bad.take(10), bad.isEmpty())
     }
 
     /** 防止「守卫本身失效」：至少要扫到上千条，否则说明解析正则被改坏了。 */
     @Test
     fun `parity guard actually parsed the resource files`() {
-        assertTrue("中文资源解析出的条目过少（${zh.size}）——解析正则可能已失效", zh.size > 1000)
-        assertTrue("英文资源解析出的条目过少（${en.size}）——解析正则可能已失效", en.size > 1000)
-        assertFalse("app_name 应当存在", values(en)["app_name"].isNullOrBlank())
+        val all = pairs()
+        assertTrue("没有扫到任何含字符串的资源文件", all.isNotEmpty())
+        val total = all.sumOf { it.second.size }
+        assertTrue("解析出的条目过少（$total）——解析正则可能已失效", total > 1000)
+        assertTrue("应当存在 strings.xml", all.any { it.first == "strings.xml" })
+        assertFalse("app_name 应当存在", all.flatMap { it.third }.toMap()["app_name"].isNullOrBlank())
     }
 
     private companion object {

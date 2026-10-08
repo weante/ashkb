@@ -1,0 +1,484 @@
+[
+  {
+    "id": "itx-001",
+    "category": "interaction",
+    "title": "Methotrexate must be taken once weekly — mistaking it for a daily dose can be fatal",
+    "summary": "When used for rheumatic disease, methotrexate tablets are dosed once weekly; both in China and abroad there are poisoning reports of deaths caused by mistakenly taking it once daily.",
+    "severity_level": "high",
+    "applicable_scene": "Adding or adjusting methotrexate; a strong alert is shown when the frequency is set to weekly; any operation that changes the frequency",
+    "source_name": "National Medical Products Administration (NMPA), Adverse Drug Reaction Information Bulletin (Issue 75): Focus on the risk of misuse of methotrexate tablets (2017)",
+    "source_url": "https://www.nmpa.gov.cn/xxgk/yjjsh/ypblfytb/20170505153001254.html",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-04",
+    "review_due": "2027-03-04",
+    "version": 1,
+    "payload": {
+      "drug_a": "methotrexate",
+      "drug_b": null,
+      "risk_level": "high",
+      "effect": "Mistaken daily dosing causes drug accumulation and poisoning: agranulocytosis, thrombocytopenia and other effects; fatal cases have occurred",
+      "mechanism": "The dosing schedules for low-dose antirheumatic methotrexate and for antitumour methotrexate are completely different; the antirheumatic regimen is once weekly",
+      "evidence": [
+        "The bulletin cites Swissmedic data: from January 1997 to July 2015, 18 cases of poisoning from mistakenly taking methotrexate daily were received, mostly by the oral route, of which 4 were fatal.",
+        "Domestic case: in the National Adverse Drug Reaction Monitoring Center database, a rheumatic disease patient mistakenly took methotrexate tablets daily for 5 days between 2004 and 2016 (the correct regimen is once weekly, 7.5 mg per dose), developed agranulocytosis, thrombocytopenia and other signs of poisoning, and ultimately died."
+      ],
+      "action": [
+        "Take the dose on the same day of the week every week (pick an easy-to-remember day and set a weekly reminder)",
+        "Check the dosage and administration in the instructions each time you collect the medicine or change to a different strength",
+        "In this app the frequency for methotrexate can only be set to weekly; choosing any other value pops up this entry as a strong alert"
+      ],
+      "app_link": "medications.frequency='weekly' mandatory guidance; medication_logs weekly check-in"
+    }
+  },
+  {
+    "id": "itx-002",
+    "category": "interaction",
+    "title": "TNF inhibitors (using the adalimumab PI as an example): risk of serious infections and tuberculosis (boxed warning)",
+    "summary": "Treatment with TNF inhibitors can increase the risk of serious infections (including tuberculosis and opportunistic infections); tuberculosis screening and ongoing monitoring are needed before and during treatment.",
+    "severity_level": "high",
+    "applicable_scene": "Adding a TNF inhibitor (adalimumab / etanercept / infliximab and others); when fever or infection symptoms appear; tuberculosis screening due reminder",
+    "source_name": "Humira (adalimumab) Chinese prescribing information (AbbVie) · WARNINGS: Serious Infections and Malignancy; FDA HUMIRA label Boxed Warning (the quotations in this entry are taken verbatim from this adalimumab PI; class-level applicability is noted in the title parentheses) (all evidence quotations in this entry come from this source: https://www.rxabbvie.com/content/dam/rxabbvie/pdf/humira_CHI.pdf)",
+    "source_url": "https://www.rxabbvie.com/content/dam/rxabbvie/pdf/humira_CHI.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-04",
+    "review_due": "2027-03-04",
+    "version": 1,
+    "payload": {
+      "drug_a": "tnf_inhibitor_strict",
+      "drug_b": null,
+      "risk_level": "high",
+      "effect": "Increased risk of serious infections (including tuberculosis, bacterial sepsis, invasive fungal infections and other opportunistic infections), which can lead to hospitalisation or death; malignancies including lymphoma have also been reported in children and adolescents",
+      "mechanism": "TNF is an important mediator of the body's defences against infection; blocking it can reactivate latent infection (especially tuberculosis)",
+      "evidence": [
+        "Chinese PI boxed warning (WARNINGS: Serious Infections and Malignancy): Serious infections include tuberculosis (TB), bacterial sepsis, invasive fungal infections (such as histoplasmosis), and infections due to other opportunistic pathogens.",
+        "Chinese PI: HUMIRA should be discontinued; if the result is positive, tuberculosis treatment should be started before HUMIRA is begun.",
+        "Chinese PI: monitoring should be performed even if the initial latent tuberculosis test result is negative.",
+        "FDA Boxed Warning: HUMIRA should be discontinued if a patient develops a serious infection or sepsis during treatment."
+      ],
+      "action": [
+        "Complete tuberculosis screening (T-SPOT or PPD) before starting or continuing a TNF inhibitor — corresponds to the tb_screen periodic item in checkup_items",
+        "With fever (≥38.5 °C or persistent fever), contact your doctor before pausing the injections — linked to the infection_fever emergency workflow",
+        "Seek medical attention promptly for suspicious tuberculosis symptoms such as persistent cough, night sweats or weight loss",
+        "This app automatically shows a \"contact your doctor first\" alert on fever days in the injection card"
+      ],
+      "app_link": "checkup_items(tb_screen); emergency card infection_fever linkage; vitals.temperature threshold trigger"
+    }
+  },
+  {
+    "id": "itx-003",
+    "category": "interaction",
+    "title": "NSAIDs plus warfarin: increased bleeding risk",
+    "summary": "The warfarin label lists NSAIDs among the drugs that increase bleeding risk; INR must be monitored closely during concomitant use.",
+    "severity_level": "high",
+    "applicable_scene": "Check when adding warfarin or any NSAID; when bruising, black stools or unusual bleeding occur while both drugs are on the medication list",
+    "source_name": "FDA warfarin sodium tablet label · Table 3: Drugs that Can Increase the Risk of Bleeding (DailyMed generic-name label; the page was verified to contain 0 instances of COUMADIN, hence it is not called a brand-name label)",
+    "source_url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=2384f45e-ad8e-4367-b99d-a2c670f99d02",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-05",
+    "review_due": "2027-03-05",
+    "version": 1,
+    "payload": {
+      "drug_a": "nsaid",
+      "drug_b": "warfarin",
+      "risk_level": "high",
+      "effect": "Bleeding risk increases synergistically (warfarin itself can cause major or fatal bleeding, and NSAIDs are members of its drug list for bleeding risk)",
+      "mechanism": "Warfarin anticoagulation plus NSAID inhibition of platelet function and damage to the gastrointestinal mucosa — the two pathways add together",
+      "evidence": [
+        "Warfarin sodium label Table 3 (Drugs that Can Increase the Risk of Bleeding) lists Nonsteroidal Anti-Inflammatory Agents as an entire class, specifically mentioning celecoxib, diclofenac, ibuprofen, naproxen, piroxicam and others.",
+        "Warfarin sodium label Highlights (the original uses the generic name): WARFARIN SODIUM can cause major or fatal bleeding. Perform regular monitoring of INR in all treated patients."
+      ],
+      "action": [
+        "Monitor INR as prescribed while both drugs are on the medication list (corresponds to the lab periodic item in checkup_items)",
+        "Watch for bleeding signs: bruising, bleeding gums, black stools, blood in urine — contact your doctor immediately if any of these appear",
+        "Trigger this check before adding any NSAID (including over-the-counter ibuprofen)"
+      ],
+      "app_link": "medications cross-check when adding nsaid/warfarin; linked to the lab_results INR trend view"
+    }
+  },
+  {
+    "id": "itx-004",
+    "category": "interaction",
+    "title": "NSAIDs combined with glucocorticoids: gastrointestinal bleeding risk multiplied",
+    "summary": "Study data show that people taking both drugs have roughly a 12-fold higher risk of upper gastrointestinal bleeding than non-users; avoid stacking them long-term on your own.",
+    "severity_level": "high",
+    "applicable_scene": "When starting a corticosteroid (such as prednisone) while already on long-term NSAIDs, or the reverse; when stomach discomfort occurs while both drugs are on the list",
+    "source_name": "García Rodríguez LA, Hernández-Díaz S. Arthritis Res 2001 (PMC128885, DOI 10.1186/ar146); Venerito M et al. Pharmaceuticals 2010 (PMC4036660, DOI 10.3390/ph3072225, DOI",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC128885/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-05",
+    "review_due": "2027-03-05",
+    "version": 1,
+    "payload": {
+      "drug_a": "nsaid",
+      "drug_b": "glucocorticoid",
+      "risk_level": "high",
+      "effect": "Markedly additive upper gastrointestinal bleeding / perforation risk: oral corticosteroids alone about 2-fold, non-aspirin NSAIDs alone about 4-fold, and the combination rises to more than 12-fold (relative to non-users)",
+      "mechanism": "Corticosteroids delay mucosal repair while NSAIDs inhibit the synthesis of protective prostaglandins in the mucosa, a double insult to the gastrointestinal mucosal barrier",
+      "evidence": [
+        "PMC128885: The use of oral steroids has been found to reinforce the risk of UGIC associated with NA-NSAIDs. The risk was shown to be more than 12 times higher for concomitant users of both steroids and NA-NSAIDs.",
+        "PMC128885 abstract: the risk is dose-dependent and higher when several anti-inflammatory drugs are used at the same time.",
+        "PMC4036660: a meta-analysis (16 studies) showed that concomitant NSAIDs + glucocorticoids are associated with an increased risk of gastroduodenal bleeding (OR 1.83, 95% CI 1.20–2.78)."
+      ],
+      "action": [
+        "Whether both drugs need to be taken together and how long the corticosteroid course should last — ask your doctor explicitly at follow-up; do not extend it on your own",
+        "While both are on the list, watch for gastric warning symptoms: epigastric pain, black stools, vomiting blood — seek medical care immediately",
+        "When both drugs coexist, this app shows a \"gastric protection watch\" note on the medication card; it does not replace medical advice"
+      ],
+      "app_link": "medications risk tag gi_bleed linkage; together with fdg-001 (alcohol) forms the gastric protection alert group"
+    }
+  },
+  {
+    "id": "itx-005",
+    "category": "interaction",
+    "title": "Sulfasalazine: take with meals, drink plenty of water, have regular blood counts",
+    "summary": "Sulfonamide component: contraindicated in people with an allergy; blood counts every 2 weeks early in treatment; adequate fluid intake prevents crystalluria.",
+    "severity_level": "medium",
+    "applicable_scene": "Adding sulfasalazine; blood count recheck due reminder; when rash / sore throat / fever appear (warning symptoms of agranulocytosis)",
+    "source_name": "FDA AZULFIDINE EN-TABS (sulfasalazine delayed-release tablets) current label (DailyMed, Revised verified: 4/2025) — ⚠️ previously cited the DailyMed archive path (archiveid=119335), now replaced with the current version; domestic sulfasalazine enteric-coated tablet instructions (Dongguan People's Hospital page)",
+    "source_url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=b9ef541a-93c8-4428-ba45-398aa0b327d1",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-05",
+    "review_due": "2027-03-05",
+    "version": 1,
+    "payload": {
+      "drug_a": "sulfasalazine",
+      "drug_b": null,
+      "risk_level": "medium",
+      "effect": "Risks of non-standard use: crystalluria / stones (inadequate fluid intake), blood abnormalities such as agranulocytosis (missed monitoring), sulfonamide allergic reactions",
+      "mechanism": "This product contains a sulfonamide structure, with a cross-allergy risk; long-term treatment affects blood counts and liver and kidney function",
+      "evidence": [
+        "DailyMed: Patients should be instructed to take AZULFIDINE EN-tabs in evenly divided doses, preferably after meals, and to swallow the tablets whole.",
+        "DailyMed: Adequate fluid intake must be maintained in order to prevent crystalluria and stone formation.",
+        "DailyMed: Complete blood counts... should be performed before starting AZULFIDINE EN-tabs and every second week during the first three months of therapy.",
+        "Domestic instructions: contraindicated in people allergic to sulfonamides; drink plenty of water during treatment to maintain high urine output and prevent crystalluria."
+      ],
+      "action": [
+        "Swallow the tablet whole after meals (do not crush it); take in evenly divided doses",
+        "Drink enough water every day; tell your doctor promptly if urination becomes uncomfortable",
+        "Blood counts before treatment and every 2 weeks for the first three months — corresponds to setting a lab periodic item in checkup_items (this app schedules the reminder automatically)",
+        "Contraindicated in people with a known sulfonamide / salicylate allergy — cross-checked against allergy history on entry",
+        "Seek medical care immediately for an unexplained rash, sore throat or fever (the warning combination for blood abnormalities) and have blood tests done"
+      ],
+      "app_link": "checkup_items(blood count q2w×3 months auto-suggested); profile.allergies sulfonamide cross-check"
+    }
+  },
+  {
+    "id": "itx-006",
+    "category": "interaction",
+    "title": "Folic acid supplementation weekly during methotrexate (per medical advice)",
+    "summary": "Multiple national guidelines strongly recommend supplementing at least 5 mg of folic acid per week during methotrexate therapy to reduce side effects — the specific regimen is per medical advice.",
+    "severity_level": "medium",
+    "applicable_scene": "Prompt about folic acid supplementation when adding methotrexate; linked prompt when side effects (mouth ulcers / nausea) appear",
+    "source_name": "3E Initiative multinational standardised recommendations (Ann Rheum Dis 2008); British Society for Rheumatology (BSR) recommendation",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2689523/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-06",
+    "review_due": "2027-03-06",
+    "version": 1,
+    "payload": {
+      "drug_a": "methotrexate",
+      "drug_b": "folic_acid",
+      "risk_level": "medium",
+      "effect": "Without folic acid supplementation: increased risk of side effects such as mouth ulcers and nausea (this entry is a \"supplementation support\" warning, not a risk-additive one)",
+      "mechanism": "Methotrexate antagonises folate metabolism; folic acid supplementation can ease its effects on proliferating tissues (mucosa / bone marrow)",
+      "evidence": [
+        "3E Initiative Recommendation 3 (Ann Rheum Dis 2009;68:758-764, PMID 19033291, https://pmc.ncbi.nlm.nih.gov/articles/PMC2689523/): Prescription of at least 5 mg folic acid per week with methotrexate therapy is strongly recommended. (evidence level 1a / A)",
+        "BSR (British Society for Rheumatology) recommendation: patients on methotrexate are coprescribed a minimum dose of 5 mg folic acid once a week. ⚠️ The original source of this BSR recommendation could not be verified this time (two PubMed searches returned no match), so it is marked unverified; the same folic acid dose recommendation is supported by the 3E Initiative above (PMID 19033291)."
+      ],
+      "action": [
+        "When methotrexate is entered, the app suggests recording \"folic acid\" under nutrients (dose and days per medical advice; commonly on days other than the methotrexate day)",
+        "Confirm the folic acid regimen at follow-up (whether to take it / the dose / which day)",
+        "This entry gives no specific dose recommendation — follow medical advice"
+      ],
+      "app_link": "supplements suggested item; linked to the medications(methotrexate) add flow"
+    }
+  },
+  {
+    "id": "itx-007",
+    "category": "interaction",
+    "title": "Long-term sulfasalazine can cause folate deficiency",
+    "summary": "Sulfasalazine inhibits folate absorption and metabolism and may cause blood abnormalities related to folate deficiency; whether to supplement folic acid is per medical advice.",
+    "severity_level": "medium",
+    "applicable_scene": "Long-term sulfasalazine treatment (>3 months); when blood counts suggest macrocytic changes",
+    "source_name": "UK Salazopyrin (sulfasalazine) prescribing information Section 4.4",
+    "source_url": "https://www.medicines.org.uk/emc/product/3838/smpc/print",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-06",
+    "review_due": "2027-03-06",
+    "version": 1,
+    "payload": {
+      "drug_a": "sulfasalazine",
+      "drug_b": "folic_acid",
+      "risk_level": "medium",
+      "effect": "Folate deficiency can cause serious blood abnormalities such as megaloblastic anaemia and pancytopenia",
+      "mechanism": "Oral sulfasalazine inhibits the absorption and metabolism of folic acid",
+      "evidence": [
+        "Section 4.4: Oral sulfasalazine inhibits the absorption and metabolism of folic acid and may cause folic acid deficiency, potentially resulting in serious blood disorders (e.g., macrocytosis and pancytopenia), this can be normalised by administration of folic acid or folinic acid (leucovorin)."
+      ],
+      "action": [
+        "On the same track as itx-005 blood count monitoring: check blood counts regularly during long-term treatment",
+        "Ask at follow-up whether folic acid supplementation is needed (the label states it can be corrected with folic acid / folinic acid)",
+        "When sulfasalazine is entered, link and show this entry together with itx-005"
+      ],
+      "app_link": "forms the sulfasalazine key-points group with itx-005; checkup_items(blood count)"
+    }
+  },
+  {
+    "id": "itx-008",
+    "category": "interaction",
+    "title": "SSRI antidepressants combined with NSAIDs greatly increase bleeding risk",
+    "summary": "Studies show a markedly increased gastroduodenal bleeding risk with the SSRI + NSAID combination (OR about 12); proactively tell your doctor about all medicines you take for other conditions.",
+    "severity_level": "high",
+    "applicable_scene": "When adding an SSRI (sertraline / escitalopram and others) while already on NSAIDs, or the reverse; medication list check for patients with comorbid depression",
+    "source_name": "Venerito M et al. Pharmaceuticals 2010 (PMC4036660)",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4036660/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-06",
+    "review_due": "2027-03-06",
+    "version": 1,
+    "payload": {
+      "drug_a": "nsaid",
+      "drug_b": "ssri",
+      "risk_level": "high",
+      "effect": "Markedly increased gastroduodenal bleeding risk (observational study OR 12.2, 95% CI 7.1–19.5)",
+      "mechanism": "SSRIs reduce platelet 5-HT (impairing platelet aggregation) plus NSAID mucosal damage — two pathways",
+      "evidence": [
+        "PMC4036660: concomitant use of an SSRI with an NSAID (or low-dose aspirin) can further increase the risk of gastroduodenal bleeding; pooled risk OR 12.2 (95% CI 7.1–19.5)."
+      ],
+      "action": [
+        "While both drugs are on the list, watch for black stools / vomiting blood / unusual bruising, and seek medical care immediately if they occur",
+        "If both drugs must continue, confirm a gastric protection plan at follow-up (whether to add a gastroprotective drug is a medical decision)",
+        "This check is triggered when an SSRI medicine is entered"
+      ],
+      "app_link": "medications cross-check on addition; part of the gastric protection alert group with itx-004 / fdg-001"
+    }
+  },
+  {
+    "id": "itx-009",
+    "category": "interaction",
+    "title": "Taking several anti-inflammatory painkillers at once: risk multiplied",
+    "summary": "Studies show the relative risk of upper gastrointestinal complications can reach 18-fold when 3–4 anti-inflammatory drugs are taken at the same time — do not stack \"painkillers\" on your own.",
+    "severity_level": "high",
+    "applicable_scene": "When NSAIDs / corticosteroids / aspirin-type drugs total ≥2 in medications; when you feel the painkiller is not enough and want to add another",
+    "source_name": "García Rodríguez LA, Hernández-Díaz S. Arthritis Res 2001 (PMC128885, DOI 10.1186/ar146; same source as itx-004)",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC128885/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "drug_a": "nsaid",
+      "drug_b": "anti_inflammatory_multi",
+      "risk_level": "high",
+      "effect": "Upper gastrointestinal bleeding / perforation risk rises steeply with the number of stacked anti-inflammatory drugs (2 combined more than 8-fold; 3–4 drugs RR 18.0, 95% CI 9.0–36.1)",
+      "mechanism": "The same mucosal injury mechanism stacks with no ceiling for benefit; dose-dependent and class-dependent",
+      "evidence": [
+        "PMC128885: Overall, the risk is dose dependent and is greater with more than one anti-inflammatory drug taken simultaneously.",
+        "PMC128885: The use of NA-NSAIDs concomitantly with oral steroids, aspirin, or high doses of acetaminophen increases the risk of UGIC greater than eightfold.",
+        "PMC128885 (supplementary section): relative risk 18.0 for taking 3 or 4 anti-inflammatory drugs at the same time."
+      ],
+      "action": [
+        "\"One is not enough\" is a follow-up topic, not a reason to add a drug — poorly controlled pain is itself an indication to see your doctor (linked to R08)",
+        "Include OTC painkillers (ibuprofen bought at the pharmacy and the like) in the medication list too",
+        "When any member of the gastric protection alert group (fdg-001 / itx-004 / itx-008 / this entry) is triggered, the whole group is shown"
+      ],
+      "app_link": "medications anti-inflammatory drug count (≥2 drugs active simultaneously triggers the whole group); group-level warning bar on the \"My - Medications\" page"
+    }
+  },
+  {
+    "id": "itx-010",
+    "category": "interaction",
+    "title": "Avoid live vaccines during biologic therapy: hold 1 dosing interval before vaccination, then hold 4 weeks after",
+    "summary": "Live vaccines are contraindicated during TNF inhibitor therapy; the ACR 2022 vaccination guideline gives an explicit time window (hold 1 dosing interval before vaccination / hold 4 weeks after) — the vaccination plan must be coordinated with your treating physician.",
+    "severity_level": "high",
+    "applicable_scene": "When a user on a TNF inhibitor (biologic class) adds a vaccine plan (live vaccine entered in vaccine_records); physician confirmation checkbox logic",
+    "source_name": "2022 ACR vaccination guideline (PMC10291822); FDA adalimumab label (2024) (all evidence quotations in this entry come from this source: https://pmc.ncbi.nlm.nih.gov/articles/PMC10291822/)",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10291822/",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-10",
+    "review_due": "2027-03-10",
+    "version": 1,
+    "payload": {
+      "drug_a": "tnf_inhibitor",
+      "drug_b": "live_vaccine",
+      "risk_level": "high",
+      "effect": "Live vaccines (attenuated strains) can cause disseminated infection under immunosuppression; FDA label: Live vaccines: Avoid use",
+      "mechanism": "TNF blockade weakens immune containment of attenuated live pathogens",
+      "evidence": [
+        "ACR 2022: bDMARDs (including etanercept, adalimumab, certolizumab, golimumab, infliximab) Hold before live attenuated virus vaccine administration: 1 dosing interval; Hold after: 4 weeks.",
+        "FDA adalimumab label: Live vaccines: Avoid use with Adalimumab-aaty (5.10, 7.3).",
+        "2015 review: One thing that is definite is that live vaccines are contraindicated during treatment with these agents."
+      ],
+      "action": [
+        "Add a live vaccine record (vaccine_records.type=live) → if the medication list contains a biologic: show this entry + mandatory physician confirmation (R25 doctor_confirm status)",
+        "Non-live vaccines (inactivated / recombinant) are not restricted by this entry (ACR: may be given as usual)",
+        "Vaccination timing window prompt: last injection → wait 1 dosing interval → vaccinate → resume injections 4 weeks later"
+      ],
+      "app_link": "vaccine_records entry validation (live × biologic active → mandatory doctor_confirm); checkup_items vaccine item; vaccine topic on the follow-up preparation page"
+    }
+  },
+  {
+    "id": "itx-011",
+    "category": "interaction",
+    "title": "Methotrexate and NSAIDs may be combined but require monitoring as prescribed",
+    "summary": "Low-dose MTX (for rheumatic disease) with NSAIDs is common and not absolutely contraindicated, but the FDA label explicitly requires caution and monitoring; severe toxicity has been reported with high-dose combinations.",
+    "severity_level": "medium",
+    "applicable_scene": "Check prompt when the medication list contains both MTX and NSAIDs; blood count / liver and kidney function recheck due",
+    "source_name": "FDA METHOTREXATE injection current label (DailyMed, title verified as \"METHOTREXATE injection\", Revised: 12/2025) — ⚠️ previously cited the DailyMed archive path (archiveid=10507), now replaced with the current version; the METHOTREXATE tablet label also carries the same class of NSAID warning; NHS SATH methotrexate safety management materials",
+    "source_url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=dd035a9f-cd40-4314-b9d8-2294b8a924e2",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-10",
+    "review_due": "2027-03-10",
+    "version": 1,
+    "payload": {
+      "drug_a": "methotrexate",
+      "drug_b": "nsaid",
+      "risk_level": "medium",
+      "effect": "NSAIDs can reduce renal tubular secretion of MTX and increase toxicity (animal-model evidence + FDA warning); low-dose concomitant use is clinically common and managed with standard monitoring",
+      "mechanism": "Competition for renal tubular secretion — the risk is manageable at low doses",
+      "evidence": [
+        "FDA METHOTREXATE injection label (DailyMed, https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=dd035a9f-cd40-4314-b9d8-2294b8a924e2, Revised 12/2025): Unexpectedly severe (sometimes fatal) bone marrow suppression, aplastic anemia, and gastrointestinal toxicity have been reported with concomitant administration of methotrexate (usually in high dosage) along with some NSAIDs.",
+        "FDA METHOTREXATE injection label (same setid link): Caution should be used when NSAIDs or salicylates are administered concomitantly with lower doses of methotrexate. These drugs have been reported to reduce the tubular secretion of methotrexate.",
+        "NHS SATH: NSAIDs with low-dose aspirin (<300 mg) unlikely to cause any clinically significant adverse effects and treatment can be continued."
+      ],
+      "action": [
+        "Both drugs on the list → prompt \"the combination is common; monitor blood counts and liver and kidney function as prescribed\" — neither alarmist nor hiding the warning",
+        "checkup_items linkage: the blood count / liver and kidney cycles for MTX users are scheduled as usual (same pattern as itx-005 sulfasalazine)",
+        "This entry is not an \"avoid the combination\" recommendation — in AS clinical practice MTX + NSAIDs commonly coexist, and the app does not make decisions for your doctor"
+      ],
+      "app_link": "medications dual-drug detection (MTX active + NSAID active → medium alert card); checkup_items(lab) linkage"
+    }
+  },
+  {
+    "id": "itx-012",
+    "category": "interaction",
+    "title": "ACR 2022: prednisone ≥20 mg/day should defer non-live vaccines other than influenza; live vaccines are conditionally deferred for everyone on immunosuppressive therapy",
+    "summary": "Two separate things — do not mix them up: ① the \"prednisone ≥20 mg/day\" dose threshold applies only to **non-live vaccines other than influenza** (taper to <20 mg/day before vaccinating; the influenza vaccine is given as usual); ② **live vaccines** are a **class-level** recommendation — deferral is recommended for all RMD patients on immunosuppressive drugs, **regardless of corticosteroid dose**.",
+    "severity_level": "medium",
+    "applicable_scene": "Entering a vaccine plan during pulse / high-dose corticosteroid therapy; validation of vaccine records against the corticosteroid dose on the medication list",
+    "source_name": "2022 ACR vaccination guideline (PMC10291822) Table 4 (non-live vaccine dose stratification) + Table 5 and body text (class-level recommendation for live vaccines)",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10291822/",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-10",
+    "review_due": "2027-03-10",
+    "version": 1,
+    "payload": {
+      "drug_a": "glucocorticoid_high_dose",
+      "drug_b": "live_vaccine",
+      "risk_level": "medium",
+      "effect": "① (non-live vaccines, dose condition): when the prednisone equivalent is ≥20 mg/day, non-live vaccines other than the influenza vaccine should be deferred until the dose is tapered to <20 mg/day. ② (live vaccines, class condition): for all rheumatic disease patients taking immunosuppressive drugs, live vaccines (attenuated strains) are conditionally recommended for deferral — this recommendation does not depend on corticosteroid dose and also applies to those on ≤10 mg/day.",
+      "mechanism": "Vaccine response and safety window under systemic immunosuppression (ACR Table 4 stratifies by corticosteroid dose; Table 5 gives hold windows for live vaccines by drug class)",
+      "evidence": [
+        "ACR 2022 Table 4 title: Whether to give or defer non–live attenuated vaccinations in patients taking glucocorticoids regardless of disease activity (the two columns are Influenza vaccination | Other non–live attenuated vaccinations).",
+        "ACR 2022 Table 4: Prednisone ≥20 mg daily row = Give | Defer †; † = Defer vaccination until glucocorticoids are tapered to the equivalent of prednisone <20 mg daily. (The Prednisone ≤10 mg and >10–<20 mg rows are both Give | Give)",
+        "ACR 2022 body text: For patients with RMD who are taking the equivalent of prednisone ≥20 mg daily, deferring non–live attenuated vaccinations, other than influenza vaccination, until glucocorticoids are tapered to the equivalent of prednisone <20 mg daily is conditionally recommended.",
+        "ACR 2022 body text (live vaccines · class-level): For patients with RMD who are taking immunosuppressive medication, deferring live attenuated vaccines is conditionally recommended.",
+        "ACR 2022 body text: For patients with RMD, holding immunosuppressive medication for an appropriate period before and 4 weeks after live attenuated virus vaccination is conditionally recommended. (Table 5: Glucocorticoids — 4 weeks before vaccination / 4 weeks after vaccination)"
+      ],
+      "action": [
+        "When a corticosteroid is on the medication list and a non-live vaccine (other than influenza) is entered → show this entry; confirm with your doctor whether the \"prednisone equivalent ≥20 mg/day\" threshold is met (this app does not parse doses; see the wording note below)",
+        "When a corticosteroid is on the list and a live vaccine is entered → show this entry + physician confirmation; this is a class-level recommendation independent of corticosteroid dose",
+        "Honest wording: ACR's \"≥20 mg/day\" is a **pure dose condition**, and a full-text search of the guideline for \"14 days\" returns 0 hits — **there is no such thing as \"must be used continuously for 2 weeks\"**; this entry has removed \"more than 2 weeks / ≥14 days\" from the older title",
+        "Honest wording: this app does not parse mg/day and cannot convert to equivalent doses (the older wording \"dose and duration taken automatically from the medication list\" did not match the implementation and has been deleted); ACR's * footnote is Or the equivalent dose of any other glucocorticoid formulation"
+      ],
+      "app_link": "vaccine_records × medications corticosteroid combination validation (prompt whenever a corticosteroid is on the list; the dose is judged by the doctor); forms the two-entry vaccine group with itx-010 (biologic / corticosteroid trigger conditions)"
+    }
+  },
+  {
+    "id": "itx-013",
+    "category": "interaction",
+    "title": "NSAIDs can weaken antihypertensive drugs; monitor blood pressure and renal function when combined",
+    "summary": "NSAIDs can blunt the antihypertensive effect of ACEIs / ARBs / beta-blockers; in elderly patients, those who are volume-depleted, or those with renal impairment, NSAID + ACEI/ARB carries a risk of acute renal failure — a concern for AS patients with comorbid hypertension (linked to the edu-001 cardiovascular topic).",
+    "severity_level": "medium",
+    "applicable_scene": "When the medication list contains both NSAIDs and antihypertensives (ACEI/ARB/diuretic/beta-blocker); when blood pressure records show an abnormal trend",
+    "source_name": "FDA naproxen / diclofenac / enalapril labels",
+    "source_url": "https://dailymed.nlm.nih.gov/dailymed/fda/fdaDrugXsl.cfm?setid=12202ef3-c65e-45a6-88ed-5d945d8fd41c",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "drug_a": "nsaid",
+      "drug_b": "antihypertensive",
+      "risk_level": "medium",
+      "effect": "Reduced antihypertensive effect (blood pressure rises); risk of worsening renal function in specific populations (possible acute renal failure)",
+      "mechanism": "Prostaglandin inhibition → reduced vasodilation + impaired regulation of renal blood flow",
+      "evidence": [
+        "FDA naproxen label (DailyMed, see source_url for this entry): NSAIDs may diminish the antihypertensive effect of angiotensin converting enzyme (ACE) inhibitors, angiotensin receptor blockers (ARBs), or beta-blockers.",
+        "FDA naproxen label (same DailyMed source): In patients who are elderly, volume-depleted (including those on diuretic therapy), or have renal impairment, co-administration of an NSAID with ACE inhibitors or ARBs may result in deterioration of renal function, including possible acute renal failure.",
+        "FDA diclofenac label: Monitor blood pressure (BP) during the initiation of NSAID treatment and throughout the course of therapy."
+      ],
+      "action": [
+        "Dual-class detection on the medication list → prompt \"intensify blood pressure monitoring when starting an NSAID\" (required by the FDA text)",
+        "Link the vitals blood pressure item to the medication list: when an NSAID or an antihypertensive is added, generate a suggestion for more frequent BP monitoring (a follow-up topic)",
+        "Elderly / renal impairment users (profile flag) → the risk is displayed upgraded to high"
+      ],
+      "app_link": "medications dual-class detection; vitals(bp) monitoring suggestion; follow-up topic generation (linked to the edu-001 cardiovascular group)"
+    }
+  },
+  {
+    "id": "itx-014",
+    "category": "interaction",
+    "title": "Long-term / high-risk NSAID use: discuss with your doctor whether to add a PPI for gastric protection",
+    "summary": "High-risk features for NSAID-related ulcers are well defined (advanced age / previous ulcer / high dose / concomitant anticoagulant or corticosteroid); in ACG gastric protection strategies a PPI is one option — whether to combine is for the doctor to judge.",
+    "severity_level": "low",
+    "applicable_scene": "Medication list prompt for long-term NSAID users; gastric protection alert group linkage (same group as itx-009 multi-drug / itx-004 corticosteroid / itx-008 SSRI)",
+    "source_name": "ACG Guidelines for prevention of NSAID-related ulcer complications (Am J Gastroenterol 2009;104(3):728-38, PMID 19240698, DOI 10.1038/ajg.2009.115) — ⚠️ this is the 2009 version of the guideline and no newer ACG version has appeared since; AAFP PUD review; also: PMC11657060 physician attitude survey study (**not a guideline**, for context only)",
+    "source_url": "https://doi.org/10.1038/ajg.2009.115",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "drug_a": "nsaid_longterm",
+      "drug_b": "ppi",
+      "risk_level": "low",
+      "positive_interaction": true,
+      "effect": "Positive combination: a PPI reduces NSAID-related gastroduodenal ulcer risk (clear benefit in high-risk groups)",
+      "mechanism": "Acid suppression → a better environment for repair of NSAID mucosal injury",
+      "evidence": [
+        "ACG Guidelines for prevention of NSAID-related ulcer complications (Am J Gastroenterol 2009;104(3):728-38, PMID 19240698, https://doi.org/10.1038/ajg.2009.115); the PMC11657060 physician attitude survey study also states: Older age, previous upper gastrointestinal events, concurrent use of warfarin or corticosteroids, and high-dose NSAID therapy have been identified as high-risk characteristics.",
+        "AAFP (American Academy of Family Physicians) PUD review ⚠️ the URL of the specific article could not be verified, so it is marked unverified: Recommended therapies for preventing PUD in these patients include misoprostol and proton pump inhibitors."
+      ],
+      "action": [
+        "High-risk features met (age / ulcer history / concomitant corticosteroid or anticoagulant / high dose) → a follow-up topic \"is a gastric protection plan needed?\" is generated automatically",
+        "The app does not advise buying a PPI to take long-term on your own — it should be prescribed by a doctor (long-term PPI use itself raises deprescribing issues)",
+        "This is a positive entry: combining is protection, not risk — payload.risk_level=low with positive_interaction flagged"
+      ],
+      "app_link": "follow-up topic generation; gastric protection group display linkage (positive entry within the group); medications high-risk feature calculation"
+    }
+  },
+  {
+    "id": "itx-015",
+    "category": "interaction",
+    "title": "Alendronate: take on an empty stomach with plain water in the morning, stay upright 30 minutes, separate from calcium and food",
+    "summary": "A bisphosphonate commonly used for comorbid osteoporosis in AS — the administration rules are strict (empty stomach with plain water / upright 30 min / 30 min apart from food and calcium); getting the rules wrong directly reduces efficacy and increases oesophageal irritation.",
+    "severity_level": "medium",
+    "applicable_scene": "Medication-rule seed when adding alendronate; check-in plan generation (a separate early-morning slot); detection of conflicts with calcium supplement timing",
+    "source_name": "FDA FOSAMAX (alendronate sodium) current label · Medication Guide section (DailyMed, Revised verified: 2/2026) — ⚠️ previously cited the 2004 label, now replaced with the current version; that page uses the term Medication Guide, not Patient Information",
+    "source_url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=14e931fd-2c5f-4d90-b7db-5980706f4a56",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "drug_a": "alendronate",
+      "drug_b": "food_calcium",
+      "risk_level": "medium",
+      "effect": "Taken with food / calcium / other medicines → absorption markedly reduced (FOSAMAX is effective only if it is taken when your stomach is empty); lying down → risk of oesophageal irritation",
+      "mechanism": "Oral bisphosphonate bioavailability is very low and is impaired by food; direct irritation of the oesophageal mucosa",
+      "evidence": [
+        "FDA: After getting up for the day and before taking your first food, drink, or other medicine, swallow your FOSAMAX tablet with a full glass (6-8 oz) of plain water only.",
+        "FDA: After swallowing your FOSAMAX tablet, do not lie down – stay fully upright (sitting, standing, or walking) for at least 30 minutes.",
+        "FDA: wait at least 30 minutes before taking your first food, drink, or other medicine of the day, including antacids, calcium, and other supplements and vitamins.",
+        "FDA: Do not take FOSAMAX at bedtime or before getting up for the day."
+      ],
+      "action": [
+        "medication_plans generation rule: the alendronate check-in is placed in a separate \"after getting up in the morning\" slot (before breakfast and morning medicines)",
+        "Automatic detection of conflicts with calcium supplement check-in times in supplements (alert if the interval is <30 min)",
+        "FDA warning in parallel: chest pain / new or worsening heartburn / difficulty swallowing after taking the dose → stop the drug and contact your doctor (red_flag)"
+      ],
+      "app_link": "medication_plans morning slot rule; supplements conflict detection; medications(osteoporosis tag group)"
+    }
+  }
+]

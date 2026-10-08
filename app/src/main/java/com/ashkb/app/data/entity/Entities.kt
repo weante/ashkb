@@ -1,9 +1,13 @@
 package com.ashkb.app.data.entity
 
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.ashkb.app.R
 
 /**
  * P1 实体集：profile / medications / medication_logs / kb_entries。
@@ -11,13 +15,14 @@ import androidx.room.PrimaryKey
  * V3 裁剪已生效：medication_logs 无 operator / source_cmd_id。
  */
 
-enum class MedClass(val label: String) {
-    NSAID("NSAIDs 消炎镇痛"),
-    CSDMARD("传统 DMARD"),
-    BIOLOGIC("生物制剂"),
-    JAK("JAK 抑制剂"),
-    GLUCOCORTICOID("糖皮质激素"),
-    OTHER("其他");
+/** 药物大类。v1.2.5（i18n）：展示文案改为字符串资源 `labelRes`（原先硬编码中文）。 */
+enum class MedClass(@StringRes val labelRes: Int) {
+    NSAID(R.string.enum_med_class_nsaid),
+    CSDMARD(R.string.enum_med_class_csdmard),
+    BIOLOGIC(R.string.enum_med_class_biologic),
+    JAK(R.string.enum_med_class_jak),
+    GLUCOCORTICOID(R.string.enum_med_class_glucocorticoid),
+    OTHER(R.string.enum_med_class_other);
 
     companion object {
         fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: OTHER
@@ -36,35 +41,49 @@ enum class MedClass(val label: String) {
  * 于是 `label` 与 `plain` 现在字面相同。**两个字段仍然并存**：`plain` 是急救卡的
  * 唯一来源，将来谁再往 `label` 加提示也不会漏进急救卡——v1.2.1 那个缺陷不会复发。
  *
+ * **v1.2.5（i18n）**：两个字段都改成字符串资源（`labelRes` / `plainRes`）。
+ * 「两条资源」这个结构必须保留——上面那条「字面相同但语义不同」的约束在 i18n 下更硬：
+ * `plainRes` 是急救卡唯一来源，将来谁往 `labelRes` 加表单提示，也不该跟着进急救卡。
+ *
  * [hidden] = 不出现在频次选择列表里，但**枚举项必须保留**：
  * 历史数据里已落库的 key（如 "Q8H"）仍要能解析出正确频次，
  * 删掉枚举项会让 `fromKey` 退回 DAILY，把「每 8 小时」静默改成「每日」。
  */
-enum class MedFrequency(val label: String, val plain: String, val hidden: Boolean = false) {
-    DAILY("每日", "每日"),
-    BID("每日两次", "每日两次"),
-    Q8H("每 8 小时", "每 8 小时", hidden = true),
-    WEEKLY("每周一次", "每周一次"),
-    BIW("每周两次", "每周两次"),
-    Q2W("每两周一次", "每两周一次"),
-    MONTHLY("每月一次", "每月一次"),
-    PRN("按需服用", "按需服用"),
-    CUSTOM("自定义周期", "自定义周期");
+enum class MedFrequency(@StringRes val labelRes: Int, @StringRes val plainRes: Int, val hidden: Boolean = false) {
+    DAILY(R.string.enum_med_frequency_daily, R.string.enum_med_frequency_daily_plain),
+    BID(R.string.enum_med_frequency_bid, R.string.enum_med_frequency_bid_plain),
+    Q8H(R.string.enum_med_frequency_q8h, R.string.enum_med_frequency_q8h_plain, hidden = true),
+    WEEKLY(R.string.enum_med_frequency_weekly, R.string.enum_med_frequency_weekly_plain),
+    BIW(R.string.enum_med_frequency_biw, R.string.enum_med_frequency_biw_plain),
+    Q2W(R.string.enum_med_frequency_q2w, R.string.enum_med_frequency_q2w_plain),
+    MONTHLY(R.string.enum_med_frequency_monthly, R.string.enum_med_frequency_monthly_plain),
+    PRN(R.string.enum_med_frequency_prn, R.string.enum_med_frequency_prn_plain),
+    CUSTOM(R.string.enum_med_frequency_custom, R.string.enum_med_frequency_custom_plain);
 
     companion object {
         fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: DAILY
     }
 }
 
-enum class CheckStatus(val label: String) { DONE("完成"), PARTIAL("部分完成"), SKIPPED("跳过") }
+/** 打卡状态（完成 / 部分完成 / 跳过）。v1.2.5（i18n）：文案改为字符串资源 `labelRes`。 */
+enum class CheckStatus(@StringRes val labelRes: Int) {
+    DONE(R.string.enum_check_status_done),
+    PARTIAL(R.string.enum_check_status_partial),
+    SKIPPED(R.string.enum_check_status_skipped),
+}
 
-enum class SkipReason(val label: String) {
-    TOO_BUSY("太忙"), UNWELL("身体不适"), HOSPITALIZED("住院"),
-    SIDE_EFFECT("疑似副作用"),
+/** 漏服 / 跳过原因。v1.2.5（i18n）：文案改为字符串资源 `labelRes`。 */
+enum class SkipReason(@StringRes val labelRes: Int) {
+    TOO_BUSY(R.string.enum_skip_reason_too_busy),
+    UNWELL(R.string.enum_skip_reason_unwell),
+    HOSPITALIZED(R.string.enum_skip_reason_hospitalized),
+    SIDE_EFFECT(R.string.enum_skip_reason_side_effect),
     // C5（v1.0.37）：对齐规划口径的漏服原因（遗忘 / 外出 / 药物用完）。
     // 新增项追加在 OTHER 之前——枚举 key 以 name 存库，追加不影响历史数据。
-    FORGOT("遗忘"), OUTING("外出"), RUN_OUT("药物用完"),
-    OTHER("其他");
+    FORGOT(R.string.enum_skip_reason_forgot),
+    OUTING(R.string.enum_skip_reason_outing),
+    RUN_OUT(R.string.enum_skip_reason_run_out),
+    OTHER(R.string.enum_skip_reason_other);
 
     companion object {
         /**
@@ -77,8 +96,12 @@ enum class SkipReason(val label: String) {
     }
 }
 
-enum class Reaction(val label: String) {
-    NONE("无"), MILD("轻微"), MODERATE("中等"), SEVERE("严重")
+/** 注射 / 用药后不良反应程度。v1.2.5（i18n）：文案改为字符串资源 `labelRes`。 */
+enum class Reaction(@StringRes val labelRes: Int) {
+    NONE(R.string.enum_reaction_none),
+    MILD(R.string.enum_reaction_mild),
+    MODERATE(R.string.enum_reaction_moderate),
+    SEVERE(R.string.enum_reaction_severe),
 }
 
 /**
@@ -87,17 +110,20 @@ enum class Reaction(val label: String) {
  * `key` 即 `medication_logs.inj_site` 的**存库值**（勿改——改了历史记录就与中文标签对不上），
  * `label` 为展示用中文。
  *
+ * v1.2.5（i18n）：`label` → `labelRes`（字符串资源）。`key` **仍是英文存库值、保持不动**：
+ * 它是数据不是文案，展示层按 `labelRes` 出中文/英文，落库值永远是 `thigh_l` 这类键。
+ *
  * 此前只有「今日打卡」的选择器（`TodayScreen` 里的私有 `injSites()`）知道这层映射，
  * 药单的「用药记录」直接打印存库值，于是记录里显示的是 `thigh_l` 这种英文键。
  * 收拢到这里，选择侧与展示侧共用一份映射。
  */
-enum class InjSite(val key: String, val label: String) {
-    LEFT_THIGH("thigh_l", "左大腿"),
-    RIGHT_THIGH("thigh_r", "右大腿"),
-    LEFT_ABDOMEN("abdomen_l", "左腹部"),
-    RIGHT_ABDOMEN("abdomen_r", "右腹部"),
-    LEFT_ARM("arm_l", "左上臂"),
-    RIGHT_ARM("arm_r", "右上臂");
+enum class InjSite(val key: String, @StringRes val labelRes: Int) {
+    LEFT_THIGH("thigh_l", R.string.enum_inj_site_left_thigh),
+    RIGHT_THIGH("thigh_r", R.string.enum_inj_site_right_thigh),
+    LEFT_ABDOMEN("abdomen_l", R.string.enum_inj_site_left_abdomen),
+    RIGHT_ABDOMEN("abdomen_r", R.string.enum_inj_site_right_abdomen),
+    LEFT_ARM("arm_l", R.string.enum_inj_site_left_arm),
+    RIGHT_ARM("arm_r", R.string.enum_inj_site_right_arm);
 
     companion object {
         /**
@@ -276,18 +302,24 @@ data class CheckupAttachment(
     @ColumnInfo(name = "deleted_at") val deletedAt: String? = null,
 )
 
-/** R17 停药原因分类分级（D-2 §7：自行停药触发警示） */
-enum class StopReason(val label: String, val warning: String?) {
-    DOCTOR_SCHEDULED("医嘱计划停（疗程结束）", null),
-    DOCTOR_ADJUST("医嘱调整（换药 / 减量）", null),
-    SELF_STOPPED("自行停药", "自行停药有病情反弹风险——生物制剂尤其不建议自行停用或减量，任何调整请与风湿科医生确认。"),
-    SIDE_EFFECT("副作用", "建议联系医生说明副作用表现，由医生判断停药 / 换药或对症处理。"),
-    EXAM_RESULT("检查结果调整", null),
+/**
+ * R17 停药原因分类分级（D-2 §7：自行停药触发警示）。
+ *
+ * v1.2.5（i18n）：`label` → `labelRes`、`warning` → `noteRes`（可空的咨询性提示文案）。
+ * `noteRes` **保持可空**：「这条原因有没有提示」是业务事实（判读逻辑见 domain/StopWarning），
+ * 不能为统一类型塞一个占位资源进去。
+ */
+enum class StopReason(@StringRes val labelRes: Int, @StringRes val noteRes: Int?) {
+    DOCTOR_SCHEDULED(R.string.enum_stop_reason_doctor_scheduled, null),
+    DOCTOR_ADJUST(R.string.enum_stop_reason_doctor_adjust, null),
+    SELF_STOPPED(R.string.enum_stop_reason_self_stopped, R.string.enum_stop_reason_self_stopped_note),
+    SIDE_EFFECT(R.string.enum_stop_reason_side_effect, R.string.enum_stop_reason_side_effect_note),
+    EXAM_RESULT(R.string.enum_stop_reason_exam_result, null),
     // C5（v1.0.37）：对齐规划口径的停药原因（感染发热 / 准备手术 / 经济原因）
-    INFECTION("感染发热", "感染发热期间免疫抑制类药物可能需暂缓，请先联系医生确认是否停药及何时恢复。"),
-    SURGERY("准备手术", "部分药物（尤其生物制剂 / 免疫抑制剂）需术前停用并错开手术窗口，请与医生确认停药时间。"),
-    FINANCIAL("经济原因", "因经济原因停药请与医生沟通替代方案，不建议自行中断治疗。"),
-    OTHER("其他", null);
+    INFECTION(R.string.enum_stop_reason_infection, R.string.enum_stop_reason_infection_note),
+    SURGERY(R.string.enum_stop_reason_surgery, R.string.enum_stop_reason_surgery_note),
+    FINANCIAL(R.string.enum_stop_reason_financial, R.string.enum_stop_reason_financial_note),
+    OTHER(R.string.enum_stop_reason_other, null);
 
     companion object {
         fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: OTHER
@@ -300,8 +332,8 @@ enum class StopReason(val label: String, val warning: String?) {
  * 「减量中」= 医生批准的减量方案进行中：此态下**不触发停药警示**（见 domain/StopWarning），
  * 避免把医嘱减量误报成自行停药风险。
  */
-enum class DoseState(val label: String) {
-    FIXED("固定"), PRN("按需"), TAPERING("减量中");
+enum class DoseState(@StringRes val labelRes: Int) {
+    FIXED(R.string.enum_dose_state_fixed), PRN(R.string.enum_dose_state_prn), TAPERING(R.string.enum_dose_state_tapering);
 
     companion object {
         fun fromKey(k: String?): DoseState? = entries.firstOrNull { it.name.equals(k, true) }
@@ -379,17 +411,24 @@ data class BasdaiRecord(
     }
 }
 
-/** M5 发作登记（R18 flare_events）：开始 / 诱因 / 处理 / 缓解，联动极简模式。 */
-enum class FlareTrigger(val label: String) {
-    INFECTION("感染 / 感冒"), COLD("着凉"), OVERWORK("劳累"), STRESS("情绪 / 压力"),
-    WEATHER("天气变化"), DIET("饮食"), UNKNOWN("不明");
+/**
+ * M5 发作登记（R18 flare_events）：开始 / 诱因 / 处理 / 缓解，联动极简模式。
+ * v1.2.5（i18n）：`label` → `labelRes`。
+ */
+enum class FlareTrigger(@StringRes val labelRes: Int) {
+    INFECTION(R.string.enum_flare_trigger_infection), COLD(R.string.enum_flare_trigger_cold),
+    OVERWORK(R.string.enum_flare_trigger_overwork), STRESS(R.string.enum_flare_trigger_stress),
+    WEATHER(R.string.enum_flare_trigger_weather), DIET(R.string.enum_flare_trigger_diet),
+    UNKNOWN(R.string.enum_flare_trigger_unknown);
 
     companion object { fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: UNKNOWN }
 }
 
-enum class FlareAction(val label: String) {
-    REST("休息调整"), HEAT("热敷"), GENTLE_MOVE("温和活动"), EXTRA_MED("临时加药（遵医嘱）"),
-    DOCTOR("就医"), NONE("未处理");
+/** 发作期自行处理措施。v1.2.5（i18n）：`label` → `labelRes`。 */
+enum class FlareAction(@StringRes val labelRes: Int) {
+    REST(R.string.enum_flare_action_rest), HEAT(R.string.enum_flare_action_heat),
+    GENTLE_MOVE(R.string.enum_flare_action_gentle_move), EXTRA_MED(R.string.enum_flare_action_extra_med),
+    DOCTOR(R.string.enum_flare_action_doctor), NONE(R.string.enum_flare_action_none);
 
     companion object { fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: NONE }
 }
@@ -407,8 +446,12 @@ data class FlareEvent(
     @ColumnInfo(name = "notes") val notes: String? = null,
 )
 
-/** M4 运动打卡（exercise_logs）。exc_id 弱引用 kb_entries(exercise)；R21 次日反馈字段组。 */
-enum class FeedbackChange(val label: String) { BETTER("好转"), SAME("不变"), WORSE("加重") }
+/** M4 运动打卡（exercise_logs）。exc_id 弱引用 kb_entries(exercise)；R21 次日反馈字段组。v1.2.5（i18n）：`label` → `labelRes`。 */
+enum class FeedbackChange(@StringRes val labelRes: Int) {
+    BETTER(R.string.enum_feedback_change_better),
+    SAME(R.string.enum_feedback_change_same),
+    WORSE(R.string.enum_feedback_change_worse),
+}
 
 @Entity(tableName = "exercise_logs", indices = [Index("date"), Index("exc_id")])
 data class ExerciseLog(
@@ -451,11 +494,23 @@ data class Alert(
 
 // ===== M2/M3 骨健康抗炎与营养 =====
 
-/** M2 补剂档案（supplements）——与 medications 同构但独立域，避免混淆。 */
-enum class SupplementCategory(val label: String) {
-    CALCIUM("钙"), VITAMIN_D("维生素 D"), OMEGA3("Omega-3 / 鱼油"),
-    PROBIOTIC("益生菌"), CURCUMIN("姜黄素"), COLLAGEN("胶原蛋白"),
-    VITAMIN_B("B 族"), OTHER("其他");
+/**
+ * M2 补剂档案（supplements）——与 medications 同构但独立域，避免混淆。
+ *
+ * v1.2.5（i18n）：展示文案改为 `labelRes`。**`matchToken` 是另一回事、必须留中文**：
+ * 它参与 `MedicationRepository.medicationTokens()` 的相互作用匹配——拿补剂类目名去和
+ * 知识库里写死的中文 token（「钙」「维生素 D」…）比对（见 domain/DrugInteractionKeys）。
+ * 匹配键不能随界面语言变，否则英文界面下相互作用会静默漏检。
+ */
+enum class SupplementCategory(@StringRes val labelRes: Int, val matchToken: String) {
+    CALCIUM(R.string.enum_supplement_category_calcium, "钙"),
+    VITAMIN_D(R.string.enum_supplement_category_vitamin_d, "维生素 D"),
+    OMEGA3(R.string.enum_supplement_category_omega3, "Omega-3 / 鱼油"),
+    PROBIOTIC(R.string.enum_supplement_category_probiotic, "益生菌"),
+    CURCUMIN(R.string.enum_supplement_category_curcumin, "姜黄素"),
+    COLLAGEN(R.string.enum_supplement_category_collagen, "胶原蛋白"),
+    VITAMIN_B(R.string.enum_supplement_category_vitamin_b, "B 族"),
+    OTHER(R.string.enum_supplement_category_other, "其他");
     companion object { fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: OTHER }
 }
 
@@ -577,10 +632,12 @@ data class FoodAvoidItem(
 
 // ===== M6 复诊管理 =====
 
-/** M6 复诊项目（checkup_items）——周期自动排程依据。 */
-enum class CheckupType(val label: String) {
-    LAB("化验"), IMAGE("影像"), EYE("眼科"), DENTAL("牙科"),
-    VACCINE("疫苗"), PHYSICAL("体检"), CONSULT("门诊复诊"), OTHER("其他");
+/** M6 复诊项目（checkup_items）——周期自动排程依据。v1.2.5（i18n）：`label` → `labelRes`。 */
+enum class CheckupType(@StringRes val labelRes: Int) {
+    LAB(R.string.enum_checkup_type_lab), IMAGE(R.string.enum_checkup_type_image), EYE(R.string.enum_checkup_type_eye),
+    DENTAL(R.string.enum_checkup_type_dental), VACCINE(R.string.enum_checkup_type_vaccine),
+    PHYSICAL(R.string.enum_checkup_type_physical), CONSULT(R.string.enum_checkup_type_consult),
+    OTHER(R.string.enum_checkup_type_other);
     companion object { fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: OTHER }
 }
 
@@ -666,18 +723,32 @@ data class ImagingRecord(
     @ColumnInfo(name = "checkup_id") val checkupId: String? = null,
 ) {
     companion object {
-        fun modalityLabel(m: String) = when (m) { "MRI" -> "MRI"; "CT" -> "CT"; "XRAY" -> "X 线"; else -> m }
+        /**
+         * v1.2.5（i18n）：影像模态展示名。MRI / CT 的展示名就是代码本身、不需要资源，
+         * 只有 XRAY 要查资源（中文「X 线」/ 英文 "X-ray"），故改成 @Composable +
+         * `stringResource`——全部调用点都在 Compose 内。
+         */
+        @Composable
+        fun modalityLabel(m: String) = when (m) {
+            "MRI" -> "MRI"
+            "CT" -> "CT"
+            "XRAY" -> stringResource(R.string.imaging_modality_xray)
+            else -> m
+        }
     }
 }
 
-/** M6 疫苗记录（vaccine_records）——活疫苗需医生确认。 */
-enum class VaccineType(val label: String) {
-    LIVE("活疫苗 / 减毒"), INACTIVATED("灭活 / 重组"), UNKNOWN("不详");
+/** M6 疫苗记录（vaccine_records）——活疫苗需医生确认。v1.2.5（i18n）：`label` → `labelRes`。 */
+enum class VaccineType(@StringRes val labelRes: Int) {
+    LIVE(R.string.enum_vaccine_type_live), INACTIVATED(R.string.enum_vaccine_type_inactivated),
+    UNKNOWN(R.string.enum_vaccine_type_unknown);
     companion object { fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: UNKNOWN }
 }
 
-enum class DoctorConfirm(val label: String) {
-    PENDING("待确认"), CONFIRMED("医生同意"), DECLINED("医生不建议");
+/** 疫苗接种的医生确认状态。v1.2.5（i18n）：`label` → `labelRes`。 */
+enum class DoctorConfirm(@StringRes val labelRes: Int) {
+    PENDING(R.string.enum_doctor_confirm_pending), CONFIRMED(R.string.enum_doctor_confirm_confirmed),
+    DECLINED(R.string.enum_doctor_confirm_declined);
     companion object { fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: PENDING }
 }
 
@@ -702,13 +773,13 @@ data class VaccineRecord(
 
 // ===== M7 紧急卡 =====
 
-/** M7 紧急事件（emergency_events）——五应急场景记录。 */
-enum class EmergencyScene(val label: String, val kbId: String) {
-    UVEITIS("葡萄膜炎急性发作", "emr-001"),
-    INFECTION_FEVER("感染发热（生物制剂期间）", "emr-002"),
-    FALL_FRACTURE("跌倒 / 骨折", "emr-003"),
-    CAUDA_EQUINA("马尾综合征（神经急症）", "emr-004"),
-    STEROID_ADRENAL("糖皮质激素停药 / 肾上腺危象", "emr-005");
+/** M7 紧急事件（emergency_events）——五应急场景记录。v1.2.5（i18n）：`label` → `labelRes`；`kbId` 是知识库外键不是文案，保持不动。 */
+enum class EmergencyScene(@StringRes val labelRes: Int, val kbId: String) {
+    UVEITIS(R.string.enum_emergency_scene_uveitis, "emr-001"),
+    INFECTION_FEVER(R.string.enum_emergency_scene_infection_fever, "emr-002"),
+    FALL_FRACTURE(R.string.enum_emergency_scene_fall_fracture, "emr-003"),
+    CAUDA_EQUINA(R.string.enum_emergency_scene_cauda_equina, "emr-004"),
+    STEROID_ADRENAL(R.string.enum_emergency_scene_steroid_adrenal, "emr-005");
     companion object { fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: INFECTION_FEVER }
 }
 
@@ -748,14 +819,18 @@ data class EmergencyContact(
 // P4：R20 备份台账（sync_state 裁剪语义：backup / restore / export）
 // ===========================================================================
 
-enum class LedgerType(val label: String) {
-    BACKUP("备份"), RESTORE("恢复"), EXPORT("导出"), DRILL("演练"), ATTACH("附件同步");
+/** R20 备份台账条目类型。v1.2.5（i18n）：`label` → `labelRes`。 */
+enum class LedgerType(@StringRes val labelRes: Int) {
+    BACKUP(R.string.enum_ledger_type_backup), RESTORE(R.string.enum_ledger_type_restore),
+    EXPORT(R.string.enum_ledger_type_export), DRILL(R.string.enum_ledger_type_drill),
+    ATTACH(R.string.enum_ledger_type_attach);
 
     companion object { fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: BACKUP }
 }
 
-enum class LedgerStatus(val label: String) {
-    SUCCESS("成功"), FAILED("失败");
+/** R20 备份台账结果。v1.2.5（i18n）：`label` → `labelRes`。 */
+enum class LedgerStatus(@StringRes val labelRes: Int) {
+    SUCCESS(R.string.enum_ledger_status_success), FAILED(R.string.enum_ledger_status_failed);
 
     companion object { fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: FAILED }
 }

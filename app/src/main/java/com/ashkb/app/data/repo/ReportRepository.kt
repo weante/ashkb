@@ -319,10 +319,15 @@ class ReportRepository(private val context: Context) {
     private suspend fun vaccinesAll(): List<VaccineRecord> = db.vaccineRecordDao().observeAll().first()
 
     suspend fun emergencyCard(): EmergencyCard = withContext(Dispatchers.IO) {
+        // v1.2.5（i18n）：用药摘要的频次文案按系统语言解析，故需要 context（本类已持有）
+        val meds = EmergencyMeds.summarize(
+            db.medicationDao().listActive(), LocalDate.now().toString(),
+            freqLabel = { context.getString(it.plainRes) },
+        )
         EmergencyCard(
             profile = db.profileDao().get(),
             contacts = contactsAll(),
-            meds = EmergencyMeds.summarize(db.medicationDao().listActive(), LocalDate.now().toString()),
+            meds = meds,
             cards = db.kbEntryDao().listByCategory("emergency"),
         )
     }

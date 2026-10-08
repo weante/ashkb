@@ -145,7 +145,7 @@ private fun CheckupItemCard(
     SectionCard(
         title = item.name,
         subtitle = buildString {
-            append(CheckupType.fromKey(item.checkType).label)
+            append(stringResource(CheckupType.fromKey(item.checkType).labelRes))
             if (item.cycleDays != null) append(stringResource(R.string.checkup_cycle_days_suffix, item.cycleDays))
             else append(stringResource(R.string.med_prn_suffix))
         },
@@ -341,7 +341,7 @@ private fun CheckupRecordCard(
 ) {
     SectionCard(
         title = rec.date,
-        subtitle = CheckupType.fromKey(rec.checkType).label,
+        subtitle = stringResource(CheckupType.fromKey(rec.checkType).labelRes),
         action = if (rec.checkType == "LAB") {
             {
                 TextButton(onClick = { onViewLab(rec) }) { Text(stringResource(R.string.lab_detail_title)) }
@@ -427,7 +427,7 @@ internal fun VaccineList(vaccines: List<VaccineRecord>, onAdd: () -> Unit, onEdi
                     },
                 ) {
                     Text(
-                        "医生确认：${DoctorConfirm.fromKey(vac.doctorConfirm).label}",
+                        "医生确认：${stringResource(DoctorConfirm.fromKey(vac.doctorConfirm).labelRes)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = when (vac.doctorConfirm) {
                             "CONFIRMED" -> MaterialTheme.colorScheme.primary

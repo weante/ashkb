@@ -179,8 +179,15 @@ class MedicationRepository(private val context: Context) {
     private fun tokensOfMedication(m: Medication): List<String> =
         listOfNotNull(m.nameKey, m.name, m.brandName, m.medClass)
 
+    /**
+     * 补剂 → token。
+     *
+     * v1.2.5（i18n）：取 `matchToken` 而**不是** `labelRes`——这些 token 会去和知识库里
+     * 写死的中文匹配键（「钙」「维生素 D」…，见 domain/DrugInteractionKeys）比对，
+     * 属于匹配数据、不能随界面语言变；用 `labelRes` 会让英文界面下相互作用静默漏检。
+     */
     private fun tokensOfSupplement(s: Supplement): List<String> =
-        listOfNotNull(s.name, s.brand, SupplementCategory.fromKey(s.category).label)
+        listOfNotNull(s.name, s.brand, SupplementCategory.fromKey(s.category).matchToken)
 
     /**
      * 单条判定（纯函数在 `domain/DrugInteractionKeys.matches`，这里只负责把 payload 拆出两侧）。

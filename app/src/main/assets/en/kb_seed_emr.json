@@ -1,0 +1,158 @@
+[
+  {
+    "id": "emr-001",
+    "category": "emergency",
+    "title": "Eye redness, eye pain, photophobia and blurred vision: suspect acute uveitis — seek ophthalmology care promptly",
+    "summary": "The most common ocular complication of AS is acute anterior uveitis (eye redness / eye pain / photophobia / blurred vision); ophthalmology review is needed the same day or the next day, and prompt treatment prevents posterior synechiae.",
+    "severity_level": "high",
+    "applicable_scene": "symptom_daily eye symptom checkboxes; emergency centre scenario card; checkup_items ophthalmology periodic item overdue reminder",
+    "source_name": "Gupta N, Agarwal A. Management of Uveitis in Spondyloarthropathy: Current Trends (PMC5741284, The Permanente Journal); Iatrox UKMLA Anterior Uveitis clinical material",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5741284/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "scene": "uveitis",
+      "symptoms": ["eye redness", "eye pain", "photophobia", "blurred vision", "small or irregular pupil"],
+      "urgency": "seek ophthalmology care the same day or the next day (UKMLA: Same-day or next-day ophthalmology referral)",
+      "steps": [
+        "Recognise the symptoms (the four cardinal signs) — this card appears the moment the eye symptom checkboxes in this APP are ticked",
+        "Stop the current activity and avoid bright light (wear sunglasses for relief when photophobic)",
+        "Attend ophthalmology the same day or the next day (eye emergency or uveitis specialist clinic)",
+        "Tell the doctor about the AS history and current medications (topical corticosteroid treatment must follow a full, standard course — do not stop it on your own)",
+        "After the visit: log the event (emergency_events) + set a follow-up reminder"
+      ],
+      "red_flag": [
+        "Severe, intense pain / sudden drop in vision — seek immediate medical care at the emergency department (ED) (not the next day)",
+        "Risk of delay: posterior synechiae -> pupil block -> secondary glaucoma (UKMLA)",
+        "Recurrent episodes should be reported to rheumatology (they may be related to disease activity — a topic for the follow-up visit)"
+      ],
+      "app_link": "emergency card uveitis rendering; symptom_daily eye field trigger; checkup_items(eye) periodic item; emergency_events logging"
+    }
+  },
+  {
+    "id": "emr-002",
+    "category": "emergency",
+    "title": "Fever or signs of infection: biologic therapy users should contact their doctor — do not self-administer the next dose",
+    "summary": "Contact your doctor promptly if you have fever, a persistent cough, red swollen painful skin, or flu-like symptoms; for serious infection or sepsis the doctor will stop the biologic — this is not a matter of self-discontinuing the drug.",
+    "severity_level": "high",
+    "applicable_scene": "vitals.temperature ≥ 38.5 (threshold item linkage); symptom_daily.feverish=1; fever on an injection day (itx-002 linkage)",
+    "source_name": "FDA Enbrel label; EMA Inflectra product information (EMA EPAR, https://www.ema.europa.eu/en/medicines/human/EPAR/inflectra , HTTP 200 verified); Inflectra patient information (Pfizer, ⚠️ specific URL unverified)",
+    "source_url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/103795s5600lbl.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "scene": "infection_fever",
+      "symptoms": ["fever ≥38.5℃", "persistent cough", "red, swollen, warm and painful skin", "flu-like symptoms", "unusual fatigue"],
+      "urgency": "Signs of infection appear -> contact your doctor the same day; high fever / altered mental status -> emergency department (ED)",
+      "steps": [
+        "Measure and record body temperature (vitals) — ≥38.5 automatically brings up this card",
+        "Biologic therapy users: contact your treating physician before the next injection date (whether to delay is the doctor's decision — do not self-administer the next dose, and do not decide on your own to stop permanently)",
+        "Review exposure history over the past 2 weeks (colds / infection in family members / travel) and tell your doctor",
+        "After the visit: log emergency_events + medication pause status (medication_changes: pause, source=hospital)"
+      ],
+      "red_flag": [
+        "Persistent high fever / chills / confusion — seek immediate medical care at the emergency department (ED)",
+        "Signs of infection during biologic therapy may be partly masked (immunosuppressed state, so symptoms may not match infection severity) — judge conservatively",
+        "FDA/EMA position: treatment should be stopped if serious infection or sepsis develops (Enbrel: should be discontinued if a patient develops a serious infection or sepsis) — the decision to stop rests with the doctor"
+      ],
+      "app_link": "threshold linkage (edu-th-001); itx-002 black box linkage; injection card fever-day prompt; medication_changes(pause) quick logging"
+    }
+  },
+  {
+    "id": "emr-003",
+    "category": "emergency",
+    "title": "After a fall, seek medical assessment even if you \"feel fine\": vertebral fractures in AS are easily missed",
+    "summary": "Spinal stiffness in AS plus osteoporosis means a low-energy fall can cause a fracture, and it is often missed and diagnosis delayed; those with cervical spine involvement need particular caution, and do not move the neck yourself after a fall.",
+    "severity_level": "high",
+    "applicable_scene": "emergency centre scenario card; emergency_events(fall_fracture) logging; pinned prompt for users with profile.spine_mobility≥moderate",
+    "source_name": "Chaudhary SB et al. Management of Acute Spinal Fractures in Ankylosing Spondylitis (PMC3263739)",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3263739/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-09",
+    "review_due": "2027-03-09",
+    "version": 1,
+    "payload": {
+      "scene": "fall_fracture",
+      "symptoms": ["new pain in the neck / back / lower back after a fall", "numbness or weakness in the limbs", "feeling fine yet AS fractures are often painless and asymmetrical"],
+      "urgency": "After a fall, always seek medical assessment (even without clear pain); neck pain / limb numbness — emergency department (ED)",
+      "steps": [
+        "After a fall do not get up or move yourself (first check limb sensation and movement yourself)",
+        "If the cervical spine is involved, keep the neck in a neutral position and wait for the ambulance (a traditional collar may worsen the injury — immobilise only after specialist assessment)",
+        "Proactively tell the doctor about the AS history (\"I have ankylosing spondylitis, my spine is fragile, please take X-rays\" — what the patient says is key to preventing a missed diagnosis)",
+        "After the visit: log emergency_events + imaging results (lab_results attachment path can be linked)"
+      ],
+      "red_flag": [
+        "Severe neck pain / numbness or weakness in the limbs / bladder and bowel dysfunction — seek immediate medical care at the emergency department (ED), do not move the patient",
+        "AS fracture diagnosis frequently missed or delayed (source text) — \"feels fine\" is not a valid basis for judgement",
+        "Traditional collars may cause hyperextension through the fracture site and worsen the injury (Traditional collars may cause hyperextension through the fracture site) — do not put on a collar yourself"
+      ],
+      "app_link": "emergency card fall_fracture rendering; spine_mobility user pinning; emergency_events logging"
+    }
+  },
+  {
+    "id": "emr-004",
+    "category": "emergency",
+    "title": "Numbness or weakness in the lower limbs / bladder and bowel dysfunction: suspect cauda equina syndrome — seek emergency care",
+    "summary": "A rare but well-defined neurological complication of long-standing AS; progressive numbness and weakness in the lower limbs, bladder and bowel dysfunction, or abnormal perineal sensation (saddle anaesthesia) should prompt emergency assessment as soon as possible — do not wait and do not observe.",
+    "severity_level": "high",
+    "applicable_scene": "symptom_daily neurological symptom checkboxes (new red-flag fields); emergency centre scenario card",
+    "source_name": "J Rheumatol review \"Cauda Equina Syndrome in Ankylosing Spondylitis: Challenges in Diagnosis, Management, and Pathogenesis\" (2019;46(12):1582-1588, PMID 30936280, DOI 10.3899/jrheum.181259 — **fully matches** the volume, issue and page numbers linked for this entry) — ⚠️ the original source name listed \"Ann Rheum Dis 神经并发症综述\" (Ann Rheum Dis review of neurological complications) first, but the link points to J Rheumatol, so **the first item and the link are not the same article**; this has been corrected",
+    "source_url": "https://www.jrheum.org/content/46/12/1582.long",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "scene": "cauda_equina",
+      "symptoms": ["progressive numbness and weakness in the lower limbs", "bladder and bowel dysfunction", "abnormal perineal (saddle) sensation"],
+      "urgency": "emergency department (ED) (red-flag symptom level — rare but must not be delayed)",
+      "steps": [
+        "Recognise the triad of symptoms (the appearance of any one triggers this card)",
+        "Seek immediate medical care at the emergency department (ED) (neurosurgery / spine surgery assessment) — do not adopt a watch-and-wait approach",
+        "Tell the doctor about the AS history (CES is a known association in long-standing AS, which helps the doctor localise the problem)",
+        "Log emergency_events"
+      ],
+      "red_flag": [
+        "Bladder and bowel dysfunction + saddle anaesthesia are classic indications for emergency care — waiting means delay",
+        "CES has a major impact on quality of life (J Rheumatol: extremely important effect on physical function and quality of life)"
+      ],
+      "note": "Rare-complication educational framing: presented as a red-flag symptom entry, not rendered as a common symptom (to avoid anxiety) — placed in the \"seek immediate medical care\" section of the symptom checkbox page",
+      "app_link": "symptom_daily neurological red-flag field trigger; fourth scenario card in the emergency centre; cross-linked with the emr-003 fall entry (if neurological symptoms appear after a fall, this entry takes priority)"
+    }
+  },
+  {
+    "id": "emr-005",
+    "category": "emergency",
+    "title": "Long-term corticosteroids must not be stopped abruptly on your own: risk of adrenal insufficiency",
+    "summary": "Corticosteroid use for more than 3–4 weeks can suppress the HPA axis, and abrupt cessation carries a risk of adrenal insufficiency and even adrenal crisis (fatigue / nausea / low blood pressure); if you have missed doses for several days or stopped the drug on your own and then feel unwell, seek medical care.",
+    "severity_level": "high",
+    "applicable_scene": "medication_changes discontinuation logging (corticosteroid class with source other than hospital); alert for corticosteroid users who have missed doses for more than 2 days",
+    "source_name": "Aust Prescr practical guidance on withdrawing corticosteroids (PMC12378006); Endocrine Society guideline on adrenal insufficiency (https://www.endocrine.org/clinical-practice-guidelines/adrenal-insufficiency , 302 redirect verified as reachable)",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12378006/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "scene": "steroid_adrenal",
+      "symptoms": ["unusual fatigue", "nausea and vomiting", "dizziness and low blood pressure", "fever", "altered mental status"],
+      "urgency": "Symptoms after missing doses for several days -> seek medical care the same day; severe (signs of shock) -> emergency department (ED)",
+      "steps": [
+        "Long-term (>3–4 weeks) corticosteroid users who miss ≥2 days -> this card appears automatically (reminder to contact the doctor about a replacement dosing plan — do not double the dose on your own)",
+        "Self-discontinuation logged (source=patient) -> alert + recommendation to contact the doctor to agree a tapering plan",
+        "Symptom cluster appears -> tell the doctor \"I have been on long-term corticosteroids and recently stopped\" (key history information)",
+        "Log emergency_events / medication_changes"
+      ],
+      "red_flag": [
+        "Failure to recognise adrenal crisis can lead to shock and eventual death (Aust Prescr source text)",
+        "Short-term use within 3–4 weeks can be stopped abruptly / long-term use must be tapered (the source states this cut-off explicitly) — dose and duration are determined automatically from the medication list",
+        "Corticosteroid requirements may need to be increased under stress (surgery / infection / serious illness) — proactively report the corticosteroid history when seeking care"
+      ],
+      "app_link": "medication_logs missed-dose count (corticosteroid class x 2 days trigger); medication_changes discontinuation source detection; cross-linked with the fdg-002 / emr-002 infection entries (stress dose increase scenario)"
+    }
+  }
+]

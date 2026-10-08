@@ -8,17 +8,21 @@ import com.ashkb.app.data.entity.StopReason
 /**
  * C6（v1.0.37）：停药警示判定。
  *
- * 规则：警示文案来自 `StopReason.warning`；但**医生批准的减量方案**（`DoseState.TAPERING`）
+ * 规则：警示文案来自 `StopReason.noteRes`；但**医生批准的减量方案**（`DoseState.TAPERING`）
  * 下豁免「自行停药」类警示——医嘱减量到停药是方案的自然终点，不该按自行停药风险报警。
  * 其它原因（副作用 / 感染 / 手术）的提示与减量状态无关，照常展示。
  *
- * 纯函数、无 Android 依赖，可单测。
+ * 纯函数、无 Android 依赖，可单测。v1.2.5（i18n）：返回**资源 id**而非文案，取文案由调用侧负责。
  */
 object StopWarning {
 
-    /** 停药原因自带警示；减量中且原因为「自行停药」时豁免。 */
-    fun forStop(reason: StopReason, med: Medication): String? =
-        if (isTapering(reason, med)) null else reason.warning
+    /**
+     * 停药原因自带警示的**资源 id**；减量中且原因为「自行停药」时豁免（返回 null）。
+     *
+     * （返回 `@StringRes Int?` 是为了让本对象继续留在纯领域层：不 import 任何 Android 类型。）
+     */
+    fun forStop(reason: StopReason, med: Medication): Int? =
+        if (isTapering(reason, med)) null else reason.noteRes
 
     /** 生物制剂「自行停药」强化警示是否展示（减量中豁免）。 */
     fun showBiologicStopWarning(reason: StopReason, med: Medication): Boolean =

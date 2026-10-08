@@ -1,11 +1,16 @@
 package com.ashkb.app.domain
 
+import android.content.Context
 import com.ashkb.app.data.entity.InjSite
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 /**
  * v1.0.49：手动修正用药记录的不变量（[MedLogEdit]）与注射部位映射（[InjSite]）。
@@ -15,7 +20,11 @@ import org.junit.Test
  * 反之把「已服」改成「跳过」却不填原因，就会出现一条无原因的跳过。
  * 两者都会污染依从率口径——本文件就是这两条红线的回归锁。
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "zh-rCN")
 class MedLogEditTest {
+
+    private val ctx: Context get() = RuntimeEnvironment.getApplication()
 
     // ---- needsReason ----
 
@@ -89,7 +98,7 @@ class MedLogEditTest {
     fun `every injection site key resolves back to its label`() {
         for (s in InjSite.entries) {
             assertEquals(s, InjSite.fromKey(s.key))
-            assertTrue("label must not be blank: $s", s.label.isNotBlank())
+            assertTrue("label must not be blank: $s", ctx.getString(s.labelRes).isNotBlank())
         }
     }
 

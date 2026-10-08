@@ -128,7 +128,7 @@ internal fun FlareStatusCard(
             )
             Spacer(Modifier.height(Spacing.sm))
             Text(
-                "开始：${flare.startDate} · 诱因：${FlareTrigger.fromKey(flare.trigger).label}" +
+                "开始：${flare.startDate} · 诱因：${stringResource(FlareTrigger.fromKey(flare.trigger).labelRes)}" +
                     (flare.severityPeak?.let { stringResource(R.string.symptom_peak_pain_suffix, it) } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -138,8 +138,11 @@ internal fun FlareStatusCard(
                     org.json.JSONArray(json).let { a -> (0 until a.length()).map { a.optString(it) } }
                 }.getOrDefault(emptyList<String>())
                 if (acts.isNotEmpty()) {
+                    // v1.2.5（i18n）：`joinToString` 的 transform **不是 inline 参数**，里面不能直接
+                    // 调 `@Composable` 的 stringResource；先用 inline 的 map 解析成文案再拼接。
+                    val actedLabels = acts.map { stringResource(FlareAction.fromKey(it).labelRes) }
                     Text(
-                        "已采取：${acts.joinToString("、") { FlareAction.fromKey(it).label }}",
+                        "已采取：${actedLabels.joinToString("、")}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = Spacing.xxs),
@@ -180,7 +183,7 @@ internal fun FlareHistoryList(
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(
-                "${FlareTrigger.fromKey(f.trigger).label}${f.severityPeak?.let { " · 峰值 $it/10" } ?: ""}",
+                "${stringResource(FlareTrigger.fromKey(f.trigger).labelRes)}${f.severityPeak?.let { " · 峰值 $it/10" } ?: ""}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

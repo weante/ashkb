@@ -70,7 +70,7 @@ internal fun FlareStartDialog(
                     FlareTrigger.entries.forEach { t ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             RadioButton(selected = trigger == t, onClick = { trigger = t })
-                            Text(t.label, style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(t.labelRes), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -82,7 +82,7 @@ internal fun FlareStartDialog(
                                 checked = a in actions,
                                 onCheckedChange = { checked -> actions = if (checked) actions + a else actions - a },
                             )
-                            Text(a.label, style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(a.labelRes), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -195,7 +195,7 @@ private fun FlareTriggerPicker(selected: FlareTrigger, onSelect: (FlareTrigger) 
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(selected = selected == t, onClick = { onSelect(t) })
-                Text(t.label, style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(t.labelRes), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -211,7 +211,7 @@ private fun FlareActionPicker(selected: Set<FlareAction>, onToggle: (FlareAction
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Checkbox(checked = a in selected, onCheckedChange = { checked -> onToggle(a, checked) })
-                Text(a.label, style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(a.labelRes), style = MaterialTheme.typography.bodySmall)
             }
         }
     }

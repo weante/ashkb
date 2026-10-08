@@ -1,0 +1,534 @@
+[
+  {
+    "id": "exc-001",
+    "category": "exercise",
+    "title": "Swimming and water exercise: low-impact whole-body activity",
+    "summary": "The buoyancy of warm water reduces the load on the spine: a safe, low-impact environment for improving fitness / flexibility / strength; stroke choice matters (if the cervical spine is involved, see the breaststroke entry in the blacklist).",
+    "severity_level": "low",
+    "applicable_scene": "exercise plan aerobic item configuration; routine in remission; during a flare, ask rehabilitation medicine about gentle water activity",
+    "source_name": "NASS swimming and water exercise page (https://nass.co.uk/managing-my-as/exercise/swimming/ — verified to open on a real device, content matches this entry); 2025 patient-version exercise guideline (water exercise item); alongside: EULAR 2018 exercise recommendations, PMID 29997112",
+    "source_url": "https://nass.co.uk/managing-my-as/exercise/swimming/",
+    "source_tier": "S3",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["front crawl", "backstroke", "mixed strokes"],
+      "intensity": "low",
+      "stage_fit": "stable",
+      "grade": "L2",
+      "grade_matrix": { "controlled": "pause", "flare": "pause", "stable": "allow" },
+      "cervical_condition": "breaststroke_block",
+      "dose": "No single fixed prescription (NASS gives no frequency or duration); the 2025 guideline positions it as \"an option for those who can\", counted towards total aerobic volume",
+      "benefit": "NASS: improves your general fitness, flexibility and strength in a safe, low impact environment; warm-water buoyancy makes stretching more effective, less painful, and makes it easier to stay upright",
+      "evidence": [
+        "NASS: Swimming can be great for axial SpA. It improves your general fitness, flexibility and strength in a safe, low impact environment.",
+        "NASS: Front crawl is a great stroke for many people with axial SpA. The body position remains extended throughout, including the neck, and the spine rotates gently.",
+        "NASS: Try to include some back crawl in every swimming session. This helps with opening the chest.",
+        "2025 guideline: land-based exercise is recommended as the first choice for people with axSpA/AS (2C); water exercise is an option for those who can.",
+        "NASS: Start gently. Shorter sessions or an easier pace can still bring real benefits, especially during flare-ups."
+      ],
+      "action": [
+        "Stroke: front crawl (body extended, including the neck) + include backstroke in every session (opens the chest); with breaststroke, watch neck alignment (if the cervical spine is involved, see exb-004)",
+        "Start gently with short sessions; reduce or pause during a flare (linked to exb-002)",
+        "State the 2025 guideline's land-first position honestly: both land and water exercise are acceptable — choose according to your circumstances",
+        "Honest scoping note: this entry and brisk walking (exc-003) are both L2, but the matrix gives this entry pause and brisk walking downgrade in the controlled stage (v1.1.3 batch 19 · J-3). No field in the seed explains this difference, and the NASS source only says \"Start gently\". Per the maintainer's ruling, **only this scoping note was added; the matrix was not changed** — the difference is neither presented as \"evidence-based\" nor given an invented rationale"
+      ],
+      "alternative_hint": "No pool available -> brisk walking (exc-003); ask rehabilitation medicine about hydrotherapy",
+      "app_link": "optional aerobic item in exercise plans; automatically filtered during a flare (stage_fit); linked to the exb-004 stroke check"
+    }
+  },
+  {
+    "id": "exc-002",
+    "category": "exercise",
+    "title": "Aerobic exercise: 3–5 times per week, 30–60 minutes per session",
+    "summary": "2025 guideline prescription: 3–5 times per week, 30–60 minutes per session, at moderate intensity (40%–59% heart rate reserve); use the \"talk test\" to gauge intensity yourself.",
+    "severity_level": "low",
+    "applicable_scene": "exercise plan aerobic item generation; intensity self-monitoring education; adjustment during progression",
+    "source_name": "Exercise Guideline for Axial Spondyloarthritis / Ankylosing Spondylitis, Patient Version (2025)",
+    "source_url": "http://www.ddzxhospital.com/library/up_f/file/20251029/202510291330317969.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["brisk walking", "jogging (in the stable stage)", "swimming", "stationary cycling", "rowing", "dancing", "non-competitive ball games"],
+      "intensity": "moderate",
+      "stage_fit": "stable",
+      "grade": "L2",
+      "grade_matrix": { "controlled": "pause", "flare": "pause", "stable": "recommend" },
+      "cervical_condition": "none",
+      "dose": "3–5 sessions per week × 30–60 min each; moderate intensity = 40%–59% heart rate reserve",
+      "benefit": "2025 guideline definition of aerobic exercise: cyclical, rhythmic, dynamic exercise of large muscle groups, with a clear increase in heart rate and energy expenditure",
+      "evidence": [
+        "2025 guideline: routine multimodal exercise including aerobic, flexibility and strength exercise is recommended for people with axSpA/AS (1B).",
+        "2025 guideline: aerobic exercise volume: 3–5 times per week, 30–60 min each time.",
+        "2025 guideline: moderate intensity means 40%–59% of heart rate reserve; high intensity means 60%–79% of heart rate reserve.",
+        "2025 guideline (talk test): being able to talk comfortably during exercise indicates moderate intensity; talking with some effort indicates high intensity; being unable to talk comfortably indicates very high intensity."
+      ],
+      "action": [
+        "Use the talk test as the main way to gauge intensity (a simple proxy for the lactate threshold) — no heart rate device needed",
+        "Jogging is one aerobic option but is high impact: excluded during the active stage per exb-002; for advanced disease / marked bone loss, prefer brisk walking or swimming",
+        "Start at half the dose (progression principles: see exc-010)"
+      ],
+      "alternative_hint": "Each session can be split into 2 parts (NASS: segments of ≥10 minutes are still effective)",
+      "app_link": "default dose for exercise plan template generation; the intensity selector carries talk-test helper text"
+    }
+  },
+  {
+    "id": "exc-003",
+    "category": "exercise",
+    "title": "Brisk walking: the easiest low-impact aerobic exercise to keep up",
+    "summary": "NASS gives brisk walking as the aerobic example (30 minutes × 5 times a week, and it can be split up); set your own pace according to how you feel that day.",
+    "severity_level": "low",
+    "applicable_scene": "default aerobic item in exercise plans; starting item when first building a plan; weight-management period (linked to weight_logs)",
+    "source_name": "NASS Back to Action (https://nass.co.uk/wp-content/uploads/2018/08/Back-to-Action-low-resolution-version.pdf — verified to open on a real device); ⚠️ the specific NASS AS News 2017 article and link could not be verified, marked unverified; alongside: EULAR 2018 exercise recommendations, PMID 29997112",
+    "source_url": "https://nass.co.uk/wp-content/uploads/2018/08/Back-to-Action-low-resolution-version.pdf",
+    "source_tier": "S3",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["outdoor brisk walking", "brisk walking back and forth along a corridor"],
+      "intensity": "low-moderate",
+      "stage_fit": "stable",
+      "grade": "L2",
+      "grade_matrix": { "controlled": "downgrade", "flare": "pause", "stable": "recommend" },
+      "cervical_condition": "none",
+      "dose": "NASS aerobic prescription: 30 min × 5 times a week; can be split into segments of ≥10 minutes (segments still count)",
+      "benefit": "NASS: Walking is an excellent, low impact way of toning your muscles; set your own pace and adjust to how you feel each day",
+      "evidence": [
+        "NASS: We recommend that you do 30 minutes of aerobic exercise 5 times a week. It only needs to be vigorous enough to make you slightly breathless. Fast walking is a good example.",
+        "NASS: For convenience, you can split it into segments of 10 minutes or more and this will still be good for you.",
+        "NASS home version: swing your arms while walking briskly to mobilise the shoulders and raise your heart rate; start with up to 1 minute of corridor walking at a time and build up as your fitness improves."
+      ],
+      "action": [
+        "Walk with arm swings (engages the shoulders)",
+        "Accumulate in segments: 3 × 10 minutes also counts — commuter-friendly",
+        "Wear well-cushioned shoes and choose a flat route (for those with hip or knee involvement)",
+        "Honest scoping note: this entry and swimming (exc-001) are both L2, but the matrix gives this entry downgrade and swimming pause in the controlled stage (v1.1.3 batch 19 · J-3). No field in the seed explains this difference, and the NASS source does not differentiate the two by disease stage either. Per the maintainer's ruling, **only this scoping note was added; the matrix was not changed** — the difference is itself a data fact whose cause is unknown; do not read it as a \"stage-specific rule with supporting evidence\""
+      ],
+      "alternative_hint": "Rainy day / low fitness -> indoor corridor walking (supported by the NASS home version text)",
+      "app_link": "default aerobic item in exercise plans; counted together with the exc-002 general rule"
+    }
+  },
+  {
+    "id": "exc-004",
+    "category": "exercise",
+    "title": "Intercostal breathing exercise: maintaining chest expansion",
+    "summary": "Lie on your back with your hands on your ribs; breathe in against your hands and breathe out fully — a chest-expansion exercise to do several times a day (the 2023 guideline recommends breathing exercise, with evidence supporting improved chest expansion).",
+    "severity_level": "low",
+    "applicable_scene": "routine item in the daily plan (low cost, high value); morning-stiffness sequence; for those whose doctor has measured restricted chest expansion",
+    "source_name": "Arthritis UK (formerly Versus Arthritis) \"Keeping active with ankylosing spondylitis\" workbook (archived link, verified to open on a real device); ⚠️ the specific 2023 rehabilitation practice guideline article could not be verified, marked unverified; alongside: EULAR 2021 recommendations on lifestyle and work participation, Ann Rheum Dis 2023;82(1):48-56, PMID 35260387",
+    "source_url": "https://web.archive.org/web/20231205091657id_/https://www.versusarthritis.org/media/12818/ankylosing-spondylitis-exercise-section.pdf",
+    "source_tier": "S3",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["side-rib breathing", "upper-chest breathing"],
+      "intensity": "low",
+      "stage_fit": "both",
+      "grade": "L1",
+      "grade_matrix": { "controlled": "recommend", "flare": "recommend", "stable": "recommend" },
+      "cervical_condition": "none",
+      "dose": "Repeat each exercise 5 times (Versus Arthritis text); start with once a day and build up",
+      "benefit": "Maintains chest expansion and breathing function; studies support combined exercise for improving chest expansion in AS",
+      "evidence": [
+        "Versus Arthritis: Lie on your back with your knees bent. Put your hands on your ribs at the sides of your chest. Breathe in deeply through your nose and out through your mouth, pushing your ribs out against your hands as you breathe in. Repeat five times.",
+        "Versus Arthritis: it's as important to breathe out fully as it is to breathe in deeply (breathing out fully matters just as much).",
+        "2023 rehabilitation practice guideline: routine breathing exercise is recommended (1C).",
+        "Daginfrud 2011: combined exercise is effective for improving chest expansion in people with AS."
+      ],
+      "action": [
+        "Exercise a (side ribs): lie on your back with your knees bent, hands at the sides of your chest — breathe in against your hands, breathe out fully, repeat 5 times",
+        "Exercise b (upper chest): place both hands on the upper chest — breathe in deeply, then breathe out as fully as you can, pushing the ribs against your hands, repeat 5 times (can be done sitting)",
+        "Combine with morning-stiffness management (getting-up sequence)",
+        "At follow-up visits the doctor measures chest expansion; compare the values recorded in previous notes to track progress (the APP does not offer self-measurement)"
+      ],
+      "alternative_hint": "Difficulty lying down -> do it sitting (supported by the source text)",
+      "app_link": "default item in the daily plan; changes in effect can be checked against the chest-expansion values measured by the doctor at follow-up"
+    }
+  },
+  {
+    "id": "exc-005",
+    "category": "exercise",
+    "title": "Spinal mobility exercise: what NASS calls the most important part of keeping the spine mobile",
+    "summary": "Slowly move each part of the spine to the limit of its movement, every day (NASS Back to Action: This is the most important section for keeping the spine mobile).",
+    "severity_level": "low",
+    "applicable_scene": "core item in the daily plan; includes specific movement templates such as trunk rotation",
+    "source_name": "NASS Back to Action (verified to open on a real device); Versus Arthritis workbook ⚠️ (specific article link could not be verified, marked unverified); alongside: EULAR 2018 exercise recommendations, PMID 29997112",
+    "source_url": "https://nass.co.uk/wp-content/uploads/2018/08/Back-to-Action-low-resolution-version.pdf",
+    "source_tier": "S3",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["standing trunk rotation", "segmental mobility of the cervical, thoracic and lumbar spine"],
+      "intensity": "low",
+      "stage_fit": "stable",
+      "grade": "L1",
+      "grade_matrix": { "controlled": "downgrade", "flare": "downgrade", "stable": "recommend" },
+      "cervical_condition": "amplitude_half",
+      "dose": "Daily (NASS: We would recommend that you do these every day); each session includes a 5-minute warm-up; trunk rotation 5 times each side, holding for 5 seconds",
+      "benefit": "Maintains the mobility of each spinal segment — core to long-term function in AS",
+      "evidence": [
+        "NASS: The mobility section consists of exercises that slowly move the different parts of the spine to the limit of their movement. This is the most important section for keeping the spine mobile. We would recommend that you do these every day.",
+        "NASS: You should start every session of exercise or sport with a warm-up which lasts about 5 minutes.",
+        "Versus Arthritis (trunk rotation): Stand with your feet apart. Place your hands on your hips. Turn from the waist to look behind you, keeping your knees and feet facing the front. Hold for five seconds. Repeat to the other side, five times each side."
+      ],
+      "action": [
+        "Trunk rotation: stand with your feet apart, hands on your hips, knees and feet facing forward, turn only from the waist to look behind you — hold 5 seconds, 5 times each side (can be done sitting)",
+        "5-minute warm-up before every session (NASS rule)",
+        "A feeling of tension at the end of the range is enough — do not force the range (boundary with the blacklist cervical entry exb-005: the range for the cervical segment is determined by neck symptoms)"
+      ],
+      "alternative_hint": "During a flare -> halve the range + do it after a warm bath (NASS flexibility entry: stretching is more effective after a warm-up or heat)",
+      "app_link": "core section of the daily plan template; injected by default into exercise_plans.week_structure"
+    }
+  },
+  {
+    "id": "exc-006",
+    "category": "exercise",
+    "title": "Strength training: 2–3 times per week, low weight and high repetitions, 48 hours apart",
+    "summary": "NASS: strength training should not be done every day (muscles need 48 h to adapt); keep the weight low enough to manage ≥12 repetitions per set; 2025 guideline: 60%–80% 1RM, 2–4 sets × 8–12 repetitions.",
+    "severity_level": "low",
+    "applicable_scene": "exercise plan strength item generation; education by contrast with blacklist exb-003 (heavy spinal loading)",
+    "source_name": "NASS Back to Action (verified to open on a real device); 2025 patient-version exercise guideline (ddzx hospital PDF, http://www.ddzxhospital.com/library/up_f/file/20251029/202510291330317969.pdf — HTTP 200 verified · 1.4 MB)",
+    "source_url": "https://nass.co.uk/wp-content/uploads/2018/08/Back-to-Action-low-resolution-version.pdf",
+    "source_tier": "S3",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["resistance-band row", "machine press on a fixed path", "bodyweight squat (shallow range)", "bridge"],
+      "intensity": "moderate",
+      "stage_fit": "stable",
+      "grade": "L2",
+      "grade_matrix": { "controlled": "pause", "flare": "pause", "stable": "recommend" },
+      "cervical_condition": "none",
+      "dose": "NASS: 2–3 sessions per week, ≥48 h apart, with the weight low enough for ≥12 repetitions per set; 2025 guideline: load 60%–80% 1RM (50%–60% for beginners), 2–4 sets × 8–12 repetitions per set",
+      "benefit": "The 2023 guideline recommends strength exercise (1C); the paraspinal muscles maintain posture and protect the spine",
+      "evidence": [
+        "NASS: Strength training should not be done every day. There must be at least a 48 hour gap to allow the muscle to adapt or it will not work. We suggest 2 or 3 weight sessions per week with at least a day between each.",
+        "NASS: We strongly recommend that you keep the weights setting quite low so that you can manage at least 12 repetitions in each set.",
+        "2025 guideline: the load for strength exercise is 60%–80% of 1RM (50%–60% 1RM at the start), performed 2–3 times per week, 2–4 sets per session, with 8–12 repetitions per set."
+      ],
+      "action": [
+        "Hard scheduling constraint: the plan generator enforces ≥48 h between strength days (a Wednesday / Saturday pattern)",
+        "Prefer the mode of exercise: resistance bands / fixed-path machines / bodyweight — avoid free heavy weights (exb-003)",
+        "Beginners start at 50%–60% 1RM"
+      ],
+      "alternative_hint": "During a flare -> keep only the bridge / static core work (low load); pause loaded strength work",
+      "app_link": "interval check in the exercise plan generator; intensity high + strength category triggers the exb-003 pop-up"
+    }
+  },
+  {
+    "id": "exc-007",
+    "category": "exercise",
+    "title": "Pilates / yoga: low-intensity strength and spinal flexibility under breath control",
+    "summary": "The 2025 guideline recommends Pilates and yoga combined with other exercise (1C); studies show they improve disease activity, function and quality of life more effectively than other treatments.",
+    "severity_level": "low",
+    "applicable_scene": "flexibility / strength alternative item in exercise plans; remote yoga option",
+    "source_name": "Exercise Guideline for Axial Spondyloarthritis / Ankylosing Spondylitis, Patient Version (2025)",
+    "source_url": "http://www.ddzxhospital.com/library/up_f/file/20251029/202510291330317969.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["mat Pilates core sequence", "basic Hatha yoga postures (non-inverted)", "remote instructor-led yoga"],
+      "intensity": "low-moderate",
+      "stage_fit": "stable",
+      "grade": "L2",
+      "grade_matrix": { "controlled": "conditional", "flare": "pause", "stable": "recommend" },
+      "cervical_condition": "pose_filter",
+      "dose": "2025 guideline: Pilates and yoga combined with other exercise (no specific frequency is listed separately; counted towards the multimodal total)",
+      "benefit": "Combines breath control + low-intensity strength + stretching + spinal flexibility; studies show more effective improvement in disease activity / physical function / quality of life, and it can serve as an alternative to conventional exercise",
+      "evidence": [
+        "2025 guideline: Pilates and yoga combined with other exercise are recommended for people with axSpA/AS (1C).",
+        "2025 guideline: Pilates and yoga combine breath control with low-intensity strength exercise and muscle stretching, in particular spinal mobility exercise and strength / muscular endurance exercise.",
+        "2025 guideline: relevant studies show that both Pilates and yoga improve disease activity, physical function and quality of life in people with AS more effectively than other treatments … and can therefore serve as an alternative to conventional exercise.",
+        "2025 guideline: remote yoga provides a safe and appropriate intervention for people with AS, and is also suggested as part of comprehensive disease management."
+      ],
+      "action": [
+        "Boundary for posture selection: avoid inverted postures / deep neck extension (exb-005)",
+        "Tell the instructor about your condition and contraindications before class; choose AS-friendly follow-along videos",
+        "Combine with aerobic / breathing exercise as \"multimodal exercise\" (the form recommended by the guideline)"
+      ],
+      "alternative_hint": "No access to classes -> remote yoga (a safe intervention recognised by the guideline)",
+      "app_link": "optional in the flexibility section of plan templates; linked to the exb-005 inverted-posture check"
+    }
+  },
+  {
+    "id": "exc-008",
+    "category": "exercise",
+    "title": "Flexibility stretching: static 10–30 seconds × 2–4 repetitions, 1–2 times a day",
+    "summary": "2025 guideline specifics: hold a static stretch for 10–30 s and repeat 2–4 times, 1–2 times a day; a feeling of stretch without pain is the limit; focus on the hamstrings and hip flexors (the large muscle groups anchored around the spine).",
+    "severity_level": "low",
+    "applicable_scene": "routine item in the daily plan; includes a specific movement template (hamstring stretch)",
+    "source_name": "2025 patient-version exercise guideline (ddzx hospital PDF); NASS Living well with axial SpA — ⚠️ that NASS page path no longer works (404 on a real device), so the directly accessible EULAR 2018 exercise recommendations are used as the alongside source instead: Ann Rheum Dis 2018;77(9):1251-1260, PMID 29997112, DOI 10.1136/annrheumdis-2018-213585",
+    "source_url": "http://www.ddzxhospital.com/library/up_f/file/20251029/202510291330317969.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["chair-supported hamstring / hip stretch", "static stretching (all major muscle groups)"],
+      "intensity": "low",
+      "stage_fit": "stable",
+      "grade": "L1",
+      "grade_matrix": { "controlled": "recommend", "flare": "recommend", "stable": "recommend" },
+      "cervical_condition": "amplitude_half",
+      "dose": "2025 guideline: practise 1–2 times a day; hold a static stretch for 10–30 s and repeat 2–4 times; for dynamic exercise, repeat 10 times; NASS example movement: hold 10 s × 2 repetitions on each side",
+      "benefit": "The large muscle groups anchored around the spine (hamstrings / quadriceps) do not shorten -> this prevents the spine from being pulled into wrong postures (NASS text)",
+      "evidence": [
+        "2025 guideline: hold a static stretch for 10–30 s and repeat it 2–4 times; the intensity should be such that you feel tension at the end of the range but no pain while stretching.",
+        "NASS: These exercises stretch the large muscle groups such as the hamstrings and quadriceps that are anchored around the spine. It is important that these muscles do not shorten or the spine can be pulled into wrong postures. We recommend that you do these exercises every day.",
+        "NASS chair stretch: place your right calf on the seat of a chair, move your left foot as far forward as you can and bend the knee, keeping your back straight — you should feel a stretch at the front of the hip; hold for about 10 seconds, relax, repeat twice, reaching a little further each time; then swap sides."
+      ],
+      "action": [
+        "Chair-supported hamstring stretch (movement from the NASS text): 10 seconds × 2 on each side",
+        "Judge the intensity yourself: tension at the end of the range ✓, pain while stretching ✗ (reduce the range)",
+        "Light-to-moderate aerobic warm-up or heat before stretching (NASS: stretching is more effective after the muscles are warm)"
+      ],
+      "alternative_hint": "Stretch after a warm bath (kind to high-pain days)",
+      "app_link": "daily plan template; distinguished from exc-005 mobility (mobility = joints, flexibility = muscles — the plan template splits them into two sections)"
+    }
+  },
+  {
+    "id": "exc-009",
+    "category": "exercise",
+    "title": "Core stability: alternate limb lifts under abdominal tension",
+    "summary": "Prone / four-point kneeling: gently tighten the abdominals and, keeping your balance, alternately lift one hand and one knee — a specific movement from the NASS home version, 2 times per limb, up to 2 rounds a day.",
+    "severity_level": "low",
+    "applicable_scene": "core section of the home plan; pelvic stability (a foundation of posture management in AS)",
+    "source_name": "NASS \"Exercising at Home\"",
+    "source_url": "https://nass.co.uk/wp-content/uploads/2020/06/Exercising-at-home.pdf",
+    "source_tier": "S3",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": ["four-point alternate hand lift", "alternate knee lift", "supine bridge (pelvis lift)"],
+      "intensity": "low",
+      "stage_fit": "stable",
+      "grade": "L1",
+      "grade_matrix": { "controlled": "downgrade", "flare": "downgrade", "stable": "recommend" },
+      "cervical_condition": "none",
+      "dose": "NASS: 2 times per limb, up to 2 times a day; bridge: hold the lift for 5 seconds then lower slowly (Versus Arthritis text)",
+      "benefit": "Core stability supports spinal posture; the pelvis-lift movement also trains hip extensor strength",
+      "evidence": [
+        "NASS: Gently tense your stomach muscles, then slowly lift one hand about 1cm off the mat, while maintaining your balance. Place your hand back down, then repeat with the other hand and each knee in turn. Repeat 2 times per limb in total, up to 2 times daily.",
+        "Versus Arthritis (bridge): Lie on your back with your knees bent. Lift your pelvis and lower back off the floor. Hold for five seconds and then lower down slowly."
+      ],
+      "action": [
+        "Keep the lift small (about 1 cm); control matters more than range — the hallmark of core training in AS",
+        "Bridge: hold for 5 seconds then lower slowly; on days with back pain, shorten the hold"
+      ],
+      "alternative_hint": "Wrist or knee discomfort -> pad with a thick towel",
+      "app_link": "default item in the core section of the home plan template"
+    }
+  },
+  {
+    "id": "exc-010",
+    "category": "exercise",
+    "title": "Progression principles and the \"2-hour post-exercise pain rule\"",
+    "summary": "In the first 4–6 weeks, add 5–10 minutes every 1–2 weeks, then increase frequency and intensity; if the pain score 2 h after exercise is higher than before exercise -> reduce duration and intensity next time.",
+    "severity_level": "medium",
+    "applicable_scene": "plan progression settings; interpretation rules for the next-day feedback in exercise_logs (R21); starting dose for beginners",
+    "source_name": "Exercise Guideline for Axial Spondyloarthritis / Ankylosing Spondylitis, Patient Version (2025)",
+    "source_url": "http://www.ddzxhospital.com/library/up_f/file/20251029/202510291330317969.pdf",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-08",
+    "review_due": "2027-03-08",
+    "version": 1,
+    "payload": {
+      "list_type": "red",
+      "movements": [],
+      "intensity": "n/a",
+      "stage_fit": "both",
+      "grade": "L1",
+      "grade_matrix": { "controlled": "recommend", "flare": "recommend", "stable": "recommend" },
+      "cervical_condition": "none",
+      "dose": "First 4–6 weeks: add 5–10 min every 1–2 weeks -> then increase frequency and intensity",
+      "benefit": "Progressive loading prevents flares; the pain rule is an objective criterion for whether exercise is excessive",
+      "evidence": [
+        "2025 guideline: in the first 4–6 weeks of an exercise training programme, the duration of each session can be increased by 5–10 min every 1–2 weeks, then increase the frequency and intensity.",
+        "2025 guideline: if the pain score 2 h after exercise is higher than before exercise, reduce the duration and/or intensity of exercise in subsequent sessions."
+      ],
+      "action": [
+        "Interpretation rule for the APP's next-day exercise feedback (fb_pain_change): worse -> automatically suggest reducing the next dose (duration -20% or intensity one notch lower) — this entry is the basis for interpreting the R21 feedback feature",
+        "Starting dose for beginners = 50% of the prescribed dose (e.g. 15 min of brisk walking)",
+        "Order of progression: duration -> frequency -> intensity (strict order)"
+      ],
+      "alternative_hint": "2 consecutive worse results -> suggest consulting rehabilitation medicine to adjust the plan",
+      "app_link": "auto-suggestions linked to exercise_logs.fb_pain_change; rule text on the exercise plan progression settings page"
+    }
+  },
+  {
+    "id": "exb-001",
+    "category": "exercise",
+    "title": "Contact and collision sports: risk of spinal fracture (avoid completely if the cervical spine is involved)",
+    "summary": "People with AS often have osteoporosis and a stiff / fused spine, so the impacts of contact sports can cause fractures; cervical fractures account for more than half of spinal fractures in AS and have serious consequences.",
+    "severity_level": "high",
+    "applicable_scene": "browsing the exercise library; selecting a contested sport by mistake when configuring an exercise plan; users with markedly restricted cervical mobility (profile-linked prompt)",
+    "source_name": "NASS (National Axial Spondyloarthritis Society) Safety First; Liu B et al. \"A Novel Classification of Cervical Spine Trauma in Ankylosing Spondylitis\" (Orthop Surg 2023 Jun, PMC10235179, DOI 10.1111/os.13747)",
+    "source_url": "https://nass.co.uk/managing-my-as/exercise/safety-first/",
+    "source_tier": "S3",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "list_type": "black",
+      "movements": ["rugby", "contested basketball", "contact football (soccer)", "judo / wrestling", "ice hockey"],
+      "intensity": "high",
+      "stage_fit": "none",
+      "grade": "L3",
+      "grade_matrix": { "controlled": "block", "flare": "block", "stable": "block" },
+      "cervical_condition": "always",
+      "block_rule": { "stage": ["controlled", "flare", "stable"], "cervical": false },
+      "risk": "Impact causing spinal fracture (especially of the vertebral body); cervical fractures in AS are disproportionately fatal",
+      "evidence": [
+        "NASS: Having axial SpA can put you at greater risk of having thinner bones (osteoporosis). During contact sports you may experience hard knocks and blows that may cause a bone to break.",
+        "NASS: Some people with axial SpA may also have stiffening or fusion of the spine. This means that you may be at risk of breaking one of the bones in your spine during contact sports.",
+        "Liu 2023: cervical fractures account for 54%–73% of spinal fractures in AS."
+      ],
+      "alternative_hint": "For sport-specific interests, ask rehabilitation medicine about low-impact alternatives (e.g. non-contact ball games)",
+      "app_link": "exercise_plans configuration check (selecting a contested sport brings up this entry); pinned prompt when users with spine_mobility ≥ moderate browse the exercise library"
+    }
+  },
+  {
+    "id": "exb-002",
+    "category": "exercise",
+    "title": "Avoid high-impact exercise during active inflammation (running and jumping)",
+    "summary": "High-impact movements such as running put extra stress on the joints of the legs and the spine; most people prefer to avoid high-impact sports during a flare.",
+    "severity_level": "medium",
+    "applicable_scene": "flare_events active-period configuration / when carrying out an exercise plan; exercise cards are automatically filtered in minimal mode",
+    "source_name": "NASS Safety First",
+    "source_url": "https://nass.co.uk/managing-my-as/exercise/safety-first/",
+    "source_tier": "S3",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "list_type": "black",
+      "movements": ["running", "skipping rope", "high-intensity interval training (HIIT)", "high-intensity aerobics classes"],
+      "intensity": "high",
+      "stage_fit": "flare",
+      "grade": "L3",
+      "grade_matrix": { "controlled": "block", "flare": "block", "stable": "advise_against" },
+      "cervical_condition": "none",
+      "block_rule": { "stage": ["controlled", "flare"], "cervical": false },
+      "risk": "High impact during the active stage worsens joint stress and pain; NASS states that during a flare you should seek professional advice and not exceed your limits",
+      "evidence": [
+        "NASS: High impact sports involve pounding actions, including running, which can cause extra stress on the joints of the legs and the spine.",
+        "NASS: Many people prefer to avoid high impact sports during a flare.",
+        "NASS: Don't overdo it. Keep within your limits."
+      ],
+      "alternative_hint": "During a flare switch to low impact: swimming / warm-water activity / breathing exercise (linked to redlist entries)",
+      "app_link": "when a flare is active, exercise_plans(stage_mode=flare) automatically excludes high intensity; upper-limit hint in the exercise card intensity selector"
+    }
+  },
+  {
+    "id": "exb-003",
+    "category": "exercise",
+    "title": "Heavy barbell work / loaded movements that press directly on the spine and shoulders",
+    "summary": "Heavy weights transmit large forces to the spine, and with advanced osteoporosis plus a rigid, fused structure this readily causes vertebral compression fractures; loaded training should use low weights and high repetitions.",
+    "severity_level": "high",
+    "applicable_scene": "strength exercise configuration; when a user picks a heavy-weight item while building their own exercise plan",
+    "source_name": "NASS Safety First (https://nass.co.uk/managing-my-as/exercise/safety-first/ — verified to open on a real device); myHealthcare AS Exercise and PT Protocol (commercial platform S4, https://www.myhealthcare.com/Diseases/Rheumatology/Ankylosing-Spondylitis/Exercise-and-PT-Protocol.html — verified to open on a real device)",
+    "source_url": "https://nass.co.uk/managing-my-as/exercise/safety-first/",
+    "source_tier": "S3",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "list_type": "black",
+      "movements": ["heavy barbell squat", "heavy deadlift", "behind-the-neck press", "supine weighted neck flexion"],
+      "intensity": "high",
+      "stage_fit": "none",
+      "grade": "L3",
+      "grade_matrix": { "controlled": "block", "flare": "block", "stable": "block" },
+      "cervical_condition": "always",
+      "block_rule": { "stage": ["controlled", "flare", "stable"], "cervical": false },
+      "risk": "Vertebral compression fracture; movements that press directly on the spine / shoulders increase spinal compression and worsen pain and stiffness",
+      "evidence": [
+        "NASS: If you use weights — use a regime involving low weights and high repetitions.",
+        "myHealthcare: Avoid any exercise that involves placing weight directly on the spine and shoulders. (this increases spinal compression)"
+      ],
+      "alternative_hint": "Keep strength exercise (the 2023 guideline recommends it) but change the mode: low weight and high repetitions, fixed-path machines, resistance bands — see the redlist strength entry for details",
+      "app_link": "exercise plan intensity check (intensity high + strength category -> brings up this entry); cross-linked with the redlist strength entry"
+    }
+  },
+  {
+    "id": "exb-004",
+    "category": "exercise",
+    "title": "Breaststroke: use with caution if the cervical spine is involved / the neck is stiff",
+    "summary": "Breaststroke requires repeated, large-range cervical flexion and extension, which can aggravate an already stiff neck; if cervical mobility is restricted, switching to backstroke is recommended.",
+    "severity_level": "medium",
+    "applicable_scene": "when choosing swimming as part of an exercise plan; users with cervical restriction in spine_mobility",
+    "source_name": "myHealthcare (commercial health content platform) AS Exercise and PT Protocol — commercial platform content, not peer-reviewed literature and not an official guideline, for backup reference only",
+    "source_url": "https://www.myhealthcare.com/Diseases/Rheumatology/Ankylosing-Spondylitis/Exercise-and-PT-Protocol.html",
+    "source_tier": "S4",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "list_type": "black",
+      "movements": ["breaststroke (for people with cervical restriction)"],
+      "intensity": "low",
+      "stage_fit": "stable",
+      "grade": "L3",
+      "grade_matrix": { "controlled": "block", "flare": "block", "stable": "conditional" },
+      "cervical_condition": "cervical_only",
+      "block_rule": { "stage": ["controlled", "flare"], "cervical": true },
+      "risk": "The cervical flexion-extension cycle in breaststroke aggravates neck stiffness; with a fused cervical spine the risk of neck movement is amplified",
+      "evidence": [
+        "myHealthcare: Breaststroke — demands heavy cervical flexion and extension cycling that can aggravate an already stiff neck.",
+        "myHealthcare: Best strokes: Backstroke — the single best AS stroke. (backstroke is listed as the stroke best suited to AS)"
+      ],
+      "alternative_hint": "Change strokes in the same pool: backstroke (linked to redlist exc-001); swimming itself is a recommended exercise — this is only a matter of stroke choice",
+      "app_link": "stroke-selection prompt when configuring a swimming plan; backstroke is automatically recommended for users with cervical restriction"
+    }
+  },
+  {
+    "id": "exb-005",
+    "category": "exercise",
+    "title": "Cervical spine involvement: vigorous neck flexion / extension, rotation and inverted postures",
+    "summary": "People with cervical spine involvement or markedly restricted mobility should avoid vigorous neck movements; where there is disease-specific pathology such as cervical instability, activity should be individualised (EULAR framework).",
+    "severity_level": "high",
+    "applicable_scene": "when building your own yoga / Pilates class content (shoulder stand / headstand types); users with neck symptoms",
+    "source_name": "EULAR 2018 exercise recommendations (Ann Rheum Dis 2018;77(9):1251-1260, PMID 29997112); German lay-language version (Z Rheumatol 2023;82 Suppl 1:22-29, PMID 34618207, PMC9832088); myHealthcare Protocol (commercial platform)",
+    "source_url": "https://doi.org/10.1136/annrheumdis-2018-213585",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "list_type": "black",
+      "movements": ["headstand", "shoulder stand", "deep neck extension (the neck portion of the yoga wheel pose)", "rapid head rotation"],
+      "intensity": "high",
+      "stage_fit": "none",
+      "grade": "L3",
+      "grade_matrix": { "controlled": "block", "flare": "block", "stable": "block" },
+      "cervical_condition": "cervical_only",
+      "block_rule": { "stage": ["controlled", "flare"], "cervical": true },
+      "risk": "Under impact / extreme movement a fused cervical spine fractures rather than flexes (myHealthcare: A fused cervical spine fractures rather than flexes); cervical fractures account for more than half of spinal fractures in AS (Liu 2023)",
+      "evidence": [
+        "EULAR 2018 exercise recommendations (PMID 29997112, https://doi.org/10.1136/annrheumdis-2018-213585): activity promotion should be individualised where there is disease-specific individual pathology such as cardiac involvement or cervical instability (this wording comes from Table 1 of the German lay-language version, PMID 34618207, https://pmc.ncbi.nlm.nih.gov/articles/PMC9832088/).",
+        "myHealthcare: Contact sports — avoid entirely if cervical spine is involved. A fused cervical spine fractures rather than flexes under impact."
+      ],
+      "alternative_hint": "Yoga / Pilates as a whole are redlist-recommended (supported by the 2025 patient-version guideline) — only avoid extreme neck postures; tell the instructor about your condition before class",
+      "app_link": "keyword check for self-built exercise items (inverted / neck-extension types bring up this entry); cross-linked with the 2025 guideline redlist Pilates and yoga entry"
+    }
+  }
+]

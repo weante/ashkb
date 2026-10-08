@@ -174,7 +174,7 @@ internal fun EmergencyScenePicker(selected: EmergencyScene, onSelect: (Emergency
         ) {
             RadioButton(selected = selected == s, onClick = null)
             Spacer(Modifier.width(Spacing.xs))
-            Text(s.label, style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(s.labelRes), style = MaterialTheme.typography.bodyLarge)
         }
     }
 }

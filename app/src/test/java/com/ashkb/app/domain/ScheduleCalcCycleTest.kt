@@ -1,5 +1,6 @@
 package com.ashkb.app.domain
 
+import android.content.Context
 import com.ashkb.app.data.entity.MedFrequency
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.repo.ReminderConfigRepository
@@ -7,6 +8,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 import java.time.LocalDate
 
 /**
@@ -19,7 +24,11 @@ import java.time.LocalDate
  *
  * 另外钉住两条**不许改坏的旧口径**：注射 + 每日不出卡、口服 + 每两周仍按每日。
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "zh-rCN")
 class ScheduleCalcCycleTest {
+
+    private val ctx: Context get() = RuntimeEnvironment.getApplication()
 
     private val created = "2026-01-01T00:00:00"
 
@@ -140,9 +149,11 @@ class ScheduleCalcCycleTest {
     @Test
     fun `频次选择项文案已去掉括号说明`() {
         MedFrequency.entries.filter { !it.hidden }.forEach { f ->
+            // v1.2.5（i18n）：文案改成字符串资源，先解析再查括号（断言的事实不变）
+            val label = ctx.getString(f.labelRes)
             assertFalse(
-                "「${f.label}」里不该再有括号提示（v1.2.4 要求删掉（）内容）",
-                f.label.contains('（') || f.label.contains('('),
+                "「$label」里不该再有括号提示（v1.2.4 要求删掉（）内容）",
+                label.contains('（') || label.contains('('),
             )
         }
     }

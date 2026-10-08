@@ -246,7 +246,7 @@ private fun MedRow(
             ) {
                 Text(
                     buildString {
-                        append(MedFrequency.fromKey(med.frequency).label)
+                        append(stringResource(MedFrequency.fromKey(med.frequency).labelRes))
                         if (med.route == "injection") append(stringResource(R.string.med_injection_suffix))
                     },
                     style = MaterialTheme.typography.bodySmall,
@@ -257,7 +257,7 @@ private fun MedRow(
                 }
                 // C6：医嘱减量方案进行中（此态下停药不提示「自行停药」风险）
                 if (DoseState.of(med) == DoseState.TAPERING) {
-                    StatusChip(DoseState.TAPERING.label, StatusTone.Info)
+                    StatusChip(stringResource(DoseState.TAPERING.labelRes), StatusTone.Info)
                 }
             }
         }
@@ -294,7 +294,7 @@ private fun StopMedDialog(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         RadioButton(selected = reason == r, onClick = { reason = r })
-                        Text(r.label, style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(r.labelRes), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
                 if (reason == StopReason.OTHER) {
@@ -304,10 +304,11 @@ private fun StopMedDialog(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+                // v1.2.5（i18n）：forStop 改返回资源 id，文案在这里按当前语言解析
                 StopWarning.forStop(reason, med)?.let { w ->
                     Spacer(Modifier.height(Spacing.sm))
                     Text(
-                        w,
+                        stringResource(w),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -413,7 +414,7 @@ private fun RowScope.ArchivedRow(
                 a.stopDate?.let { append(stringResource(R.string.meds_stop_line, it)) }
                 if (isNotEmpty()) append(" · ")
                 append(
-                    a.stopReason?.let { stringResource(R.string.meds_stop_reason_line, it.label) }
+                    a.stopReason?.let { stringResource(R.string.meds_stop_reason_line, stringResource(it.labelRes)) }
                         ?: stringResource(R.string.meds_stop_reason_none),
                 )
             },
@@ -580,10 +581,16 @@ private fun RowScope.MedicationLogRow(log: MedicationLog, medRoute: String, onEd
     }
     // v1.0.49：部位显示中文。未知键（老数据 / 手工导入）回退原始字符串，不猜成某个部位
     val siteText = log.injSite?.takeIf { it.isNotBlank() }
-        ?.let { stringResource(R.string.med_history_inj_site_line, InjSite.fromKey(it)?.label ?: it) }
+        ?.let { raw ->
+            val name = InjSite.fromKey(raw)?.let { stringResource(it.labelRes) } ?: raw
+            stringResource(R.string.med_history_inj_site_line, name)
+        }
     // 原因优先取枚举中文名；取不到（未知值）就显示原始字符串，不伪装成「其他」
     val reasonText = log.reason?.takeIf { it.isNotBlank() }
-        ?.let { stringResource(R.string.med_history_reason_line, SkipReason.fromKey(it)?.label ?: it) }
+        ?.let { raw ->
+            val name = SkipReason.fromKey(raw)?.let { stringResource(it.labelRes) } ?: raw
+            stringResource(R.string.med_history_reason_line, name)
+        }
     val detail = listOfNotNull(slotText, siteText, reasonText, log.notes?.takeIf { it.isNotBlank() })
         .joinToString(" · ")
 
@@ -657,7 +664,7 @@ private fun MedicationLogEditDialog(
                     SkipReason.entries.forEach { r ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             RadioButton(selected = reason == r, onClick = { reason = r })
-                            Text(r.label)
+                            Text(stringResource(r.labelRes))
                         }
                     }
                 }
@@ -672,7 +679,7 @@ private fun MedicationLogEditDialog(
                             FilterChip(
                                 selected = injSite == s.key,
                                 onClick = { injSite = s.key },
-                                label = { Text(s.label) },
+                                label = { Text(stringResource(s.labelRes)) },
                             )
                         }
                     }

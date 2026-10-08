@@ -76,13 +76,13 @@ internal fun SupplementDetailSheet(vm: WellnessViewModel, sup: Supplement, onDis
         SheetColumn {
             Text("${sup.name} ${sup.dose}", style = MaterialTheme.typography.titleLarge)
             Text(
-                SupplementCategory.fromKey(sup.category).label + (sup.brand?.let { " · $it" } ?: ""),
+                stringResource(SupplementCategory.fromKey(sup.category).labelRes) + (sup.brand?.let { " · $it" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             // 频率取 MedFrequency 的既有标签（与药单同一套词），补剂表单写入的就是它的 key
             Text(
-                MedFrequency.fromKey(sup.frequency).label +
+                stringResource(MedFrequency.fromKey(sup.frequency).labelRes) +
                     (sup.times?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

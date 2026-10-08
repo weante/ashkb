@@ -10,6 +10,7 @@ import androidx.lifecycle.viewmodel.initializer
 import com.ashkb.app.AshkbApplication
 import com.ashkb.app.R
 import com.ashkb.app.data.backup.BackupEngine
+import com.ashkb.app.data.backup.VaultCipher
 import com.ashkb.app.data.backup.WebDavClient
 import com.ashkb.app.data.db.AttachmentSyncCounts
 import com.ashkb.app.data.entity.BackupLedger
@@ -102,6 +103,46 @@ class BackupViewModel(
     private fun info(msg: String) { _message.value = msg }
     private fun fail(msg: String) { _message.value = msg }
 
+    /**
+     * v1.2.5：把异常里的资源化文案解析成当前语言。
+     * data 层（VaultCipher / BackupEngine）没有 Context，异常同时带中文 msg 与 resId/resArgs；
+     * resId == 0（或非这两类异常）时回落 msg。[resArgs] 里的 `List<*>` 用本地化枚举分隔符拼接。
+     */
+    private fun errText(e: Throwable?): String {
+        val resId = when (e) {
+            is VaultCipher.VaultException -> e.resId
+            is BackupEngine.BackupException -> e.resId
+            else -> 0
+        }
+        if (resId == 0) return e?.message.orEmpty()
+        val args = when (e) {
+            is VaultCipher.VaultException -> e.resArgs
+            is BackupEngine.BackupException -> e.resArgs
+            else -> emptyList()
+        }
+        return text(resId, localizedArgs(args))
+    }
+
+    /** 资源文案。resArgs 最多 3 个（见 `strings_backup.xml`）：按元数显式分派，避免 vararg 展开数组。 */
+    private fun text(resId: Int, args: List<Any>): String = when (args.size) {
+        0 -> app.getString(resId)
+        1 -> app.getString(resId, args[0])
+        2 -> app.getString(resId, args[0], args[1])
+        else -> app.getString(resId, args[0], args[1], args[2])
+    }
+
+    /** 参数里的列表用资源分隔符拼接（data 层拿不到 Context，故推迟到这里）。 */
+    private fun localizedArgs(args: List<Any>): List<Any> = args.map {
+        if (it is List<*>) it.joinToString(app.getString(R.string.backup_list_separator_enum)) else it
+    }
+
+    /** 恢复/校验差异文案：优先资源化条目（rowIssues），无条目时回落中文原文 rowDetails。 */
+    private fun verifyIssues(v: BackupEngine.VerifyResult): String {
+        val sep = app.getString(R.string.backup_list_separator)
+        val localized = v.rowIssues.take(5).map { it.text(app) }
+        return localized.ifEmpty { v.rowDetails.take(5) }.joinToString(sep)
+    }
+
     // ======================= 本机备份 =======================
 
     fun backupLocal(password: String, onShare: (Intent) -> Unit) {
@@ -116,7 +157,7 @@ class BackupViewModel(
                 ))
                 onShare(shareFile(out.file, "application/octet-stream"))
             } catch (e: Exception) {
-                fail(app.getString(R.string.vm_backup_failed, e.message))
+                fail(app.getString(R.string.vm_backup_failed, errText(e)))
             } finally { _busy.value = false }
         }
     }
@@ -134,7 +175,7 @@ class BackupViewModel(
                 _davUser.value = user.trim()
                 info(msg)
             } catch (e: Exception) {
-                fail(app.getString(R.string.vm_dav_connect_failed, e.message))
+                fail(app.getString(R.string.vm_dav_connect_failed, errText(e)))
             } finally { _busy.value = false }
         }
     }
@@ -147,7 +188,7 @@ class BackupViewModel(
             try {
                 info(repo.backupWebdav(password.toCharArray()) { stage -> _stage.value = stage })
             } catch (e: Exception) {
-                fail(app.getString(R.string.vm_dav_backup_failed, e.message))
+                fail(app.getString(R.string.vm_dav_backup_failed, errText(e)))
             } finally {
                 _stage.value = ""
                 _busy.value = false
@@ -167,7 +208,7 @@ class BackupViewModel(
                 // 只有约 200 KB，撞上 1 MiB 上限说明远端目录本身异常，笼统文案会让人以为是网络问题。
                 fail(app.getString(R.string.vm_dav_list_too_large, WebDavClient.sizeMb(e.limitBytes)))
             } catch (e: Exception) {
-                fail(app.getString(R.string.vm_dav_list_failed, e.message))
+                fail(app.getString(R.string.vm_dav_list_failed, errText(e)))
             } finally { _busy.value = false }
         }
     }
@@ -187,7 +228,7 @@ class BackupViewModel(
                 // 刻意**不**退回笼统的"下载失败"：那样用户只会反复重试同一个必然失败的下载。
                 fail(app.getString(R.string.vm_dav_download_too_large, WebDavClient.sizeMb(e.limitBytes), name))
             } catch (e: Exception) {
-                fail(app.getString(R.string.vm_dav_download_failed, e.message))
+                fail(app.getString(R.string.vm_dav_download_failed, errText(e)))
             } finally {
                 _stage.value = ""
                 _busy.value = false
@@ -208,7 +249,7 @@ class BackupViewModel(
                 _recoveryCodeSet.value = true
                 _recoveryReveal.value = code
             } catch (e: Exception) {
-                fail(app.getString(R.string.vm_recovery_generate_failed, e.message))
+                fail(app.getString(R.string.vm_recovery_generate_failed, errText(e)))
             } finally { _busy.value = false }
         }
     }
@@ -245,7 +286,7 @@ class BackupViewModel(
                     d.schemaVersion, d.createdAt.take(19), rows,
                 ))
             } catch (e: Exception) {
-                fail(e.message ?: app.getString(R.string.vm_restore_verify_failed))
+                fail(errText(e).ifEmpty { app.getString(R.string.vm_restore_verify_failed) })
             } finally { _busy.value = false }
         }
     }
@@ -273,9 +314,9 @@ class BackupViewModel(
                 wipeRestorePassword()
                 _restoreResult.value = v
                 if (v.rowsOk) info(app.getString(R.string.vm_restore_done, modeNote, v.totalRows))
-                else info(app.getString(R.string.vm_restore_incomplete, v.rowDetails.take(5).joinToString("；")))
+                else info(app.getString(R.string.vm_restore_incomplete, verifyIssues(v)))
             } catch (e: Exception) {
-                fail(app.getString(R.string.vm_restore_failed, e.message))
+                fail(app.getString(R.string.vm_restore_failed, errText(e)))
             } finally { _busy.value = false }
         }
     }
@@ -298,7 +339,7 @@ class BackupViewModel(
                     app.getString(R.string.vm_drill_pass, r.detail)
                 else app.getString(R.string.vm_drill_incomplete, r.detail))
             } catch (e: Exception) {
-                fail(app.getString(R.string.vm_drill_failed, e.message))
+                fail(app.getString(R.string.vm_drill_failed, errText(e)))
             } finally { _busy.value = false }
         }
     }
@@ -318,7 +359,7 @@ class BackupViewModel(
                 info(app.getString(R.string.vm_profile_export_done, f.length()))
                 onShare(shareFile(f, "application/json"))
             } catch (e: Exception) {
-                fail(app.getString(R.string.vm_profile_export_failed, e.message))
+                fail(app.getString(R.string.vm_profile_export_failed, errText(e)))
             } finally { _busy.value = false }
         }
     }
@@ -330,7 +371,7 @@ class BackupViewModel(
                 val (name, meds) = repo.importProfileJson(String(bytes, Charsets.UTF_8))
                 info(app.getString(R.string.vm_profile_import_done, name, meds))
             } catch (e: Exception) {
-                fail(app.getString(R.string.vm_profile_import_failed, e.message))
+                fail(app.getString(R.string.vm_profile_import_failed, errText(e)))
             } finally { _busy.value = false }
         }
     }
@@ -389,7 +430,7 @@ class BackupViewModel(
                 }
                 _attachSyncMsg.value = true to r.detail
             } catch (e: Exception) {
-                _attachSyncMsg.value = false to (e.message ?: "")
+                _attachSyncMsg.value = false to errText(e)
             } finally {
                 _attachSyncStage.value = null
                 refreshAttachStats()
@@ -411,7 +452,7 @@ class BackupViewModel(
                 }
                 _attachVerifyMsg.value = true to r.detail
             } catch (e: Exception) {
-                _attachVerifyMsg.value = false to (e.message ?: "")
+                _attachVerifyMsg.value = false to errText(e)
             } finally {
                 _attachSyncStage.value = null
                 refreshAttachStats()

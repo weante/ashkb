@@ -1,10 +1,15 @@
 package com.ashkb.app.domain
 
+import android.content.Context
 import com.ashkb.app.data.entity.Medication
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 /**
  * v1.0.26 紧急卡「当前用药」汇总（EmergencyMeds）单测。
@@ -13,10 +18,27 @@ import org.junit.Test
  * 不可骤停判断），故从药单自动汇总。本测试锁定在用口径、免疫抑制置顶标注、
  * 截断「置顶优先」与一页可读前提，以及展示文案（通用名（商品名）、剂量 · 频次）。
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "zh-rCN")
 class EmergencyMedsTest {
 
     private val created = "2026-01-01T00:00:00"
     private val today = "2026-08-30"
+
+    private val ctx: Context get() = RuntimeEnvironment.getApplication()
+
+    /**
+     * v1.2.5（i18n）：`summarize` 的频次文案改由调用方注入（枚举里只剩资源 id），
+     * 这里用 ctx 解析资源，断言里的中文保持原样不动。
+     *
+     * `@Config(qualifiers = "zh-rCN")` 不可省：`values-en` 已存在，Robolectric 默认跟随
+     * JVM locale，不加限定符时 `getString` 可能解析成英文而让断言失败。
+     */
+    private fun summarizeMeds(
+        meds: List<Medication>,
+        today: String,
+        maxLines: Int = EmergencyMeds.MAX_LINES,
+    ) = EmergencyMeds.summarize(meds, today, maxLines = maxLines, freqLabel = { ctx.getString(it.plainRes) })
 
     private fun med(
         id: String = "med-test",
@@ -43,7 +65,7 @@ class EmergencyMedsTest {
     fun `已归档药物被排除`() {
         val archived = med(id = "med-a", medClass = "BIOLOGIC", isArchived = true)
         assertFalse(EmergencyMeds.isActive(archived, today))
-        val s = EmergencyMeds.summarize(listOf(archived), today)
+        val s = summarizeMeds(listOf(archived), today)
         assertTrue(s.isEmpty)
         assertEquals(0, s.hiddenCount)
     }
@@ -52,14 +74,14 @@ class EmergencyMedsTest {
     fun `结束日期早于今天被排除`() {
         val ended = med(id = "med-e", endDate = "2026-08-29")
         assertFalse(EmergencyMeds.isActive(ended, today))
-        assertTrue(EmergencyMeds.summarize(listOf(ended), today).isEmpty)
+        assertTrue(summarizeMeds(listOf(ended), today).isEmpty)
     }
 
     @Test
     fun `结束日期等于今天仍算在用`() {
         val lastDay = med(id = "med-e", endDate = "2026-08-30")
         assertTrue(EmergencyMeds.isActive(lastDay, today))
-        assertEquals(1, EmergencyMeds.summarize(listOf(lastDay), today).ordered.size)
+        assertEquals(1, summarizeMeds(listOf(lastDay), today).ordered.size)
     }
 
     @Test
@@ -90,7 +112,7 @@ class EmergencyMedsTest {
         val bio = med(id = "med-2", name = "依那西普", medClass = "BIOLOGIC")
         val other = med(id = "med-3", name = "钙片", medClass = "OTHER")
         val jak = med(id = "med-4", name = "托法替布", medClass = "JAK")
-        val s = EmergencyMeds.summarize(listOf(nsaid, bio, other, jak), today)
+        val s = summarizeMeds(listOf(nsaid, bio, other, jak), today)
         assertEquals(listOf("依那西普", "托法替布"), s.immunosuppressants.map { it.name })
         assertEquals(listOf("塞来昔布", "钙片"), s.others.map { it.name })
         assertEquals(listOf("依那西普", "托法替布", "塞来昔布", "钙片"), s.ordered.map { it.name })
@@ -108,7 +130,7 @@ class EmergencyMedsTest {
         val o1 = med(id = "med-1", name = "塞来昔布", medClass = "NSAID")
         val o2 = med(id = "med-2", name = "钙片", medClass = "OTHER")
         val o3 = med(id = "med-3", name = "叶酸", medClass = "OTHER")
-        val s = EmergencyMeds.summarize(listOf(o1, bio, o2, gluco, o3), today, maxLines = 3)
+        val s = summarizeMeds(listOf(o1, bio, o2, gluco, o3), today, maxLines = 3)
         assertEquals(listOf("依那西普", "泼尼松"), s.immunosuppressants.map { it.name })
         assertEquals(listOf("塞来昔布"), s.others.map { it.name })
         assertEquals(2, s.hiddenCount)
@@ -120,7 +142,7 @@ class EmergencyMedsTest {
         val jak = med(id = "med-j", name = "托法替布", medClass = "JAK")
         val gluco = med(id = "med-g", name = "泼尼松", medClass = "GLUCOCORTICOID")
         val nsaid = med(id = "med-n", name = "塞来昔布", medClass = "NSAID")
-        val s = EmergencyMeds.summarize(listOf(bio, jak, gluco, nsaid), today, maxLines = 2)
+        val s = summarizeMeds(listOf(bio, jak, gluco, nsaid), today, maxLines = 2)
         assertEquals(listOf("依那西普", "托法替布"), s.immunosuppressants.map { it.name })
         assertTrue(s.others.isEmpty())
         assertEquals(2, s.hiddenCount)
@@ -128,7 +150,7 @@ class EmergencyMedsTest {
 
     @Test
     fun `未超上限时 hiddenCount 为零`() {
-        val s = EmergencyMeds.summarize(
+        val s = summarizeMeds(
             listOf(med(id = "med-1"), med(id = "med-2")), today,
         )
         assertEquals(2, s.ordered.size)
@@ -140,31 +162,31 @@ class EmergencyMedsTest {
     @Test
     fun `有商品名时拼接为通用名括号商品名`() {
         val m = med(name = "依那西普", brandName = "恩利", medClass = "BIOLOGIC")
-        assertEquals("依那西普（恩利）", EmergencyMeds.summarize(listOf(m), today).ordered.single().name)
+        assertEquals("依那西普（恩利）", summarizeMeds(listOf(m), today).ordered.single().name)
     }
 
     @Test
     fun `无商品名时只用通用名`() {
         val m = med(name = "甲氨蝶呤", brandName = null, medClass = "CSDMARD")
-        assertEquals("甲氨蝶呤", EmergencyMeds.summarize(listOf(m), today).ordered.single().name)
+        assertEquals("甲氨蝶呤", summarizeMeds(listOf(m), today).ordered.single().name)
     }
 
     @Test
     fun `商品名为空白时只用通用名`() {
         val m = med(name = "甲氨蝶呤", brandName = " ", medClass = "CSDMARD")
-        assertEquals("甲氨蝶呤", EmergencyMeds.summarize(listOf(m), today).ordered.single().name)
+        assertEquals("甲氨蝶呤", summarizeMeds(listOf(m), today).ordered.single().name)
     }
 
     @Test
     fun `detail 含剂量与频次中文标签`() {
         val m = med(dose = "1 片", frequency = "DAILY")
-        assertEquals("1 片 · 每日", EmergencyMeds.summarize(listOf(m), today).ordered.single().detail)
+        assertEquals("1 片 · 每日", summarizeMeds(listOf(m), today).ordered.single().detail)
     }
 
     @Test
     fun `注射药 detail 附注射周期`() {
         val m = med(dose = "25 mg", frequency = "Q2W", route = "injection", injCycleDays = 14)
-        val detail = EmergencyMeds.summarize(listOf(m), today).ordered.single().detail
+        val detail = summarizeMeds(listOf(m), today).ordered.single().detail
         assertTrue(detail.contains("25 mg"))
         assertTrue(detail.contains("· 每 14 天"))
     }
@@ -173,7 +195,7 @@ class EmergencyMedsTest {
 
     @Test
     fun `空药单 isEmpty 且 hiddenCount 为零`() {
-        val s = EmergencyMeds.summarize(emptyList(), today)
+        val s = summarizeMeds(emptyList(), today)
         assertTrue(s.isEmpty)
         assertEquals(0, s.hiddenCount)
         assertTrue(s.ordered.isEmpty())

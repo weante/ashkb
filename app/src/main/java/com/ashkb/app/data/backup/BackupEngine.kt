@@ -1,9 +1,12 @@
 package com.ashkb.app.data.backup
 
+import android.content.Context
 import android.database.Cursor
+import androidx.annotation.StringRes
 import androidx.sqlite.db.SupportSQLiteDatabase
 import org.json.JSONArray
 import org.json.JSONObject
+import com.ashkb.app.R
 import java.security.MessageDigest
 
 /**
@@ -23,7 +26,17 @@ object BackupEngine {
         MERGE_TABLES,
     }
 
-    class BackupException(msg: String, cause: Throwable? = null) : Exception(msg, cause)
+    /**
+     * v1.2.5 文案资源化：中文 [msg] 原样保留（日志 / 无资源时的回落）；
+     * data 层没有 Context，[resId] / [resArgs] 由 UI 侧解析成当前语言（见 BackupViewModel.errText）。
+     * [resArgs] 里若含 `List<*>`，UI 侧会用本地化的枚举分隔符重新拼接。
+     */
+    class BackupException(
+        msg: String,
+        cause: Throwable? = null,
+        @StringRes val resId: Int = 0,
+        val resArgs: List<Any> = emptyList(),
+    ) : Exception(msg, cause)
 
     /**
      * R7：备份 schema 标签直接取 Room DB 版本（PRAGMA user_version），随迁移自动演进——
@@ -119,9 +132,24 @@ object BackupEngine {
 
     // ======================= 恢复 =======================
 
+    /** 单条校验差异的资源化形式（[args] 同 [BackupException.resArgs] 约定）。 */
+    data class RowIssue(@StringRes val resId: Int, val args: List<Any>) {
+        /**
+         * 当前语言文案。参数最多 3 个（见 `strings_backup.xml` 的 `backup_verify_*`）：data 层拿不到
+         * Context，故在此按元数显式分派，避免 vararg 展开数组的额外拷贝（detekt SpreadOperator）。
+         */
+        fun text(context: Context): String = when (args.size) {
+            0 -> context.getString(resId)
+            1 -> context.getString(resId, args[0])
+            2 -> context.getString(resId, args[0], args[1])
+            else -> context.getString(resId, args[0], args[1], args[2])
+        }
+    }
+
     data class VerifyResult(
         val rowsOk: Boolean, val shaOk: Boolean,
         val rowDetails: List<String>, val totalRows: Int,
+        val rowIssues: List<RowIssue> = emptyList(),
     )
 
     /**
@@ -141,19 +169,23 @@ object BackupEngine {
     ): VerifyResult {
         val root = JSONObject(payload)
         val schema = root.optInt("schema_version", 0)
-        if (schema <= 0) throw BackupException("备份缺少 schema_version")
+        if (schema <= 0) throw BackupException("备份缺少 schema_version", resId = R.string.backup_err_engine_no_schema)
         val current = schemaVersion(db)
         if (schema > current) throw BackupException(
-            "备份来自更高版本（schema $schema > 当前 $current），请先升级 APP")
+            "备份来自更高版本（schema $schema > 当前 $current），请先升级 APP",
+            resId = R.string.backup_err_engine_schema_newer, resArgs = listOf(schema, current))
         val expectedFormat = root.optString("format")
-        if (expectedFormat != "ashkb-full") throw BackupException("备份格式不正确：$expectedFormat")
+        if (expectedFormat != "ashkb-full") throw BackupException(
+            "备份格式不正确：$expectedFormat",
+            resId = R.string.backup_err_engine_bad_format, resArgs = listOf(expectedFormat))
 
         val tables = root.getJSONObject("tables")
         // R8：表名白名单——备份里的每个表必须存在于当前库（sqlite_master 动态发现），
         // 任一未知表名即整体拒绝（事务开始前校验，保证拒绝时零写入）
         val unknown = unknownTables(tables, tableNames(db).toHashSet())
         if (unknown.isNotEmpty()) throw BackupException(
-            "备份包含当前数据库不存在的表，已整体拒绝：${unknown.joinToString("、")}")
+            "备份包含当前数据库不存在的表，已整体拒绝：${unknown.joinToString("、")}",
+            resId = R.string.backup_err_engine_unknown_tables, resArgs = listOf(unknown))
         db.beginTransaction()
         try {
             if (mode == RestoreMode.FULL_ROLLBACK) {
@@ -185,7 +217,9 @@ object BackupEngine {
             }
             return result
         } catch (e: Exception) {
-            throw BackupException("恢复写入失败：${e.message}", e)
+            throw BackupException(
+                "恢复写入失败：${e.message}", e,
+                resId = R.string.backup_err_engine_write_failed, resArgs = listOf(e.message.orEmpty()))
         } finally {
             db.endTransaction()
         }
@@ -211,6 +245,7 @@ object BackupEngine {
     fun verifyAgainst(db: SupportSQLiteDatabase, manifest: JSONObject, tablesJson: JSONObject? = null): VerifyResult {
         val rowsBad = mutableListOf<String>()
         val shaBad = mutableListOf<String>()
+        val issues = mutableListOf<RowIssue>()
         var total = 0
         // 有 tablesJson（正常恢复路径）时只信它；没有时（自生成负载）退回 manifest 键，
         // 但仍然先过一遍当前库的表白名单——两条路径都不允许备份文件自带的键直达 SQL。
@@ -230,14 +265,21 @@ object BackupEngine {
                 rows.map { r -> JSONObject().apply { backupCols.forEach { c -> put(c, r.opt(c) ?: JSONObject.NULL) } } }
             } else rows
             total += rows.size
-            if (rows.size != m_rows(manifest, t)) rowsBad.add("$t: 期望 ${m_rows(manifest, t)} 实际 ${rows.size}")
-            if (tableSha(compare) != m_sha(manifest, t)) shaBad.add(t)
+            if (rows.size != m_rows(manifest, t)) {
+                rowsBad.add("$t: 期望 ${m_rows(manifest, t)} 实际 ${rows.size}")
+                issues.add(RowIssue(R.string.backup_verify_rows_mismatch, listOf(t, m_rows(manifest, t), rows.size)))
+            }
+            if (tableSha(compare) != m_sha(manifest, t)) {
+                shaBad.add(t)
+                issues.add(RowIssue(R.string.backup_verify_sha_mismatch, listOf(t)))
+            }
         }
         return VerifyResult(
             rowsOk = rowsBad.isEmpty() && shaBad.isEmpty(),
             shaOk = shaBad.isEmpty(),
             rowDetails = rowsBad + shaBad.map { "$it: SHA-256 不匹配" },
             totalRows = total,
+            rowIssues = issues,
         )
     }
 
@@ -259,7 +301,10 @@ object BackupEngine {
      */
     private fun asNumber(table: String, col: String, v: Any): Number =
         v as? Number
-            ?: throw BackupException("备份数据类型不符：$table.$col 期望数值，实际为 ${v::class.simpleName}")
+            ?: throw BackupException(
+                "备份数据类型不符：$table.$col 期望数值，实际为 ${v::class.simpleName}",
+                resId = R.string.backup_err_engine_bad_type,
+                resArgs = listOf(table, col, v::class.simpleName.orEmpty()))
 
     private fun insertTable(db: SupportSQLiteDatabase, table: String, rows: JSONArray) {
         db.execSQL("DELETE FROM `$table`")
@@ -279,7 +324,9 @@ object BackupEngine {
             // 备份 JSON 的键并拼进 SQL（`INSERT INTO t (`a`, `b`) ...`）——含反引号 / `)` 的键可
             // 破坏语句结构。威胁模型正是「诱导用户导入攻击者提供、口令已知的备份」。
             val unknown = cols.firstOrNull { it !in colTypes }
-            if (unknown != null) throw BackupException("备份含未知列：$table.$unknown")
+            if (unknown != null) throw BackupException(
+                "备份含未知列：$table.$unknown",
+                resId = R.string.backup_err_engine_unknown_column, resArgs = listOf(table, unknown))
             val stmt = db.compileStatement(
                 "INSERT OR REPLACE INTO `$table` (${cols.joinToString(separator = "`, `", prefix = "`", postfix = "`")}) " +
                     "VALUES (${marks.joinToString()})")

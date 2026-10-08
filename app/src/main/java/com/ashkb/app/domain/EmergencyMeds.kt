@@ -62,12 +62,23 @@ object EmergencyMeds {
     /**
      * 汇总：免疫抑制类置顶，其余保持传入顺序（DAO 已按 created_at 排序，结果稳定可复现）。
      * 截断按「置顶优先」——先保证免疫抑制类完整列出，再补其余。
+     *
+     * v1.2.5（i18n）：频次文案不再硬编码中文，改由调用方注入 [freqLabel] 解析
+     * （`MedFrequency.plainRes` 是资源 id）——本对象因此**继续保持无 Android 依赖**，
+     * Compose 侧传 `stringResource`、非 Compose 侧传 `context::getString` 即可。
+     *
+     * @param freqLabel 把频次枚举解析成当前语言文案；急救卡必须用 `plainRes`（不是 `labelRes`）。
      */
-    fun summarize(meds: List<Medication>, today: String, maxLines: Int = MAX_LINES): Summary {
+    fun summarize(
+        meds: List<Medication>,
+        today: String,
+        freqLabel: (MedFrequency) -> String,
+        maxLines: Int = MAX_LINES,
+    ): Summary {
         val active = meds.filter { isActive(it, today) }
         val (immuno, rest) = active.partition { isImmunosuppressant(it.medClass) }
-        val head = immuno.map { entry(it) }
-        val tail = rest.map { entry(it) }
+        val head = immuno.map { entry(it, freqLabel) }
+        val tail = rest.map { entry(it, freqLabel) }
         val kept = (head + tail).take(maxLines.coerceAtLeast(0))
         val keptHead = kept.count { it.immunosuppressant }
         return Summary(
@@ -77,11 +88,12 @@ object EmergencyMeds {
         )
     }
 
-    private fun entry(m: Medication): Entry {
+    private fun entry(m: Medication, freqLabel: (MedFrequency) -> String): Entry {
         val name = m.brandName?.takeIf { it.isNotBlank() }?.let { "${m.name}（$it）" } ?: m.name
-        // v1.2.1：读 `plain` 而非 `label`——`label` 含面向患者的表单提示（如「如甲氨蝶呤」），
+        // v1.2.1：读 `plainRes` 而非 `labelRes`——`labelRes` 含面向患者的表单提示（如「如甲氨蝶呤」），
         // 会印到急救卡上（医生看的那张）。详见 MedFrequency 的注释。
-        val freq = MedFrequency.fromKey(m.frequency).plain
+        // v1.2.5（i18n）：解析交给调用方注入的 `freqLabel`，本对象不碰 Android 资源。
+        val freq = freqLabel(MedFrequency.fromKey(m.frequency))
         val cycle = m.injCycleDays?.let { " · 每 $it 天" } ?: ""
         return Entry(
             name = name,

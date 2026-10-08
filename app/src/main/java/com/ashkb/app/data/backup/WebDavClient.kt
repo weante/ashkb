@@ -1,5 +1,6 @@
 package com.ashkb.app.data.backup
 
+import android.content.Context
 import java.io.ByteArrayOutputStream
 import java.lang.reflect.Field
 import java.net.HttpURLConnection
@@ -7,6 +8,7 @@ import java.net.URL
 import java.util.Base64
 import javax.net.ssl.HttpsURLConnection
 
+import com.ashkb.app.R
 import com.ashkb.app.domain.AttachmentPath
 
 /**
@@ -21,6 +23,8 @@ class WebDavClient(
     private val serverUrl: String,
     private val username: String,
     private val password: String,
+    /** v1.2.5：文案资源化。注入 Context 而非改方法签名——方法签名被 detekt baseline 钉死。 */
+    private val context: Context,
 ) {
     class DavException(msg: String) : Exception(msg)
 
@@ -57,7 +61,7 @@ class WebDavClient(
         // v1.0.43：客户端自校验 scheme。此前唯一防线是 BackupRepository.requireHttps，而它是
         // 「拦 http://」的黑名单——任何非 http:// 的畸形基址都能带着 Basic 凭据发出去。
         if (!u.protocol.equals("https", ignoreCase = true))
-            throw DavException("WebDAV 基址必须是 https:// 地址（当前为 ${u.protocol}://）")
+            throw DavException(context.getString(R.string.backup_err_dav_base_https, u.protocol))
         return u
     }
 
@@ -102,7 +106,7 @@ class WebDavClient(
             }
             break
         }
-        throw DavException("当前 Android 网络栈无法发送 $method 方法（反射覆写失败），WebDAV 目录操作不可用")
+        throw DavException(context.getString(R.string.backup_err_dav_method, method))
     }
 
     private fun findField(start: Class<*>, name: String): Field? {
@@ -127,19 +131,10 @@ class WebDavClient(
         val rc = propfindCode()
         when {
             rc in 200..299 -> {}
-            rc == 401 -> throw DavException(
-                "认证失败（HTTP 401）：WebDAV 账号或密码错误。" +
-                    "坚果云需用注册邮箱 + 应用密码（在网页端「账户信息 → 安全选项」生成，不是登录密码）"
-            )
-            rc == 403 -> throw DavException("认证通过但无权限访问该目录（HTTP 403）")
-            rc == 404 -> throw DavException(
-                "服务器上不存在此地址（HTTP 404）：$root\n" +
-                    "请检查 WebDAV 地址是否正确：坚果云为 https://dav.jianguoyun.com/dav/ ，" +
-                    "其他服务以服务商说明为准。地址须指向服务器上已存在的目录，应用会在其下自动创建 ashkb/backup"
-            )
-            rc in 300..399 -> throw DavException(
-                "服务器要求跳转（HTTP $rc）：请改用跳转后的最终地址作为 WebDAV 地址"
-            )
+            rc == 401 -> throw DavException(context.getString(R.string.backup_err_dav_401))
+            rc == 403 -> throw DavException(context.getString(R.string.backup_err_dav_403))
+            rc == 404 -> throw DavException(context.getString(R.string.backup_err_dav_404, root))
+            rc in 300..399 -> throw DavException(context.getString(R.string.backup_err_dav_3xx, rc))
         }
         // 2. MKCOL 目录（已存在返回 405，忽略）
         mkcol("ashkb")
@@ -149,10 +144,10 @@ class WebDavClient(
         put("ashkb/backup/.probe-$probe", probe.toByteArray(Charsets.UTF_8))
         // 4. GET 回读比对
         val back = get("ashkb/backup/.probe-$probe")
-        if (back.decodeToString() != probe) throw DavException("写探针回读不一致（目录可写但读取异常）")
+        if (back.decodeToString() != probe) throw DavException(context.getString(R.string.backup_err_dav_probe_readback))
         // 5. DELETE 清探针
         delete("ashkb/backup/.probe-$probe")
-        return "连接成功：地址检查 / 目录创建 / 探针写入 / 回读 / 清理全部通过"
+        return context.getString(R.string.backup_dav_probe_ok)
     }
 
     private fun propfindCode(): Int {
@@ -165,10 +160,7 @@ class WebDavClient(
         try {
             val code = conn.responseCode
             if (code !in 200..299 && code != 405)
-                throw DavException(
-                    "无法创建目录（HTTP $code）：${url(path)}\n" +
-                        "403 = 账号无创建文件夹权限；404 = 上级目录不存在"
-                )
+                throw DavException(context.getString(R.string.backup_err_dav_mkcol, code, url(path)))
         } finally { conn.disconnect() }
     }
 
@@ -180,9 +172,9 @@ class WebDavClient(
         val shaBack = BackupEngine.sha256Hex(back)
         if (shaUp != shaBack) {
             delete("ashkb/backup/$name")
-            throw DavException("上传后回读校验失败（已删除该份）")
+            throw DavException(context.getString(R.string.backup_err_dav_upload_readback))
         }
-        return "上传成功且回读一致（SHA-256 $shaUp.take(12)…）"
+        return context.getString(R.string.backup_dav_upload_ok, shaUp.take(SHA_PREFIX_CHARS))
     }
 
     fun download(name: String): ByteArray = get("ashkb/backup/$name")
@@ -227,7 +219,7 @@ class WebDavClient(
      *  v1.0.43：改用 [AttachmentPath.isManagedRemotePath]（含日期目录校验），与「可清理形状」同强度。 */
     private fun requirePath(remotePath: String) {
         if (!AttachmentPath.isManagedRemotePath(remotePath))
-            throw DavException("非法附件路径：$remotePath")
+            throw DavException(context.getString(R.string.backup_err_dav_bad_path, remotePath))
     }
 
     /**
@@ -262,7 +254,7 @@ class WebDavClient(
             val code = conn.responseCode
             when {
                 code == 404 -> null
-                code !in 200..299 -> throw DavException("服务器拒绝列出目录（HTTP $code）——无法校验远端附件")
+                code !in 200..299 -> throw DavException(context.getString(R.string.backup_err_dav_list_denied_attach, code))
                 else -> readBounded(conn.inputStream, TEXT_RESPONSE_LIMIT, path).decodeToString()
             }
         } finally { conn.disconnect() }
@@ -276,7 +268,7 @@ class WebDavClient(
             conn.outputStream.use { it.write(data) }
             val code = conn.responseCode
             if (code !in 200..299 && code != 201 && code != 204)
-                throw DavException("PUT 失败：HTTP $code ${conn.responseMessage}")
+                throw DavException(context.getString(R.string.backup_err_dav_put, code, conn.responseMessage))
         } finally { conn.disconnect() }
     }
 
@@ -284,7 +276,7 @@ class WebDavClient(
         val conn = open(path, "GET")
         try {
             val code = conn.responseCode
-            if (code !in 200..299) throw DavException("GET 失败：HTTP $code")
+            if (code !in 200..299) throw DavException(context.getString(R.string.backup_err_dav_get, code))
             // v1.0.86（批次 11 / D6）：二进制读路径统一走上限——备份下载、附件懒下载、
             // 上传后的回读校验（upload 内部也是 get）全在这里收口。
             // v1.1.1：上限改为**由调用方给**——备份（几百 KB）与附件（≤ 20 MB）不是同一条尺寸带，
@@ -298,7 +290,7 @@ class WebDavClient(
         val conn = open(path, "DELETE")
         try {
             val code = conn.responseCode
-            if (code !in 200..299 && code != 404) throw DavException("DELETE 失败：HTTP $code")
+            if (code !in 200..299 && code != 404) throw DavException(context.getString(R.string.backup_err_dav_delete, code))
         } finally { conn.disconnect() }
     }
 
@@ -356,7 +348,7 @@ class WebDavClient(
         return try {
             val code = conn.responseCode
             if (code !in 200..299)
-                throw DavException("服务器拒绝列出目录（HTTP $code）——无法获取远程备份列表")
+                throw DavException(context.getString(R.string.backup_err_dav_list_denied_backup, code))
             val xml = readBounded(conn.inputStream, TEXT_RESPONSE_LIMIT, "ashkb/backup/").decodeToString()
             parseDavBackups(xml)
         } finally {
@@ -411,6 +403,9 @@ class WebDavClient(
 
         /** 读流缓冲（8 KiB）：HTTP 响应体分块读取的常规粒度，与上限无关。 */
         private const val READ_BUFFER_BYTES = 8 * 1024
+
+        /** 回读一致提示里展示的 SHA-256 前缀长度：12 个十六进制字符足够肉眼比对。 */
+        private const val SHA_PREFIX_CHARS = 12
 
         /** 字节 → MB（整数，供上限 / 超限文案共用；不做四舍五入，宁可少报也不夸大）。 */
         fun sizeMb(bytes: Long): Long = bytes / BYTES_PER_MB

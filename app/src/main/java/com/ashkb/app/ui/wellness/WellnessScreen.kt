@@ -709,7 +709,7 @@ private fun SupplementCardRow(
         ) {
             Text("${sup.name} ${sup.dose}", style = MaterialTheme.typography.bodyMedium)
             Text(
-                SupplementCategory.fromKey(sup.category).label +
+                stringResource(SupplementCategory.fromKey(sup.category).labelRes) +
                     (sup.brand?.let { " · $it" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1062,7 +1062,7 @@ private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, 
             )
             Text(stringResource(R.string.common_category), style = MaterialTheme.typography.labelMedium)
             ChipGroup(
-                options = SupplementCategory.entries.map { it.name to it.label },
+                options = SupplementCategory.entries.map { it.name to stringResource(it.labelRes) },
                 selected = category.name,
                 onSelect = { key -> category = SupplementCategory.fromKey(key) },
             )

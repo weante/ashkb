@@ -2,6 +2,7 @@ package com.ashkb.app
 
 import com.ashkb.app.AshkbApplication.Companion.KB_SEED_VERSION
 import com.ashkb.app.AshkbApplication.Companion.SEED_FILES
+import com.ashkb.app.AshkbApplication.Companion.SEED_FILES_EN
 import java.io.File
 import java.security.MessageDigest
 import org.junit.Assert.assertEquals
@@ -72,6 +73,10 @@ class KbSeedVersionGateTest {
         10 to "63c974077bd5e5c1bb5dc536ee0ee3adacbe708aa623613063ce2b802da38d19",
         11 to "9451c3c05fdcb3d2207cec9b5d7efe1d45f998ee72cfb74cd37331f5afd69e1b",
         12 to "8ef30e4b4a3fdde43b623aee657f577a6fa2bd8ecd52b8c61d847e1f256211bb",
+        // 13 = v1.2.5 英文支持：新增 `assets/en/` 下 5 个英文种子，闸门同时纳入应用语言。
+        // 指纹口径从「5 个中文种子」扩到「5 中 + 5 英」——见 [fingerprint]。
+        // 中文种子本身一个字节未改；bump 是为了让英文设备首启拿到英文内容。
+        13 to "b4a0dfaa236bb5823742d6f4671fb50c8d1c2c10d0b39946e8ea48555257e866",
     )
 
     /** 单测工作目录是模块目录（`app/`），与 `MedicationInteractionChainTest` 同一约定。 */
@@ -81,10 +86,17 @@ class KbSeedVersionGateTest {
             ?: error("找不到种子文件 $name（单测工作目录=${File(".").absolutePath}）")
     }
 
-    /** 全部种子文件的 SHA-256（文件名单独并入摘要，改名也要被看见）。 */
+    /**
+     * 全部种子文件的 SHA-256（文件名单独并入摘要，改名也要被看见）。
+     *
+     * v1.2.5：口径从「[SEED_FILES]」扩到「[SEED_FILES] + [SEED_FILES_EN]」。
+     * 只盖中文那份的话，英文种子被改动（或漏译、漏文件）不会让任何东西变红——
+     * 而它同样是「已装用户看不到的静默缺口」，正是这道门要防的东西。
+     * 两份都用 [assetFile] 读盘，所以 `assets/en/` 少一个文件时这里会直接报错，而不是静默跳过。
+     */
     private fun fingerprint(): String {
         val md = MessageDigest.getInstance("SHA-256")
-        for (name in SEED_FILES) {
+        for (name in SEED_FILES + SEED_FILES_EN) {
             md.update(name.toByteArray())
             md.update(assetFile(name).readBytes())
         }

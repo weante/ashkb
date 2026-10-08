@@ -85,7 +85,7 @@ class BackupRepository(private val context: Context) {
      */
     private fun requireHttps(url: String) {
         if (!url.trim().startsWith("https://", ignoreCase = true))
-            throw WebDavClient.DavException("仅支持 https:// 地址——明文 http 会把账号密码暴露给链路上任何人")
+            throw WebDavClient.DavException(context.getString(R.string.backup_err_https_only))
     }
 
     fun saveWebdavConfig(url: String, user: String, pass: String) {
@@ -155,7 +155,8 @@ class BackupRepository(private val context: Context) {
     private fun vaultKeyOrThrow(): ByteArray = vaultKeys.getOrCreate()
         ?: throw BackupEngine.BackupException(
             "本机附件密钥无法解密（系统密钥库异常）。为避免云端已上传的附件永久不可解，已停止生成新密钥。" +
-                "请先恢复一份本机或云端的 v3 备份以取回密钥。"
+                "请先恢复一份本机或云端的 v3 备份以取回密钥。",
+            resId = R.string.backup_err_vault_key_unreadable,
         )
 
     // ======================= 本机备份 =======================
@@ -176,7 +177,7 @@ class BackupRepository(private val context: Context) {
         val f = dir.resolve("$name.ashkb")
         f.writeBytes(bytes)
         log(LedgerType.BACKUP, true, "local", f.name, exported.rowTotal, null,
-            "${exported.tableCount} 表 ${exported.rowTotal} 行，AES-256-GCM")
+            context.getString(R.string.backup_detail_local_aes, exported.tableCount, exported.rowTotal))
         BackupOutcome(f, exported.rowTotal, exported.tableCount, BackupEngine.sha256Hex(bytes))
     }
 
@@ -190,12 +191,12 @@ class BackupRepository(private val context: Context) {
     ): String = withContext(Dispatchers.IO) {
         withTimeout(120_000) {
         val (url, user, pass) = webdavConfig()
-        if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
+        if (url.isBlank()) throw WebDavClient.DavException(context.getString(R.string.backup_err_no_webdav))
         requireHttps(url) // R3：旧版本存的 http:// 配置给出明确报错，而非网络层异常
-        val client = WebDavClient(url, user, pass)
-        onStage("正在导出数据库快照…")
+        val client = WebDavClient(url, user, pass, context)
+        onStage(context.getString(R.string.backup_stage_export_db))
         val exported = BackupEngine.export(supportDb(), nowIso())
-        onStage("正在加密（AES-256-GCM）…")
+        onStage(context.getString(R.string.backup_stage_encrypt))
         val bytes = VaultCipher.encryptV3(vaultKeyOrThrow(), password, recoverySlot(), exported.payload,
             BackupEngine.schemaVersion(supportDb()), nowIso())
         // X2：文件名带时间戳——同一天多次备份不再互相覆盖（旧按日命名 PUT 同名即覆盖）
@@ -203,14 +204,14 @@ class BackupRepository(private val context: Context) {
             LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmmss")) +
             ".ashkb"
         try {
-            onStage("正在上传到 WebDAV…")
+            onStage(context.getString(R.string.backup_stage_upload))
             val upMsg = client.upload(name, bytes)
-            onStage("正在清理过期备份…")
+            onStage(context.getString(R.string.backup_stage_cleanup))
             val removed = client.rotate()
             log(LedgerType.BACKUP, true, "webdav", name, exported.rowTotal, true,
-                "$upMsg；轮换清理 ${removed.size} 份过期备份")
-            "WebDAV 备份成功：$name（${exported.rowTotal} 行）。$upMsg" +
-                if (removed.isEmpty()) "" else "；清理过期 ${removed.size} 份"
+                context.getString(R.string.backup_detail_rotate, upMsg, removed.size))
+            context.getString(R.string.backup_success_webdav, name, exported.rowTotal, upMsg) +
+                if (removed.isEmpty()) "" else context.getString(R.string.backup_detail_cleanup_expired, removed.size)
         } catch (e: Exception) {
             log(LedgerType.BACKUP, false, "webdav", name, null, false, e.message)
             throw e
@@ -221,7 +222,7 @@ class BackupRepository(private val context: Context) {
     suspend fun probeWebdav(url: String, user: String, pass: String): String =
         withContext(Dispatchers.IO) {
             requireHttps(url) // R3：先于任何网络请求拦截明文 http
-            WebDavClient(url, user, pass).probe()
+            WebDavClient(url, user, pass, context).probe()
         }
 
     // ---- W4：WebDAV 远程恢复 ----
@@ -230,9 +231,9 @@ class BackupRepository(private val context: Context) {
     suspend fun listWebdavBackups(): List<WebDavClient.DavBackupFile> =
         withContext(Dispatchers.IO) {
             val (url, user, pass) = webdavConfig()
-            if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
+            if (url.isBlank()) throw WebDavClient.DavException(context.getString(R.string.backup_err_no_webdav))
             requireHttps(url)
-            WebDavClient(url, user, pass).listBackupFiles()
+            WebDavClient(url, user, pass, context).listBackupFiles()
         }
 
     /** 下载指定远程备份（随后走既有五步恢复：旁路解密 → pre-restore 快照 → 覆盖写入）。 */
@@ -241,11 +242,11 @@ class BackupRepository(private val context: Context) {
             // name 来自刚拉取的远程列表，拼 URL 前再守一道：只放行本应用备份文件名形状
             if (!name.startsWith("ashkb-backup-") || !name.endsWith(".ashkb") ||
                 name.contains('/') || name.contains('?')
-            ) throw WebDavClient.DavException("非法备份文件名：$name")
+            ) throw WebDavClient.DavException(context.getString(R.string.backup_err_bad_file_name, name))
             val (url, user, pass) = webdavConfig()
-            if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
+            if (url.isBlank()) throw WebDavClient.DavException(context.getString(R.string.backup_err_no_webdav))
             requireHttps(url)
-            WebDavClient(url, user, pass).download(name)
+            WebDavClient(url, user, pass, context).download(name)
         }
 
     // ======================= 恢复 =======================
@@ -260,9 +261,10 @@ class BackupRepository(private val context: Context) {
             // 否则一次旧备份恢复会把本机附件密钥冲掉，已上传的附件立刻解不开）
             d.vaultKey?.let { vaultKeys.adoptIfAbsent(it) }
             val root = JSONObject(d.payload)
-            if (root.optString("format") != "ashkb-full") throw BackupEngine.BackupException("备份格式不正确")
+            if (root.optString("format") != "ashkb-full")
+                throw BackupEngine.BackupException(context.getString(R.string.backup_err_bad_format))
             if (root.optInt("schema_version", 0) > BackupEngine.schemaVersion(supportDb()))
-                throw BackupEngine.BackupException("备份 schema 高于当前 APP 版本，请先升级")
+                throw BackupEngine.BackupException(context.getString(R.string.backup_err_schema_newer))
             // 文件内自校验：payload 行重新序列化后与 manifest 比对
             val manifest = root.getJSONObject("manifest")
             val tables = root.getJSONObject("tables")
@@ -272,10 +274,12 @@ class BackupRepository(private val context: Context) {
                 for (i in 0 until arr.length()) rows.add(arr.getJSONObject(i).toString())
                 val m = manifest.getJSONObject(t)
                 if (rows.size != m.getInt("rows"))
-                    throw BackupEngine.BackupException("文件自校验失败：$t 行数 ${rows.size} ≠ manifest ${m.getInt("rows")}")
+                    throw BackupEngine.BackupException(
+                        context.getString(R.string.backup_err_selfcheck_rows, t, rows.size, m.getInt("rows"))
+                    )
                 val sha = BackupEngine.sha256Hex(rows.sorted().joinToString("\n").toByteArray())
                 if (sha != m.getString("sha256"))
-                    throw BackupEngine.BackupException("文件自校验失败：$t SHA-256 不匹配（文件可能损坏）")
+                    throw BackupEngine.BackupException(context.getString(R.string.backup_err_selfcheck_sha, t))
             }
             DecryptedFile(d.payload, d.schemaVersion, d.createdAt)
         }
@@ -310,13 +314,18 @@ class BackupRepository(private val context: Context) {
             val dir = File(context.filesDir, "backups").apply { mkdirs() }
             val snapFile = dir.resolve("pre-restore-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))}.ashkb")
             snapFile.writeBytes(snapBytes)
-            val modeNote = if (mode == BackupEngine.RestoreMode.FULL_ROLLBACK) "完整回滚" else "按表合并"
+            val modeNote = when (mode) {
+                BackupEngine.RestoreMode.FULL_ROLLBACK -> context.getString(R.string.backup_restore_full_rollback)
+                BackupEngine.RestoreMode.MERGE_TABLES -> context.getString(R.string.backup_restore_table_merge)
+            }
             try {
                 // 2. 覆盖写入 + 3. 双校验（事务内：失败即整体回滚，库保持恢复前状态）
                 val verify = BackupEngine.restore(supportDb(), decrypted.payload, mode)
                 log(LedgerType.RESTORE, verify.rowsOk, "restore", snapFile.name, verify.totalRows,
-                    verify.rowsOk, "pre-restore 快照已留存；$modeNote；行数+SHA 双校验" +
-                        if (verify.rowsOk) "通过" else "失败——已整体回滚，库保持恢复前状态")
+                    verify.rowsOk, context.getString(
+                        R.string.backup_detail_prerestore, modeNote,
+                        if (verify.rowsOk) context.getString(R.string.backup_verify_result_pass)
+                        else context.getString(R.string.backup_verify_result_fail_rollback)))
                 verify
             } catch (e: Exception) {
                 log(LedgerType.RESTORE, false, "restore", snapFile.name, null, false, e.message)
@@ -365,10 +374,18 @@ class BackupRepository(private val context: Context) {
             val after = BackupEngine.export(copy, now)
             val roundtripOk = before.payload == after.payload
             val detail = buildString {
-                append("加密链路✓ 解密✓ 恢复双校验${if (verify.rowsOk) "✓" else "✗"}" +
-                    " 复核一致${if (roundtripOk) "✓" else "✗"}；" +
-                    "${before.tableCount} 表 ${before.rowTotal} 行（旁路副本，生产库零写入）")
-                if (!verify.rowsOk) append("；异常：${verify.rowDetails.take(3).joinToString("；")}")
+                append(
+                    context.getString(
+                        R.string.backup_detail_drill_chain,
+                        if (verify.rowsOk) "✓" else "✗", if (roundtripOk) "✓" else "✗",
+                        before.tableCount, before.rowTotal,
+                    )
+                )
+                if (!verify.rowsOk) {
+                    val sep = context.getString(R.string.backup_list_separator)
+                    val issues = verify.rowIssues.take(3).joinToString(sep) { it.text(context) }
+                    append(context.getString(R.string.backup_detail_drill_issue, issues))
+                }
             }
             // 5. 台账照旧登记 DRILL（生产库唯一写入，放在比对之后）
             log(LedgerType.DRILL, verify.rowsOk && roundtripOk, "drill", null,
@@ -428,9 +445,10 @@ class BackupRepository(private val context: Context) {
     suspend fun importProfileJson(json: String): Pair<String, Int> = withContext(Dispatchers.IO) {
         val root = JSONObject(json)
         if (root.optString("format") != "ashkb-profile")
-            throw BackupEngine.BackupException("不是有效的档案 JSON（缺 format=ashkb-profile）")
+            throw BackupEngine.BackupException(context.getString(R.string.backup_err_profile_json_format))
         val existing = db.profileDao().get()
-        val po = root.optJSONObject("profile") ?: throw BackupEngine.BackupException("JSON 中无 profile 段")
+        val po = root.optJSONObject("profile")
+            ?: throw BackupEngine.BackupException(context.getString(R.string.backup_err_profile_json_section))
         val profile = (existing ?: com.ashkb.app.data.entity.Profile(
             id = 1, displayName = po.getString("display_name"), diagnosis = po.getString("diagnosis"),
             createdAt = nowIso(), updatedAt = nowIso(),
@@ -474,12 +492,14 @@ class BackupRepository(private val context: Context) {
                 medCount++
             }
         }
-        log(LedgerType.EXPORT, true, "import-profile", null, medCount, null, "档案 JSON 导入")
+        log(LedgerType.EXPORT, true, "import-profile", null, medCount, null,
+            context.getString(R.string.backup_detail_profile_import))
         Pair(profile.displayName, medCount)
     }
 
     suspend fun logExportJson(fileName: String, rows: Int) {
-        log(LedgerType.EXPORT, true, "local", fileName, rows, null, "档案 JSON 导出")
+        log(LedgerType.EXPORT, true, "local", fileName, rows, null,
+            context.getString(R.string.backup_detail_profile_export))
     }
 
     suspend fun logFailed(type: LedgerType, target: String, msg: String) {
@@ -520,11 +540,11 @@ class BackupRepository(private val context: Context) {
     suspend fun syncAttachments(
         onProgress: (AttachmentSyncProgress) -> Unit = {},
     ): AttachmentSyncResult = withContext(Dispatchers.IO) {
-        if (!attachments.isSyncEnabled()) throw WebDavClient.DavException("附件同步已关闭")
+        if (!attachments.isSyncEnabled()) throw WebDavClient.DavException(context.getString(R.string.backup_err_attach_sync_off))
         val (url, user, pass) = webdavConfig()
-        if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
+        if (url.isBlank()) throw WebDavClient.DavException(context.getString(R.string.backup_err_no_webdav))
         requireHttps(url)
-        val client = WebDavClient(url, user, pass)
+        val client = WebDavClient(url, user, pass, context)
         val vaultKey = vaultKeyOrThrow()
 
         // 1. 先清墓碑：释放服务器空间，也让「删除」尽快闭环
@@ -536,9 +556,9 @@ class BackupRepository(private val context: Context) {
         var uploaded = 0
         var noLocal = 0
         val ensured = mutableSetOf<String>()
-        onProgress(AttachmentSyncProgress("准备上传附件", 0, pending.size, failed))
+        onProgress(AttachmentSyncProgress(context.getString(R.string.backup_stage_attach_prepare), 0, pending.size, failed))
         pending.forEachIndexed { idx, a ->
-            onProgress(AttachmentSyncProgress("正在上传附件", idx, pending.size, failed))
+            onProgress(AttachmentSyncProgress(context.getString(R.string.backup_stage_attach_uploading), idx, pending.size, failed))
             val plain = attachments.readLocal(a)
             if (plain == null) { noLocal++; return@forEachIndexed }
             val folder = AttachmentPath.folderOf(a.createdAt)
@@ -550,11 +570,13 @@ class BackupRepository(private val context: Context) {
                 .onSuccess { attachments.markUploaded(a.id, remote, BackupEngine.sha256Hex(blob)); uploaded++ }
                 .onFailure { failed++ }
         }
-        onProgress(AttachmentSyncProgress("附件同步完成", pending.size, pending.size, failed))
+        onProgress(AttachmentSyncProgress(context.getString(R.string.backup_stage_attach_done), pending.size, pending.size, failed))
 
-        val detail = "上传 $uploaded / 待传 ${pending.size}；远端清理 ${tc.deleted} / 待删 ${tc.total}" +
-            if (noLocal > 0) "；$noLocal 个本地文件缺失（无法上传）" else "" +
-            if (failed > 0) "；失败 $failed" else ""
+        val detail = context.getString(
+            R.string.backup_detail_attach_upload, uploaded, pending.size, tc.deleted, tc.total
+        ) +
+            if (noLocal > 0) context.getString(R.string.backup_detail_attach_local_missing, noLocal) else "" +
+            if (failed > 0) context.getString(R.string.backup_detail_attach_failed, failed) else ""
         log(LedgerType.ATTACH, failed == 0, "webdav", null, uploaded, failed == 0, detail)
         AttachmentSyncResult(uploaded, tc.deleted, noLocal, failed, detail)
     }
@@ -610,14 +632,14 @@ class BackupRepository(private val context: Context) {
     suspend fun verifyAttachments(
         onProgress: (AttachmentSyncProgress) -> Unit = {},
     ): AttachmentVerifyResult = withContext(Dispatchers.IO) {
-        if (!attachments.isSyncEnabled()) throw WebDavClient.DavException("附件同步已关闭")
+        if (!attachments.isSyncEnabled()) throw WebDavClient.DavException(context.getString(R.string.backup_err_attach_sync_off))
         val (url, user, pass) = webdavConfig()
-        if (url.isBlank()) throw WebDavClient.DavException("未配置 WebDAV 服务器")
+        if (url.isBlank()) throw WebDavClient.DavException(context.getString(R.string.backup_err_no_webdav))
         requireHttps(url)
-        val client = WebDavClient(url, user, pass)
+        val client = WebDavClient(url, user, pass, context)
         val vaultKey = vaultKeyOrThrow()
 
-        onProgress(AttachmentSyncProgress("正在列出远端附件", 0, 0, 0))
+        onProgress(AttachmentSyncProgress(context.getString(R.string.backup_stage_attach_list), 0, 0, 0))
         val remote = client.listAttachmentRemotePaths()
 
         val rows = attachments.withRemotePath()
@@ -632,7 +654,7 @@ class BackupRepository(private val context: Context) {
         var noLocal = 0
         val ensured = mutableSetOf<String>()
         missing.forEachIndexed { idx, path ->
-            onProgress(AttachmentSyncProgress("正在补传附件", idx, missing.size, failed))
+            onProgress(AttachmentSyncProgress(context.getString(R.string.backup_stage_attach_reupload), idx, missing.size, failed))
             val a = byPath[path] ?: return@forEachIndexed
             val plain = attachments.readLocal(a)
             if (plain == null) { noLocal++; return@forEachIndexed }
@@ -648,7 +670,7 @@ class BackupRepository(private val context: Context) {
         val orphans = plan.orphans.toList()
         var orphanDeleted = 0
         orphans.forEachIndexed { idx, path ->
-            onProgress(AttachmentSyncProgress("正在清理远端多余文件", idx, orphans.size, failed))
+            onProgress(AttachmentSyncProgress(context.getString(R.string.backup_stage_attach_cleanup), idx, orphans.size, failed))
             runCatching { client.deleteAttachment(path) }
                 .onSuccess { orphanDeleted++ }
                 .onFailure { failed++ }
@@ -657,12 +679,15 @@ class BackupRepository(private val context: Context) {
         // ③ 收尾墓碑（远端已确认不在 → 物理删行）
         failed += clearTombstones(client).failed
 
-        onProgress(AttachmentSyncProgress("远端校验完成", 0, 0, failed))
-        val detail = "远端 ${remote.size} 个文件；补传 $uploaded / 缺 ${missing.size}；" +
-            "清理多余 $orphanDeleted / 共 ${orphans.size}" +
-            if (noLocal > 0) "；$noLocal 个本地文件缺失（无法补传）" else "" +
-            if (failed > 0) "；失败 $failed" else ""
-        log(LedgerType.ATTACH, failed == 0, "webdav", null, uploaded, failed == 0, "远端校验：$detail")
+        onProgress(AttachmentSyncProgress(context.getString(R.string.backup_stage_remote_verify_done), 0, 0, failed))
+        val detail = context.getString(
+            R.string.backup_detail_remote_verify, remote.size, uploaded, missing.size,
+            orphanDeleted, orphans.size
+        ) +
+            if (noLocal > 0) context.getString(R.string.backup_detail_remote_local_missing, noLocal) else "" +
+            if (failed > 0) context.getString(R.string.backup_detail_attach_failed, failed) else ""
+        log(LedgerType.ATTACH, failed == 0, "webdav", null, uploaded, failed == 0,
+            context.getString(R.string.backup_detail_remote_verify_prefix, detail))
         AttachmentVerifyResult(remote.size, uploaded, missing.size, orphanDeleted, orphans.size, noLocal, failed, detail)
     }
 
@@ -681,7 +706,7 @@ class BackupRepository(private val context: Context) {
         requireHttps(url)
         val vaultKey = vaultKeys.current() ?: return@withContext R.string.attach_download_failed
         runCatching {
-            val blob = WebDavClient(url, user, pass).downloadAttachment(remote)
+            val blob = WebDavClient(url, user, pass, context).downloadAttachment(remote)
             val plain = VaultCipher.decryptBlob(vaultKey, blob, a.id)
             attachments.writeLocal(a, plain)
         }.fold(

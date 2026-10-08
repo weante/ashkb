@@ -744,7 +744,8 @@ private fun medStatusOf(item: TodayItem, missed: Boolean): MedStatus = when {
         tone = StatusTone.Neutral,
         icon = Icons.Rounded.RemoveCircleOutline,
         detail = stringResource(R.string.backup_skipped_prefix) + (
-            SkipReason.entries.firstOrNull { it.name.equals(item.log?.reason, true) }?.label
+            SkipReason.entries.firstOrNull { it.name.equals(item.log?.reason, true) }
+                ?.let { stringResource(it.labelRes) }
                 ?: item.log?.reason ?: ""
             ),
         actionable = false,
@@ -917,7 +918,7 @@ private fun SkipDialog(
                 SkipReason.entries.forEach { r ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = reason == r, onClick = { reason = r })
-                        Text(r.label)
+                        Text(stringResource(r.labelRes))
                     }
                 }
                 if (reason == SkipReason.OTHER) {
@@ -941,7 +942,7 @@ private fun InjSiteDialog(
     onConfirm: (site: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sites = InjSite.entries.map { it.key to it.label }
+    val sites = InjSite.entries.map { it.key to stringResource(it.labelRes) }
     var site by remember { mutableStateOf(sites.firstOrNull { it.first != lastSite }?.first ?: "thigh_l") }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -950,7 +951,7 @@ private fun InjSiteDialog(
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 if (lastSite != null) {
                     // v1.0.49：部位映射收拢到 InjSite（此前本页私有），展示中文而非存库键
-                    val lastLabel = InjSite.fromKey(lastSite)?.label ?: lastSite
+                    val lastLabel = InjSite.fromKey(lastSite)?.let { stringResource(it.labelRes) } ?: lastSite
                     Text(stringResource(R.string.med_last_site_note, lastLabel), style = MaterialTheme.typography.bodySmall)
                 }
                 Text(stringResource(R.string.med_inj_site_prompt), style = MaterialTheme.typography.bodyMedium)

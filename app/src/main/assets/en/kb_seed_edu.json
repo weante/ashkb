@@ -1,0 +1,192 @@
+[
+  {
+    "id": "edu-001",
+    "category": "edu",
+    "title": "AS is a systemic inflammatory disease: cardiovascular risk is higher than in the general population—check blood pressure and lipids at follow-up",
+    "summary": "Studies show a risk of major atherosclerotic events in patients with AS with HR 1.36 (after adjustment for traditional risk factors); the risk of myocardial infarction and stroke deserves particular attention—blood pressure / lipids / blood glucose should be checked at follow-up.",
+    "severity_level": "medium",
+    "applicable_scene": "Pinned at the top of the knowledge-base education section; topic generation on the follow-up preparation page; suggested cardiovascular items for checkup_items",
+    "source_name": "Agca R et al. Heart 2021 (Arthritis Res / Heart 2022 Jan, PMC8666803, DOI 10.1136/heartjnl-2019-316378); Frontiers in Medicine 2026 review \"Cardiovascular involvement in ankylosing spondylitis and axial spondyloarthritis\" (PMC13222810, DOI 10.3389/fmed.2026.1841913)",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8666803/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-10",
+    "review_due": "2027-03-10",
+    "version": 1,
+    "payload": {
+      "key": "as_cardiovascular_risk",
+      "content": "AS is a systemic inflammatory disease and is associated with an increased risk of major cardiovascular events such as myocardial infarction and stroke (HR 1.36, 95% CI 1.13–1.65). At follow-up, cardiovascular risk factors such as blood pressure, lipids and blood glucose should be reviewed, and interventions should be carried out under a doctor's guidance.",
+      "evidence": [
+        "Agca 2021: HR of 1.36 (95% CI 1.13 to 1.65) in patients with AS for major atherosclerotic events after adjustment for traditional CV risk factors.",
+        "Agca 2021: AS table—Increased mortality rate. CVD main cause of death. Both atherosclerotic disease and specific cardiac manifestations.",
+        "Agca 2021: lipid levels may be affected during active inflammation, so lipid assessment is better performed during a stable or remission phase."
+      ],
+      "action": [
+        "The follow-up preparation page automatically generates the topic: \"Have blood pressure / lipids / blood glucose been checked in the past 3 months\" (checkup_items cardiovascular group)",
+        "Enhanced prompt for users who smoke (dual rationale: ASAS-EULAR smoking cessation + cardiovascular risk)",
+        "Lipid testing is best scheduled during a stable disease phase (detail from Agca 2021)"
+      ],
+      "app_link": "Follow-up preparation page topics; checkup_items(blood_pressure / lipid_panel); linked with the smoking cessation entry"
+    }
+  },
+  {
+    "id": "edu-002",
+    "category": "edu",
+    "title": "When to contact a doctor if symptoms worsen: no improvement in 7–10 days / worsening night pain that wakes you / prolonged morning stiffness",
+    "summary": "Self-management has its limits: if self-care during a flare brings no improvement within 7–10 days, contact the rheumatology team; worsening night pain that wakes you, prolonged morning stiffness and worsening activity limitation are indications for a follow-up visit; frequent recurrent flares suggest a follow-up visit to discuss adjusting medication.",
+    "severity_level": "medium",
+    "applicable_scene": "Prompt on days 7–10 after a flare_events record; worsening symptom-trend detection (linked to the BASDAI threshold); escalation prompt when minimal mode continues beyond the threshold",
+    "source_name": "Identification of inflammatory back pain (NCBI Bookshelf NBK539753, https://www.ncbi.nlm.nih.gov/books/NBK539753/ , verified HTTP 200; Beijing news report)",
+    "source_url": "https://www.kingstonandrichmond.nhs.uk/patients-and-families/patient-leaflets/axial-spondyloarthritis-flare-self-management",
+    "source_tier": "S3",
+    "adapted_at": "2026-09-10",
+    "review_due": "2027-03-10",
+    "version": 1,
+    "payload": {
+      "key": "flare_relapse_indicators",
+      "content": "If self-care during a flare (rest adjustment / gentle activity / heat) brings no improvement after 7–10 days → contact the rheumatology team; worsening night pain that wakes you, longer morning stiffness, worsening activity limitation → indications for a follow-up visit; frequent recurrent flares → the doctor may need to adjust your medication (original text: your GP or rheumatology team may decide to review your medicines).",
+      "evidence": [
+        "Kingston NHS: If you have tried all of these and your symptoms show no signs of improvement after 7 to 10 days, you may need to contact your rheumatology team.",
+        "Kingston NHS: If you experience regular flares, your GP or rheumatology team may decide to review your medicines.",
+        "Identification of inflammatory back pain (reference): back pain lasting more than three months that worsens at night, morning stiffness, not relieved by rest and improved by activity."
+      ],
+      "action": [
+        "flare_events active on day 7 → medium alert (\"Day 7 of the flare; if there is no improvement, consider contacting the rheumatology team\")",
+        "Forms a dual-channel follow-up trigger together with the edu-th-002 BASDAI threshold (symptom-duration channel + score channel)",
+        "Minimal mode for >10 consecutive days → escalation prompt (beyond the reasonable window for self-management)"
+      ],
+      "app_link": "flare_events day-count alert; basdai_records threshold linkage; basis for the question-page copy on day 3 of minimal mode"
+    }
+  },
+  {
+    "id": "edu-003",
+    "category": "edu",
+    "title": "Smoking is a risk factor for AS disease progression: smoking cessation is advised",
+    "summary": "ASAS-EULAR 2022 states: smoking has been shown to be a risk factor for spinal inflammation and disease progression in axSpA; smoking cessation is recommended on general health-risk grounds.",
+    "severity_level": "medium",
+    "applicable_scene": "Pinned in the knowledge base after smoking status is recorded in the profile; follow-up topic; displayed together with the edu-001 cardiovascular entry",
+    "source_name": "ASAS-EULAR 2022 updated recommendations for the management of axSpA (Ramiro S et al., Ann Rheum Dis 2023;82(1):19-34, PMID 36270658, DOI 10.1136/annrheumdis-2022-223296)—⚠️ the original link was the author accepted manuscript (AAM) archived by King's College London (AAM ✅ its cover also reads \"Article A78 ✅ not yet formally typeset\" ✅); it has been replaced with the official journal version",
+    "source_url": "https://doi.org/10.1136/annrheumdis-2022-223296",
+    "source_tier": "S1",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "key": "smoking_cessation",
+      "content": "Smoking has been shown to be a risk factor for spinal inflammation and disease progression in axSpA; ASAS-EULAR 2022 recommends smoking cessation on the basis of the known health risks of smoking. Smoking cessation also lowers cardiovascular risk (cardiovascular risk is already elevated in patients with AS).",
+      "evidence": [
+        "ASAS-EULAR 2022: Smoking has been shown as a risk factor for spinal inflammation and disease progression in axSpA.",
+        "ASAS-EULAR 2022: Though no formal investigation has been conducted on the benefits of smoking cessation on axSpA outcomes, it seemed reasonable to recommend it, on the basis of all well-known health risks associated with smoking."
+      ],
+      "action": [
+        "profile.smoking status recorded → pin this entry at the top of the knowledge-base education section + display it together with the cardiovascular entry",
+        "Honest framing: there is still no formal study of the specific benefit of smoking cessation on axSpA outcomes (the guideline itself says so)—do not overstate the disease-specific benefit of smoking cessation",
+        "Smoking-cessation support visit topic (discuss cessation aids at the follow-up visit)"
+      ],
+      "app_link": "profile(smoking) linkage; follow-up topic; forms a two-entry \"modifiable risk factors\" group with edu-001"
+    }
+  },
+  {
+    "id": "edu-004",
+    "category": "edu",
+    "title": "Do not stop or reduce a biologic on your own: the risk of relapse is clear",
+    "summary": "ACR/SAA/SPARTAN guidelines conditionally recommend against self-discontinuation and routine tapering; withdrawal studies show that 53% of patients relapse within 24–104 weeks—any adjustment should be assessed by a rheumatologist.",
+    "severity_level": "high",
+    "applicable_scene": "When a stop / dose reduction is recorded in medication_changes (auto-displayed when source=patient); knowledge-base education section; follow-up topic",
+    "source_name": "ACR/SAA/SPARTAN 2019 society recommendations (discontinuation and routine tapering, S1 level); Front Med 2025 systematic review and meta-analysis (8 RCTs / 1,384 participants, basis of the Spanish Society of Rheumatology guideline update, PMC12457669—the primary citation link for this entry is counted as S2 because its carrier is a journal study rather than a society guideline); ixekizumab withdrawal study",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12457669/",
+    "source_tier": "S2",
+    "adapted_at": "2026-09-11",
+    "review_due": "2027-03-11",
+    "version": 1,
+    "payload": {
+      "key": "no_self_discontinuation",
+      "content": "The guidelines conditionally recommend against discontinuing a biologic (routine tapering is also not advised); the systematic review shows that withdrawal significantly compromises the maintenance of remission, while tapering is relatively safer but still requires medical guidance. Stopping treatment on your own may cause a relapse.",
+      "evidence": [
+        "ACR/SAA/SPARTAN 2019 (https://acrjournals.onlinelibrary.wiley.com/doi/full/10.1002/art.41042): In adults receiving treatment with a biologic, we conditionally recommend against discontinuation of the biologic.",
+        "ACR/SAA/SPARTAN 2019 (same link): we conditionally recommend against tapering of the biologic dose as a standard approach.",
+        "Front Med 2025 systematic review and meta-analysis, 8 RCTs / 1,384 participants (https://pmc.ncbi.nlm.nih.gov/articles/PMC12457669/): withdrawal significantly compromises the ability to sustain remission, whereas tapering appears to be a potentially safer alternative. Original conclusion: Treatment withdrawal reduces the likelihood of maintaining inactive or low disease activity. Tapering does not significantly compromise the maintenance of remission or low disease activity offering a safer alternative to complete treatment withdrawal.",
+        "ixekizumab withdrawal study: 53% of patients experienced a relapse within 24–104 weeks after withdrawal. ⚠️ This figure comes from an existing excerpt; the original source could not be verified this time and it is marked as unverified."
+      ],
+      "action": [
+        "medication_changes(source=patient and involving a biologic) → strong prompt for this entry + guidance to contact a doctor",
+        "\"I feel better, so I want to stop\" is the most common patient self-decision—always displayed in the knowledge-base education section",
+        "Linked with the R17 discontinuation-reason classification (self_assessment-type discontinuation is flagged as a scenario requiring physician review)"
+      ],
+      "app_link": "medication_changes record validation; R17 discontinuation workflow; follow-up topic generation"
+    }
+  },
+  {
+    "id": "edu-005",
+    "category": "edu",
+    "title": "Posture and sleeping position: avoid lying prone and prolonged fixed flexed positions; sleep on a firm mattress",
+    "summary": "Patients with AS should keep the spine neutral and avoid holding a flexed posture for long periods; for sleep, prefer lying on your back or side with a thin / low pillow and a firmer mattress; lying prone (sleeping on the stomach) should be avoided.",
+    "severity_level": "low",
+    "applicable_scene": "Posture tip block on the exercise prescription page; knowledge-base education section; basis for the sedentary-reminder copy",
+    "source_name": "NASS (UK National Axial Spondyloarthritis Society) patient education on exercise and positioning in axSpA; ASAS-EULAR 2022 exercise recommendations",
+    "source_url": "https://nass.co.uk/managing-my-as/exercise/",
+    "source_tier": "S3",
+    "adapted_at": "2026-09-27",
+    "review_due": "2027-03-27",
+    "version": 1,
+    "payload": {
+      "key": "posture_sleep_advice",
+      "content": "Daily posture points: keep the spine in a neutral position and avoid holding the same flexed posture for long periods (for example, sitting with rounded shoulders and a hunched back, or looking down at a phone); when sitting, use a firm chair with a backrest and, if needed, place a small cushion behind the lower back to maintain lumbar lordosis; when standing, keep your weight evenly distributed and look straight ahead. Sleeping position points: prefer lying on your back or on your side; the pillow should not be too high (when lying on your side, pillow height should be roughly equal to the width of one shoulder; when lying on your back, use a thin pillow); a firmer mattress with good support is preferable, and overly soft sprung mattresses should be avoided; lying prone (sleeping on the stomach) is not recommended—it requires twisting the neck and is not conducive to spinal extension, and patients with AS should avoid it in particular. The above is general positional advice and does not replace a doctor's individual assessment.",
+      "evidence": [
+        "NASS: Try to keep your spine in a neutral position and avoid staying in the same position for long periods.",
+        "NASS: A firm mattress is generally recommended; sleeping on your front should be avoided as it puts your neck in a twisted position.",
+        "NASS: Using a small pillow or rolled towel in the small of your back can help maintain the natural curve of your lower back when sitting.",
+        "ASAS-EULAR 2022: Exercise and posture/positioning are recommended as part of the non-pharmacological management of axSpA."
+      ],
+      "action": [
+        "The exercise prescription page displays the posture / sleeping position tip block (in parallel with the lifestyle profile tips)",
+        "The sedentary-reminder copy cites this entry as the positional basis for \"stand up and move\"",
+        "Framing discipline: this entry is general positional advice (severity=low) and does not constitute individualised treatment or diagnostic advice"
+      ],
+      "app_link": "Exercise page posture tip block; knowledge-base education section; basis for the sedentary reminder"
+    }
+  },
+  {
+    "id": "edu-th-001",
+    "category": "edu",
+    "title": "Fever alert threshold: 38.5 ℃",
+    "summary": "When body temperature is ≥ 38.5 ℃, the system triggers the infection-fever emergency card prompt (especially important for users on biologics).",
+    "severity_level": "medium",
+    "applicable_scene": "vitals.temperature entry ≥ threshold; symptom_daily.feverish=1 with a subsequent temperature entry",
+    "source_name": "Built-in system threshold (general medical convention for infection-fever emergency workflows; this entry documents system behaviour, not treatment advice)",
+    "source_url": "",
+    "source_tier": "SYS",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "key": "threshold_fever",
+      "value": 38.5,
+      "unit": "℃",
+      "condition": "vitals.temperature >= value triggers alert(symptom_abnormal, high) + infection_fever emergency card",
+      "note": "Users may tighten the threshold (e.g. 38.0) but not loosen it—tightening makes it more sensitive; loosening requires consulting a doctor (Decision G)",
+      "app_link": "alert_records trigger logic; infection_fever card in the emergency centre"
+    }
+  },
+  {
+    "id": "edu-th-002",
+    "category": "edu",
+    "title": "BASDAI disease activity alert threshold: the two most recent self-assessments both ≥4.0 (no interval restriction)",
+    "summary": "When the two most recent BASDAI self-assessments are both ≥4.0, a follow-up visit is suggested (disease activity may require a treatment adjustment—to be determined by the doctor). No interval restriction applies between the two.",
+    "severity_level": "medium",
+    "applicable_scene": "basdai_records consecutive-record evaluation (the two most recent entries)",
+    "source_name": "Built-in system threshold (BASDAI ≥4 is the cut-off for disease activity commonly used in clinical practice; \"the two most recent both ≥4.0\" is this App's product rule, not a guideline provision)",
+    "source_url": "",
+    "source_tier": "SYS",
+    "adapted_at": "2026-09-07",
+    "review_due": "2027-03-07",
+    "version": 1,
+    "payload": {
+      "key": "threshold_basdai_flare",
+      "value": 4.0,
+      "unit": "points",
+      "condition": "the two most recent BASDAI records both ≥4.0 (no interval restriction) → alert(basdai_high, medium) + follow-up suggestion card",
+      "note": "Advisory, not diagnostic; BASDAI is a patient self-assessment tool. Rule-change log: v1.1.2 removed the old criterion \"≥2 times within 14 consecutive days\"—the default BASDAI reminder cycle is 28 days, so under the default configuration a 14-day window cannot accumulate a second record and the alert became an unreachable dead branch; v1.1.3 synchronised this entry's copy with the implementation",
+      "app_link": "basdai_records trend linkage (marked above threshold on the trend page in the Data tab)"
+    }
+  }
+]

@@ -94,12 +94,12 @@ internal object DrugInteractionKeys {
         "alendronate" to listOf("alendronate", "阿仑膦酸钠", "福善美", "固邦"),
         "zoledronic" to listOf("zoledronic", "唑来膦酸", "密固达"),
         "calcitriol" to listOf("calcitriol", "骨化三醇", "罗盖全"),
-        // 「维生素 D」是 `SupplementCategory.VITAMIN_D.label` 的字面量，补剂档案会把它当 token 递进来；
+        // 「维生素 D」是 `SupplementCategory.VITAMIN_D.matchToken` 的字面量，补剂档案会把它当 token 递进来；
         // 「维生素 D3」是同一支药在药单上的常见写法。两种写法都登记，否则补剂侧的写法永远匹配不上。
         "colecalciferol" to listOf(
             "colecalciferol", "维生素 D3", "维生素d3", "维生素 D", "维生素d", "vitamin_d3", "维d", "vd",
         ),
-        // `SupplementCategory.CALCIUM.label` = 「钙」（补剂档案的类目名会作为 token 参与匹配），
+        // `SupplementCategory.CALCIUM.matchToken` = 「钙」（补剂档案的类目名会作为 token 参与匹配），
         // 故这里把单字「钙」也登记进来——否则「补剂类目 = 钙」的那条补剂对钙相关条目不可见。
         "calcium" to listOf("calcium", "钙", "钙剂", "碳酸钙", "迪巧", "钙尔奇"),
         "folic_acid" to listOf("folic_acid", "叶酸", "folate", "亚叶酸"),

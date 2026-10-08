@@ -186,7 +186,7 @@ internal fun MedBasicsSection(
     Text(stringResource(R.string.med_category), style = MaterialTheme.typography.labelMedium)
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
         MedClass.entries.forEach { c ->
-            FilterChip(selected = medClass.value == c, onClick = { medClass.value = c }, label = { Text(c.label) })
+            FilterChip(selected = medClass.value == c, onClick = { medClass.value = c }, label = { Text(stringResource(c.labelRes)) })
         }
     }
 }
@@ -250,7 +250,7 @@ internal fun MedScheduleSection(
             FilterChip(
                 selected = frequency.value == f,
                 onClick = { frequency.value = f; mtxError.value = false },
-                label = { Text(f.label) },
+                label = { Text(stringResource(f.labelRes)) },
             )
         }
     }
@@ -446,7 +446,7 @@ internal fun MedDoseStateSection(
     Text(stringResource(R.string.med_dose_state_label), style = MaterialTheme.typography.labelMedium)
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
         DoseState.entries.forEach { s ->
-            FilterChip(selected = doseState.value == s, onClick = { doseState.value = s }, label = { Text(s.label) })
+            FilterChip(selected = doseState.value == s, onClick = { doseState.value = s }, label = { Text(stringResource(s.labelRes)) })
         }
     }
     if (doseState.value == DoseState.TAPERING) {

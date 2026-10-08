@@ -1,7 +1,9 @@
 package com.ashkb.app.data.backup
 
+import androidx.annotation.StringRes
 import org.json.JSONArray
 import org.json.JSONObject
+import com.ashkb.app.R
 import com.ashkb.app.domain.RecoveryCode
 import java.security.SecureRandom
 import java.util.Base64
@@ -56,7 +58,17 @@ object VaultCipher {
     private const val SLOT_AAD_PREFIX = "ASHKBAK2:slot:"
     private const val SLOT_AAD_PREFIX_V3 = "ASHKBAK3:slot:"
 
-    class VaultException(msg: String, cause: Throwable? = null) : Exception(msg, cause)
+    /**
+     * v1.2.5 文案资源化：中文 [msg] **原样保留**——单测（VaultCipherTest）与日志按它断言/排查。
+     * data 层没有 Context，故 [resId] / [resArgs] 交给 UI 侧 `getString` 解析成当前语言；
+     * [resId] == 0 表示无对应资源，调用方回落 [msg]。
+     */
+    class VaultException(
+        msg: String,
+        cause: Throwable? = null,
+        @StringRes val resId: Int = 0,
+        val resArgs: List<Any> = emptyList(),
+    ) : Exception(msg, cause)
 
     fun deriveKey(password: CharArray, salt: ByteArray, iter: Int): SecretKeySpec {
         val spec = PBEKeySpec(password, salt, iter, KEY_BITS)
@@ -152,43 +164,59 @@ object VaultCipher {
 
     /** 解密并返回明文 payload；格式错误 / 口令与恢复码均不匹配 / 篡改均抛 VaultException。 */
     fun decrypt(secret: CharArray, file: ByteArray): Decrypted {
-        if (file.size < 12) throw VaultException("文件过短，不是有效的 ASHKB 备份")
+        if (file.size < 12) throw VaultException("文件过短，不是有效的 ASHKB 备份", resId = R.string.backup_err_vault_too_short)
         val magic = String(file, 0, 8, Charsets.US_ASCII)
         if (magic != MAGIC_V1 && magic != MAGIC_V2 && magic != MAGIC_V3)
-            throw VaultException("文件头标识不符（期望 $MAGIC_V1/$MAGIC_V2/$MAGIC_V3）")
+            throw VaultException(
+                "文件头标识不符（期望 $MAGIC_V1/$MAGIC_V2/$MAGIC_V3）",
+                resId = R.string.backup_err_vault_magic,
+                resArgs = listOf(MAGIC_V1, MAGIC_V2, MAGIC_V3),
+            )
         val headerLen = readIntBE(file, 8)
-        if (headerLen <= 0 || 12 + headerLen >= file.size) throw VaultException("文件头长度非法")
+        if (headerLen <= 0 || 12 + headerLen >= file.size)
+            throw VaultException("文件头长度非法", resId = R.string.backup_err_vault_header_len)
         val headerBytes = file.copyOfRange(12, 12 + headerLen)
         val ct = file.copyOfRange(12 + headerLen, file.size)
         val header = try {
             JSONObject(String(headerBytes, Charsets.UTF_8))
         } catch (e: Exception) {
-            throw VaultException("文件头损坏", e)
+            throw VaultException("文件头损坏", e, resId = R.string.backup_err_vault_header_corrupt)
         }
         if (header.optString("cipher") != "aes-256-gcm")
-            throw VaultException("不支持的加密算法 ${header.optString("cipher")}")
+            throw VaultException(
+                "不支持的加密算法 ${header.optString("cipher")}",
+                resId = R.string.backup_err_vault_bad_cipher,
+                resArgs = listOf(header.optString("cipher")),
+            )
         return if (magic == MAGIC_V1) decryptV1(secret, header, headerBytes, ct)
         else decryptSlotted(magic, secret, header, headerBytes, ct)
     }
 
     /** v1：口令直接派生 payload 密钥（历史文件，只读兼容）。 */
     private fun decryptV1(secret: CharArray, header: JSONObject, headerBytes: ByteArray, ct: ByteArray): Decrypted {
-        if (header.optString("kdf") != KDF) throw VaultException("不支持的 KDF：${header.optString("kdf")}")
+        if (header.optString("kdf") != KDF)
+            throw VaultException(
+                "不支持的 KDF：${header.optString("kdf")}",
+                resId = R.string.backup_err_vault_bad_kdf,
+                resArgs = listOf(header.optString("kdf")),
+            )
         val salt: ByteArray; val iv: ByteArray; val iter: Int
         try {
             salt = Base64.getDecoder().decode(header.getString("salt"))
             iv = Base64.getDecoder().decode(header.getString("iv"))
             iter = header.getInt("iter")
         } catch (e: Exception) {
-            throw VaultException("文件头损坏", e)
+            throw VaultException("文件头损坏", e, resId = R.string.backup_err_vault_header_corrupt)
         }
         // v1.0.43：v1 分支此前完全不校验 salt / iv 长度与 iter 范围（v2/v3 槽已校验）
-        if (salt.size != SALT_LEN || iv.size != IV_LEN) throw VaultException("文件头损坏")
-        if (iter !in MIN_ITER..MAX_ITER) throw VaultException("文件头损坏：KDF 迭代次数越界")
+        if (salt.size != SALT_LEN || iv.size != IV_LEN)
+            throw VaultException("文件头损坏", resId = R.string.backup_err_vault_header_corrupt)
+        if (iter !in MIN_ITER..MAX_ITER)
+            throw VaultException("文件头损坏：KDF 迭代次数越界", resId = R.string.backup_err_vault_kdf_iter)
         val key = try {
             deriveKey(secret, salt, iter)
         } catch (e: Exception) {
-            throw VaultException("文件头损坏", e)
+            throw VaultException("文件头损坏", e, resId = R.string.backup_err_vault_header_corrupt)
         }
         val plain = try {
             Cipher.getInstance("AES/GCM/NoPadding").apply {
@@ -196,7 +224,7 @@ object VaultCipher {
                 updateAAD(headerBytes)
             }.doFinal(ct)
         } catch (e: Exception) {
-            throw VaultException("解密失败：口令错误或文件已损坏", e)
+            throw VaultException("解密失败：口令错误或文件已损坏", e, resId = R.string.backup_err_vault_bad_pass)
         }
         return Decrypted(
             payload = String(plain, Charsets.UTF_8),
@@ -222,20 +250,26 @@ object VaultCipher {
      */
     private fun decryptSlotted(magic: String, secret: CharArray, header: JSONObject,
                                headerBytes: ByteArray, ct: ByteArray): Decrypted {
-        val slots = header.optJSONArray("slots") ?: throw VaultException("文件头缺少密钥槽")
+        val slots = header.optJSONArray("slots")
+            ?: throw VaultException("文件头缺少密钥槽", resId = R.string.backup_err_vault_slot_missing)
         val prefix = slotAadPrefix(magic)
         var dek: ByteArray? = null
         outer@ for (cand in candidates(secret)) {
             for (i in 0 until slots.length()) {
                 val slot = slots.optJSONObject(i) ?: continue
-                if (slot.optString("kdf") != KDF) throw VaultException("不支持的 KDF：${slot.optString("kdf")}")
+                if (slot.optString("kdf") != KDF)
+                    throw VaultException(
+                        "不支持的 KDF：${slot.optString("kdf")}",
+                        resId = R.string.backup_err_vault_bad_kdf,
+                        resArgs = listOf(slot.optString("kdf")),
+                    )
                 val salt = b64d(slot.optString("salt"))
                 val iv = b64d(slot.optString("iv"))
                 val wrapped = b64d(slot.optString("wrapped"))
                 val iter = slot.optInt("iter", -1)
                 if (salt.size != SALT_LEN || iv.size != IV_LEN || wrapped.isEmpty() ||
                     iter !in MIN_ITER..MAX_ITER
-                ) throw VaultException("密钥槽损坏")
+                ) throw VaultException("密钥槽损坏", resId = R.string.backup_err_vault_slot_corrupt)
                 val unwrapped = try {
                     Cipher.getInstance("AES/GCM/NoPadding").apply {
                         init(Cipher.DECRYPT_MODE, deriveKey(cand, salt, iter), GCMParameterSpec(GCM_TAG_BITS, iv))
@@ -247,16 +281,19 @@ object VaultCipher {
                 if (unwrapped != null && unwrapped.size == DEK_LEN) { dek = unwrapped; break@outer }
             }
         }
-        val key = dek ?: throw VaultException("解密失败：口令或恢复码错误，或文件已损坏")
+        val key = dek ?: throw VaultException(
+            "解密失败：口令或恢复码错误，或文件已损坏",
+            resId = R.string.backup_err_vault_bad_pass_or_code,
+        )
         val payloadIv = b64d(header.optString("iv"))
-        if (payloadIv.size != IV_LEN) throw VaultException("文件头损坏")
+        if (payloadIv.size != IV_LEN) throw VaultException("文件头损坏", resId = R.string.backup_err_vault_header_corrupt)
         val plain = try {
             Cipher.getInstance("AES/GCM/NoPadding").apply {
                 init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(GCM_TAG_BITS, payloadIv))
                 updateAAD(headerBytes)
             }.doFinal(ct)
         } catch (e: Exception) {
-            throw VaultException("解密失败：文件已损坏（密钥槽通过但内容认证失败）", e)
+            throw VaultException("解密失败：文件已损坏（密钥槽通过但内容认证失败）", e, resId = R.string.backup_err_vault_auth)
         }
         return Decrypted(
             payload = String(plain, Charsets.UTF_8),
@@ -289,9 +326,14 @@ object VaultCipher {
 
     /** 解密附件密文；标识不符 / 密钥错 / 篡改 / id 不匹配均抛 VaultException。 */
     fun decryptBlob(vaultKey: ByteArray, blob: ByteArray, attachmentId: String): ByteArray {
-        if (blob.size <= 8 + IV_LEN) throw VaultException("附件密文过短")
+        if (blob.size <= 8 + IV_LEN) throw VaultException("附件密文过短", resId = R.string.backup_err_vault_blob_short)
         val magic = String(blob, 0, 8, Charsets.US_ASCII)
-        if (magic != BLOB_MAGIC) throw VaultException("附件密文标识不符（期望 $BLOB_MAGIC）")
+        if (magic != BLOB_MAGIC)
+            throw VaultException(
+                "附件密文标识不符（期望 $BLOB_MAGIC）",
+                resId = R.string.backup_err_vault_blob_magic,
+                resArgs = listOf(BLOB_MAGIC),
+            )
         val iv = blob.copyOfRange(8, 8 + IV_LEN)
         val ct = blob.copyOfRange(8 + IV_LEN, blob.size)
         return try {
@@ -300,7 +342,7 @@ object VaultCipher {
                 updateAAD(attachmentId.toByteArray(Charsets.UTF_8))
             }.doFinal(ct)
         } catch (e: Exception) {
-            throw VaultException("附件解密失败：密钥不匹配或文件已损坏", e)
+            throw VaultException("附件解密失败：密钥不匹配或文件已损坏", e, resId = R.string.backup_err_vault_blob_decrypt)
         }
     }
 

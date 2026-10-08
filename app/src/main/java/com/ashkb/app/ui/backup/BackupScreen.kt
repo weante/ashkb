@@ -820,11 +820,11 @@ private fun RestorePendingBlock(
     ) {
         Column(Modifier.padding(Spacing.md)) {
             Text(
-                "已通过文件自校验：${pendingName ?: ""}",
+                stringResource(R.string.backup_pending_selfcheck_ok, pendingName ?: ""),
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
-                "备份于 ${pending.createdAt.take(19)}（schema v${pending.schemaVersion}）",
+                stringResource(R.string.backup_pending_created_at, pending.createdAt.take(19), pending.schemaVersion),
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(Modifier.height(Spacing.sm))
@@ -870,6 +870,18 @@ private fun RestorePendingBlock(
     }
 }
 
+/**
+ * 校验差异的可读文案：优先用资源化条目（[BackupEngine.VerifyResult.rowIssues]），
+ * 无资源条目时回落到中文原文 `rowDetails`。连接符走资源（中英不同）。
+ */
+@Composable
+private fun verifyIssueText(result: BackupEngine.VerifyResult): String {
+    val sep = stringResource(R.string.backup_list_separator)
+    val context = LocalContext.current
+    val localized = result.rowIssues.take(5).map { it.text(context) }
+    return localized.ifEmpty { result.rowDetails.take(5) }.joinToString(sep)
+}
+
 /** 恢复执行结果行（行数是否全部对上）。 */
 @Composable
 private fun RestoreResultBlock(result: BackupEngine.VerifyResult) {
@@ -886,7 +898,7 @@ private fun RestoreResultBlock(result: BackupEngine.VerifyResult) {
         )
         Text(
             if (result.rowsOk) stringResource(R.string.backup_verify_pass, result.totalRows)
-            else "校验未全部通过：${result.rowDetails.take(5).joinToString("；")}",
+            else stringResource(R.string.backup_verify_incomplete, verifyIssueText(result)),
             style = MaterialTheme.typography.bodyMedium,
             color = if (result.rowsOk) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.error,
@@ -940,7 +952,7 @@ private fun LedgerRow(l: BackupLedger) {
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "${LedgerType.fromKey(l.ledgerType).label} · ${l.target}",
+                "${stringResource(LedgerType.fromKey(l.ledgerType).labelRes)} · ${l.target}",
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.weight(1f),
             )
@@ -965,7 +977,7 @@ private fun LedgerRow(l: BackupLedger) {
         Text(
             buildString {
                 append(l.createdAt.take(19).replace("T", " "))
-                l.fileName?.let { append("　$it") }
+                l.fileName?.let { append(" $it") }
                 l.rowTotal?.let { append(stringResource(R.string.backup_row_count, it)) }
                 l.verifyOk?.let { if (it) append(stringResource(R.string.backup_dual_verify_passed)) }
             },

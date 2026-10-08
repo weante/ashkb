@@ -1,5 +1,6 @@
 package com.ashkb.app.domain
 
+import android.content.Context
 import com.ashkb.app.data.entity.DoseState
 import com.ashkb.app.data.entity.MedClass
 import com.ashkb.app.data.entity.Medication
@@ -10,9 +11,27 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
-/** v1.0.37：C6 服药三态与停药警示豁免、C5 原因枚举对齐。 */
+/**
+ * v1.0.37：C6 服药三态与停药警示豁免、C5 原因枚举对齐。
+ *
+ * v1.2.5（i18n）：停药警示从枚举里的字面量改成字符串资源，本测试改为解析资源后断言。
+ * `@Config(qualifiers = "zh-rCN")` 不可省——`values-en` 已存在，Robolectric 默认跟随
+ * JVM locale，不加限定符时可能取到英文。
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "zh-rCN")
 class StopWarningTest {
+
+    private val ctx: Context get() = RuntimeEnvironment.getApplication()
+
+    /** 把（可空）警示资源解析成文案；未配警示的原因返回空串，`isNotBlank` 即失败。 */
+    private fun warningText(reason: StopReason): String =
+        reason.noteRes?.let { ctx.getString(it) } ?: ""
 
     private fun med(
         medClass: String = MedClass.CSDMARD.name,
@@ -27,7 +46,7 @@ class StopWarningTest {
 
     @Test
     fun `self stop on normal med keeps the warning`() {
-        assertEquals(StopReason.SELF_STOPPED.warning, StopWarning.forStop(StopReason.SELF_STOPPED, med()))
+        assertEquals(StopReason.SELF_STOPPED.noteRes, StopWarning.forStop(StopReason.SELF_STOPPED, med()))
     }
 
     /** C6 核心：医生批准的减量方案下，自行停药警示豁免。 */
@@ -40,8 +59,8 @@ class StopWarningTest {
     @Test
     fun `tapering does not suppress unrelated warnings`() {
         val m = med(doseState = DoseState.TAPERING.name)
-        assertEquals(StopReason.SIDE_EFFECT.warning, StopWarning.forStop(StopReason.SIDE_EFFECT, m))
-        assertEquals(StopReason.INFECTION.warning, StopWarning.forStop(StopReason.INFECTION, m))
+        assertEquals(StopReason.SIDE_EFFECT.noteRes, StopWarning.forStop(StopReason.SIDE_EFFECT, m))
+        assertEquals(StopReason.INFECTION.noteRes, StopWarning.forStop(StopReason.INFECTION, m))
     }
 
     @Test
@@ -68,9 +87,9 @@ class StopWarningTest {
     /** C5：新增的停药原因（感染发热 / 准备手术 / 经济原因）都带警示。 */
     @Test
     fun `c5 stop reasons carry warnings`() {
-        assertTrue(StopReason.INFECTION.warning!!.isNotBlank())
-        assertTrue(StopReason.SURGERY.warning!!.isNotBlank())
-        assertTrue(StopReason.FINANCIAL.warning!!.isNotBlank())
+        assertTrue(warningText(StopReason.INFECTION).isNotBlank())
+        assertTrue(warningText(StopReason.SURGERY).isNotBlank())
+        assertTrue(warningText(StopReason.FINANCIAL).isNotBlank())
         assertEquals(StopReason.INFECTION, StopReason.fromKey("infection"))
         assertEquals(StopReason.OTHER, StopReason.fromKey("nope"))
     }

@@ -63,7 +63,7 @@ internal fun CheckupItemFormSheet(
             OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.checkup_item_name)) }, singleLine = true)
             ChipGroupLabel(stringResource(R.string.common_type))
             ChipGroup(
-                options = CheckupType.entries.map { it.name to it.label },
+                options = CheckupType.entries.map { it.name to stringResource(it.labelRes) },
                 selected = type.name,
                 onSelect = { type = CheckupType.valueOf(it) },
             )
@@ -135,7 +135,7 @@ internal fun CheckupRecordFormSheet(
                 label = { Text(stringResource(R.string.checkup_item_name)) }, singleLine = true)
             ChipGroupLabel(stringResource(R.string.common_type))
             ChipGroup(
-                options = CheckupType.entries.map { it.name to it.label },
+                options = CheckupType.entries.map { it.name to stringResource(it.labelRes) },
                 selected = checkType.name,
                 onSelect = { checkType = CheckupType.valueOf(it) },
             )
@@ -269,7 +269,7 @@ internal fun VaccineFormSheet(
                 label = { Text(stringResource(R.string.vaccine_name_field)) }, singleLine = true)
             ChipGroupLabel(stringResource(R.string.common_type))
             ChipGroup(
-                options = VaccineType.entries.map { it.name to it.label },
+                options = VaccineType.entries.map { it.name to stringResource(it.labelRes) },
                 selected = type.name,
                 onSelect = { type = VaccineType.valueOf(it) },
             )
@@ -280,7 +280,7 @@ internal fun VaccineFormSheet(
                 label = { Text(stringResource(R.string.vaccine_hospital)) }, singleLine = true)
             ChipGroupLabel(stringResource(R.string.vaccine_doctor_confirm))
             ChipGroup(
-                options = DoctorConfirm.entries.map { it.name to it.label },
+                options = DoctorConfirm.entries.map { it.name to stringResource(it.labelRes) },
                 selected = confirm.name,
                 onSelect = { confirm = DoctorConfirm.valueOf(it) },
             )
