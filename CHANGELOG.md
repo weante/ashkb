@@ -8,6 +8,10 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 **英文支持第三层：domain 文案层 + 散落 UI 文案 + 种子内容。** 无库结构变更，可覆盖安装。
 
+**已发布**：GitHub Release `v1.2.6`（release id `407329934`，Latest），资产 `ashkb-1.2.6-release.apk`（5219392 B，
+sha256 `b3455fe8aa5c15364f53cd35fa86b33a93535d78512775a961617729e510ae94`，与本地 `Get-FileHash` 逐字节一致）。
+同批发布 `v1.2.5`（id `407329822`，`ashkb-1.2.5-release.apk` 5084704 B，由提交 `93f41ed` 的 worktree 重建）。
+
 维护者诉求（m00655）：「新增对英文的支持，并增加英文README，简体中文为默认页」。
 前两层（v1.2.4 界面字符串、v1.2.5 知识库正文 + 枚举 + 备份层）之后，本版清掉最后三处中文来源。
 
