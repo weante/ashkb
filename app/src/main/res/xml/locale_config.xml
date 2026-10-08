@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v1.2.4：应用内语言清单（Android 13+ 的「每应用语言」设置读取此文件）。
+  简体中文排第一：它同时是 values/ 的默认语言——系统语言不在清单内时，
+  资源解析会落到无语言限定的 values/，即中文，符合「简体中文为默认」的要求。
+  values-en/ 提供英文；未翻译的条目会自动回退到中文，不会显示空白。
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="zh-Hans" />
+    <locale android:name="en" />
+</locale-config>

@@ -401,6 +401,10 @@ object ReportPdfWriter {
         "WEEKLY" -> context.getString(R.string.pdf_freq_weekly)
         "BIW" -> context.getString(R.string.pdf_freq_biw)
         "Q2W" -> context.getString(R.string.pdf_freq_q2w)
+        // v1.2.4：这两个此前没有分支，落进 `else -> k` 会在 PDF 上印出英文枚举名
+        // （「MONTHLY」/「CUSTOM」）——给医生看的报告里出现内部 key 是明显的漏译。
+        "MONTHLY" -> context.getString(R.string.pdf_freq_monthly)
+        "CUSTOM" -> context.getString(R.string.pdf_freq_custom)
         "PRN" -> context.getString(R.string.pdf_freq_prn)
         else -> k
     }

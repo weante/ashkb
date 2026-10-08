@@ -23,6 +23,7 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:localeConfig="@xml/locale_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.Ashkb">
 
@@ -74,6 +75,11 @@
             android:exported="false" />
         <receiver
             android:name=".reminder.ExerciseReminderReceiver"
+            android:exported="false" />
+
+        <!-- v1.2.4：补剂每日提醒闹钟触发 -->
+        <receiver
+            android:name=".reminder.SupplementReminderReceiver"
             android:exported="false" />
 
         <receiver

@@ -65,6 +65,8 @@ import com.ashkb.app.domain.Labels
 import com.ashkb.app.domain.SupplementLimits
 import com.ashkb.app.domain.SupplementLogStatus
 import com.ashkb.app.domain.SupplementTiming
+import com.ashkb.app.reminder.SupplementReminderScheduler
+import com.ashkb.app.ui.me.PlanTimePicker
 import com.ashkb.app.R
 import com.ashkb.app.ui.components.DestructiveAction
 import com.ashkb.app.ui.components.DividerList
@@ -79,6 +81,7 @@ import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
 import com.ashkb.app.ui.components.GlassSheet
+import org.json.JSONArray
 
 /**
  * 「营养与骨骼」主页（route `wellness`）。
@@ -1032,6 +1035,10 @@ private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, 
     var dailyMax by remember { mutableStateOf(current?.dailyMax?.let { fmtNum(it) } ?: "") }
     var category by remember { mutableStateOf(SupplementCategory.fromKey(current?.category)) }
     var notes by remember { mutableStateOf(current?.notes ?: "") }
+    // v1.2.4：提醒时刻——预填既有值（`times` 是 JSON 数组字符串，解析口径与调度器同一份实现）
+    var times by remember {
+        mutableStateOf(SupplementReminderScheduler.parseTimes(current?.times))
+    }
 
     // v1.1.6（B'）：弹层玻璃表层——与底部导航栏同一套语言（半透明底 + 顶部 1dp 高光）。
     // 不用真 backdrop-blur 的理由见 GlassSheet 的注释；内容区一字未改（SheetColumn 照旧）。
@@ -1060,6 +1067,15 @@ private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, 
                 onSelect = { key -> category = SupplementCategory.fromKey(key) },
             )
             OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
+            // v1.2.4：提醒时刻。复用「添加药品」的 PlanTimePicker（口服可多选）——
+            // 补剂的 `times` 本来就是 JSON 数组，一天多次是它支持过的形状，不必另造一个单值输入。
+            Text(stringResource(R.string.supp_reminder_time_field), style = MaterialTheme.typography.labelMedium)
+            PlanTimePicker(times = times, onTimesChange = { times = it }, single = false)
+            Text(
+                stringResource(R.string.supp_reminder_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
                 enabled = name.isNotBlank() && dose.isNotBlank(),
@@ -1074,7 +1090,10 @@ private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, 
                                 dose = dose.trim(),
                                 // 编辑时保留原排班 / 用药属性，避免被默认值覆盖
                                 frequency = current?.frequency ?: "daily",
-                                times = current?.times,
+                                // v1.2.4：空列表落地为 null——与药品同一口径（不用 "[]" 表达「没设时刻」，
+                                // 否则 `parseTimes` 会得到一个空数组而不是 null，两种「没时刻」会分叉）
+                                times = times.distinct().sorted()
+                                    .let { if (it.isEmpty()) null else JSONArray(it).toString() },
                                 takeWithFood = current?.takeWithFood,
                                 prescribed = current?.prescribed ?: false,
                                 isArchived = current?.isArchived ?: false,

@@ -19,6 +19,7 @@ import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.DateProvider
+import com.ashkb.app.reminder.SupplementReminderScheduler
 import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +36,14 @@ class WellnessViewModel(
     private val medRepo: MedicationRepository,
     /** v1.0.86（批次 11）：全应用唯一的「今天」来源，取代此前的跨零点 ticker。 */
     private val dateProvider: DateProvider,
+    /**
+     * v1.2.4：补剂提醒重排需要 Context（AlarmManager / PendingIntent）。
+     *
+     * 为什么放在 VM 而不是仓储：既有依赖方向是 reminder → repo，仓储反向依赖提醒层会造成
+     * 包级回环；而且既有范式就是 **ViewModel 调调度器**（`CheckupViewModel` / `ExerciseViewModel`
+     * / `SymptomViewModel` / `TodayViewModel` / `MeViewModel` 都是这么做的）。
+     */
+    private val app: AshkbApplication,
 ) : ViewModel() {
     /**
      * 语义与批次 10 完全一致：**今天**（今日体征 / 体重 / 补剂记录流都相对它取窗口，
@@ -134,12 +143,41 @@ class WellnessViewModel(
     }
 
     // ---- 补剂 ----
+
+    /**
+     * v1.2.4：补剂提醒重排的**唯一入口**。
+     *
+     * 补剂的每一个会改变提醒的写操作（新增 / 编辑 / 归档 / 删除 / 打卡 / 撤销 / 删记录）都调它，
+     * 于是「改了时刻但闹钟还是旧的」「打了卡却还在提醒」这两类不一致没有藏身处。
+     *
+     * 为什么不挂在仓储的写入里：见构造参数 [app] 的说明（依赖方向）。
+     * `runCatching` 包住：提醒是附加能力，排不上不该让「保存补剂」本身失败。
+     */
+    private suspend fun rescheduleSupplementReminders() {
+        runCatching {
+            val today = dateProvider.today.value
+            SupplementReminderScheduler.rescheduleAll(
+                app,
+                repo.listActiveSupplements(),
+                repo.loggedSupplementIdsOn(today.toString()),
+                today,
+                LocalDateTime.now(),
+            )
+        }
+    }
+
     fun saveSupplement(supp: Supplement) {
-        viewModelScope.launch { repo.saveSupplement(supp) }
+        viewModelScope.launch {
+            repo.saveSupplement(supp)
+            rescheduleSupplementReminders()
+        }
     }
 
     fun archiveSupplement(id: String) {
-        viewModelScope.launch { repo.archiveSupplement(id) }
+        viewModelScope.launch {
+            repo.archiveSupplement(id)
+            rescheduleSupplementReminders()
+        }
     }
 
     /**
@@ -149,7 +187,10 @@ class WellnessViewModel(
      * 理由与确认框报数口径见 `domain/SupplementDeletion`。
      */
     fun deleteSupplement(id: String) {
-        viewModelScope.launch { repo.deleteSupplement(id) }
+        viewModelScope.launch {
+            repo.deleteSupplement(id)
+            rescheduleSupplementReminders()
+        }
     }
 
     /**
@@ -189,6 +230,8 @@ class WellnessViewModel(
                     notes = notes,
                 )
             )
+            // v1.2.4：打卡后当天剩余时刻的补剂提醒要撤下（否则同一支补剂一天里被提醒第二次）
+            rescheduleSupplementReminders()
         }
     }
 
@@ -214,6 +257,8 @@ class WellnessViewModel(
             supplementLogsToday.value
                 .filter { it.supId == supp.id }
                 .forEach { repo.deleteSupplementLog(it.id) }
+            // v1.2.4：撤销打卡 → 该补剂今天又「没记过」了，剩余时刻的提醒要重新排上
+            rescheduleSupplementReminders()
         }
     }
 
@@ -227,7 +272,11 @@ class WellnessViewModel(
      * 无派生数据：补剂打卡不参与排程与警报，删完不需要重排提醒或重算警报。
      */
     fun deleteSupplementLog(id: String) {
-        viewModelScope.launch { repo.deleteSupplementLog(id) }
+        viewModelScope.launch {
+            repo.deleteSupplementLog(id)
+            // v1.2.4：删掉的是「某一天」的记录，只有删到今天的才影响提醒——重排是幂等的，不必再判
+            rescheduleSupplementReminders()
+        }
     }
 
     // ---- 饮食画像 ----
@@ -253,7 +302,7 @@ class WellnessViewModel(
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                WellnessViewModel(app.healthRepository, app.medicationRepository, app.dateProvider)
+                WellnessViewModel(app.healthRepository, app.medicationRepository, app.dateProvider, app)
             }
         }
     }

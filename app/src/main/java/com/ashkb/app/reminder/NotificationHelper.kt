@@ -33,6 +33,13 @@ object NotificationHelper {
     const val CHANNEL_EMERGENCY_LOCKSCREEN = "emergency_lockscreen"
     /** v1.0.68 C8a：久坐起身提醒通道。 */
     const val CHANNEL_SEDENTARY = "sedentary_reminders"
+    /**
+     * v1.2.4：补剂提醒通道。
+     *
+     * 刻意**与用药通道（[CHANNEL_MED]）分开**：用药是 IMPORTANCE_HIGH + 震动（漏服有临床后果），
+     * 补剂是 DEFAULT 且不震动。合成一个通道的话，用户为了关掉补剂提醒就不得不连用药提醒一起关掉。
+     */
+    const val CHANNEL_SUPPLEMENT = "supplement_reminders"
     /** v1.0.60 B8：所有提醒归入同一通知组，2+ 条时折叠为 summary。 */
     const val GROUP_REMINDERS = "ashkb_reminders"
     private const val SUMMARY_ID = 100001
@@ -111,6 +118,14 @@ object NotificationHelper {
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_SEDENTARY, context.getString(R.string.notif_channel_sedentary_name), NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = context.getString(R.string.notif_channel_sedentary_desc)
+            }
+        )
+        // v1.2.4：补剂提醒——DEFAULT 但不震动（补剂不是漏服就有临床后果的用药）
+        val suppChannelName = context.getString(R.string.notif_channel_supplement_name)
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_SUPPLEMENT, suppChannelName, NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = context.getString(R.string.notif_channel_supplement_desc)
+                enableVibration(false)
             }
         )
     }
@@ -436,6 +451,48 @@ object NotificationHelper {
     }
 
     /**
+     * 补剂提醒（v1.2.4）。
+     *
+     * 文案带**剂量快照**（[dose]）：补剂提醒最容易失效的方式是「用户不记得该吃多少」——
+     * 通知里直接给出剂量，用户不必为了看一眼剂量去开应用。剂量为空时退回不带剂量的句式。
+     *
+     * 图标沿用 `ic_stat_pill`：补剂与用药在状态栏上是同一类东西，不需要第二枚图标。
+     */
+    fun postSupplementReminder(
+        context: Context,
+        supId: String,
+        name: String,
+        dose: String,
+        date: String,
+        time: String,
+        silent: Boolean = false,
+    ) {
+        if (!canPost(context)) return
+        val open = openMainActivity(context, "sup|$date|$time")
+        val title = context.getString(R.string.notif_supplement_title)
+        val text = if (dose.isBlank()) context.getString(R.string.notif_supplement_text, name)
+        else context.getString(R.string.notif_supplement_text_dose, name, dose)
+        val channel = if (silent) CHANNEL_REMINDER_SILENT else CHANNEL_SUPPLEMENT
+        val n = NotificationCompat.Builder(context, channel)
+            .setSmallIcon(R.drawable.ic_stat_pill)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(if (silent) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(open)
+            .setGroup(GROUP_REMINDERS)
+            .build()
+        postNotification(context, notifIdSupplement(supId, date, time), n)
+        updateGroupSummary(context)
+    }
+
+    fun cancelSupplement(context: Context, supId: String, date: String, time: String) {
+        NotificationManagerCompat.from(context).cancel(notifIdSupplement(supId, date, time))
+        updateGroupSummary(context)
+    }
+
+    /**
      * v1.0.62 C11：测试提醒通知——用于「提醒可靠性自检」的端到端链路验证。
      *
      * 刻意**不归入 `ashkb_reminders` 组**：它是自检的一次性通知，不参与提醒折叠统计。
@@ -564,4 +621,11 @@ object NotificationHelper {
 
     private fun notifIdExercise(date: String, escalation: Int): Int =
         ("n_exc|$date|$escalation").hashCode()
+
+    /**
+     * v1.2.4：补剂通知 ID 必须含 `supId`——同一天里两支补剂可以设成**同一个时刻**，
+     * 只按 date+time 生成 ID 会让后发的那条覆盖前一条（用户只看得到其中一支）。
+     */
+    private fun notifIdSupplement(supId: String, date: String, time: String): Int =
+        ("n_sup|$supId|$date|$time").hashCode()
 }

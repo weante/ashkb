@@ -64,6 +64,22 @@ object ScheduleCalc {
     }
 
     /**
+     * 「今天是不是周期日」——周期类频次（每两周 / 自定义周期 / 每月一次）共用的判定。
+     *
+     * v1.2.4：原先只有 [isInjectionDay]（按天数取模），而「每月一次」是**日历**概念，
+     * 用 30 天取模会逐月漂移（1 月 31 日 → 3 月 2 日 …），所以按月另立一条：
+     * 与锚点同「日」即到日子；锚点是 29/30/31 时，短月取该月最后一天（2 月不会跳过）。
+     */
+    fun isCycleDay(med: Medication, date: LocalDate, freq: MedFrequency): Boolean =
+        if (freq == MedFrequency.MONTHLY) isMonthlyDay(med, date) else isInjectionDay(med, date)
+
+    private fun isMonthlyDay(med: Medication, date: LocalDate): Boolean {
+        val anchor = runCatching { LocalDate.parse(med.startDate) }.getOrNull() ?: return false
+        if (date.isBefore(anchor)) return false
+        return date.dayOfMonth == anchor.dayOfMonth.coerceAtMost(date.lengthOfMonth())
+    }
+
+    /**
      * 某药品某日的计划槽位列表（PRN 返回空——使用记录不受计划约束）。
      *
      * **`label` 一律是计划时刻**（口服与注射都一样）：今日卡的 chip 直接显示它，
@@ -76,27 +92,41 @@ object ScheduleCalc {
         if (freq == MedFrequency.PRN) return emptyList()
 
         // 固定星期给药（WEEKLY 一天 / BIW 两天）：口服按时刻出多槽；注射按默认/首选时刻出一针
-        if (freq == MedFrequency.WEEKLY || freq == MedFrequency.BIW) {
-            val wds = if (freq == MedFrequency.BIW) listOfNotNull(med.weeklyWeekday, med.weeklyWeekday2)
-            else listOfNotNull(med.weeklyWeekday)
-            if (wds.isEmpty() || date.dayOfWeek.value !in wds) return emptyList()
-            if (med.route == "injection") {
-                val t = takeTimesOf(med).firstOrNull() ?: DEFAULT_PLAN_TIME
-                return listOf(PlanSlot("inj", t, t))
-            }
-            val times = takeTimesOf(med)
-            return times.map { PlanSlot(it, it, slotLabel(it, med)) }
-        }
+        if (freq == MedFrequency.WEEKLY || freq == MedFrequency.BIW) return weekdaySlots(med, date, freq)
 
-        if (med.route == "injection") {
-            return if (isInjectionDay(med, date) && (freq == MedFrequency.Q2W || freq == MedFrequency.CUSTOM)) {
-                val t = takeTimesOf(med).firstOrNull() ?: DEFAULT_PLAN_TIME
-                listOf(PlanSlot("inj", t, t))
-            } else emptyList()
-        }
+        // 周期类频次先过「今天到日子了吗」这一关。
+        //
+        // v1.2.4：这道关原先写在下面的注射分支里，**口服根本走不到**——于是「口服 + 自定义周期」
+        // 会天天出卡（维护者报「自定义周期没法自定义日期」）。判定提到路由分支之前，
+        // 口服与注射走同一套周期口径。
+        // 每两周（Q2W）保持旧口径：只有注射按周期出卡，口服 Q2W 仍按每日。
+        val cycleGated = isCycleGatedBy(freq, med.route)
+        if (cycleGated && !isCycleDay(med, date, freq)) return emptyList()
 
-        val times = takeTimesOf(med)
-        return times.map { PlanSlot(it, it, slotLabel(it, med)) }
+        // 注射只对周期类频次出卡（每日/每日两次等在注射下不出卡，沿用旧口径）
+        if (med.route == "injection") return if (cycleGated) listOf(injectionSlot(med)) else emptyList()
+
+        return takeTimesOf(med).map { PlanSlot(it, it, slotLabel(it, med)) }
+    }
+
+    /** 该频次 + 该给药途径是否按「周期日」出卡（见 [isCycleDay]）。 */
+    private fun isCycleGatedBy(freq: MedFrequency, route: String): Boolean =
+        freq == MedFrequency.CUSTOM || freq == MedFrequency.MONTHLY ||
+            (freq == MedFrequency.Q2W && route == "injection")
+
+    /** 固定星期给药（WEEKLY 一天 / BIW 两天）：口服按时刻出多槽；注射按默认/首选时刻出一针。 */
+    private fun weekdaySlots(med: Medication, date: LocalDate, freq: MedFrequency): List<PlanSlot> {
+        val wds = if (freq == MedFrequency.BIW) listOfNotNull(med.weeklyWeekday, med.weeklyWeekday2)
+        else listOfNotNull(med.weeklyWeekday)
+        if (wds.isEmpty() || date.dayOfWeek.value !in wds) return emptyList()
+        if (med.route == "injection") return listOf(injectionSlot(med))
+        return takeTimesOf(med).map { PlanSlot(it, it, slotLabel(it, med)) }
+    }
+
+    /** 注射槽位：key 固定 "inj"，时刻取首选计划时刻（缺省 [DEFAULT_PLAN_TIME]）。 */
+    private fun injectionSlot(med: Medication): PlanSlot {
+        val t = takeTimesOf(med).firstOrNull() ?: DEFAULT_PLAN_TIME
+        return PlanSlot("inj", t, t)
     }
 
     /** 晨起空腹药（itx-015 双膦酸盐类）槽位标签加提示 */

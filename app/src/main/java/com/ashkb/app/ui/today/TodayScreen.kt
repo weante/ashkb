@@ -75,6 +75,7 @@ import com.ashkb.app.ui.components.DisclaimerNote
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.StatusChip
+import com.ashkb.app.ui.components.rememberDateFormatter
 import com.ashkb.app.ui.theme.Clinical
 import com.ashkb.app.ui.theme.DataLarge
 import com.ashkb.app.ui.theme.Size
@@ -83,8 +84,6 @@ import com.ashkb.app.ui.theme.StatusTone
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /**
  * 今日页（route `today`）。
@@ -174,9 +173,7 @@ fun TodayScreen(
         // ---- Hero：一屏一主角（今天是"下一次该做什么"）----
         item {
             HeroHeader(
-                dateText = todayDate.format(
-                    DateTimeFormatter.ofPattern(stringResource(R.string.date_pattern_month_day_week), Locale.CHINESE),
-                ),
+                dateText = todayDate.format(rememberDateFormatter()),
                 who = profile?.let { "${it.displayName} · ${it.diagnosis}" }
                     ?: stringResource(R.string.today_profile_not_built),
                 // 两个计数只喂这一行：它们随 `items` 变，放根部算等于每次打卡都让整屏跟着重组
@@ -991,7 +988,7 @@ private fun PostponeDialog(
     var custom by remember { mutableStateOf("") }
     val customDate = runCatching { LocalDate.parse(custom.trim()) }.getOrNull()
     val target = customDate ?: today.plusDays(offset.toLong())
-    val fmt = DateTimeFormatter.ofPattern(stringResource(R.string.date_pattern_month_day_week), Locale.CHINESE)
+    val fmt = rememberDateFormatter()
 
     AlertDialog(
         onDismissRequest = onDismiss,

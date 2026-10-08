@@ -196,7 +196,16 @@ fun MedEditScreen(
         },
         weeklyWeekday2 = if (frequency.value == MedFrequency.BIW) weekday2.value else null,
         startDate = DateFieldRules.toIsoOrNull(startDate.value) ?: startDate.value,
-        injCycleDays = if (route.value == "injection") cycleDays.value.toIntOrNull() ?: 14 else null,
+        // v1.2.4：落库范围 == 可见范围（`cycleAnchorVisible`）。原先只看 `route`，
+        // 于是口服的「自定义周期」永远存 null → `isInjectionDay` 直接 false，
+        // 周期形同虚设。「每月一次」按日历日号数出卡，不存周期天数。
+        injCycleDays = if (cycleAnchorVisible(route.value, frequency.value) &&
+            frequency.value != MedFrequency.MONTHLY
+        ) {
+            cycleDays.value.toIntOrNull() ?: 14
+        } else {
+            null
+        },
         storage = storage.value.trim().ifBlank { null },
         takeWithFood = if (route.value == "oral") food.value else null,
         // C6：服药状态；减量备注仅在「减量中」时落库（切回固定 / 按需即清空，避免残留脏备注）

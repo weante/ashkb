@@ -90,6 +90,14 @@ class BootReceiver : BroadcastReceiver() {
                 // v1.0.68 C8a：久坐起身提醒（第四源）——链式单发，重启后重排一次
                 runCatching { SedentaryReminderScheduler.rescheduleAll(context, now) }
 
+                // v1.2.4：补剂提醒（第五源）——与启动路径对称，各自 runCatching 兜底
+                runCatching {
+                    val sups = db.supplementDao().listActive()
+                    val loggedSups = db.supplementLogDao().byDate(today.toString())
+                        .mapNotNull { it.supId }.toSet()
+                    SupplementReminderScheduler.rescheduleAll(context, sups, loggedSups, today, now)
+                }
+
                 // 权限回授场景顺手把 sys 通道告知一声（通道存在才发，免打扰用户）
                 if (action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED &&
                     Build.VERSION.SDK_INT >= 31

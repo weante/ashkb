@@ -301,6 +301,9 @@
     <string name="med_category">药物类别</string>
     <string name="med_complete_injection">完成注射</string>
     <string name="med_cycle_anchor_date">周期锚点日期（YYYY-MM-DD，本期注射日）</string>
+    <string name="med_oral_cycle_field">周期天数（如 14 = 每两周）</string>
+    <string name="med_oral_cycle_anchor_date">周期锚点日期（YYYY-MM-DD，本期首日）</string>
+    <string name="med_monthly_anchor_date">每月用药日（YYYY-MM-DD，取该日号数）</string>
     <string name="med_cycle_days_field">周期（天，留空=按需）</string>
     <string name="med_deactivate">停用</string>
     <string name="med_deactivate_and_record">停用并记录</string>
@@ -324,7 +327,7 @@
     <string name="med_inj_schedule_note">注射日按下方选择的固定星期自动出卡；提醒时刻取上方「计划用药时间」。</string>
     <string name="med_inj_site_prompt">请选择本次注射部位：</string>
     <string name="med_inj_two_days_error">两针星期需不同（如周一 / 周四），请调整</string>
-    <string name="med_mtx_frequency_error">甲氨蝶呤只能每周服用一次（itx-001：误按每日服用已有致死通报）。请改选「每周一次（如甲氨蝶呤）」；确需调整请先与医生确认。</string>
+    <string name="med_mtx_frequency_error">甲氨蝶呤只能每周服用一次（itx-001：误按每日服用已有致死通报）。请改选「每周一次」；确需调整请先与医生确认。</string>
     <string name="med_injection_suffix">" · 注射"</string>
     <string name="med_late_note">（晚于计划 30 分钟以上）</string>
     <string name="med_manage_title">药单管理</string>
@@ -974,6 +977,8 @@
     <string name="pdf_freq_weekly">每周一次</string>
     <string name="pdf_freq_biw">每周两次</string>
     <string name="pdf_freq_q2w">每两周一次</string>
+    <string name="pdf_freq_monthly">每月一次</string>
+    <string name="pdf_freq_custom">自定义周期</string>
     <string name="pdf_freq_prn">按需</string>
 
     <!-- ===== v10（v1.0.33）：C4 复诊前准备清单 ===== -->
@@ -1084,6 +1089,8 @@
     <string name="supp_dose_unit_label">单位（如 mg / IU）</string>
     <string name="supp_daily_max_label">每日参考上限（可选）</string>
     <string name="supp_daily_max_hint">按医生 / 营养师给的值填写；留空则不警示。App 不内置任何医学上限数值</string>
+    <string name="supp_reminder_time_field">提醒时刻（到点提醒）</string>
+    <string name="supp_reminder_hint">留空则不提醒。补剂打卡按天记，当天记过一次后其余时刻不再打扰</string>
     <string name="supp_over_limit">当日累计 %1$s %2$s，已超过你设置的上限 %3$s %2$s</string>
     <string name="supp_timing_conflict">与「%1$s」服用时间过近（间隔约 %2$d 分钟）——钙等矿物会与其螯合、影响吸收，建议间隔 2 小时以上</string>
     <string name="supp_merged_title">今日服药 / 补剂时间表</string>
@@ -1185,6 +1192,9 @@
     <string name="notif_exercise_title">今日运动提醒</string>
     <string name="notif_exercise_escalated_text">傍晚已过仍未完成今日运动处方，尽快补上</string>
     <string name="notif_exercise_text">今日运动处方尚未完成，请按计划执行</string>
+    <string name="notif_supplement_title">补剂提醒</string>
+    <string name="notif_supplement_text">该服用 %1$s 了</string>
+    <string name="notif_supplement_text_dose">该服用 %1$s（%2$s）了</string>
 
     <!-- v1.0.59 B5：提醒设置入口 -->
     <string name="reminder_settings_title">提醒设置</string>
@@ -1193,10 +1203,8 @@
     <string name="reminder_exercise_switch">启用运动提醒</string>
     <string name="reminder_basdai_cycle_label">BASDAI 评估间隔</string>
     <string name="reminder_basdai_cycle_7">每周</string>
-    <string name="reminder_basdai_cycle_14">每两周</string>
-    <string name="reminder_basdai_cycle_28">每四周（默认）</string>
-    <string name="reminder_basdai_cycle_56">每八周</string>
-    <string name="reminder_basdai_cycle_84">每十二周</string>
+    <string name="reminder_basdai_cycle_1">每日</string>
+    <string name="reminder_basdai_cycle_30">每月（默认）</string>
     <!-- v1.0.60 B8：免打扰时段 + 通知组合并 -->
     <string name="notif_channel_silent_name">免打扰时段提醒</string>
     <string name="notif_channel_silent_desc">免打扰时段内的提醒静默投递，不响铃不震动</string>
@@ -1276,6 +1284,8 @@
     <!-- v1.0.68 C8a：久坐起身提醒 -->
     <string name="notif_channel_sedentary_name">久坐起身提醒</string>
     <string name="notif_channel_sedentary_desc">活动时段内按固定间隔提醒起身活动</string>
+    <string name="notif_channel_supplement_name">补剂提醒</string>
+    <string name="notif_channel_supplement_desc">按设定的时刻提醒服用补剂</string>
     <string name="notif_sedentary_title">该起身活动一下了</string>
     <string name="notif_sedentary_text">站起来走动 2–3 分钟，比一次性长时间运动更有效对抗僵硬</string>
     <!-- v1.0.77（批次 3b）：漏服补发——昨天有 N 剂未记录时的一条汇总通知（不逐剂发、每天最多一条） -->

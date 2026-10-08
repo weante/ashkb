@@ -470,6 +470,19 @@ class HealthRepository(private val context: Context) {
     fun observeSupplementLogs(date: String): Flow<List<SupplementLog>> = supplementLogDao.observeByDate(date)
 
     /**
+     * v1.2.4：补剂提醒重排要的是**当下这一刻的库内状态**，不是一条 Flow。
+     *
+     * 为什么不能读 `WellnessViewModel.supplements.value`：那是 `observeActive()` 经 Room 派发的
+     * 状态流，写入之后**要等下一次派发**才更新。重排紧跟在写入之后调用，读 `.value` 会拿到
+     * 保存前的旧列表——新加的那支补剂当场排不出闹钟，用户看到「设了时刻却没提醒」。
+     */
+    suspend fun listActiveSupplements(): List<Supplement> = supplementDao.listActive()
+
+    /** v1.2.4：某日已打卡的补剂 id 集合（`slotKey` 恒 NULL，故粒度就是「整支补剂」）。 */
+    suspend fun loggedSupplementIdsOn(date: String): Set<String> =
+        supplementLogDao.byDate(date).mapNotNull { it.supId }.toSet()
+
+    /**
      * U3 单个补剂的服用历史（近 90 天，**已结算**状态：done / partial / skipped）。
      * v1.0.81（批次 7）：窗口长度改为引用 `domain/SupplementHistory` 的常量——
      * 弹层的行数上限与这里的窗口是同一条规则，散在两个文件里迟早只改一处。

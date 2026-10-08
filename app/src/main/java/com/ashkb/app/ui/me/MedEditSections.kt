@@ -82,10 +82,28 @@ import com.ashkb.app.ui.theme.Spacing
  *
  * v1.0.92（批次 17）：本判定改由调用方在**自己的作用域**里求值——写进根级正文会让敲锚点日期
  * 重组整屏（`DateFieldRules.requiredOk(startDate)` 依赖 startDate）。
+ *
+ * v1.2.4：**自定义周期 / 每月一次不再要求 `route == "injection"`**。原来这一条把口服挡在门外，
+ * 于是「口服 + 自定义周期」选完没有任何地方能填周期天数与锚点日期（维护者报「自定义周期
+ * 没法自定义日期」）；而排程侧同时也只对注射生效，等于选了等于没选。
+ * 每两周（Q2W）仍是注射专属——它是「几周一针」的概念，保持旧口径不动。
  */
-internal fun cycleAnchorVisible(route: String, frequency: MedFrequency): Boolean =
-    route == "injection" && frequency != MedFrequency.PRN &&
-        (frequency == MedFrequency.Q2W || frequency == MedFrequency.CUSTOM)
+internal fun cycleAnchorVisible(route: String, frequency: MedFrequency): Boolean = when (frequency) {
+    MedFrequency.CUSTOM, MedFrequency.MONTHLY -> true
+    MedFrequency.Q2W -> route == "injection"
+    else -> false
+}
+
+/**
+ * 周期类频次：按「每 N 天」或「每月某日号数」出卡，**不按星期**。
+ *
+ * v1.2.4：与 [cycleAnchorVisible] 成对——凡按周期出卡的频次，注射说明
+ * （[R.string.med_inj_schedule_note]，讲的是「按下方固定星期自动出卡」）都不该显示，
+ * 否则会告诉用户一件不会发生的事。
+ */
+internal fun isCycleFrequency(frequency: MedFrequency): Boolean =
+    frequency == MedFrequency.Q2W || frequency == MedFrequency.CUSTOM ||
+        frequency == MedFrequency.MONTHLY
 
 // ===== 第一步：基础信息 =====
 
@@ -225,7 +243,10 @@ internal fun MedScheduleSection(
 ) {
     Text(stringResource(R.string.med_frequency), style = MaterialTheme.typography.labelMedium)
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-        MedFrequency.entries.forEach { f ->
+        // v1.2.4：`hidden` 项（每 8 小时）不再作为新选项出现；但**当前值若是 hidden 项**
+        // 仍要显示出来——否则编辑一张历史「每 8 小时」的药单时，频次区会一片空白，
+        // 用户看不出它现在是什么，一保存还可能被别的选项顶掉。
+        MedFrequency.entries.filter { !it.hidden || it == frequency.value }.forEach { f ->
             FilterChip(
                 selected = frequency.value == f,
                 onClick = { frequency.value = f; mtxError.value = false },
@@ -243,36 +264,36 @@ internal fun MedScheduleSection(
         )
     }
     if (frequency.value != MedFrequency.PRN) {
-        if (route.value == "oral") {
-            Text(stringResource(R.string.med_dose_time_field), style = MaterialTheme.typography.labelMedium)
-            PlanTimePicker(
-                times = times.value,
-                onTimesChange = { times.value = it },
-                single = false,
+        // v1.2.4：周期锚点从注射分支里提出来——「自定义周期 / 每月一次」在口服下也要能填。
+        // 原来它被 `else`（注射）挡着，口服选完这两个频次看不到任何周期输入框，
+        // 而排程侧同时也不按周期出卡 → 选了等于没选（维护者报「自定义周期没法自定义日期」）。
+        if (cycleAnchorVisible(route.value, frequency.value)) {
+            MedCycleSection(
+                cycleDays = cycleDays,
+                startDate = startDate,
+                isInjection = route.value != "oral",
+                isMonthly = frequency.value == MedFrequency.MONTHLY,
             )
-        } else {
-            // v1.0.51：注射类此前**没有任何「计划用药时间」入口**——时刻选择只在口服分支里，
-            // 注射的时刻被静默写成表单默认值 08:00，用户既看不到也改不了；
-            // 今日卡又只显示「注射」不显示时刻，于是「计划用药时间」在全应用都无处可见。
-            // 与保存按钮的判定同一份：**校验生效的范围 == 输入框可见的范围**，
-            // 两处各写一遍条件迟早会漂移（改了这里忘了那里，就会出现「看得见却没人校验」）
-            if (cycleAnchorVisible(route.value, frequency.value)) {
-                MedCycleSection(cycleDays = cycleDays, startDate = startDate)
-            }
-            Text(stringResource(R.string.med_dose_time_field), style = MaterialTheme.typography.labelMedium)
-            PlanTimePicker(
-                times = times.value,
-                onTimesChange = { times.value = it },
-                single = true,
+        }
+        // v1.0.51：注射类此前**没有任何「计划用药时间」入口**——时刻选择只在口服分支里，
+        // 注射的时刻被静默写成表单默认值 08:00，用户既看不到也改不了；
+        // 今日卡又只显示「注射」不显示时刻，于是「计划用药时间」在全应用都无处可见。
+        // 与保存按钮的判定同一份：**校验生效的范围 == 输入框可见的范围**，
+        // 两处各写一遍条件迟早会漂移（改了这里忘了那里，就会出现「看得见却没人校验」）
+        Text(stringResource(R.string.med_dose_time_field), style = MaterialTheme.typography.labelMedium)
+        PlanTimePicker(
+            times = times.value,
+            onTimesChange = { times.value = it },
+            single = route.value != "oral",
+        )
+        // 固定星期类（WEEKLY / BIW）才按星期出卡，故说明只在这类频次下显示；
+        // 周期类（Q2W / CUSTOM / MONTHLY）同样不按星期，也要排除
+        if (route.value != "oral" && !isCycleFrequency(frequency.value)) {
+            Text(
+                stringResource(R.string.med_inj_schedule_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            // 固定星期类（WEEKLY / BIW）才按星期出卡，故说明只在这类频次下显示
-            if (frequency.value != MedFrequency.Q2W && frequency.value != MedFrequency.CUSTOM) {
-                Text(
-                    stringResource(R.string.med_inj_schedule_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
     } else {
         OutlinedTextField(
@@ -284,26 +305,46 @@ internal fun MedScheduleSection(
 }
 
 /**
- * 注射周期（每 N 天 + 锚点日期）。
+ * 周期输入（每 N 天 + 锚点日期，或每月用药日）。
  *
- * 只在「注射 + 每 N 天 / 自定义」时可见，但它的两个字段**任何时候都会落库**
- * （`buildMed` 的 `injCycleDays` 只看 `route`），所以 state 由根级持有、本 section 只读它：
- * 把 state 搬进这个分支会让「隐藏期间的值」随分支一起消失。
+ * 可见性由 [cycleAnchorVisible] 决定；它的两个字段**任何时候都会落库**
+ * （`buildMed` 只在 [cycleAnchorVisible] 为真时写 `injCycleDays`），
+ * 所以 state 由根级持有、本 section 只读它：把 state 搬进分支会让「隐藏期间的值」随分支一起消失。
+ *
+ * v1.2.4：① 不再只服务注射——口服的「自定义周期 / 每月一次」同样走这里，故文案按 [isInjection] 分岔；
+ * ② 每月一次按**日历日号数**出卡（见 `ScheduleCalc.isCycleDay`），周期天数对它没有意义，
+ * 故 [isMonthly] 时整个不渲染天数输入框（少一个填了也不生效的字段）。
  */
 @Composable
 internal fun MedCycleSection(
     cycleDays: MutableState<String>,
     startDate: MutableState<String>,
+    isInjection: Boolean,
+    isMonthly: Boolean,
 ) {
-    OutlinedTextField(
-        cycleDays.value, { cycleDays.value = it.filter { c -> c.isDigit() }.take(3) },
-        label = { Text(stringResource(R.string.med_inj_cycle_field)) },
-        modifier = Modifier.fillMaxWidth(),
-    )
+    if (!isMonthly) {
+        OutlinedTextField(
+            cycleDays.value, { cycleDays.value = it.filter { c -> c.isDigit() }.take(3) },
+            label = {
+                Text(
+                    stringResource(
+                        if (isInjection) R.string.med_inj_cycle_field else R.string.med_oral_cycle_field,
+                    ),
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
     DateTextField(
         value = startDate.value,
         onValueChange = { startDate.value = it },
-        label = stringResource(R.string.med_cycle_anchor_date),
+        label = stringResource(
+            when {
+                isMonthly -> R.string.med_monthly_anchor_date
+                isInjection -> R.string.med_cycle_anchor_date
+                else -> R.string.med_oral_cycle_anchor_date
+            },
+        ),
         modifier = Modifier.fillMaxWidth(),
     )
 }
@@ -505,7 +546,7 @@ private const val NEW_TIME_INDEX = -1
  *   （否则 `take_times` 变 null，计划时刻会被静默回退到 [ScheduleCalc.DEFAULT_PLAN_TIME]）。
  */
 @Composable
-private fun PlanTimePicker(
+internal fun PlanTimePicker(
     times: List<String>,
     onTimesChange: (List<String>) -> Unit,
     single: Boolean,

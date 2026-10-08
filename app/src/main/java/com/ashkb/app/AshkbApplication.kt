@@ -23,6 +23,7 @@ import com.ashkb.app.reminder.MissedDoseReminder
 import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
 import com.ashkb.app.reminder.SedentaryReminderScheduler
+import com.ashkb.app.reminder.SupplementReminderScheduler
 import java.io.File
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -131,6 +132,17 @@ class AshkbApplication : Application() {
                     }
                 } else {
                     ExerciseReminderScheduler.cancelAllFuture(this@AshkbApplication, today)
+                }
+                // v1.2.4：补剂提醒——与用药/复诊/BASDAI/运动同批重排。
+                // 补剂没有独立开关：频次是「每日」且填了时刻才排得出闹钟，没填时刻自然一条也不排
+                // （开关的语义在「有没有时刻」里，不需要第二个状态）。
+                runCatching {
+                    val sups = db.supplementDao().listActive()
+                    val loggedSups = db.supplementLogDao().byDate(today.toString())
+                        .mapNotNull { it.supId }.toSet()
+                    SupplementReminderScheduler.rescheduleAll(
+                        this@AshkbApplication, sups, loggedSups, today, now,
+                    )
                 }
                 // v1.0.66 B6a：锁屏紧急信息——启动时同步一次（兜住"改完数据后没进紧急卡页"的情况）；
                 // 开关关闭时该调用内部会撤下通知，故无需外层判断

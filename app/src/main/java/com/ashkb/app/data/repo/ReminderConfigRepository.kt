@@ -31,7 +31,20 @@ class ReminderConfigRepository(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun basdaiCycleDays(): Long = prefs.getLong(KEY_BASDAI_CYCLE, DEFAULT_BASDAI_CYCLE)
+    /**
+     * BASDAI 评估周期（天）。
+     *
+     * v1.2.4：候选档位从 7/14/28/56/84 收窄为 1/7/30。历史值（如默认的 28）已不在
+     * [CYCLE_CHOICES] 里，直接返回会让设置页一个单选都不选中、也让排程按一个界面上
+     * 看不到的周期走。这里把**不在候选清单里的值归一到默认档并写回**——
+     * 归一结果对用户可见（单选会选中「每月」），不留隐形的旧值。
+     */
+    fun basdaiCycleDays(): Long {
+        val stored = prefs.getLong(KEY_BASDAI_CYCLE, DEFAULT_BASDAI_CYCLE)
+        if (stored in CYCLE_CHOICES) return stored
+        setBasdaiCycleDays(DEFAULT_BASDAI_CYCLE)
+        return DEFAULT_BASDAI_CYCLE
+    }
     fun setBasdaiCycleDays(days: Long) = prefs.edit().putLong(KEY_BASDAI_CYCLE, days).apply()
 
     fun checkupEnabled(): Boolean = prefs.getBoolean(KEY_CHECKUP_ENABLED, true)
@@ -88,7 +101,15 @@ class ReminderConfigRepository(context: Context) {
 
     companion object {
         const val PREFS_NAME = "reminder_config"
-        const val DEFAULT_BASDAI_CYCLE = 28L
+
+        /**
+         * v1.2.4：默认周期由 28 天（每四周）改为 30 天（每月）。
+         *
+         * 维护者要求 BASDAI 自评间隔只留「每日 / 每周 / 每月」三档
+         * （原来五档是 7/14/28/56/84 天，即周/双周/四周/八周/十二周）。
+         * 语义上「每月」= 30 天；已落库的 28 天由 [basdaiCycleDays] 归一到 [DEFAULT_BASDAI_CYCLE]。
+         */
+        const val DEFAULT_BASDAI_CYCLE = 30L
 
         const val KEY_BASDAI_CYCLE = "basdai_cycle_days"
         const val KEY_CHECKUP_ENABLED = "checkup_reminder_enabled"
@@ -110,7 +131,13 @@ class ReminderConfigRepository(context: Context) {
         // v1.0.77（批次 3b）：漏服补发的去重标记（存「已提醒过的归属日」）
         const val KEY_MISSED_ALERT_DATE = "missed_dose_alert_date"
 
-        /** 候选周期清单（天）：周 / 双周 / 月 / 双月 / 季。 */
-        val CYCLE_CHOICES = listOf(7L, 14L, 28L, 56L, 84L)
+        /**
+         * 候选周期清单（天）：每日 / 每周 / 每月。
+         *
+         * v1.2.4 之前是 7/14/28/56/84 五档。改动后**必须**经 [basdaiCycleDays] 读，
+         * 否则历史存下的 14/28/56/84 会让「BASDAI 评估间隔」区一个单选都不选中
+         * （`basdaiCycle == days` 永不成立），看起来就是「一排空心圆没人被选上」。
+         */
+        val CYCLE_CHOICES = listOf(1L, 7L, 30L)
     }
 }

@@ -217,11 +217,9 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
             Column(Modifier.selectableGroup()) {
                 ReminderConfigRepository.CYCLE_CHOICES.forEach { days ->
                     val labelRes = when (days) {
+                        1L -> R.string.reminder_basdai_cycle_1
                         7L -> R.string.reminder_basdai_cycle_7
-                        14L -> R.string.reminder_basdai_cycle_14
-                        28L -> R.string.reminder_basdai_cycle_28
-                        56L -> R.string.reminder_basdai_cycle_56
-                        else -> R.string.reminder_basdai_cycle_84
+                        else -> R.string.reminder_basdai_cycle_30
                     }
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
