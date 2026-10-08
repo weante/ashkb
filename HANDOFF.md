@@ -96,6 +96,19 @@ $env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.7\bin\g
 > · ⚠️ **连带坑**：**删掉 release 的 tag ref 会把该 release 自动变成 draft**（`draft=true`，`GET /releases/tags/<tag>` 返回 404）。
 >   重建 tag 后还要 `PATCH /releases/<id>` 传 `{"draft": false}` 才能恢复已发布状态，资产不受影响。
 > · **发版后必查**：`git ls-remote --tags origin` 的 SHA **是否等于本地该版本的 commit**，不要只看 push 有没有报错。
+> · **⚠️ 代理端口会变（v1.2.4 又踩到）**：本机现在跑的是 Clash Verge，系统代理是 **`127.0.0.1:7897`**，
+>   而 git 里配的 `http.proxy` 仍写着旧的 **`7890`**（那个端口已无人监听）。
+>   于是「直连失败（`Recv failure: Connection was reset`）+ 代理失败（`Failed to connect ... over proxy 127.0.0.1:7890`）」同时出现。
+>   **先探测哪个通，再决定用哪个**：
+>   ```powershell
+>   (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings').ProxyServer   # 当前系统代理
+>   curl.exe -sS --http1.1 -m 15 -o NUL -w "%{http_code}`n" https://api.github.com                          # 直连探测
+>   ```
+>   · 直连通 → `git -c http.version=HTTP/1.1 -c http.proxy= -c https.proxy= push origin main`
+>   · 只有代理通 → `git -c http.version=HTTP/1.1 -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 push origin main`
+> · **⚠️ `uploads.github.com` 与 `api.github.com` 的连通性未必一致**：v1.2.4 时 `api.github.com` 直连可用（curl 200），
+>   但 `uploads.github.com` 直连 **21 秒超时**。资产上传脚本要**单独给 `-x <proxy>`**，不要复用「api 通所以上传也通」的假设。
+> · **发版后必查**：`git ls-remote --tags origin` 的 SHA **是否等于本地该版本的 commit**，不要只看 push 有没有报错。
 
 > **v1.0.73 更新（2026-09-29）**：**git 直推与资产上传其实可用——只要强制 HTTP/1.1**。
 > · 直推：`git -c http.version=HTTP/1.1 push origin main` —— 默认 HTTP/2 会 Recv failure: Connection was reset（v1.0.73 首次推送即此报错，加该参数后一次通过）；
