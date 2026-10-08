@@ -72,12 +72,13 @@ object RecipeSources {
         ),
         Source(
             R8,
-            "NASS（英国国家强直性脊柱炎协会）Your Diet. nass.co.uk",
+            "NASS (UK National Ankylosing Spondylitis Society) Your Diet. nass.co.uk",
             R.string.recipe_src_r8_note,
         ),
         Source(
             R9,
-            "Erciyes University. Evaluation of the Effect of the Mediterranean Diet on Disease Activity … in Patients With Axial Spondyloarthritis Receiving Biologic Therapy (NCT07170384，进行中).",
+            "Erciyes University. Evaluation of the Effect of the Mediterranean Diet on Disease Activity … " +
+                "in Patients With Axial Spondyloarthritis Receiving Biologic Therapy (NCT07170384, ongoing).",
             R.string.recipe_src_r9_note,
         ),
     )
