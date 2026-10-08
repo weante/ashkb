@@ -43,6 +43,7 @@ class EmergencyMedsTest {
         meds, today, maxLines = maxLines,
         freqLabel = { ctx.getString(it.plainRes) },
         injCycleLabel = { ctx.getString(R.string.ui_emergency_meds_inj_cycle, it) },
+        brandParen = { ctx.getString(R.string.ui_brand_paren, it) },
     )
 
     private fun med(

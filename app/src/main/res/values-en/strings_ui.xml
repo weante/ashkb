@@ -71,4 +71,23 @@
     <string name="ui_crash_fatal_separator">\n===== Fatal crash =====\n</string>
     <string name="ui_appshell_last_crash">Last error:\n%1$s</string>
 
+    <!-- ===== Derived alerts (built in the repository, stored in alerts.message, patient-visible) =====
+         Note: once written, an alert is a historical record: changing the app language does not rewrite old alerts. -->
+    <string name="ui_alert_fever">Temperature today %1$s℃ ≥ the %2$s℃ threshold. Fever from infection must be assessed before the next biologic injection — see the emergency card.</string>
+    <string name="ui_alert_eye">Eye symptoms recorded (pain / redness / light sensitivity / blurred vision) — this may be uveitis; see an ophthalmologist as soon as possible.</string>
+    <string name="ui_alert_neuro">Neurological symptoms recorded (numbness / weakness / changes in bowel or bladder control) — contact a doctor for assessment immediately.</string>
+    <string name="ui_alert_basdai_high">The last 2 BASDAI self-assessments were both ≥%1$s (this one %2$s). Self-reported disease activity has stayed high; consider booking a rheumatology follow-up.</string>
+    <string name="ui_alert_flare_days">This flare is now on day %1$d. If self-care (rest / gentle activity / heat) brings no improvement within 7-10 days, contact the rheumatology team (frequent recurring flares may mean the treatment needs adjusting).</string>
+    <string name="ui_alert_kb_review_due">Knowledge entry \"%1$s\" is past its review date (%2$s) — the content may be out of date; when checking with your doctor, their advice takes precedence.</string>
+    <string name="ui_alert_vitals_fever">Recorded temperature %1$s℃ ≥ the %2$s℃ threshold. Fever from infection must be assessed before the next biologic injection — see the emergency card.</string>
+    <string name="ui_alert_live_vaccine">A live vaccine (%1$s) was recorded but the doctor\'s confirmation is still \"pending\" — live vaccines carry a serious infection risk for AS patients on biologics / DMARDs; confirm with your rheumatologist first (itx-010/012).</string>
+
+    <!-- ===== List separators and brackets (half-width / full-width follow the language) ===== -->
+    <string name="ui_list_separator_semicolon">"; "</string>
+    <string name="ui_brand_paren">" (%1$s)"</string>
+    <string name="ui_kb_title_bracket">"[%1$s]"</string>
+    <string name="ui_value_colon">": %1$s"</string>
+    <string name="ui_pdf_field_separator">" | "</string>
+    <string name="ui_pdf_contact_gap">" "</string>
+
 </resources>

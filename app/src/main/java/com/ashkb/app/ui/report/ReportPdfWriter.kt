@@ -180,10 +180,18 @@ object ReportPdfWriter {
             // 注：注射周期段必须先落成局部值再接续拼接——`x + y + z?.let{} ?: ""` 会因 `+`
             // 优先级高于 `?:` 而解析为 `(x + y + z?.let{}) ?: ""`，口服药（injCycleDays 为 null）
             // 会把字面量 "null" 拼进 PDF（曾出现「…｜口服null」）
-            val injCycle = m.injCycleDays?.let { "｜" + context.getString(R.string.pdf_med_inj_cycle, it) } ?: ""
-            d.line("· ${m.name}${m.brandName?.let { "（$it）" } ?: ""}｜${m.dose}｜${freq(context, m.frequency)}" +
-                "｜${if (m.route == "injection") context.getString(R.string.pdf_route_injection) else context.getString(R.string.pdf_route_oral)}" +
-                injCycle)
+            val bar = context.getString(R.string.ui_pdf_field_separator)
+            val injCycle = m.injCycleDays?.let { bar + context.getString(R.string.pdf_med_inj_cycle, it) } ?: ""
+            val brand = m.brandName?.let { context.getString(R.string.ui_brand_paren, it) } ?: ""
+            val route = if (m.route == "injection") {
+                context.getString(R.string.pdf_route_injection)
+            } else {
+                context.getString(R.string.pdf_route_oral)
+            }
+            d.line(
+                "· ${m.name}$brand$bar${m.dose}$bar${freq(context, m.frequency)}" +
+                    "$bar$route" + injCycle,
+            )
         }
 
         d.h2(context.getString(R.string.pdf_section_adherence))
@@ -283,7 +291,8 @@ object ReportPdfWriter {
                     "abnormal" -> " " + context.getString(R.string.pdf_lab_flag_abnormal)
                     else -> ""
                 }
-                d.line("  ${l.date} ${l.testName}：$v${l.unit?.let { " $it" } ?: ""}$flag" +
+                d.line("  ${l.date} ${l.testName}" + context.getString(R.string.ui_value_colon, v) +
+                    (l.unit?.let { " $it" } ?: "") + flag +
                     (l.refLow?.let { lo ->
                         l.refHigh?.let { hi -> context.getString(R.string.pdf_lab_ref_range, lo, hi) }
                     } ?: ""), flag.isNotBlank())
@@ -297,7 +306,7 @@ object ReportPdfWriter {
         if (r.checkups.isEmpty()) d.line(context.getString(R.string.pdf_no_checkups))
         r.checkups.take(15).forEach { c ->
             d.line("  ${c.date} ${c.itemName}" + (c.hospital?.let { " @$it" } ?: "") +
-                (c.conclusion?.let { "：${it.take(60)}" } ?: ""))
+                (c.conclusion?.let { context.getString(R.string.ui_value_colon, it.take(60)) } ?: ""))
         }
 
         d.h2(context.getString(R.string.pdf_section_next_checkups))
@@ -341,14 +350,16 @@ object ReportPdfWriter {
         }
 
         d.h2(context.getString(R.string.emergency_meds_section))
+        val gap = context.getString(R.string.ui_pdf_contact_gap)
         val meds = c.meds
         if (meds.isEmpty) {
             d.line(context.getString(R.string.emergency_meds_empty))
         } else {
             val tag = context.getString(R.string.emergency_meds_tag_immunosuppressant)
             meds.ordered.forEach { e ->
-                val suffix = if (e.immunosuppressant) "　$tag" else ""
-                d.line(fit("· ${e.name}｜${e.detail}", MED_LINE_CHARS - suffix.length) + suffix)
+                val suffix = if (e.immunosuppressant) gap + tag else ""
+                val bar = context.getString(R.string.ui_pdf_field_separator)
+                d.line(fit("· ${e.name}$bar${e.detail}", MED_LINE_CHARS - suffix.length) + suffix)
             }
             if (meds.hiddenCount > 0) {
                 d.line(context.getString(R.string.emergency_meds_more, meds.hiddenCount.toString()))
@@ -361,15 +372,16 @@ object ReportPdfWriter {
         d.h2(context.getString(R.string.pdf_section_contacts, c.contacts.size))
         if (c.contacts.isEmpty()) d.line(context.getString(R.string.pdf_no_contacts))
         c.contacts.forEach { ct ->
-            d.line("· ${ct.name}${ct.relation?.let { "（$it）" } ?: ""}　${ct.phone}" +
-                (ct.hospital?.let { "　$it" } ?: "") +
-                if (ct.isDoctor) "　" + context.getString(R.string.pdf_marker_doctor) else "")
+            val relation = ct.relation?.let { context.getString(R.string.ui_brand_paren, it) } ?: ""
+            d.line("· ${ct.name}$relation$gap${ct.phone}" +
+                (ct.hospital?.let { "$gap$it" } ?: "") +
+                if (ct.isDoctor) gap + context.getString(R.string.pdf_marker_doctor) else "")
         }
 
         d.h2(context.getString(R.string.pdf_section_emergency_cards))
         c.cards.forEach { kb ->
             d.gap(4f)
-            d.line("【${kb.title}】")
+            d.line(context.getString(R.string.ui_kb_title_bracket, kb.title))
             d.line(kb.summary, warn = kb.severityLevel == "high")
         }
 

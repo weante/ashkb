@@ -115,7 +115,8 @@ fun MeScreen(
                 subtitle = if (meds.isEmpty()) {
                     stringResource(R.string.med_not_added)
                 } else {
-                    stringResource(R.string.me_in_use_prefix, meds.size) + meds.joinToString("、") { it.name }
+                    stringResource(R.string.me_in_use_prefix, meds.size) +
+                        meds.joinToString(stringResource(R.string.ui_list_separator)) { it.name }
                 },
                 badge = {
                     if (meds.isNotEmpty()) {

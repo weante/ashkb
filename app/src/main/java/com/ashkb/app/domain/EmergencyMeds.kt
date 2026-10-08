@@ -72,18 +72,20 @@ object EmergencyMeds {
      *
      * @param freqLabel 把频次枚举解析成当前语言文案；急救卡必须用 `plainRes`（不是 `labelRes`）。
      * @param injCycleLabel 把注射周期天数（`injCycleDays`）解析成「 · 每 N 天」形式的文案。
+     * @param brandParen 把商品名包成当前语言的括号形式（资源 `ui_brand_paren`：中文全角、英文半角）。
      */
     fun summarize(
         meds: List<Medication>,
         today: String,
         freqLabel: (MedFrequency) -> String,
         injCycleLabel: (Int) -> String,
+        brandParen: (String) -> String,
         maxLines: Int = MAX_LINES,
     ): Summary {
         val active = meds.filter { isActive(it, today) }
         val (immuno, rest) = active.partition { isImmunosuppressant(it.medClass) }
-        val head = immuno.map { entry(it, freqLabel, injCycleLabel) }
-        val tail = rest.map { entry(it, freqLabel, injCycleLabel) }
+        val head = immuno.map { entry(it, freqLabel, injCycleLabel, brandParen) }
+        val tail = rest.map { entry(it, freqLabel, injCycleLabel, brandParen) }
         val kept = (head + tail).take(maxLines.coerceAtLeast(0))
         val keptHead = kept.count { it.immunosuppressant }
         return Summary(
@@ -97,8 +99,9 @@ object EmergencyMeds {
         m: Medication,
         freqLabel: (MedFrequency) -> String,
         injCycleLabel: (Int) -> String,
+        brandParen: (String) -> String,
     ): Entry {
-        val name = m.brandName?.takeIf { it.isNotBlank() }?.let { "${m.name}（$it）" } ?: m.name
+        val name = m.brandName?.takeIf { it.isNotBlank() }?.let { "${m.name}${brandParen(it)}" } ?: m.name
         // v1.2.1：读 `plainRes` 而非 `labelRes`——`labelRes` 含面向患者的表单提示（如「如甲氨蝶呤」），
         // 会印到急救卡上（医生看的那张）。详见 MedFrequency 的注释。
         // v1.2.5（i18n）：解析交给调用方注入的 `freqLabel`，本对象不碰 Android 资源。

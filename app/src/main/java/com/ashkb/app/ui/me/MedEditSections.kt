@@ -164,7 +164,8 @@ internal fun MedBasicsSection(
                             },
                     ) {
                         Text(
-                            "${s.key} · ${s.display}${s.brand?.let { "（$it）" } ?: ""}",
+                            "${s.key} · ${s.display}" +
+                                (s.brand?.let { stringResource(R.string.ui_brand_paren, it) } ?: ""),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                         )

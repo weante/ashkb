@@ -586,7 +586,7 @@ object NotificationHelper {
         if (!canPost(context)) return false
         val silent = isInDndNow(context)
         val channel = if (silent) CHANNEL_REMINDER_SILENT else CHANNEL_MED
-        val names = medNames.joinToString("、")
+        val names = medNames.joinToString(context.getString(R.string.ui_list_separator))
         val n = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_stat_pill)
             .setContentTitle(context.getString(R.string.notif_missed_doses_title, count))

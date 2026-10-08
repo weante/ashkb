@@ -566,7 +566,7 @@ private fun labCaveat(lab: LabTrend): String? {
     val unit = lab.indicator.canonicalUnit
     val m = if (mismatch > 0) stringResource(R.string.report_lab_unit_mismatch, mismatch) else null
     val a = if (assumed > 0) stringResource(R.string.report_lab_unit_assumed, assumed, unit) else null
-    return listOfNotNull(m, a).joinToString("；").ifBlank { null }
+    return listOfNotNull(m, a).joinToString(stringResource(R.string.ui_list_separator_semicolon)).ifBlank { null }
 }
 
 // 趋势图已抽到 ui/components/TrendChart.kt

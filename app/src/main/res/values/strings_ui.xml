@@ -72,4 +72,23 @@
     <string name="ui_crash_fatal_separator">\n===== 致命崩溃 =====\n</string>
     <string name="ui_appshell_last_crash">上次异常：\n%1$s</string>
 
+    <!-- ===== 派生告警（仓库层生成后写入 alerts.message，患者可见） =====
+         注意：告警一旦写入数据库就是历史记录，改语言不会重写旧告警——这是有意的。 -->
+    <string name="ui_alert_fever">今日体温 %1$s℃ ≥ 阈值 %2$s℃。感染发热需先评估再注射生物制剂——请查看应急处理卡。</string>
+    <string name="ui_alert_eye">记录到眼部症状（眼痛 / 发红 / 畏光 / 视物模糊）——可能是葡萄膜炎，建议尽快眼科就诊。</string>
+    <string name="ui_alert_neuro">记录到神经症状（麻木 / 无力 / 大小便控制变化）——请立即联系医生评估。</string>
+    <string name="ui_alert_basdai_high">最近 2 次 BASDAI 自评均 ≥%1$s（本次 %2$s 分）。自评活动度持续偏高，建议预约风湿科复诊评估。</string>
+    <string name="ui_alert_flare_days">本次发作已第 %1$d 天。若自我处理（休息 / 温和活动 / 热敷）后 7–10 天仍无改善，建议联系风湿科（频繁反复发作可能需调整用药）。</string>
+    <string name="ui_alert_kb_review_due">知识条目「%1$s」已过复核日（%2$s）——内容可能过期，就医核对时请以医生意见为准。</string>
+    <string name="ui_alert_vitals_fever">体征体温 %1$s℃ ≥ 阈值 %2$s℃。感染发热需先评估再注射生物制剂——请查看应急处理卡。</string>
+    <string name="ui_alert_live_vaccine">记录了活疫苗（%1$s）但医生确认状态为「待确认」——AS 患者使用生物制剂 / DMARD 期间接种活疫苗有严重感染风险，请务必先与风湿科医生确认（itx-010/012）。</string>
+
+    <!-- ===== 列表分隔与括号（半角/全角随语言变） ===== -->
+    <string name="ui_list_separator_semicolon">"；"</string>
+    <string name="ui_brand_paren">"（%1$s）"</string>
+    <string name="ui_kb_title_bracket">"【%1$s】"</string>
+    <string name="ui_value_colon">"：%1$s"</string>
+    <string name="ui_pdf_field_separator">"｜"</string>
+    <string name="ui_pdf_contact_gap">"　"</string>
+
 </resources>

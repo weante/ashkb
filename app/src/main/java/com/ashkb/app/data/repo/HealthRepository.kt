@@ -160,21 +160,25 @@ class HealthRepository(private val context: Context) {
         if (log.feverish && (log.feverTemp ?: 0.0) >= FEVER_THRESHOLD) {
             insertAlertOnce(
                 type = "symptom_abnormal", severity = "high", refDate = log.date,
-                message = "今日体温 ${log.feverTemp}℃ ≥ 阈值 38.5℃。感染发热需先评估再注射生物制剂——请查看应急处理卡。",
+                message = context.getString(
+                    R.string.ui_alert_fever,
+                    log.feverTemp.toString(),
+                    FEVER_THRESHOLD.toString(),
+                ),
                 kbRef = "emr-002",
             )
         }
         if (log.eyeSymptom) {
             insertAlertOnce(
                 type = "symptom_abnormal", severity = "high", refDate = log.date,
-                message = "记录到眼部症状（眼痛 / 发红 / 畏光 / 视物模糊）——可能是葡萄膜炎，建议尽快眼科就诊。",
+                message = context.getString(R.string.ui_alert_eye),
                 kbRef = "emr-001",
             )
         }
         if (log.neuroRedFlag) {
             insertAlertOnce(
                 type = "neuro_red_flag", severity = "high", refDate = log.date,
-                message = "记录到神经症状（麻木 / 无力 / 大小便控制变化）——请立即联系医生评估。",
+                message = context.getString(R.string.ui_alert_neuro),
                 kbRef = "emr-004",
             )
         }
@@ -221,8 +225,11 @@ class HealthRepository(private val context: Context) {
         if (lastTwo.all { ClinicalThresholds.basdaiHigh(it.total) }) {
             insertAlertOnce(
                 type = "basdai_high", severity = "medium", refDate = record.date,
-                message = "最近 2 次 BASDAI 自评均 ≥4.0（本次 ${"%.1f".format(record.total)} 分）。" +
-                    "自评活动度持续偏高，建议预约风湿科复诊评估。",
+                message = context.getString(
+                    R.string.ui_alert_basdai_high,
+                    "%.1f".format(ClinicalThresholds.BASDAI_HIGH),
+                    "%.1f".format(record.total),
+                ),
                 kbRef = "edu-th-002",
             )
         }
@@ -279,7 +286,7 @@ class HealthRepository(private val context: Context) {
         if (days >= FLARE_ALERT_DAY) {
             insertAlertOnce(
                 type = "flare_day7", severity = "medium", refDate = today.toString(),
-                message = "本次发作已第 $days 天。若自我处理（休息 / 温和活动 / 热敷）后 7–10 天仍无改善，建议联系风湿科（频繁反复发作可能需调整用药）。",
+                message = context.getString(R.string.ui_alert_flare_days, days),
                 kbRef = "edu-002",
             )
         }
@@ -494,7 +501,7 @@ class HealthRepository(private val context: Context) {
         overdue.forEach { e ->
             insertAlertOnce(
                 type = "review_due", severity = "low", refDate = e.id,
-                message = "知识条目「${e.title}」已过复核日（${e.reviewDue}）——内容可能过期，就医核对时请以医生意见为准。",
+                message = context.getString(R.string.ui_alert_kb_review_due, e.title, e.reviewDue),
                 kbRef = e.id,
             )
         }
@@ -622,7 +629,7 @@ class HealthRepository(private val context: Context) {
         if (t < FEVER_THRESHOLD) return
         insertAlertOnce(
             type = "symptom_abnormal", severity = "high", refDate = log.date,
-            message = "体征体温 $t℃ ≥ 阈值 $FEVER_THRESHOLD℃。感染发热需先评估再注射生物制剂——请查看应急处理卡。",
+            message = context.getString(R.string.ui_alert_vitals_fever, t.toString(), FEVER_THRESHOLD.toString()),
             kbRef = "emr-002",
         )
     }
@@ -957,7 +964,7 @@ class HealthRepository(private val context: Context) {
         if (VaccineSafety.needsLiveVaccineAlert(record.vaccineType, record.doctorConfirm)) {
             insertAlertOnce(
                 type = DerivedAlerts.VACCINE_LIVE_PENDING, severity = "high", refDate = record.date,
-                message = "记录了活疫苗（${record.vaccineName}）但医生确认状态为「待确认」——AS 患者使用生物制剂 / DMARD 期间接种活疫苗有严重感染风险，请务必先与风湿科医生确认（itx-010/012）。",
+                message = context.getString(R.string.ui_alert_live_vaccine, record.vaccineName),
                 kbRef = "itx-010",
             )
         }

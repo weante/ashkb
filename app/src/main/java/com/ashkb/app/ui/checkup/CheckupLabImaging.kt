@@ -601,7 +601,8 @@ internal fun ImagingDetailDialog(record: ImagingRecord, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("${ImagingRecord.modalityLabel(record.modality)} · ${record.bodyPart}（${record.examDate}）")
+            val date = stringResource(R.string.ui_brand_paren, record.examDate)
+            Text("${ImagingRecord.modalityLabel(record.modality)} · ${record.bodyPart}$date")
         },
         text = {
             Column(

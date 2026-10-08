@@ -444,7 +444,9 @@ private fun PlanCard(
         title = card.entry.title,
         subtitle = buildString {
             append("${card.grade} · $verdict")
-            if (card.movements.isNotEmpty()) append(" · ${card.movements.joinToString("、")}")
+            if (card.movements.isNotEmpty()) {
+                append(" · ${card.movements.joinToString(stringResource(R.string.ui_list_separator))}")
+            }
         },
         action = {
             StatusChip(

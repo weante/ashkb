@@ -338,6 +338,8 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                                 freqLabel = { context.getString(it.plainRes) },
                                 // v1.2.6（i18n）：注射周期文案同样按系统语言解析
                                 injCycleLabel = { context.getString(R.string.ui_emergency_meds_inj_cycle, it) },
+                                // v1.2.6（i18n）：商品名括号随语言换全角 / 半角
+                                brandParen = { context.getString(R.string.ui_brand_paren, it) },
                             )
                         }
                         Spacer(Modifier.height(Spacing.xs))

@@ -35,6 +35,7 @@ class EmergencyLockscreenTest {
         meds, today,
         freqLabel = { ctx.getString(it.plainRes) },
         injCycleLabel = { ctx.getString(R.string.ui_emergency_meds_inj_cycle, it) },
+        brandParen = { ctx.getString(R.string.ui_brand_paren, it) },
     )
 
     private fun render(t: ResText): String = ctx.getString(t.res, *t.args.toTypedArray())

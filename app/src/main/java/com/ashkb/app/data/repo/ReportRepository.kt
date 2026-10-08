@@ -326,6 +326,8 @@ class ReportRepository(private val context: Context) {
             freqLabel = { context.getString(it.plainRes) },
             // v1.2.6（i18n）：注射周期文案同样按系统语言解析
             injCycleLabel = { context.getString(R.string.ui_emergency_meds_inj_cycle, it) },
+            // v1.2.6（i18n）：商品名括号随语言换全角 / 半角
+            brandParen = { context.getString(R.string.ui_brand_paren, it) },
         )
         EmergencyCard(
             profile = db.profileDao().get(),
