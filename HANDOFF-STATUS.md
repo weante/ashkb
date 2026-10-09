@@ -11,7 +11,7 @@
 
 | 项 | 结果 |
 |---|---|
-| 工作树 | 提交 `d8f371b`（v1.2.7 + 批次 14）已推送；工作树干净（`HANDOFF-STATUS.md` 已纳入版本管理） |
+| 工作树 | 提交 `fb6d9e0`（v1.2.7 发布记录）已推送；版本提交 `d8f371b`（v1.2.7 + 批次 14）与附注标签 `v1.2.7` 同批推送；工作树干净（`HANDOFF-STATUS.md` 已纳入版本管理） |
 | 全量单测 | **874 条，0 失败 / 0 错误 / 0 跳过**（100 个测试文件）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
 | APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 119 / versionName 1.2.7**（批次 14 六项清扫 + 英文支持三层 + 安全链 + 知识库闸门 + 分级释义） |
