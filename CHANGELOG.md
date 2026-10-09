@@ -12,6 +12,8 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 **R1 已在 v1.2.2 修复**（紧急卡剂量独占整行、胶囊只与药名同行）；**R2「停药后的历史幽灵行」经维护者裁决「不动历史行、保持现状」不做**
 （清理 `date < today` 的行等于删用户的历史数据，现有防护已保证不再新增）。本版实际落地 **R3 / R4 / R5 / R6 / R7 / R8**。
 
+**已发布**：GitHub Release `v1.2.7`（release id `407916739`，Latest），资产 `ashkb-1.2.7-release.apk`（5220504 B，sha256 `e09e6990…`，与本地 `Get-FileHash` 逐字节一致）。附注标签 `v1.2.7` 指向 `d8f371b`（已核对远端 `refs/tags/v1.2.7^{}` = 本地 commit）。
+
 ### 一、R3 周报「下次复诊日」恒为 null
 
 `ReportRepository.periodicReport` 用 `checkupRecordDao.between(f, t)` 找下次复诊，而 `between` 过滤的是 **`date` 列（就诊日）**——

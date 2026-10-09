@@ -11,12 +11,12 @@
 
 | 项 | 结果 |
 |---|---|
-| 工作树 | 提交 `85fcfa4`（v1.2.6 + 发布记录）已推送；工作树干净（`HANDOFF-STATUS.md` 已纳入版本管理） |
+| 工作树 | 提交 `d8f371b`（v1.2.7 + 批次 14）已推送；工作树干净（`HANDOFF-STATUS.md` 已纳入版本管理） |
 | 全量单测 | **874 条，0 失败 / 0 错误 / 0 跳过**（100 个测试文件）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
 | APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 119 / versionName 1.2.7**（批次 14 六项清扫 + 英文支持三层 + 安全链 + 知识库闸门 + 分级释义） |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
-| GitHub 正式版（Latest） | **v1.2.6**（2026-10-09，release id `407329934`，资产 `ashkb-1.2.6-release.apk` 5219392 B）；同批发布 **v1.2.5**（id `407329822`，5084704 B）——两条资产摘要与本地 `Get-FileHash` **逐字节一致** |
+| GitHub 正式版（Latest） | **v1.2.7**（2026-10-09，release id `407916739`，资产 `ashkb-1.2.7-release.apk` 5220504 B，sha256 `e09e6990…`）；上一版 **v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——三条资产摘要与本地 `Get-FileHash` **逐字节一致** |
 | GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 / v1.2.7 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |
 
 > **最关键的一句话**：真机走查（Xiaomi 15 Pro / Android 16，被测制品 = v1.0.70 发布资产，SHA-256 逐字节一致）已完成：
