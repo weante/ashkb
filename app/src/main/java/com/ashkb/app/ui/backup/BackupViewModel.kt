@@ -114,7 +114,16 @@ class BackupViewModel(
             is BackupEngine.BackupException -> e.resId
             else -> 0
         }
-        if (resId == 0) return e?.message.orEmpty()
+        if (resId == 0) {
+            // v1.2.7（批次 14 / R5）：以前这里是 `return e?.message.orEmpty()`——data 层那些没带
+            // resId 的异常（IO、JSON、共享库）会把 `java.io.FileNotFoundException: /data/user/0/...`
+            // 原样糊到提示条上：英文类名 + 绝对私有路径，对用户零信息量，还像是应用坏了。
+            // 现在主文案是一句人话，原始文本降级成第二行「供排查」（仍可截图反馈）。
+            val raw = e?.message?.trim().orEmpty()
+            if (raw.isEmpty()) return app.getString(R.string.vm_err_unknown)
+            return app.getString(R.string.vm_err_unknown) + "\n" +
+                app.getString(R.string.vm_err_unknown_detail, raw)
+        }
         val args = when (e) {
             is VaultCipher.VaultException -> e.resArgs
             is BackupEngine.BackupException -> e.resArgs

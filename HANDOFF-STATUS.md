@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.2.6（versionCode 118）· 2026-10-09 · 英文支持第三层（domain 文案层 105 条 + 散落 UI 文案 51 条 + 种子内容 72 条 + 语言感知重种 + 对等守卫）**。
+> **时点快照**：截至 **v1.2.7（versionCode 119）· 2026-10-09 · 批次 14「清扫 OPEN-RISK 六项」（R3–R8：周报下次复诊日 / WebDAV 删除白名单 / 备份密钥采纳时机 / 全局提示不丢 / 级联删除两段式 / 知识卡弹窗日期）**。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号与测试条数以 `app/build.gradle.kts` 与 `app/build/test-results/testDebugUnitTest/*.xml` 为准。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -12,12 +12,12 @@
 | 项 | 结果 |
 |---|---|
 | 工作树 | 提交 `85fcfa4`（v1.2.6 + 发布记录）已推送；工作树干净（`HANDOFF-STATUS.md` 已纳入版本管理） |
-| 全量单测 | **865 条，0 失败 / 0 错误 / 0 跳过**（98 个测试文件）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
+| 全量单测 | **874 条，0 失败 / 0 错误 / 0 跳过**（100 个测试文件）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
-| APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 118 / versionName 1.2.6**（英文支持三层 + 安全链 + 知识库闸门 + 分级释义） |
+| APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 119 / versionName 1.2.7**（批次 14 六项清扫 + 英文支持三层 + 安全链 + 知识库闸门 + 分级释义） |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
 | GitHub 正式版（Latest） | **v1.2.6**（2026-10-09，release id `407329934`，资产 `ashkb-1.2.6-release.apk` 5219392 B）；同批发布 **v1.2.5**（id `407329822`，5084704 B）——两条资产摘要与本地 `Get-FileHash` **逐字节一致** |
-| GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |
+| GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 / v1.2.7 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |
 
 > **最关键的一句话**：真机走查（Xiaomi 15 Pro / Android 16，被测制品 = v1.0.70 发布资产，SHA-256 逐字节一致）已完成：
 > **Android 16 WebDAV 反射回归 / 8 通道 / 电池白名单 / 锁屏紧急卡 / 测试提醒 / 冷启动五 Tab 全部结项**；
@@ -423,3 +423,27 @@ AI 标记：正常；本地参考范围判读：偏高             ← v1.0.78 �
 | **v1.0.87 回归**：补剂卡片按钮全消失 | 维护者真机截图发现 → v1.0.88 热修（`RowScope` + `weight(1f)`） | ✅ 已修；**按钮是否恢复待维护者目视确认** |
 
 **教训（写下来避免重犯）**：v1.0.87 装到真机后，我只读屏核对了"健康页化验条数"就收工，**没有把改动到的补剂卡片也逐屏读一遍** → 一个"按钮全被挤成零宽"的回归靠维护者截图才发现。**此后凡改 UI，必须把改动到的界面逐个读屏一遍再报"已装"。**
+
+### 批次 14（v1.2.7）：清扫 OPEN-RISK 六项 —— 静态 + 单测，**真机验证 0 项**
+
+来源是 `NEXT-SESSION.md` 的 R1–R8 高危表（每一条都在 v1.2.6 / versionCode 118 的代码上用只读审计核实过）：
+**R1 已在 v1.2.2 修复**（剂量已独占整行，胶囊只与药名同行）；**R2 经维护者裁决「不动历史行、保持现状」不做**；本批做 R3–R8。
+
+| # | 修复 | 回归测试 | 真机 |
+|---|---|---|---|
+| R3 | 周报「下次复诊日」恒 null → 新增 `CheckupRecordDao.upcomingByNextDate`（按 `next_date` 查） | `NextCheckupDateQueryTest` 4 条 | ❌ 未装机 |
+| R4 | WebDAV 轮换加 `isSafeBackupName` 全匹配白名单（`%2f` 也拦） | `BackupEngineTest` +2 条 | ❌ 未装机 |
+| R5 | 密钥采纳从 verify 移到 `restore()` 内、pre-restore 快照前；兜底错误文案资源化 | 无（顺序约束靠注释 + 代码评审） | ❌ 未装机 |
+| R6 | `GlobalMessages` 改 `Channel`（无订阅者期间不丢） | `GlobalMessagesTest` 1 条 | ❌ 未装机 |
+| R7 | 级联删除改「事务内删行 → 提交后删字节」 | `RecordDeletionCascadeTest` +2 条中间态 | ❌ 未装机 |
+| R8 | 知识卡弹窗改用注入日期（四个调用方） | 无（`today` 由编译期强制传参） | ❌ 未装机 |
+
+**⚠️ 未验证清单（如实记录）**：
+
+1. **六项全部没有装机**——构建机 `adb devices -l` 与 `adb mdns services` **均为空**（无线调试未开或设备不在线）。
+2. 按上面的教训，本批**唯一改到的界面**是知识卡详情弹窗的「已过期」胶囊（`KbDetailDialog`）——需要维护者从
+   **知识库 / 紧急卡 / 症状 / 运动**四个入口各点开一张知识卡，核对胶囊与页面顶部日期一致（跨零点前后尤其要看）。
+3. R7 的两种「可接受崩溃态」只在 Robolectric 里造过（`deleted_at` 墓碑、用非空目录卡住删字节）；
+   **附件级联删除（行 + 磁盘文件）从 v1.0.86 起就一直没在真机上验过**（设备上没有附件，原因同上）。
+4. R4 的白名单只做了单元测试；**真实 WebDAV 服务端**上「轮换到底删了哪几个文件」未复验。
+5. R5 的「取消恢复后密钥不再被采纳」需要一个**携带不同 vault key 的备份**才能真机验证（换机恢复场景），本批未做。

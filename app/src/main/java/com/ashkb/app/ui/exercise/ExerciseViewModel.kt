@@ -59,6 +59,14 @@ class ExerciseViewModel(
      */
     private val date: LocalDate get() = dateProvider.today.value
 
+    /**
+     * v1.2.7（批次 14 / R8）：给知识卡详情弹窗用。
+     *
+     * 弹窗里的「已过期」小胶囊原先自己读系统时钟，与页面顶部日期可能差一天（跨零点前后）。
+     * 现在一律用这里注入的日期源——语义与 `SymptomViewModel.today` 一致。
+     */
+    val today: LocalDate get() = dateProvider.today.value
+
     private val library = MutableStateFlow<List<KbEntry>>(emptyList())
     private val feedbackRefresh = MutableStateFlow(0)
 

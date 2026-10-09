@@ -64,7 +64,7 @@
     <ID>LongMethod:ExerciseScreen.kt$@Composable private fun PrescriptionHero( ui: com.ashkb.app.ui.exercise.ExerciseUiState, yesterday: com.ashkb.app.data.entity.SymptomDaily?, warmup: com.ashkb.app.domain.MorningWarmup.Sequence?, )</ID>
     <ID>LongMethod:ExerciseScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -&gt; Unit, onBack: () -&gt; Unit)</ID>
     <ID>LongMethod:Forms.kt$@Composable fun ScoreInput( value: Int, onValueChange: (Int) -&gt; Unit, range: IntRange = 0..10, label: String, unrecorded: Boolean = false, lowLabel: String = stringResource(R.string.common_none), highLabel: String = stringResource(R.string.symptom_scale_worst), tone: (Int) -&gt; StatusTone, )</ID>
-    <ID>LongMethod:KbDetailDialog.kt$@Composable fun KbDetailDialog( entry: KbEntry, onSaveNote: (String?) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    <ID>LongMethod:KbDetailDialog.kt$@Composable fun KbDetailDialog( entry: KbEntry, today: String, onSaveNote: (String?) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
     <ID>LongMethod:KnowledgeScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun KnowledgeScreen(vm: KnowledgeViewModel)</ID>
     <ID>LongMethod:MeScreen.kt$@Composable fun MeScreen( vm: MeViewModel, onOpenMeds: () -&gt; Unit = {}, onOpenBackup: () -&gt; Unit = {}, onEditProfile: () -&gt; Unit = {}, onOpenReminderCheck: () -&gt; Unit = {}, )</ID>
     <ID>LongMethod:MedEditScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun MedEditScreen( vm: MeViewModel, editId: String? = null, onSaved: () -&gt; Unit, onBack: () -&gt; Unit, )</ID>

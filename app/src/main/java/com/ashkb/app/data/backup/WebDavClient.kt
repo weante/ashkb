@@ -312,6 +312,11 @@ class WebDavClient(
         val keep = dailyKeep(existing, keepDates)
         val removed = mutableListOf<String>()
         existing.filter { it !in keep }.forEach { name ->
+            // v1.2.7（批次 14 / R4）：**删除前再守一道白名单**。`existing` 来自远端 PROPFIND 的回显
+            // （不可信输入），里面的名字是会直接拼进 URL 去 DELETE 的。名字不合法就跳过——
+            // 代价只是少清一份旧备份，而这份旧备份下一轮还在、也不会伤害任何人；
+            // 反过来放行一个带 `../` 或 `%2f` 的名字，删掉的就是别处的文件了。
+            if (!isSafeBackupName(name)) return@forEach
             val conn = open("ashkb/backup/$name", "DELETE")
             try {
                 if (conn.responseCode in 200..299) removed.add(name)
@@ -437,11 +442,31 @@ class WebDavClient(
             }
         }
 
+        /**
+         * v1.2.7（批次 14 / R4）：**备份文件名白名单**（整串匹配）。
+         *
+         * 与 `domain/AttachmentPath.kt` 的 `SEGMENT_PATTERN` 同一口径：只放行字母数字与 `.` `_` `-`。
+         * 刻意排除：
+         *  · `%`——百分号解码是逐段校验的经典绕过口（服务端把 `%2f` 解成分隔符时，检查早已做完）；
+         *  · `/` `\`——能跨出 `ashkb/backup/` 目录；
+         *  · `?` `#`——会截断 URL，拼出来的目标与看到的名字不是同一个。
+         */
+        private val BACKUP_NAME_PATTERN = Regex("ashkb-backup-[0-9A-Za-z._-]+\\.ashkb")
+
+        /**
+         * 名字形状是否确为本应用的备份，且**不含任何需要服务端解码才能理解的字符**。
+         *
+         * 轮换会照 `ashkb/backup/<name>` 发 DELETE，而 `name` 来自远端 PROPFIND 的**回显**——
+         * 是不可信输入。此前只查了前后缀（`startsWith` / `endsWith`），中间的路径分隔符与转义序列
+         * 原样拼进 URL。附件远端路径早就靠 `SEGMENT_PATTERN` 做了同样的事，备份轮换这边一直缺这道。
+         */
+        fun isSafeBackupName(name: String): Boolean = BACKUP_NAME_PATTERN.matches(name)
+
         /** 从 PROPFIND 多状态响应中提取本应用的备份文件名（纯 JVM 可单测）。 */
         fun parseBackupFileNames(xml: String): List<String> =
             Regex(">([^<>]*ashkb-backup-[^<>]*\\.ashkb)<").findAll(xml)
                 .map { m -> m.groupValues[1].substringAfterLast('/').substringBefore('?') }
-                .filter { it.startsWith("ashkb-backup-") && it.endsWith(".ashkb") }
+                .filter { isSafeBackupName(it) }
                 .distinct()
                 .toList()
 

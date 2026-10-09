@@ -124,6 +124,46 @@ class RecordDeletionCascadeTest {
         )
     }
 
+    // ---- v1.2.7（批次 14 / R7）：级联删除的两种崩溃中间态 ----
+
+    @Test
+    fun `同步开启且有远端副本时级联删除留墓碑而不是物理删行`() {
+        val recId = "crec-cascade-tomb"
+        val remote = "2026-09-20/catt-cascade-tomb.enc"
+        val file = io { seedCheckupWithChildren(recId, "crec-cascade-keep-tomb", remotePath = remote) }
+        attachments.setSyncEnabled(true)
+        try {
+            val counts = io { repo.deleteCheckupRecord(recId) }
+
+            assertEquals(CheckupDeletion.Counts(labs = 2, imaging = 1, attachments = 1), counts)
+            val row = io { db.checkupAttachmentDao().byId("catt-$recId") }
+            assertNotNull("有远端副本却把行物理删了：远端那份成了无从追溯的孤儿，同步流程再也找不到它", row)
+            assertNotNull("墓碑（deleted_at）没写上，这个附件永远不会被同步流程清掉", row!!.deletedAt)
+            assertEquals("远端路径要原样留着，否则清远端时不知道该删哪个", remote, row.remotePath)
+            assertFalse("留墓碑不代表本地字节也要留着（远端还有一份）", file.exists())
+        } finally {
+            attachments.setSyncEnabled(false)
+        }
+    }
+
+    @Test
+    fun `附件字节删不掉也不能让级联删除半途而废`() {
+        val recId = "crec-cascade-blocked"
+        val keepId = "crec-cascade-keep-blocked"
+        val stuck = io { seedCheckupWithChildren(recId, keepId, blockedBytes = true) }
+
+        val counts = io { repo.deleteCheckupRecord(recId) }
+
+        assertEquals(CheckupDeletion.Counts(labs = 2, imaging = 1, attachments = 1), counts)
+        assertNull("复诊记录本身没删掉", io { db.checkupRecordDao().byId(recId) })
+        assertNull(
+            "附件行没删掉——删字节是「尽力而为」，不该反过来卡住行（行留下才是真的烂账）",
+            io { db.checkupAttachmentDao().byId("catt-$recId") },
+        )
+        assertTrue("前提没造出来：这个文件名本该是删不掉的非空目录", stuck.isDirectory)
+        assertNotNull("对照组被误删了", io { db.checkupRecordDao().byId(keepId) })
+    }
+
     // ---- 化验结果：编辑重判 + 删除 ----
 
     @Test
@@ -472,7 +512,12 @@ class RecordDeletionCascadeTest {
      *
      * @return 附件在磁盘上的文件（调用方断言它被删掉）
      */
-    private suspend fun seedCheckupWithChildren(recId: String, keepId: String): File {
+    private suspend fun seedCheckupWithChildren(
+        recId: String,
+        keepId: String,
+        remotePath: String? = null,
+        blockedBytes: Boolean = false,
+    ): File {
         db.checkupRecordDao().upsert(checkup(recId, "2026-09-20", "抽血复查"))
         db.checkupRecordDao().upsert(checkup(keepId, "2026-09-19", "对照组就诊"))
         db.labResultDao().upsert(lab("lab-$recId-1", recId, "ESR"))
@@ -486,11 +531,19 @@ class RecordDeletionCascadeTest {
         )
         val dir = File(ctx.filesDir, "checkup_attachments").apply { mkdirs() }
         val file = File(dir, "catt-$recId.jpg")
-        file.writeBytes(ByteArray(32) { 7 })
+        if (blockedBytes) {
+            // v1.2.7（R7）：用一个**非空目录**占住这个文件名——`File.delete()` 对非空目录返回 false，
+            // 这就是"删不掉的字节"在测试里最省事的等价物（不需要真的锁文件）。
+            file.mkdirs()
+            File(file, "child.bin").writeBytes(ByteArray(8) { 1 })
+        } else {
+            file.writeBytes(ByteArray(32) { 7 })
+        }
         db.checkupAttachmentDao().upsert(
             CheckupAttachment(
                 id = "catt-$recId", checkupId = recId, kind = "PHOTO", fileName = file.name,
                 mime = "image/jpeg", sizeBytes = file.length(), createdAt = "2026-09-20T11:00:00",
+                remotePath = remotePath,
             )
         )
         return file

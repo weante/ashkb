@@ -145,6 +145,8 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
         val live = ui.entries.firstOrNull { it.id == opened.id } ?: opened
         KbDetailDialog(
             entry = live,
+            // v1.2.7（批次 14 / R8）：把本屏已经算好的 `today` 传进去，弹窗不再自己读时钟
+            today = today,
             onSaveNote = { vm.saveNote(live.id, it) },
             onDismiss = { detail = null },
         )

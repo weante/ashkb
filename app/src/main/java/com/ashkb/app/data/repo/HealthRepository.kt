@@ -807,28 +807,41 @@ class HealthRepository(private val context: Context) {
      * （界面上还在，却再也看不出属于哪次就诊）。故一并删除，且附件要连**磁盘文件**一起删——
      * 否则内部存储里会永久留着一份用户以为已经删掉的化验单照片（隐私问题，不只是空间问题）。
      *
-     * **顺序是有意的**：附件先走 [AttachmentRepository.delete]（删文件 + 有远端副本时留墓碑等同步收尾），
-     * 再在一个事务里删三张表的行。附件删除跨了文件系统与远端，本就塞不进 Room 事务；
-     * 而「先附件、后记录」保证中途失败时留下的是**记录本身**——用户还能再点一次删除；
-     * 反过来先删记录再删附件，失败就会留下指向不存在记录的附件行，用户无从清理。
+     * **顺序是有意的**：先把「附件的行 / 化验行 / 影像行 / 记录本身」在**一个事务里**处理干净，
+     * 事务提交之后再删附件的磁盘字节。
+     *
+     * v1.2.7（批次 14 / R7）**改过一次**，理由值得留着：
+     * 旧顺序是「先逐个 `attachmentRepo.delete()`（删文件 + 删/标行，各自独立提交），再开事务删三张表」。
+     * 那样在两步之间崩溃会留下**悬空附件行**（文件已经没了、行还在），用户点开就失败，
+     * 而且没有任何入口能把它清掉——级联删除那一次已经失败，记录还在，但附件已经烂了。
+     * 现在反过来：事务里 `deleteRowsForCascade` 只动行、不碰磁盘；提交后才 `deleteLocalFiles`。
+     * 崩溃只可能落在两种可接受的状态上：
+     *  ① 事务之前——什么都没变，用户再点一次删除即可；
+     *  ② 事务提交后、删字节前——留下无人引用的孤儿字节（占空间，不影响任何界面）。
+     * 两种都比「行在、文件没了」好：后者是用户看得见且无法自救的坏状态。
+     *
+     * 附件删除里「有远端副本则留墓碑」那一分支保持不变（见 [AttachmentRepository.deleteRowsForCascade]）。
      *
      * @return 实际连带删除的条数；`null` = 该记录不存在（**零写入**）
      */
     suspend fun deleteCheckupRecord(id: String): CheckupDeletion.Counts? {
         checkupRecordDao.byId(id) ?: return null
         val attachments = attachmentRepo.listByCheckup(id)
-        attachments.forEach { attachmentRepo.delete(it) }
-        return db.withTransaction {
-            val counts = CheckupDeletion.Counts(
+        val counts = db.withTransaction {
+            val c = CheckupDeletion.Counts(
                 labs = labResultDao.countByCheckup(id),
                 imaging = imagingDao.countByCheckup(id),
                 attachments = attachments.size,
             )
+            attachmentRepo.deleteRowsForCascade(attachments)
             labResultDao.deleteByCheckup(id)
             imagingDao.deleteByCheckup(id)
             checkupRecordDao.delete(id)
-            counts
+            c
         }
+        // 事务已提交：行已经不可能再引用这些文件，此时删字节不会造成悬空行
+        attachmentRepo.deleteLocalFiles(attachments)
+        return counts
     }
 
     /**

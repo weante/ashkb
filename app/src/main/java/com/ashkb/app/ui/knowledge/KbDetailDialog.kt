@@ -31,7 +31,6 @@ import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
-import java.time.LocalDate
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -42,18 +41,23 @@ import org.json.JSONObject
 @Composable
 fun KbDetailDialog(
     entry: KbEntry,
+    today: String,
     onSaveNote: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val payload = runCatching { JSONObject(entry.payload) }.getOrDefault(JSONObject())
     val uriHandler = LocalUriHandler.current
-    // v1.1.1（MEDIUM-4）**残留（明说）**：这里仍然读系统时钟，是本批次三处「第二个日期源」里
-    // 唯一没修掉的一处。原因不是忘了，而是**改签名会撞 detekt 基线**：基线按"规则 + 完整函数签名"
-    // 记账，本函数的 `LongMethod` 就在基线里（它本来就 125 行），加一个 `today: LocalDate` 形参
-    // 会让那条基线失配 → 构建失败；而把它拆短属于布局重构（本模块无 Compose UI 测试），
-    // 不该塞进这批修复。影响面：跨零点前后那个「已过期」小胶囊可能与页面顶部日期差一天。
-    // 记在这里，避免下一个人以为是漏改。
-    val overdue = entry.reviewDue < LocalDate.now().toString()
+    // v1.2.7（批次 14 / R8）：**改用调用方注入的 `today`**，不再读系统时钟。
+    //
+    // v1.1.1（MEDIUM-4）在这里留过一条"明说的残留"：弹窗与列表各读一次时钟，跨零点前后那个
+    // 「已过期」小胶囊可能与页面顶部日期差一天；当时不改的理由是**改签名会撞 detekt 基线**
+    // （基线按"规则 + 完整函数签名"记账，本函数的 `LongMethod` 就在基线里）——那条签名字串
+    // 本批次已同步更新（既存豁免，未新增）。
+    //
+    // `today` 来自 `KnowledgeScreen` 的 `KnowledgeViewModel.date`（注入的 `DateProvider`，
+    // 每零点推进），与列表行 `overdue = entry.reviewDue < today` 是**同一个值**：
+    // 「同一屏上的同一件事只允许有一个日期源」。
+    val overdue = entry.reviewDue < today
 
     AlertDialog(
         onDismissRequest = onDismiss,

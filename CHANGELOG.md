@@ -4,6 +4,88 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.2.7] — 2026-10-09
+
+**批次 14：清扫 OPEN-RISK 六项（R3–R8）——把「改法早就写好了、但一直没动」的六处失效一次性收口。** 无库结构变更，可覆盖安装。
+
+范围为 `NEXT-SESSION.md` 的 R1–R8 高危表（逐条在 v1.2.6 / versionCode 118 的代码上用只读审计核实过）。
+**R1 已在 v1.2.2 修复**（紧急卡剂量独占整行、胶囊只与药名同行）；**R2「停药后的历史幽灵行」经维护者裁决「不动历史行、保持现状」不做**
+（清理 `date < today` 的行等于删用户的历史数据，现有防护已保证不再新增）。本版实际落地 **R3 / R4 / R5 / R6 / R7 / R8**。
+
+### 一、R3 周报「下次复诊日」恒为 null
+
+`ReportRepository.periodicReport` 用 `checkupRecordDao.between(f, t)` 找下次复诊，而 `between` 过滤的是 **`date` 列（就诊日）**——
+「就诊日已经过去、`next_date` 在将来」的记录全部落在窗口外，那栏于是**永远是空的**（不是偶发，是恒空）。
+
+新增 `CheckupRecordDao.upcomingByNextDate(from, to)`：`next_date IS NOT NULL AND next_date != ''` + `BETWEEN` + 按 `next_date` 升序，
+`periodicReport` 改调它。消费方 `ReportScreen` 本来就只在非空时显示这一行，无需改动。
+
+### 二、R4 WebDAV 轮换可能删到备份目录之外
+
+`WebDavClient.rotate()` 把 PROPFIND 回显的文件名**直接拼进** `open("ashkb/backup/$name", "DELETE")`，
+原先只校验 `startsWith("ashkb-backup-") && endsWith(".ashkb")`——一个形如 `ashkb-backup-%2e%2e%2f…` 的名字
+（服务端会解码 `%2f`）就能让 DELETE 落到目录之外。**远端目录列表是外部输入**。
+
+新增 `WebDavClient.isSafeBackupName()`（`Regex("ashkb-backup-[0-9A-Za-z._-]+\.ashkb")` **全匹配**），
+`parseBackupFileNames` 与删除循环**都**过这道闸——与 `domain/AttachmentPath.kt` 早就用上的段白名单同源。
+守卫测试把 `ashkb-backup-.ashkb`、`ashkb-backup-x.ashkb.bak`、`notes-ashkb-backup-x.ashkb`、裸 `../../x` 一并拒绝。
+
+### 三、R5 取消恢复也会留下备份携带的 vault key
+
+`adoptIfAbsent` 原先在 `decryptAndSelfCheck` 里执行——那是**用户点「确认恢复」之前**的 verify 阶段，
+于是「看一眼备份就返回」也会把备份携带的 vault key 采纳进本机，**取消恢复不回滚**。
+
+现在移到 `restore()` 内部，带两条顺序硬约束：
+**① 必须在用户确认之后**（verify 只是看一眼）；**② 必须在 pre-restore 快照之前**——
+快照走 `VaultCipher.encryptV3(vaultKeyOrThrow(), …)`，换机恢复时本机此刻还没有密钥。
+（`vaultKeyOrThrow() = vaultKeys.getOrCreate()`，**缺密钥会自建**，故不存在「没密钥导致快照失败」。）
+
+同版顺带：`BackupViewModel` 的兜底错误文案不再把原始异常文本（会带 `java.io.FileNotFoundException: /data/user/0/…`）直接糊到提示条，
+改为 `vm_err_unknown` + `vm_err_unknown_detail`（原文只作为排查附注），zh / en 两侧同序新增。
+
+### 四、R6 全局提示在无订阅者期间被静默丢弃
+
+`GlobalMessages` 原为 `MutableSharedFlow(replay = 0, extraBufferCapacity = 8, DROP_OLDEST)` + `tryEmit`——
+**没有订阅者时投递直接消失**（受 `AppShell` 组合时序影响）。改为
+`Channel<String>(capacity = 8, onBufferOverflow = DROP_OLDEST)` + `receiveAsFlow()`（`post` = `trySend`），
+订阅之前投递的消息会等订阅者来取。唯一订阅者 `AppShell` 的 `.collect` 不用改。
+
+### 五、R7 级联删除附件的顺序反了（本批唯一不可恢复的失败模式）
+
+旧顺序：**先**逐条 `attachmentRepo.delete()`（**先删磁盘字节**，再删行 / 标墓碑，各自独立提交），**再**开事务删化验 / 影像 / 记录。
+两步之间崩溃 → **文件已经没了、附件行还在**：用户点开就失败，而且**没有任何入口能把它清掉**（级联那一次已经失败，
+记录还在，但附件已经烂了）。
+
+现在：事务内 `deleteRowsForCascade`（只动行，按 `remotePath != null && isSyncEnabled()` 决定墓碑还是物理删）
++ 化验 / 影像 / 记录**同一个事务**，**提交之后**才 `deleteLocalFiles` 删字节。崩溃只可能停在两种可接受态：
+① 事务之前——什么都没变；② 提交后、删字节前——**孤儿字节**（占空间，不影响任何界面）。
+单条用户删除路径（`AttachmentRepository.delete`）**刻意保持原样**。
+
+### 六、R8 知识卡详情弹窗自己读系统时钟
+
+`KbDetailDialog` 里 `val overdue = entry.reviewDue < LocalDate.now().toString()`——
+跨零点前后，「已过期」小胶囊可能与页面顶部日期**差一天**（原注释里早就写明「不是忘了，是改签名会撞 detekt 基线」）。
+
+本版加 `today: String` 形参，**四个调用方全部传入注入的 `DateProvider` 日期**：
+`KnowledgeScreen`（`vm.date`）、`EmergencyScreen`（`vm.date`）、`SymptomScreen`（`vm.today`）、
+`ExerciseViewModel.today`（本版新增，该 VM 此前没有公开的「今天」）。`config/detekt/baseline.xml` 里那条
+`LongMethod:KbDetailDialog.kt$…` 的**签名字串同步更新**（既存豁免，**未新增豁免条目**）。
+
+### 新守卫（+9 条，共 874 条 / 100 个文件全绿）
+
+`NextCheckupDateQueryTest` 4 条（就诊日已过但 `next_date` 在未来仍要报出 / 多条待复诊取最近一次 / 已错过的不报 / 超出 120 天视野不报）、
+`GlobalMessagesTest` 1 条（**先 `post` 再订阅**，旧实现下这条会超时收不到）、
+`RecordDeletionCascadeTest` +2 条（同步开启且有远端副本时**留墓碑而不是物理删行** / 附件字节删不掉（非空目录）**不能让级联半途而废**）、
+`BackupEngineTest` +2 条（白名单放行与拒绝清单 / PROPFIND 回显里的越界名不进删除名单）。
+
+单测 **874 条 / 100 个文件全绿**；detekt 干净、lint 0 error。
+
+### ⚠️ 真机验证：本批 0 项
+
+构建机 `adb devices -l` / `adb mdns services` **均为空**（无线调试未开或设备不在线），故只做了静态审查与单测验证，**没有装机**。
+本批唯一改到的界面是知识卡详情弹窗的「已过期」胶囊，需维护者从知识库 / 紧急卡 / 症状 / 运动四个入口各点开一张知识卡核对；
+R7 的真机附件级联删除（行 + 磁盘文件）自 v1.0.86 起一直未验（设备上没有附件）。详见 `HANDOFF-STATUS.md` 的批次 14 一节。
+
 ## [v1.2.6] — 2026-10-09
 
 **英文支持第三层：domain 文案层 + 散落 UI 文案 + 种子内容。** 无库结构变更，可覆盖安装。

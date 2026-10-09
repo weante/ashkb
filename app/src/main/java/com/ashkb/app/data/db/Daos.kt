@@ -725,6 +725,26 @@ interface CheckupRecordDao {
     suspend fun between(from: String, to: String): List<CheckupRecord>
 
     /**
+     * v1.2.7（批次 14 / R3）：按**下次复诊日**取未来窗口内的记录。
+     *
+     * 这是「下次复诊日」唯一正确的取数口径。此前周报用的是 [between]（过滤 `date` 列，即**就诊日**），
+     * 于是「上个月就诊、医生约了三个月后复查」这种最常见的情形**必然落在窗口外**：
+     * 就诊日早于今天 → `BETWEEN today AND today+120 天` 直接把它排除 → 周报里的
+     * 「下次复诊日」**恒为空**（真实数据下从未显示过一次）。
+     *
+     * `next_date` 是可空自由文本：`IS NOT NULL` 挡掉没填的，`!= ''` 挡掉填了空串的
+     * （空串在字典序里小于任何日期，本来就进不来，但显式写出来意图更清楚）。
+     * ISO `yyyy-MM-dd` 定长无前导零歧义，字典序即日期序，故直接比较字符串。
+     *
+     * @return 按 `next_date` 升序——调用方取 `firstOrNull()` 即「最近一次要去的复诊」。
+     */
+    @Query(
+        "SELECT * FROM checkup_records WHERE next_date IS NOT NULL AND next_date != '' " +
+            "AND next_date >= :from AND next_date <= :to ORDER BY next_date ASC",
+    )
+    suspend fun upcomingByNextDate(from: String, to: String): List<CheckupRecord>
+
+    /**
      * v1.0.87（批次 13）：某个复诊项目名下的记录（「项目」→「记录」的项目筛选）。
      *
      * 为什么条件是 `item_id OR item_name`：`item_id` 列 v11 就建好了（还带索引），但

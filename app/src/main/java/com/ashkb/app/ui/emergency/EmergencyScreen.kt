@@ -468,6 +468,7 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
     selectedCard?.let { card ->
         KbDetailDialog(
             entry = card,
+            today = today.toString(),
             onSaveNote = { vm.saveKbNote(card.id, it) },
             onDismiss = { selectedCard = null },
         )

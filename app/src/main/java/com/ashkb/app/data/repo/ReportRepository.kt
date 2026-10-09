@@ -246,9 +246,15 @@ class ReportRepository(private val context: Context) {
         val weights = db.weightLogDao().recent(30).filter { it.date >= f }.sortedByDescending { it.date }
 
         val checkups = db.checkupRecordDao().between(f, t)
-        val nextCheckup = db.checkupRecordDao().between(t, to.plusDays(120).toString())
-            .filter { !it.nextDate.isNullOrBlank() && it.nextDate!! >= t }
-            .minByOrNull { it.nextDate!! }?.nextDate
+        // v1.2.7（批次 14 / R3）：**按下次复诊日查，不按就诊日查**。
+        // 旧写法 `between(t, to + 120 天)` 过滤的是 `date`（就诊日），而 `next_date` 通常就在
+        // 就诊日之后 1–6 个月——「本月就诊、约在三个月后复查」的记录就诊日早于今天，被 BETWEEN
+        // 直接排除，周报里的「下次复诊日」于是**恒为空**（其后的 `filter { nextDate >= t }` 也就
+        // 永远无事可做）。现在 `upcomingByNextDate` 按 `next_date` 落在 [今天, 今天+120 天] 取，
+        // 已按该列升序，取第一条即最近一次要去的复诊。
+        val nextCheckup = db.checkupRecordDao()
+            .upcomingByNextDate(t, to.plusDays(120).toString())
+            .firstOrNull()?.nextDate
 
         PeriodicReport(
             days = days,

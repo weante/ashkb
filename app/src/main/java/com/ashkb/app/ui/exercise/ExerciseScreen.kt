@@ -245,6 +245,7 @@ fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -> Unit, onBack: () ->
     kbDetail?.let { card ->
         KbDetailDialog(
             entry = card,
+            today = vm.today.toString(),
             onSaveNote = { vm.saveKbNote(card.id, it) },
             onDismiss = { kbDetail = null },
         )

@@ -158,6 +158,34 @@ class AttachmentRepository(private val context: Context) {
     /** 远端已清理（或无需清理）→ 物理删行，由同步流程调用。 */
     suspend fun hardDelete(id: String) = withContext(Dispatchers.IO) { dao.delete(id) }
 
+    /**
+     * v1.2.7（批次 14 / R7）：**只在调用方的事务里把行处理掉，不碰磁盘**。
+     *
+     * 与 [delete] 的分支口径完全一致（有远端副本且同步开启 → 留墓碑；否则物理删行），
+     * 唯一的区别是不删文件。存在的理由是级联删除必须让
+     * 「行已经没了、文件还在」与「文件已经没了、行还在」这两件事**不可能同时发生**：
+     * 先在一个事务里把行处理干净，提交之后再调 [deleteLocalFiles] 删字节。
+     * 中途崩溃留下的是**无人引用的孤儿字节**（占空间，但没有任何界面会引用它），
+     * 而不是「行还在、文件已经没了」的悬空记录——后者用户一点开就失败，
+     * 而且他没有任何办法把它清理掉（级联删除已经失败，那一行还在记录名下）。
+     */
+    suspend fun deleteRowsForCascade(attachments: List<CheckupAttachment>) {
+        val now = nowIso()
+        attachments.forEach { a ->
+            if (a.remotePath != null && isSyncEnabled()) dao.markDeleted(a.id, now) else dao.delete(a.id)
+        }
+    }
+
+    /**
+     * v1.2.7（批次 14 / R7）：事务**提交之后**删字节，配合 [deleteRowsForCascade]。
+     *
+     * 逐个 `runCatching`：一份文件删不掉（被占用 / 已不存在）不该中断其余文件，
+     * 也不该把异常抛回级联删除的调用方——那时行已经删干净了，操作在用户看来是成功的。
+     */
+    suspend fun deleteLocalFiles(attachments: List<CheckupAttachment>) = withContext(Dispatchers.IO) {
+        attachments.forEach { a -> runCatching { fileOf(a).delete() } }
+    }
+
     /** v11：改归属复诊记录（null = 解除归属）。 */
     suspend fun linkToCheckup(attachmentId: String, checkupId: String?) = withContext(Dispatchers.IO) {
         dao.linkToCheckup(attachmentId, checkupId)

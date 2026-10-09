@@ -861,6 +861,11 @@
     <string name="vm_dav_download_failed">下载远程备份失败：%1$s</string>
     <!-- v1.0.86（批次 11 / D6）：WebDAV 响应超过读取上限。必须与"下载失败"分开报——这是唯一"重试也没用"的分支，笼统文案会把用户引向错误的排查方向。 -->
     <string name="vm_dav_download_too_large">服务器返回的备份超过读取上限（%1$d MB）：%2$s。已中止下载（不会截断保存半份备份）——请确认该文件是否被替换或损坏，或改从本机恢复。</string>
+    <!-- v1.2.7（批次 14 / R5）：兜底异常文案。此前这里直接把 e.message 抛给用户，界面上会出现
+         「java.io.FileNotFoundException: /data/.../xxx」这类英文类名与私有路径；给一句人话，原始文本
+         降级成「供排查」的第二行，仍可截图反馈，但不再当作主文案。 -->
+    <string name="vm_err_unknown">操作未能完成，请重试；若反复失败，请截图反馈。</string>
+    <string name="vm_err_unknown_detail">供排查的原始错误信息：%1$s</string>
     <string name="vm_restore_verify_ok">解密与文件自校验通过（schema v%1$d，备份于 %2$s，约 %3$d 行）。下一步将先做 pre-restore 快照再覆盖写入。</string>
     <string name="vm_restore_verify_failed">备份文件校验失败</string>
     <string name="vm_restore_password_expired">恢复口令已失效，请重新选择备份文件并输入口令</string>

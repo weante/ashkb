@@ -851,6 +851,8 @@
     <string name="vm_dav_downloaded">Downloaded %1$s (%2$d bytes) — enter that backup\'s password to decrypt and verify it separately</string>
     <string name="vm_dav_download_failed">Could not download the remote backup: %1$s</string>
     <string name="vm_dav_download_too_large">The backup returned by the server exceeds the read limit (%1$d MB): %2$s. The download was stopped (no partial backup is saved) — please check whether the file was replaced or damaged, or restore from a local copy instead.</string>
+    <string name="vm_err_unknown">The action could not be completed — please try again, and if it keeps failing, take a screenshot and report it.</string>
+    <string name="vm_err_unknown_detail">Raw error message (for troubleshooting): %1$s</string>
     <string name="vm_restore_verify_ok">Decryption and file self-check passed (schema v%1$d, backed up on %2$s, about %3$d rows). Next, a pre-restore snapshot will be taken before anything is overwritten.</string>
     <string name="vm_restore_verify_failed">Backup file verification failed</string>
     <string name="vm_restore_password_expired">The restore password is no longer valid — please select the backup file again and enter its password</string>

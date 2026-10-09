@@ -251,7 +251,16 @@ class BackupRepository(private val context: Context) {
 
     // ======================= 恢复 =======================
 
-    class DecryptedFile(val payload: String, val schemaVersion: Int, val createdAt: String)
+    /**
+     * v1.2.7（批次 14 / R5）：[vaultKey] 只**携带**、不在校验阶段采纳——采纳由 [restore] 负责。
+     * 见 [decryptAndSelfCheck] 的说明。
+     */
+    class DecryptedFile(
+        val payload: String,
+        val schemaVersion: Int,
+        val createdAt: String,
+        val vaultKey: ByteArray? = null,
+    )
 
     /** 旁路解密 + 文件自校验（协议 §6 第 1/3 步：不动主库）。 */
     suspend fun decryptAndSelfCheck(bytes: ByteArray, password: CharArray): DecryptedFile =
@@ -259,7 +268,13 @@ class BackupRepository(private val context: Context) {
             val d = VaultCipher.decrypt(password, bytes)
             // v1.0.35：v3 备份携带稳定 vault key——本机没有才采纳（不覆盖本机已有密钥，
             // 否则一次旧备份恢复会把本机附件密钥冲掉，已上传的附件立刻解不开）
-            d.vaultKey?.let { vaultKeys.adoptIfAbsent(it) }
+            //
+            // v1.2.7（批次 14 / R5）：**这里改成只把 key 带走，不再就地采纳**。
+            // 本函数是"校验 + 展示待恢复内容"这一步（`BackupViewModel.verifyBackup`），用户看完
+            // 摘要后点「取消」是完全正常的路径；而采纳密钥是**不可逆副作用**：本机密钥槽一旦
+            // 变成备份里的那把，用旧密钥加密的本地附件就再也解不开了，且没有任何回滚点。
+            // "只是看一眼就把钥匙换掉"不该发生——采纳挪到用户确认的 [restore] 里，且必须先于
+            // pre-restore 快照（快照是用本机密钥加密的，换机恢复时本机本来没有密钥）。
             val root = JSONObject(d.payload)
             if (root.optString("format") != "ashkb-full")
                 throw BackupEngine.BackupException(context.getString(R.string.backup_err_bad_format))
@@ -281,7 +296,8 @@ class BackupRepository(private val context: Context) {
                 if (sha != m.getString("sha256"))
                     throw BackupEngine.BackupException(context.getString(R.string.backup_err_selfcheck_sha, t))
             }
-            DecryptedFile(d.payload, d.schemaVersion, d.createdAt)
+            // v1.2.7（批次 14 / R5）：vault key 随对象带走，**不在这里采纳**（见 [restore]）
+            DecryptedFile(d.payload, d.schemaVersion, d.createdAt, d.vaultKey)
         }
 
     /**
@@ -305,6 +321,13 @@ class BackupRepository(private val context: Context) {
         mode: BackupEngine.RestoreMode = BackupEngine.RestoreMode.FULL_ROLLBACK,
     ): BackupEngine.VerifyResult = restoreMutex.withLock {
         withContext(Dispatchers.IO) {
+            // v1.2.7（批次 14 / R5）：**在这里才采纳备份携带的 vault key**（旧位置在 decryptAndSelfCheck，
+            // 即"校验一下看看"那一步）。这个位置有两个硬约束，顺序不能动：
+            //  ① 必须在用户点了"恢复"之后（走到这里说明他已经确认过内容），看一眼摘要就取消不该换钥匙；
+            //  ② 必须在下面第 1 步 pre-restore 快照**之前**——快照是用本机当前密钥加密的
+            //     （`VaultCipher.encryptV3(vaultKeyOrThrow(), …)`），换机恢复时本机压根没有密钥，
+            //     先跑去加密快照会直接抛异常，用户连"退路快照"这份保险都拿不到。
+            decrypted.vaultKey?.let { vaultKeys.adoptIfAbsent(it) }
             // 1. pre-restore 快照（退路）
             val snapshot = BackupEngine.export(supportDb(), nowIso())
             // 快照同样带恢复码槽——用户用恢复码完成恢复时，快照仍可用同一恢复码解开

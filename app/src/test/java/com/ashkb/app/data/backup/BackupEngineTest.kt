@@ -2,6 +2,7 @@ package com.ashkb.app.data.backup
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -128,6 +129,42 @@ class BackupEngineTest {
     fun `空响应与非备份目录内容返回空列表`() {
         assertTrue(WebDavClient.parseBackupFileNames("").isEmpty())
         assertTrue(WebDavClient.parseBackupFileNames("<d:multistatus></d:multistatus>").isEmpty())
+    }
+
+    // ======================= v1.2.7（批次 14 / R4）：删除前的文件名白名单 =======================
+
+    @Test
+    fun `删除前白名单只放行真正的备份文件名`() {
+        // 合法：既有用例里的名字必须继续通过，否则轮换一份旧备份都清不掉
+        assertTrue(WebDavClient.isSafeBackupName("ashkb-backup-2026-09-18.ashkb"))
+        assertTrue(WebDavClient.isSafeBackupName("ashkb-backup-20260918-101530.ashkb"))
+
+        // 越界 / 伪装：这些名字会被直接拼进 URL 去 DELETE（`open("ashkb/backup/$name", "DELETE")`）
+        assertFalse(
+            "百分比编码的路径分隔符会被服务端解码——`%2f` 能删到目录外",
+            WebDavClient.isSafeBackupName("ashkb-backup-%2e%2e%2f.ashkb"),
+        )
+        assertFalse("裸斜杠与上跳段都不该进 URL", WebDavClient.isSafeBackupName("../../ashkb-release.jks"))
+        assertFalse(WebDavClient.isSafeBackupName("ashkb-backup-../evil.ashkb"))
+        assertFalse("必须以前缀开头才算备份", WebDavClient.isSafeBackupName("notes-ashkb-backup-x.ashkb"))
+        assertFalse("后缀也要卡死", WebDavClient.isSafeBackupName("ashkb-backup-x.ashkb.bak"))
+        assertFalse("前缀与后缀之间必须有内容", WebDavClient.isSafeBackupName("ashkb-backup-.ashkb"))
+        assertFalse(WebDavClient.isSafeBackupName(""))
+    }
+
+    @Test
+    fun `PROPFIND 回显里的越界名字不会进入删除名单`() {
+        val xml = """
+            <d:multistatus xmlns:d="DAV:">
+              <d:response><d:href>/dav/ashkb/backup/ashkb-backup-2026-09-18.ashkb</d:href></d:response>
+              <d:response><d:href>/dav/ashkb/backup/ashkb-backup-%2e%2e%2fevil.ashkb</d:href></d:response>
+            </d:multistatus>
+        """.trimIndent()
+        assertEquals(
+            "远端目录列表是外部输入：放行一个带 %2f 的名字，轮换就会去删别处的文件",
+            listOf("ashkb-backup-2026-09-18.ashkb"),
+            WebDavClient.parseBackupFileNames(xml),
+        )
     }
 
     // ======================= W4 远程恢复：PROPFIND 条目解析（含大小） =======================
