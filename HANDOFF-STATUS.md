@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.2.7（versionCode 119）· 2026-10-09 · 批次 14「清扫 OPEN-RISK 六项」（R3–R8：周报下次复诊日 / WebDAV 删除白名单 / 备份密钥采纳时机 / 全局提示不丢 / 级联删除两段式 / 知识卡弹窗日期）**。
+> **时点快照**：截至 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」（冷调瓷白 + 单一临床蓝）**；上一版 **v1.2.7（versionCode 119）· 批次 14「清扫 OPEN-RISK 六项」（R3–R8）** 已发布为 GitHub Latest。⚠️ **v1.2.8 未提交 GitHub、未发布**——它是给维护者装机对比用的最小包（只换色），设计稿的 ②换形 / ③换件 / ④换图 待看完效果再定。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号与测试条数以 `app/build.gradle.kts` 与 `app/build/test-results/testDebugUnitTest/*.xml` 为准。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -14,7 +14,7 @@
 | 工作树 | 提交 `fb6d9e0`（v1.2.7 发布记录）已推送；版本提交 `d8f371b`（v1.2.7 + 批次 14）与附注标签 `v1.2.7` 同批推送；工作树干净（`HANDOFF-STATUS.md` 已纳入版本管理） |
 | 全量单测 | **874 条，0 失败 / 0 错误 / 0 跳过**（100 个测试文件）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
-| APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 119 / versionName 1.2.7**（批次 14 六项清扫 + 英文支持三层 + 安全链 + 知识库闸门 + 分级释义） |
+| APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 120 / versionName 1.2.8**（UI 2.0 批次 A 换色 + 批次 14 六项清扫 + 英文支持三层 + 安全链 + 知识库闸门 + 分级释义） |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
 | GitHub 正式版（Latest） | **v1.2.7**（2026-10-09，release id `407916739`，资产 `ashkb-1.2.7-release.apk` 5220504 B，sha256 `e09e6990…`）；上一版 **v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——三条资产摘要与本地 `Get-FileHash` **逐字节一致** |
 | GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 / v1.2.7 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |
@@ -447,3 +447,39 @@ AI 标记：正常；本地参考范围判读：偏高             ← v1.0.78 �
    **附件级联删除（行 + 磁盘文件）从 v1.0.86 起就一直没在真机上验过**（设备上没有附件，原因同上）。
 4. R4 的白名单只做了单元测试；**真实 WebDAV 服务端**上「轮换到底删了哪几个文件」未复验。
 5. R5 的「取消恢复后密钥不再被采纳」需要一个**携带不同 vault key 的备份**才能真机验证（换机恢复场景），本批未做。
+
+### 批次 A（v1.2.8）：UI 2.0 换色 —— 只换颜色，装机双主题截图已核对
+
+来源是维护者提供的设计稿「**澄序 CLARITY · ASHKB UI 2.0**」（`ashkb-ui2-clarity.html` + `ashkb-ui2-handoff.md`，基于 v1.2.7 出具）。
+设计稿自己把落地分成四批（①换色 ②换形 ③换件 ④换图），维护者裁决**先做批次 A**——只换颜色，出一个能装机的最小对比包，看完效果再决定后面三批。**v1.2.8 就是这个对比包**。
+
+改动面 **3 个文件**，与交接包 §5「明确不改动的文件」完全一致：屏幕结构 / 组件 API / `domain/` / `data/` / 任何 ViewModel / 导航图**一行未动**。
+
+| 文件 | 改了什么 |
+|---|---|
+| `app/src/main/java/com/ashkb/app/ui/theme/Color.kt` | 48 个角色 × 浅 / 深两套**整份**换成设计稿的值；文件头的生成参数换成设计稿口径（并注明仓库里没有那个生成器，避免下次重生成时静默回退旧暖色板）；`object Glass` 六值改冷调——`borderLight` 的**语义从"白高光"变成"冷发线"** |
+| `app/src/main/java/com/ashkb/app/ReminderFullScreenActivity.kt` | 强提醒全屏页「已服」按钮写死 `Color.White` → `MaterialTheme.colorScheme.onError`（深色 `error` 变成高明度红后白字只有 **2.02:1**；`onError` = **7.99:1**），删掉因此不再使用的 `Color` 导入 |
+| `app/build.gradle.kts` | `versionCode` 119 → **120** / `versionName` 1.2.7 → **1.2.8** |
+
+**静态校验**（`E:\ASHKB\verify-palette-contrast.ps1`，只读、可复跑）：**48 × 2 个角色与设计稿表逐条一致**（0 缺失 / 0 不符 / 0 多余）；**18 组文本对全部 ≥ AA**，最低 **4.85:1**（浅色 `onSurfaceVariant` `#5A6B78` on `surfaceVariant` `#EDF1F4`），深色最低 6.67:1，浅色 `onPrimary`/`primary` = 5.62:1。
+
+**门禁**：`cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug` → **BUILD SUCCESSFUL in 3m14s**；单测 **874 条 / 100 个文件全绿**（本版不动逻辑，条数与 v1.2.7 相同），detekt 干净、lint 0 error。
+中途被 detekt 拦下过一次（`ReminderFullScreenActivity.kt` 改动首版超出 `MaxLineLength`，拆行后通过）；**本版没有向 detekt 基线添加任何条目**。
+构建：`assembleRelease assembleDebug verifySpecSync` → **BUILD SUCCESSFUL in 2m34s**，`verifySpecSync` 通过（"实际单测 874 条，版本 v1.2.8（120）"）。
+release APK = `ashkb-1.2.8-release.apk`（5220504 B，sha256 `ECE175F8CF4A3602CC10BAD7A8867D944E45727CB4B15DB5E6C49819E0064399`），`apksigner verify --print-certs` → 正式证书 `38ca80a6…`（**未回退 debug 签名**）。
+
+**真机验证**（Xiaomi 15 Pro / Android 16 / API 36 / 1440×3200，无线调试）：`adb install -r` 覆盖安装 → `versionCode=120 / versionName=1.2.8`，**数据未丢**（知识库 48 条 / 化验 171 项 / 档案 / BASDAI / 症状记录均在）。按 §7 的教训，**改到的界面逐个读屏 + 截双主题图**：
+
+| 界面 | 浅色 | 深色 |
+|---|---|---|
+| 今日 | ✅ 瓷白底 `#F3F6F8` + 白卡 + 冷蓝「添加药品」+ 冷白 Dock（选中胶囊 `#DCEEF7`） | ✅ 冷黑底 `#0C1218` + 卡片 `#151D26` + 浅蓝文字 / 胶囊 `#124F6E` |
+| 健康管理 | ✅ 白色卡片 + 冷蓝图标，无零宽元素、无不可读文字 | ✅ 深色卡片 + 浅蓝图标，文字清晰 |
+
+截图：`E:\ASHKB\ui2-shots\before\today-{light,dark}.png`（v1.2.7 旧配色基准）与 `E:\ASHKB\ui2-shots\after\{today,health}-{light,dark}.png`（同一台机、同一页）。
+
+**⚠️ 未验证清单（如实记录）**：
+
+1. **强提醒全屏页的「已服」按钮没有真机截图**——该页只在**锁屏 / 息屏**且升级链走完（`ReminderScheduler.MAX_ESCALATION = 2`，需 +30 / +60 两跳）时才出现，本轮没有制造这个场景；依据只有 WCAG 复算（2.02:1 → 7.99:1）。
+2. 深色下**卡片比页面底略暗**（`surfaceContainerLowest` `#0A0F14` on `background` `#0C1218`；全仓 **12 处**把 `surfaceContainerLowest` 当"卡片底"用）——**与旧配色同构**（旧 `#130D09` on `#18120E`），**不是本版引入**；设计稿本意是"卡片比底亮"，这条属于**批次 C 的"角色取色"问题**。
+3. 本版**只换色**：形（圆角 `10/14/18/28`、Dock 圆角 20、数据字号上限 36sp）、件（卡片发线 / 42dp 图标瓦片 / 分段控件 / 表单凹陷填充）、图（Today 用药卡时间轨）、**启动图标**（`ic_launcher_background.xml` 仍是旧钢青 `#416476`）全部保持原样 —— 逐条列在 `CHANGELOG.md` 的 v1.2.8「本版没有做的事」。
+4. **未提交 GitHub、未发布**：这是给维护者看效果的对比包（见本文件快照头的 ⚠️）。

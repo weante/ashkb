@@ -87,7 +87,7 @@ gradle testDebugUnitTest    # 单元测试
 
 ## 版本
 
-当前 `v1.2.7`（versionCode 119）。P0~P5 阶段开发完成，处于自用验证（dogfooding）阶段。
+当前 `v1.2.8`（versionCode 120）。P0~P5 阶段开发完成，处于自用验证（dogfooding）阶段。
 
 ## License
 

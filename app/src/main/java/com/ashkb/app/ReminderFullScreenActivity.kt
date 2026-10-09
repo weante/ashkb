@@ -27,7 +27,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.res.stringResource
@@ -181,7 +180,14 @@ private fun StrongReminderScreen(
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
             ) {
-                Text(stringResource(R.string.strong_reminder_taken), style = MaterialTheme.typography.titleMedium, color = Color.White)
+                // v1.2.8：改用 onError 而不是写死的 Color.White。新配色的深色 error
+                // 是**高明度红** 0xFFF2A0A9，白字压在上面只有 2.02:1（远低于 AA）；
+                // onError（深色 0xFF4A0010）是 7.99:1，浅色下同样是白字（5.82:1）。
+                Text(
+                    stringResource(R.string.strong_reminder_taken),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onError,
+                )
             }
             Spacer(Modifier.height(Spacing.md))
             OutlinedButton(

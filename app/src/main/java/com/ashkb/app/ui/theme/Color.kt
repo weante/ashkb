@@ -5,111 +5,121 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
 // ============================================================
-// ASHKB 设计 token · 单色值部分由脚本生成，勿手改
-// 生成参数：primary h232 C0.050 · secondary h80 C0.036 · tertiary h52 C0.055
-//          neutral h52 (L C0.010 / D C0.013) · success h135 C0.060
-//          warning h88 C0.110 · danger h18 C0.170
-// 校验：全部文本对 ≥ AA（最低 4.31:1），语义色 ΔE ≥ 0.065
+// ASHKB 设计 token · 整表来自「澄序 CLARITY · ASHKB UI 2.0」设计稿（批次 A：换色）
+//
+// 生成口径（设计稿 §1 的重生成参数，替换 v1.2.7 之前的旧的暖色口径）：
+//   primary h199 C0.075 · neutral h210 C0.008
+//   success h158 C0.065 · warning h72 C0.095 · danger h355 C0.155
+//
+// ⚠️ 本仓库里**没有**这个生成器（全盘搜过 .ps1/.js/.py/.sh/.mjs 无命中）。上面这行
+//    是**口径记录**，不是"别手改"的命令：日后若用外部生成器重生成，必须用这一组参数，
+//    否则会静默回到旧的暖色调色板（正是 v1.2.8 换掉的东西）。改色值请直接改下面的 hex，
+//    并用设计稿 §1 的表逐条校对。
+//
+// 校验（v1.2.8 实测，脚本 E:\ASHKB\verify-palette-contrast.ps1 可复跑，只读）：
+//   · 48 个角色 × 浅/深两套 **与设计稿 §1 的表逐条一致**（0 缺失 / 0 不符 / 0 多余）
+//   · 18 组文本对（onX vs X、onXContainer vs XContainer、onSurfaceVariant vs surfaceVariant …）
+//     **全部 ≥ AA**：最低 **4.85:1**（浅色 onSurfaceVariant / surfaceVariant），深色最低 6.67:1
 // ============================================================
 
 // ---------- Light ----------
-val primaryLight = Color(0xFF416476)
+val primaryLight = Color(0xFF0B6E9E)          // 品牌蓝，白字 5.6:1
 val onPrimaryLight = Color(0xFFFFFFFF)
-val primaryContainerLight = Color(0xFFC2E9FF)
-val onPrimaryContainerLight = Color(0xFF001F2D)
-val inversePrimaryLight = Color(0xFFA7CDE2)
-val secondaryLight = Color(0xFF695C47)
+val primaryContainerLight = Color(0xFFC7E4F5)
+val onPrimaryContainerLight = Color(0xFF062A3D)
+val inversePrimaryLight = Color(0xFF8FC6DF)
+val secondaryLight = Color(0xFF4C6A7A)
 val onSecondaryLight = Color(0xFFFFFFFF)
-val secondaryContainerLight = Color(0xFFEFE0C8)
-val onSecondaryContainerLight = Color(0xFF241A06)
-val tertiaryLight = Color(0xFF785641)
+val secondaryContainerLight = Color(0xFFDCEEF7)   // 选中胶囊底（= 设计稿 brand-soft）
+val onSecondaryContainerLight = Color(0xFF07374F) // 压在 brand-soft 上的文字，8.2:1
+val tertiaryLight = Color(0xFF5A6B78)
 val onTertiaryLight = Color(0xFFFFFFFF)
-val tertiaryContainerLight = Color(0xFFFFDAC5)
-val onTertiaryContainerLight = Color(0xFF2F1301)
-val errorLight = Color(0xFFA92138)
+val tertiaryContainerLight = Color(0xFFE2E8ED)
+val onTertiaryContainerLight = Color(0xFF16232E)
+val errorLight = Color(0xFFC0283C)
 val onErrorLight = Color(0xFFFFFFFF)
-val errorContainerLight = Color(0xFFFFD7D7)
-val onErrorContainerLight = Color(0xFF3B000A)
-val successLight = Color(0xFF506644)
+val errorContainerLight = Color(0xFFFBDDE2)
+val onErrorContainerLight = Color(0xFF5C0A18)
+val successLight = Color(0xFF157A52)
 val onSuccessLight = Color(0xFFFFFFFF)
-val successContainerLight = Color(0xFFD2ECC4)
-val onSuccessContainerLight = Color(0xFF0E2102)
-val warningLight = Color(0xFF755A03)
+val successContainerLight = Color(0xFFD8F0E5)
+val onSuccessContainerLight = Color(0xFF0A3D28)
+val warningLight = Color(0xFF96610A)
 val onWarningLight = Color(0xFFFFFFFF)
-val warningContainerLight = Color(0xFFFFDF92)
-val onWarningContainerLight = Color(0xFF241A00)
-val dangerLight = Color(0xFFA92138)
+val warningContainerLight = Color(0xFFFBEED3)
+val onWarningContainerLight = Color(0xFF3F2A04)
+val dangerLight = Color(0xFFC0283C)
 val onDangerLight = Color(0xFFFFFFFF)
-val dangerContainerLight = Color(0xFFFFD7D7)
-val onDangerContainerLight = Color(0xFF3B000A)
-val backgroundLight = Color(0xFFFFF8F4)
-val onBackgroundLight = Color(0xFF1F1A17)
-val surfaceLight = Color(0xFFFFF8F4)
-val onSurfaceLight = Color(0xFF1F1A17)
-val surfaceVariantLight = Color(0xFFEDE0D8)
-val onSurfaceVariantLight = Color(0xFF4F443E)
+val dangerContainerLight = Color(0xFFFBDDE2)
+val onDangerContainerLight = Color(0xFF5C0A18)
+val backgroundLight = Color(0xFFF3F6F8)       // 冷调瓷白（原暖米 0xFFFFF8F4）
+val onBackgroundLight = Color(0xFF16232E)
+val surfaceLight = Color(0xFFFFFFFF)
+val onSurfaceLight = Color(0xFF16232E)
+val surfaceVariantLight = Color(0xFFEDF1F4)
+val onSurfaceVariantLight = Color(0xFF5A6B78)
 val surfaceContainerLowestLight = Color(0xFFFFFFFF)
-val surfaceContainerLowLight = Color(0xFFF9F2EE)
-val surfaceContainerLight = Color(0xFFF4ECE8)
-val surfaceContainerHighLight = Color(0xFFEEE6E2)
-val surfaceContainerHighestLight = Color(0xFFE8E1DD)
-val surfaceDimLight = Color(0xFFE0D8D4)
-val surfaceBrightLight = Color(0xFFFFF8F4)
-val surfaceTintLight = Color(0xFF416476)
-val outlineLight = Color(0xFF80746E)
-val outlineVariantLight = Color(0xFFD1C4BC)
-val inverseSurfaceLight = Color(0xFF352F2C)
-val inverseOnSurfaceLight = Color(0xFFF7EFEB)
+val surfaceContainerLowLight = Color(0xFFF8FAFB)
+val surfaceContainerLight = Color(0xFFF3F6F8)
+val surfaceContainerHighLight = Color(0xFFEDF1F4)
+val surfaceContainerHighestLight = Color(0xFFE2E8ED)
+val surfaceDimLight = Color(0xFFDDE4E9)
+val surfaceBrightLight = Color(0xFFFFFFFF)
+val surfaceTintLight = Color(0xFF0B6E9E)
+val outlineLight = Color(0xFF8B99A4)
+val outlineVariantLight = Color(0xFFE2E8ED)   // 卡片发线（1px hairline 承担层级）
+val inverseSurfaceLight = Color(0xFF2A3742)
+val inverseOnSurfaceLight = Color(0xFFEAF2F7)
 val scrimLight = Color(0xFF000000)
 
 // ---------- Dark ----------
-val primaryDark = Color(0xFFA7CDE2)
-val onPrimaryDark = Color(0xFF113545)
-val primaryContainerDark = Color(0xFF294C5D)
-val onPrimaryContainerDark = Color(0xFFC2E9FF)
-val inversePrimaryDark = Color(0xFF416476)
-val secondaryDark = Color(0xFFD3C5AD)
-val onSecondaryDark = Color(0xFF3A2E1B)
-val secondaryContainerDark = Color(0xFF514531)
-val onSecondaryContainerDark = Color(0xFFEFE0C8)
-val tertiaryDark = Color(0xFFE4BDA6)
-val onTertiaryDark = Color(0xFF462814)
-val tertiaryContainerDark = Color(0xFF5E3E2A)
-val onTertiaryContainerDark = Color(0xFFFFDAC5)
-val errorDark = Color(0xFFFFADAF)
-val onErrorDark = Color(0xFF600117)
-val errorContainerDark = Color(0xFF870224)
-val onErrorContainerDark = Color(0xFFFFD7D7)
-val successDark = Color(0xFFB6D0A9)
-val onSuccessDark = Color(0xFF233716)
-val successContainerDark = Color(0xFF394E2D)
-val onSuccessContainerDark = Color(0xFFD2ECC4)
-val warningDark = Color(0xFFE4C36F)
-val onWarningDark = Color(0xFF3E2E01)
-val warningContainerDark = Color(0xFF594402)
-val onWarningContainerDark = Color(0xFFFFDF92)
-val dangerDark = Color(0xFFFFADAF)
-val onDangerDark = Color(0xFF600117)
-val dangerContainerDark = Color(0xFF870224)
-val onDangerContainerDark = Color(0xFFFFD7D7)
-val backgroundDark = Color(0xFF18120E)
-val onBackgroundDark = Color(0xFFEAE0DB)
-val surfaceDark = Color(0xFF18120E)
-val onSurfaceDark = Color(0xFFEAE0DB)
-val surfaceVariantDark = Color(0xFF51433B)
-val onSurfaceVariantDark = Color(0xFFD4C3B9)
-val surfaceContainerLowestDark = Color(0xFF130D09)
-val surfaceContainerLowDark = Color(0xFF211A16)
-val surfaceContainerDark = Color(0xFF251E1A)
-val surfaceContainerHighDark = Color(0xFF2F2824)
-val surfaceContainerHighestDark = Color(0xFF38312D)
-val surfaceDimDark = Color(0xFF18120E)
-val surfaceBrightDark = Color(0xFF3F3733)
-val surfaceTintDark = Color(0xFFA7CDE2)
-val outlineDark = Color(0xFF9D8D84)
-val outlineVariantDark = Color(0xFF51433B)
-val inverseSurfaceDark = Color(0xFFEAE0DB)
-val inverseOnSurfaceDark = Color(0xFF362F2A)
+val primaryDark = Color(0xFF7BC8EE)           // 高明度蓝
+val onPrimaryDark = Color(0xFF06334A)
+val primaryContainerDark = Color(0xFF124F6E)
+val onPrimaryContainerDark = Color(0xFFC7E4F5)
+val inversePrimaryDark = Color(0xFF0B6E9E)
+val secondaryDark = Color(0xFF9FC4D8)
+val onSecondaryDark = Color(0xFF0A2E40)
+val secondaryContainerDark = Color(0xFF1B4558)   // 深色选中胶囊底
+val onSecondaryContainerDark = Color(0xFFC4E6F7)
+val tertiaryDark = Color(0xFF9DADBA)
+val onTertiaryDark = Color(0xFF16232E)
+val tertiaryContainerDark = Color(0xFF27333F)
+val onTertiaryContainerDark = Color(0xFFE7EEF3)
+val errorDark = Color(0xFFF2A0A9)
+val onErrorDark = Color(0xFF4A0010)
+val errorContainerDark = Color(0xFF6E1020)
+val onErrorContainerDark = Color(0xFFFBDDE2)
+val successDark = Color(0xFF7CC9A5)
+val onSuccessDark = Color(0xFF0A2E1E)
+val successContainerDark = Color(0xFF14382A)
+val onSuccessContainerDark = Color(0xFFBDE8D4)
+val warningDark = Color(0xFFE5B760)
+val onWarningDark = Color(0xFF2E1F00)
+val warningContainerDark = Color(0xFF3D2E0C)
+val onWarningContainerDark = Color(0xFFF3DCA8)
+val dangerDark = Color(0xFFF2A0A9)
+val onDangerDark = Color(0xFF4A0010)
+val dangerContainerDark = Color(0xFF4A1220)
+val onDangerContainerDark = Color(0xFFF8D3D8)
+val backgroundDark = Color(0xFF0C1218)
+val onBackgroundDark = Color(0xFFE7EEF3)
+val surfaceDark = Color(0xFF151D26)           // 设计稿注：卡片比底亮 ~6%
+val onSurfaceDark = Color(0xFFE7EEF3)
+val surfaceVariantDark = Color(0xFF1B2631)
+val onSurfaceVariantDark = Color(0xFF9DADBA)
+val surfaceContainerLowestDark = Color(0xFF0A0F14)
+val surfaceContainerLowDark = Color(0xFF10161D)
+val surfaceContainerDark = Color(0xFF151D26)
+val surfaceContainerHighDark = Color(0xFF1B2631)
+val surfaceContainerHighestDark = Color(0xFF27333F)
+val surfaceDimDark = Color(0xFF0C1218)
+val surfaceBrightDark = Color(0xFF2E3B48)
+val surfaceTintDark = Color(0xFF7BC8EE)
+val outlineDark = Color(0xFF5A6B78)
+val outlineVariantDark = Color(0xFF27333F)
+val inverseSurfaceDark = Color(0xFFE7EEF3)
+val inverseOnSurfaceDark = Color(0xFF1B2631)
 val scrimDark = Color(0xFF000000)
 
 // ============================================================
@@ -123,6 +133,7 @@ val scrimDark = Color(0xFF000000)
  * HTML 里的 `backdrop-filter` 在 Compose **没有等价物**：`Modifier.blur()` 模糊的是
  * **这个元素自己**，不是它背后的内容。真正模糊背后需要 `RenderEffect`（**API 31+**），
  * 而本应用 `minSdk = 26` —— 维护者明确要求**顾及其他机型**，所以不用它。
+ * （v1.2.8 的批次 A 只改了下面这几个数值，这条理由不变。）
  *
  * ### 用的是什么
  * 「**半透明底 + 一道高光分隔线**」：视觉上非常接近毛玻璃，代价近零，**全机型一致**。
@@ -136,17 +147,20 @@ val scrimDark = Color(0xFF000000)
  * "看背景运气"。
  */
 object Glass {
-    // v1.1.6：**逐字对齐 HTML 预览的三件套**（此前我只做了"半透明"，漏了边框与投影，
-    // 所以看起来不像玻璃）。HTML 原值：
-    //   --glass:        rgba(255,255,255,.52)   →  52%（我原先用 95%，肉眼几乎看不出差别）
-    //   --glass-border: rgba(255,255,255,.75)   →  那道"玻璃边缘"
-    //   --glass-shadow: 0 8px 32px rgba(44,50,56,.10)  →  让它"浮起来"
-    // 半透明底本身是白，深色下换成深底；边框与投影同理各一套。
-    val surfaceLight = Color(0x85FFF8F4)   // 52% 白（0x85 ≈ 133/255）
-    val surfaceDark = Color(0x85151210)
-    val borderLight = Color(0xBFFFFFFF)    // 75% 白：玻璃边缘高光
-    val borderDark = Color(0x2EFFFFFF)
-    val highlightLight = Color(0x66FFFFFF) // 顶部 1dp 那道更亮的高光（边框之上再强调一次）
+    // v1.2.8（设计稿批次 A）：**从暖调半透明改成冷调**。
+    // 页面底从暖米 0xFFFFF8F4 换成了冷瓷白 0xFFF3F6F8，暖白玻璃压在冷底上会发黄，
+    // 所以设计稿 §1.3 给的是「92% 冷白 + 一道冷调发线」：
+    //   surfaceLight  52% 暖白 0x85FFF8F4 → 92% 冷白 0xEAFFFFFF
+    //   surfaceDark   52% 暖深 0x85151210 → 94% 深底 0xF0151D26
+    //   borderLight   75% 白高光 0xBFFFFFFF → 冷调发线 0xFFE2E8ED
+    //                 （**语义变了**：不再是"玻璃边缘高光"，而是与卡片同款的发线）
+    // borderDark 与两道 highlight 不变：深色下 18% 白边框本来就够淡，
+    // 顶部高光属于光照模拟，与主题色温无关。
+    val surfaceLight = Color(0xEAFFFFFF)   // 92% 冷白（0xEA = 234/255）
+    val surfaceDark = Color(0xF0151D26)    // 94% 深底（0xF0 = 240/255）
+    val borderLight = Color(0xFFE2E8ED)    // 冷调发线（= outlineVariantLight）
+    val borderDark = Color(0x2EFFFFFF)     // 深色边框：不变
+    val highlightLight = Color(0x66FFFFFF) // 顶部高光：不变
     val highlightDark = Color(0x1FFFFFFF)
 
     /** `0 8px 32px rgba(44,50,56,.10)` —— 悬浮感来源；对应 HTML 的垂直偏移 8px。 */

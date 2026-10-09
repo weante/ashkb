@@ -85,7 +85,7 @@ Requirements: JDK 17+, Gradle 8.7, Android SDK 34.
 
 ## Version
 
-Currently `v1.2.7` (versionCode 119). Phases P0–P5 are complete; the app is in self-use validation (dogfooding).
+Currently `v1.2.8` (versionCode 120). Phases P0–P5 are complete; the app is in self-use validation (dogfooding).
 
 ## License
 

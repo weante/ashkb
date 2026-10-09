@@ -3,7 +3,14 @@
 > 本文档面向接手本仓库开发的 AI 会话（TraeWork Code 模式 / TraeCode）或人类工程师。
 > 记录截至 **v1.0.73**（versionCode 78，2026-09-29）的全部工程知识。
 > 应用本身介绍见 `README.md`，版本历史见 `CHANGELOG.md`。
-> **v1.2.7 更新（2026-10-09，先看这条）——批次 14：清扫 OPEN-RISK 六项（R3 / R4 / R5 / R6 / R7 / R8）**：
+> **v1.2.8 更新（2026-10-09，先看这条）——UI 2.0 批次 A：整份换色（冷调瓷白 + 单一临床蓝）**：
+> · **只**动 `ui/theme/Color.kt`（48 个角色 × 浅/深两套全部换成「澄序 CLARITY · ASHKB UI 2.0」设计稿的值）+ `object Glass` 六值（暖调半透明 → 冷调 92%/94% + 冷发线）+ 一处**必修的对比度回归**（`ReminderFullScreenActivity` 的「已服」按钮写死白字压在深色 `error` 上只有 2.02:1 → 改 `onError`）。**没有**动屏幕结构 / 组件 API / domain / data / ViewModel。
+> · 设计稿分四批（①换色 ②换形 ③换件 ④换图）；本版 = ①，是给维护者**装机对比用的最小包**。⚠️ **未提交 GitHub、未发布**——②～④ 待看完效果再定。
+> · 校验脚本 `E:\ASHKB\verify-palette-contrast.ps1`（只读、可复跑）：48 × 2 个角色与设计稿 §1 的表**逐条一致**（0 缺失 / 0 不符 / 0 多余）；18 组文本对**全部 ≥ AA**，最低 **4.85:1**（浅色 `onSurfaceVariant` / `surfaceVariant`）。
+> · 单测 **874 条 / 100 个文件全绿**；detekt 干净、lint 0 error。真机：`adb install -r` 覆盖安装（`versionCode 120`）**数据未丢**，今日 / 健康管理两页**浅色 + 深色截图逐个核对**（`E:\ASHKB\ui2-shots\`）。
+>   ⚠️ **强提醒全屏页的「已服」按钮没有真机截图**（该页只在锁屏升级链走完时出现），依据是 WCAG 复算 2.02:1 → 7.99:1。
+>
+> **v1.2.7 更新（2026-10-09）——批次 14：清扫 OPEN-RISK 六项（R3 / R4 / R5 / R6 / R7 / R8）**：
 > （来源：`NEXT-SESSION.md` 的 R1–R8 高危表；R1 已在 v1.2.2 修复，R2「历史幽灵行」经维护者裁决**不做**。）
 > · **R3 周报「下次复诊日」恒为 null**：`ReportRepository.periodicReport` 用 `checkupRecordDao.between(f, t)` 取下次复诊，
 >   而 `between` 过滤的是 **`date` 列（就诊日）**——「就诊日已过、`next_date` 在将来」的记录全被排除，那栏于是永远空着。
@@ -385,7 +392,8 @@ app/src/main/java/com/ashkb/app/
 
 ## 8. 当前状态与下一步
 
-- **最新版**：**v1.2.7（versionCode 119）· 批次 14「清扫 OPEN-RISK 六项」（R3–R8）**——周报「下次复诊日」改按 `next_date` 查（新增 `upcomingByNextDate`）/ WebDAV 轮换加文件名白名单（`isSafeBackupName`，`%2f` 也拦）/ 备份密钥采纳从 verify 移到 `restore()` 内且兜底错误文案资源化 / `GlobalMessages` 改 `Channel`（无订阅者不丢）/ 级联删除改「事务内删行 → 提交后删字节」（消灭「文件没了行还在」的悬空态）/ 知识卡弹窗改用注入日期（四个调用方）⚠️ **真机验证 0 项**（构建机无设备），静态 + 874 条单测 ✅ **已发布为 GitHub 正式版（Latest）**：`git push` 远端 main = `d8f371b` → 附注标签 `v1.2.7` → `gh api -X POST releases --input rel-v127.json`（`make_latest=true`）→ 资产 `ashkb-1.2.7-release.apk`（5220504 B，sha256 `e09e6990…`）与本地 `Get-FileHash` **逐字节一致**（release id `407916739`）
+- **最新版**：**v1.2.8（versionCode 120）· UI 2.0 批次 A「整份换色」**——`ui/theme/Color.kt` 整表重写（底 `#FFF8F4` 暖米 → `#F3F6F8` 冷瓷白；品牌蓝 `#416476` 钢青 → `#0B6E9E`；深色底 `#18120E` → `#0C1218`；成功/警告/危险三组语义色换设计稿值）+ `object Glass` 六值（52% 暖白 → 92% 冷白、`borderLight` 从白高光改成冷发线 `#E2E8ED`）+ `ReminderFullScreenActivity` 一处硬编码白字改 `onError`（深色下 2.02:1 → 7.99:1）⚠️ **未提交 GitHub、未发布**（装机对比用的最小包；设计稿 ②换形 ③换件 ④换图 待维护者看完效果再定）
+- **上一版**：**v1.2.7（versionCode 119）· 批次 14「清扫 OPEN-RISK 六项」（R3–R8）**——周报「下次复诊日」改按 `next_date` 查（新增 `upcomingByNextDate`）/ WebDAV 轮换加文件名白名单（`isSafeBackupName`，`%2f` 也拦）/ 备份密钥采纳从 verify 移到 `restore()` 内且兜底错误文案资源化 / `GlobalMessages` 改 `Channel`（无订阅者不丢）/ 级联删除改「事务内删行 → 提交后删字节」（消灭「文件没了行还在」的悬空态）/ 知识卡弹窗改用注入日期（四个调用方）⚠️ **真机验证 0 项**（构建机无设备），静态 + 874 条单测 ✅ **已发布为 GitHub 正式版（Latest）**：`git push` 远端 main = `d8f371b` → 附注标签 `v1.2.7` → `gh api -X POST releases --input rel-v127.json`（`make_latest=true`）→ 资产 `ashkb-1.2.7-release.apk`（5220504 B，sha256 `e09e6990…`）与本地 `Get-FileHash` **逐字节一致**（release id `407916739`）
 - **上一版**：**v1.2.6（versionCode 118）· 英文支持第三层**——domain 文案层 105 条（10 个文件改 `@StringRes`）+ 散落 UI 文案 51 条 + **种子内容 72 条**（食谱 / 标签 / 出处 / 筛查项 / 周期模板）+ **语言感知重种**（`SeedLocales`，按内容比对认定「用户没编辑过」）+ 5 类新守卫测试 ✅ **已发布为 GitHub 正式版（Latest）**：release id `407329934`，资产 `ashkb-1.2.6-release.apk`（5219392 B，sha256 `b3455fe8…`）与本地 `Get-FileHash` 逐字节一致
 - **上一版**：**v1.2.5（versionCode 117）· 英文支持第二层**——`values-en` 再加 113 条枚举 + 87 条备份文案，知识库 48 条正文全部译成英文种子，载入闸门纳入语言（版本或语言变化即重灌，个人备注保留）✅ **已发布为 GitHub 正式版**（后由 v1.2.6 取代）：release id `407329822`，资产 `ashkb-1.2.5-release.apk`（5084704 B，sha256 `44e8c464…`，由 `93f41ed` 的 worktree 重建，与当时产物同尺寸）与本地 `Get-FileHash` 逐字节一致
 - **上一版**：**v1.2.4（versionCode 116）· 英文支持（i18n）+ 提醒频次修正 + 补剂每日提醒**——维护者 m00655 一次提了 6 条，全部落地 ✅ **① BASDAI 自评间隔**：原 5 档（7/14/28/56/84 天）→ **每日 / 每周 / 每月** 三档 ✅ 读取时**归一历史存值并写回**，不留隐形旧值 ✅。**② 删「每 8 小时」**：该频次**没有任何药物规则引用**（全仓只有枚举定义 + PDF 文案）✅ 但**枚举必须保留**——删掉会让 `fromKey` 退回 DAILY，把历史「每 8 小时」静默改成「每日」⚠️ → 加 `hidden = true`，**仅当当前值就是它时才显示** ✅ 同时删掉频次标签里的括号提示（`label` 改纯名称；`plain` 字段保留给急救卡）✅。**③ 自定义周期可自定义日期**：`cycleAnchorVisible` 原**只放行注射途径** ⚠️ 于是**口服 + 自定义周期静默等同于每日** ✅ 改为口服也能填周期天数与锚点日期 ✅。**④ 新增「每月 1 次」**：`ScheduleCalc.isMonthlyDay`（按锚点日号数，月末夹到当月最后一天）✅。**⑤ 补剂每日提醒**：新增 `SupplementReminderScheduler` / `SupplementReminderReceiver` / `CHANNEL_SUPPLEMENT`（**刻意与用药通道分开**——合成一个会让用户为了关补剂而不得不连用药一起关）✅ `SupplementSheet` 增时刻输入 ✅。**⑥ 英文支持**：`values-en/strings.xml`（1289 条）+ `locale_config.xml`（**简中为默认**）+ `rememberDateFormatter()` + `README.en.md` + `EnglishStringsParityTest` 对等守卫 ✅。

@@ -4,6 +4,67 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.2.8] — 2026-10-09
+
+**UI 2.0 批次 A：整份换色——从「暖纸底 + 钢青 + 大地色」换成「冷调瓷白 + 单一临床蓝」。** 无库结构变更，可覆盖安装。
+
+这一版是设计稿「**澄序 CLARITY · ASHKB UI 2.0**」（维护者提供，基于 v1.2.7 出具）四批里的**第一批：只换颜色**，目的是先看到一个可装机的最小对比包，再决定后面三批。批次划分来自交接包本身：①换色 ②换形 ③换件 ④换图。
+
+维护者诉求（m01085）：「@ashkb-ui2-clarity.html @ashkb-ui2-handoff.md 如果我想按这个UI设计稿修改APP的UI，你有什么建议吗」
+
+**范围纪律**（照交接包 §5「明确不改动的文件」）：**不动**屏幕结构、组件 API、`domain/`、`data/`、任何 ViewModel、导航图。全版只改 3 个文件。
+
+### 一、`ui/theme/Color.kt`：48 个角色 × 浅/深两套，逐条照设计稿换值
+
+| 角色 | 浅色（旧 → 新） | 深色（旧 → 新） |
+|---|---|---|
+| `primary` | `#416476` 钢青 → `#0B6E9E` 品牌蓝 | `#A7CDE2` → `#7BC8EE` |
+| `primaryContainer` | `#C2E9FF` → `#C7E4F5` | `#294C5D` → `#124F6E` |
+| `secondaryContainer` | `#EFE0C8` 米黄 → `#DCEEF7`（选中胶囊底） | `#514531` → `#1B4558` |
+| `tertiary` | `#785641` 棕 → `#5A6B78` 冷灰 | `#E4BDA6` → `#9DADBA` |
+| `background` | `#FFF8F4` 暖米 → `#F3F6F8` 冷瓷白 | `#18120E` 暖黑 → `#0C1218` |
+| `surface` | `#FFF8F4` → `#FFFFFF` | `#18120E` → `#151D26`（比底亮约 6%） |
+| `outlineVariant` | `#D1C4BC` 暖线 → `#E2E8ED` 冷发线 | `#51433B` → `#27333F` |
+| `success` / `warning` / `danger` | `#506644` / `#755A03` / `#A92138` → `#157A52` / `#96610A` / `#C0283C` | `#B6D0A9` / `#E4C36F` / `#FFADAF` → `#7CC9A5` / `#E5B760` / `#F2A0A9` |
+
+（表里只是差异最大的几行，**48 个角色全部**按设计稿 §1.1 / §1.2 的表逐条改过；`outline`、`inverseSurface`、`scrim`、五档 `surfaceContainer*`、`surfaceDim/Bright/Tint` 同样换值。）
+
+`ui/theme/Tone.kt` 与 `ui/theme/Semantics.kt` **零改动**：六态语义（正常 / 注意 / 警告 / 危险 / 成功 / 中性）与 `ClinicalColors` 结构不变，只换了它们引用的色值 —— 所以「发热 / 漏服 / 相互作用 / 黑框警告 / 级联删除确认」这些安全语义的**判定与文案一个字没动**。
+
+### 二、`object Glass`：暖调半透明 → 冷调
+
+| 成员 | 旧值 | 新值 | 说明 |
+|---|---|---|---|
+| `surfaceLight` | `0x85FFF8F4`（52% 暖白） | `0xEAFFFFFF`（92% 冷白） | 页面底换成冷瓷白后，暖白玻璃压上去会发黄 |
+| `surfaceDark` | `0x85151210`（52% 暖深） | `0xF0151D26`（94% 深底） | 同上 |
+| `borderLight` | `0xBFFFFFFF`（75% 白高光） | `0xFFE2E8ED`（冷发线） | **语义变了**：不再是"玻璃边缘高光"，而是与卡片同款的发线 |
+| `borderDark` / 两道 `highlight*` | — | 不变 | 深色下 18% 白边框本来就够淡，顶部高光属于光照模拟，与色温无关 |
+
+### 三、一处必修的对比度回归（不在设计稿清单里，是核对时发现的）
+
+`ReminderFullScreenActivity.kt` 强提醒全屏页的「已服」按钮把文字写死成 `Color.White`，压在 `colorScheme.error` 上。旧配色浅色 `error` 是深红，白字没问题；**新配色的深色 `error` 是高明度红 `#F2A0A9`，白字只有 2.02:1**（AA 要求 4.5:1，等于锁屏上最关键的那个按钮几乎读不清）。改用 `colorScheme.onError`：深色 `#4A0010` = **7.99:1**，浅色下 `onError` 就是白字（5.82:1）。同时删掉因此不再使用的 `Color` 导入。
+
+### 四、校验（可复跑，只读）
+
+`E:\ASHKB\verify-palette-contrast.ps1` 从 `Color.kt` 里解析全部色值再与设计稿的表逐条比对、并按 WCAG 公式复算每一组前景/背景：
+
+- **48 个角色 × 浅/深两套 = 与设计稿逐条一致**（0 缺失 / 0 不符 / 0 多余）；
+- **18 组文本对全部 ≥ AA**：最低 **4.85:1**（浅色 `onSurfaceVariant` / `surfaceVariant`），深色最低 6.67:1；浅色 `onPrimary`/`primary` = 5.62:1，深色 `onBackground`/`background` = 16.07:1；
+- `object Glass` 的 8 个成员逐一命中设计稿值。
+
+### 五、本版**没有**做的事（避免误读）
+
+- **形**没换：圆角仍是 `small 10 / medium 14 / large 18 / extraLarge 28`（设计稿要 8 / 12 / 16 / 24），`dockCorner` 仍是 20（设计稿要 22），数据字号上限仍是 36sp（设计稿要 40sp）。
+- **件**没换：卡片仍是"表面色阶 + 无边框"，没有加 1dp `outlineVariant` 发线；`NavRow` 没有 42dp 图标瓦片；`TabChips` 仍是品牌渐变的胶囊页签（设计稿要拆成 `SegmentedTabs` + 实心 `FilterChips`）；表单仍是 `OutlinedTextField`（设计稿要凹陷填充，那涉及全仓约 100 个调用点，会单独成批）。
+- **图**没换：`TodayScreen` 的用药卡仍是旧结构，没有改设计稿的 `DoseCard` 时间轨。
+- **启动图标**没换：`res/drawable/ic_launcher_background.xml` 的底色仍是旧钢青 `#416476`（图标资源不在批次 A 的范围里）。
+
+### 六、门禁与真机验证
+
+- `cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug` → **BUILD SUCCESSFUL**（3m14s）；单测 **874 条 / 100 个文件全绿**（本版不改任何逻辑，条数与 v1.2.7 相同），**detekt 干净、lint 0 error**。
+- 中途被 detekt 拦下过一次：`ReminderFullScreenActivity.kt` 那处改动最初的写法超出了 `MaxLineLength`，拆行后通过 —— **本版没有向 detekt 基线添加任何条目**。
+- 装机对比：`adb install -r` 覆盖安装到 Xiaomi 15 Pro（Android 16 / API 36 / 1440×3200），**数据未丢**；浅色 / 深色各截一张 Today 页（对比图与逐项核对见 `HANDOFF-STATUS.md` 的「批次 A」一节）。
+
 ## [v1.2.7] — 2026-10-09
 
 **批次 14：清扫 OPEN-RISK 六项（R3–R8）——把「改法早就写好了、但一直没动」的六处失效一次性收口。** 无库结构变更，可覆盖安装。
