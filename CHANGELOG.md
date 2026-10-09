@@ -14,6 +14,8 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 **范围纪律**（照交接包 §5「明确不改动的文件」）：**不动**屏幕结构、组件 API、`domain/`、`data/`、任何 ViewModel、导航图。全版只改 3 个文件。
 
+**已发布**：GitHub Release `v1.2.8`（release id `408053469`，**Latest**，非预发布），资产 `ashkb-1.2.8-release.apk`（5220504 B，sha256 `ece175f8cf4a3602cc10bad7a8867d944e45727cb4b15db5e6c49819e0064399`，与本地 `Get-FileHash` 逐字节一致）。附注标签 `v1.2.8` 指向 `e4320d8`（已核对远端 `refs/tags/v1.2.8^{}` = 本地 commit）。
+
 ### 一、`ui/theme/Color.kt`：48 个角色 × 浅/深两套，逐条照设计稿换值
 
 | 角色 | 浅色（旧 → 新） | 深色（旧 → 新） |

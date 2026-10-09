@@ -5,7 +5,7 @@
 > 应用本身介绍见 `README.md`，版本历史见 `CHANGELOG.md`。
 > **v1.2.8 更新（2026-10-09，先看这条）——UI 2.0 批次 A：整份换色（冷调瓷白 + 单一临床蓝）**：
 > · **只**动 `ui/theme/Color.kt`（48 个角色 × 浅/深两套全部换成「澄序 CLARITY · ASHKB UI 2.0」设计稿的值）+ `object Glass` 六值（暖调半透明 → 冷调 92%/94% + 冷发线）+ 一处**必修的对比度回归**（`ReminderFullScreenActivity` 的「已服」按钮写死白字压在深色 `error` 上只有 2.02:1 → 改 `onError`）。**没有**动屏幕结构 / 组件 API / domain / data / ViewModel。
-> · 设计稿分四批（①换色 ②换形 ③换件 ④换图）；本版 = ①，是给维护者**装机对比用的最小包**。⚠️ **未提交 GitHub、未发布**——②～④ 待看完效果再定。
+> · 设计稿分四批（①换色 ②换形 ③换件 ④换图）；本版 = ①，是给维护者**装机对比用的最小包**。✅ **已发布**：GitHub Release `v1.2.8`（release id `408053469`，**Latest**），资产 `ashkb-1.2.8-release.apk`（5220504 B，sha256 `ece175f8…`）——②～④ 待看完效果再定。
 > · 校验脚本 `E:\ASHKB\verify-palette-contrast.ps1`（只读、可复跑）：48 × 2 个角色与设计稿 §1 的表**逐条一致**（0 缺失 / 0 不符 / 0 多余）；18 组文本对**全部 ≥ AA**，最低 **4.85:1**（浅色 `onSurfaceVariant` / `surfaceVariant`）。
 > · 单测 **874 条 / 100 个文件全绿**；detekt 干净、lint 0 error。真机：`adb install -r` 覆盖安装（`versionCode 120`）**数据未丢**，今日 / 健康管理两页**浅色 + 深色截图逐个核对**（`E:\ASHKB\ui2-shots\`）。
 >   ⚠️ **强提醒全屏页的「已服」按钮没有真机截图**（该页只在锁屏升级链走完时出现），依据是 WCAG 复算 2.02:1 → 7.99:1。
@@ -392,7 +392,7 @@ app/src/main/java/com/ashkb/app/
 
 ## 8. 当前状态与下一步
 
-- **最新版**：**v1.2.8（versionCode 120）· UI 2.0 批次 A「整份换色」**——`ui/theme/Color.kt` 整表重写（底 `#FFF8F4` 暖米 → `#F3F6F8` 冷瓷白；品牌蓝 `#416476` 钢青 → `#0B6E9E`；深色底 `#18120E` → `#0C1218`；成功/警告/危险三组语义色换设计稿值）+ `object Glass` 六值（52% 暖白 → 92% 冷白、`borderLight` 从白高光改成冷发线 `#E2E8ED`）+ `ReminderFullScreenActivity` 一处硬编码白字改 `onError`（深色下 2.02:1 → 7.99:1）⚠️ **未提交 GitHub、未发布**（装机对比用的最小包；设计稿 ②换形 ③换件 ④换图 待维护者看完效果再定）
+- **最新版**：**v1.2.8（versionCode 120）· UI 2.0 批次 A「整份换色」**——`ui/theme/Color.kt` 整表重写（底 `#FFF8F4` 暖米 → `#F3F6F8` 冷瓷白；品牌蓝 `#416476` 钢青 → `#0B6E9E`；深色底 `#18120E` → `#0C1218`；成功/警告/危险三组语义色换设计稿值）+ `object Glass` 六值（52% 暖白 → 92% 冷白、`borderLight` 从白高光改成冷发线 `#E2E8ED`）+ `ReminderFullScreenActivity` 一处硬编码白字改 `onError`（深色下 2.02:1 → 7.99:1）✅ **已发布为 GitHub 正式版（Latest）**：附注标签 `v1.2.8` → `e4320d8`（远端 `refs/tags/v1.2.8^{}` 已核对）→ `gh api -X POST releases --input rel-v128.json`（`make_latest=true`）→ 资产 `ashkb-1.2.8-release.apk`（5220504 B，sha256 `ece175f8…`）与本地 `Get-FileHash` **逐字节一致**（release id `408053469`，资产 id `625371828`）；真机已装机双主题核对（今日 / 健康管理）
 - **上一版**：**v1.2.7（versionCode 119）· 批次 14「清扫 OPEN-RISK 六项」（R3–R8）**——周报「下次复诊日」改按 `next_date` 查（新增 `upcomingByNextDate`）/ WebDAV 轮换加文件名白名单（`isSafeBackupName`，`%2f` 也拦）/ 备份密钥采纳从 verify 移到 `restore()` 内且兜底错误文案资源化 / `GlobalMessages` 改 `Channel`（无订阅者不丢）/ 级联删除改「事务内删行 → 提交后删字节」（消灭「文件没了行还在」的悬空态）/ 知识卡弹窗改用注入日期（四个调用方）⚠️ **真机验证 0 项**（构建机无设备），静态 + 874 条单测 ✅ **已发布为 GitHub 正式版（Latest）**：`git push` 远端 main = `d8f371b` → 附注标签 `v1.2.7` → `gh api -X POST releases --input rel-v127.json`（`make_latest=true`）→ 资产 `ashkb-1.2.7-release.apk`（5220504 B，sha256 `e09e6990…`）与本地 `Get-FileHash` **逐字节一致**（release id `407916739`）
 - **上一版**：**v1.2.6（versionCode 118）· 英文支持第三层**——domain 文案层 105 条（10 个文件改 `@StringRes`）+ 散落 UI 文案 51 条 + **种子内容 72 条**（食谱 / 标签 / 出处 / 筛查项 / 周期模板）+ **语言感知重种**（`SeedLocales`，按内容比对认定「用户没编辑过」）+ 5 类新守卫测试 ✅ **已发布为 GitHub 正式版（Latest）**：release id `407329934`，资产 `ashkb-1.2.6-release.apk`（5219392 B，sha256 `b3455fe8…`）与本地 `Get-FileHash` 逐字节一致
 - **上一版**：**v1.2.5（versionCode 117）· 英文支持第二层**——`values-en` 再加 113 条枚举 + 87 条备份文案，知识库 48 条正文全部译成英文种子，载入闸门纳入语言（版本或语言变化即重灌，个人备注保留）✅ **已发布为 GitHub 正式版**（后由 v1.2.6 取代）：release id `407329822`，资产 `ashkb-1.2.5-release.apk`（5084704 B，sha256 `44e8c464…`，由 `93f41ed` 的 worktree 重建，与当时产物同尺寸）与本地 `Get-FileHash` 逐字节一致

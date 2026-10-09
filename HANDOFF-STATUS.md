@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」（冷调瓷白 + 单一临床蓝）**；上一版 **v1.2.7（versionCode 119）· 批次 14「清扫 OPEN-RISK 六项」（R3–R8）** 已发布为 GitHub Latest。⚠️ **v1.2.8 未提交 GitHub、未发布**——它是给维护者装机对比用的最小包（只换色），设计稿的 ②换形 / ③换件 / ④换图 待看完效果再定。
+> **时点快照**：截至 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」（冷调瓷白 + 单一临床蓝）**，已发布为 GitHub **Latest**（release id `408053469`）；上一版 **v1.2.7（versionCode 119）· 批次 14「清扫 OPEN-RISK 六项」（R3–R8）**。⚠️ v1.2.8 **只换色**——设计稿的 ②换形 / ③换件 / ④换图 待维护者看完效果再定。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号与测试条数以 `app/build.gradle.kts` 与 `app/build/test-results/testDebugUnitTest/*.xml` 为准。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -11,13 +11,13 @@
 
 | 项 | 结果 |
 |---|---|
-| 工作树 | **本地提交 `e4320d8`**（v1.2.8 + UI 2.0 批次 A：`Color.kt` 整份换色 + 强提醒按钮对比度回归 + 版本号与四份文档），本行更新为紧随其后的指针提交 → 工作树重新干净。⚠️ **尚未推送**：`origin/main` 仍停在 `0ec8109`（v1.2.7 的收尾提交）——这是给维护者看的装机对比包，**看完效果再决定是否推送 / 发布** |
+| 工作树 | 已推送：版本提交 `e4320d8`（v1.2.8 + UI 2.0 批次 A：`Color.kt` 整份换色 + 强提醒按钮对比度回归 + 版本号与四份文档）与指针提交 `e21e4d0` 均在 `origin/main`；附注标签 `v1.2.8` → `e4320d8`（远端 `refs/tags/v1.2.8^{}` 已核对）。发布记录回填（本行所在提交）随后推送 |
 | 全量单测 | **874 条，0 失败 / 0 错误 / 0 跳过**（100 个测试文件）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
 | APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 120 / versionName 1.2.8**（UI 2.0 批次 A 换色 + 批次 14 六项清扫 + 英文支持三层 + 安全链 + 知识库闸门 + 分级释义） |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
-| GitHub 正式版（Latest） | **v1.2.7**（2026-10-09，release id `407916739`，资产 `ashkb-1.2.7-release.apk` 5220504 B，sha256 `e09e6990…`）；上一版 **v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——三条资产摘要与本地 `Get-FileHash` **逐字节一致** |
-| GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 / v1.2.7 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |
+| GitHub 正式版（Latest） | **v1.2.8**（2026-10-09，release id `408053469`，资产 `ashkb-1.2.8-release.apk` 5220504 B，sha256 `ece175f8…`）；上一版 **v1.2.7**（id `407916739`，5220504 B，`e09e6990…`）、**v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——四条资产摘要与本地 `Get-FileHash` **逐字节一致** |
+| GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 / v1.2.7 / v1.2.8 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |
 
 > **最关键的一句话**：真机走查（Xiaomi 15 Pro / Android 16，被测制品 = v1.0.70 发布资产，SHA-256 逐字节一致）已完成：
 > **Android 16 WebDAV 反射回归 / 8 通道 / 电池白名单 / 锁屏紧急卡 / 测试提醒 / 冷启动五 Tab 全部结项**；
@@ -482,4 +482,4 @@ release APK = `ashkb-1.2.8-release.apk`（5220504 B，sha256 `ECE175F8CF4A3602CC
 1. **强提醒全屏页的「已服」按钮没有真机截图**——该页只在**锁屏 / 息屏**且升级链走完（`ReminderScheduler.MAX_ESCALATION = 2`，需 +30 / +60 两跳）时才出现，本轮没有制造这个场景；依据只有 WCAG 复算（2.02:1 → 7.99:1）。
 2. 深色下**卡片比页面底略暗**（`surfaceContainerLowest` `#0A0F14` on `background` `#0C1218`；全仓 **12 处**把 `surfaceContainerLowest` 当"卡片底"用）——**与旧配色同构**（旧 `#130D09` on `#18120E`），**不是本版引入**；设计稿本意是"卡片比底亮"，这条属于**批次 C 的"角色取色"问题**。
 3. 本版**只换色**：形（圆角 `10/14/18/28`、Dock 圆角 20、数据字号上限 36sp）、件（卡片发线 / 42dp 图标瓦片 / 分段控件 / 表单凹陷填充）、图（Today 用药卡时间轨）、**启动图标**（`ic_launcher_background.xml` 仍是旧钢青 `#416476`）全部保持原样 —— 逐条列在 `CHANGELOG.md` 的 v1.2.8「本版没有做的事」。
-4. **未提交 GitHub、未发布**：这是给维护者看效果的对比包（见本文件快照头的 ⚠️）。
+4. **发布事实**：`git push` 远端 main = `e21e4d0` → 附注标签 `v1.2.8` → `e4320d8`（远端 `refs/tags/v1.2.8^{}` 已核对）→ `gh api -X POST releases --input rel-v128.json`（`make_latest=true`）→ 资产 `ashkb-1.2.8-release.apk`（5220504 B，sha256 `ece175f8…`）与本地 `Get-FileHash` **逐字节一致**（release id `408053469`，资产 id `625371828`）。
