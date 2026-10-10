@@ -129,7 +129,10 @@ internal object DrugInteractionKeys {
         "nsaid" to listOf(
             "nsaid", "nsaids", "非甾体抗炎药", "消炎镇痛", "消炎镇痛类",
             "naproxen", "ibuprofen", "diclofenac", "celecoxib", "etoricoxib",
-            "meloxicam", "indomethacin", "acetaminophen",
+            "meloxicam", "indomethacin",
+            // v1.2.9（裁决项 1 = A）：摘除 `acetaminophen`——对乙酰氨基酚不是 NSAID
+            // （中枢作用、无抗炎活性），留在家族里会让「塞来昔布 + 泰诺林」这类组合
+            // 误触发 nsaid 条目、并被 itx-009 的抗炎药计数多算一支。详见 DrugKeyCatalog。
         ),
         // 激素这一条**例外**：它是 ACR 原文里的类目名，除目录里的三种外还有别的糖皮质激素
         // （布地奈德 / 可的松…）。故激素类药物不但容不下 TNF 的具体药——那会让「泼尼松」
@@ -202,9 +205,10 @@ internal object DrugInteractionKeys {
         // 两条都挂在同一个 `drug_a` 上，故匹配层无需改动。
         "glucocorticoid_high_dose" to listOf("prednisone", "methylprednisolone", "dexamethasone"),
         // `nsaid_longterm`（itx-014）：条目语义是「长期 / 高危 NSAID 使用」，同样是强度限定词。
+        // v1.2.9：摘除 `acetaminophen`（不是 NSAID，理由同 `nsaid` 家族）。
         "nsaid_longterm" to listOf(
             "naproxen", "ibuprofen", "diclofenac", "celecoxib",
-            "etoricoxib", "meloxicam", "indomethacin", "acetaminophen",
+            "etoricoxib", "meloxicam", "indomethacin",
         ),
         // `anti_inflammatory_multi`（itx-009）：条目讲「**同时**使用 3–4 种抗炎药」，
         // 没有「另一个具体的药」，只要求药单上的抗炎药 ≥2 种——它是**数量条件**，

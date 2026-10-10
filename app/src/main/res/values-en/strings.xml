@@ -1298,6 +1298,7 @@
     <string name="nutrition_supplement_undo_confirm">Undo today\'s check-in for \"%1$s\"?</string>
     <string name="nutrition_supplement_undo_note">After undoing, today\'s entry for this supplement returns to not logged (whether it was \"taken\" or \"skipped\"); the supplement itself and its history are not affected.</string>
     <string name="enum_med_class_nsaid">NSAIDs (anti-inflammatory)</string>
+    <string name="enum_med_class_analgesic">Analgesic (acetaminophen)</string>
     <string name="enum_med_class_csdmard">Conventional DMARD</string>
     <string name="enum_med_class_biologic">Biologic</string>
     <string name="enum_med_class_jak">JAK inhibitor</string>

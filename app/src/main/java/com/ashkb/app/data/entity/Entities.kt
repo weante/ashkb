@@ -15,9 +15,15 @@ import com.ashkb.app.R
  * V3 裁剪已生效：medication_logs 无 operator / source_cmd_id。
  */
 
-/** 药物大类。v1.2.5（i18n）：展示文案改为字符串资源 `labelRes`（原先硬编码中文）。 */
+/** 药物大类。v1.2.5（i18n）：展示文案改为字符串资源 `labelRes`（原先硬编码中文）。
+ *
+ *  **v1.2.9**：新增 `ANALGESIC`（解热镇痛药）——对乙酰氨基酚（泰诺林/扑热息痛）的
+ *  药理分类**不是** NSAID（中枢作用、无抗炎活性、无胃肠/血小板风险），三方独立结论
+ *  （两份医学报告 + 第三方代码审查旧账 P-08/09/10）。枚举存 name 字符串，无 schema 迁移。
+ */
 enum class MedClass(@StringRes val labelRes: Int) {
     NSAID(R.string.enum_med_class_nsaid),
+    ANALGESIC(R.string.enum_med_class_analgesic),
     CSDMARD(R.string.enum_med_class_csdmard),
     BIOLOGIC(R.string.enum_med_class_biologic),
     JAK(R.string.enum_med_class_jak),

@@ -82,7 +82,11 @@ object DrugKeyCatalog {
         DrugKeyEntry("etoricoxib", "依托考昔", "安康信", MedClass.NSAID),
         DrugKeyEntry("meloxicam", "美洛昔康", "莫比可", MedClass.NSAID),
         DrugKeyEntry("indomethacin", "吲哚美辛", "消炎痛", MedClass.NSAID),
-        DrugKeyEntry("acetaminophen", "对乙酰氨基酚", "泰诺林", MedClass.NSAID, listOf("扑热息痛", "paracetamol")),
+        // v1.2.9（裁决项 1 = A）：对乙酰氨基酚**不是 NSAID**——中枢作用、无抗炎活性、
+        // 无胃肠/血小板风险；两份独立医学报告 + 第三方审查（旧账 P-08/09/10）同此结论。
+        // 若继续归 NSAID：「塞来昔布 + 泰诺林」会误触发 nsaid 家族条目（假阳性），
+        // itx-009 的抗炎药计数也会把它数进去。`DrugInteractionKeys` 的 `nsaid` 家族名单已同步摘除。
+        DrugKeyEntry("acetaminophen", "对乙酰氨基酚", "泰诺林", MedClass.ANALGESIC, listOf("扑热息痛", "paracetamol")),
         // ---- JAK 抑制剂 ----
         DrugKeyEntry("tofacitinib", "托法替布", "尚杰", MedClass.JAK, listOf("xeljanz")),
         DrugKeyEntry("upadacitinib", "乌帕替尼", "瑞福", MedClass.JAK, listOf("rinvoq")),

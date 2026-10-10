@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」（冷调瓷白 + 单一临床蓝）**，已发布为 GitHub **Latest**（release id `408053469`）；上一版 **v1.2.7（versionCode 119）· 批次 14「清扫 OPEN-RISK 六项」（R3–R8）**。⚠️ v1.2.8 **只换色**——设计稿的 ②换形 / ③换件 / ④换图 待维护者看完效果再定。
+> **时点快照**：截至 **v1.2.9（versionCode 121）· 2026-10-10 · 裁决项 1「对乙酰氨基酚改 ANALGESIC」**（本地已提交，未推送未发布）；上一版 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」**，已发布为 GitHub **Latest**（release id `408053469`）。⚠️ v1.2.8 **只换色**——设计稿的 ②换形 / ③换件 / ④换图 待维护者看完效果再定。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号与测试条数以 `app/build.gradle.kts` 与 `app/build/test-results/testDebugUnitTest/*.xml` 为准。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -12,9 +12,10 @@
 | 项 | 结果 |
 |---|---|
 | 工作树 | 已推送：版本提交 `e4320d8`（v1.2.8 + UI 2.0 批次 A：`Color.kt` 整份换色 + 强提醒按钮对比度回归 + 版本号与四份文档）与指针提交 `e21e4d0` 均在 `origin/main`；附注标签 `v1.2.8` → `e4320d8`（远端 `refs/tags/v1.2.8^{}` 已核对）。发布记录回填（本行所在提交）随后推送 |
-| 全量单测 | **874 条，0 失败 / 0 错误 / 0 跳过**（100 个测试文件）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
+| 全量单测 | **876 条，0 失败 / 0 错误 / 0 跳过**（100 个测试文件）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
-| APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 120 / versionName 1.2.8**（UI 2.0 批次 A 换色 + 批次 14 六项清扫 + 英文支持三层 + 安全链 + 知识库闸门 + 分级释义） |
+| APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 120 / versionName 1.2.8**（UI 2.0 批次 A 换色 + 批次 14 六项清扫 + 英文支持三层 + 安全链 + 知识库闸门 + 分级释义）。⚠️ v1.2.9（121）尚未构建 APK |
+| 审查裁决进度 | **裁决项 1 已落地（v1.2.9）**：对乙酰氨基酚 `MedClass.NSAID` → 新增 `MedClass.ANALGESIC`，`DrugInteractionKeys` 的 `nsaid`/`nsaid_longterm` 摘除 acetaminophen，新增 2 条回归（`MedicationInteractionChainTest`）；其余 7 项待裁决 |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
 | GitHub 正式版（Latest） | **v1.2.8**（2026-10-09，release id `408053469`，资产 `ashkb-1.2.8-release.apk` 5220504 B，sha256 `ece175f8…`）；上一版 **v1.2.7**（id `407916739`，5220504 B，`e09e6990…`）、**v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——四条资产摘要与本地 `Get-FileHash` **逐字节一致** |
 | GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 / v1.2.7 / v1.2.8 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |

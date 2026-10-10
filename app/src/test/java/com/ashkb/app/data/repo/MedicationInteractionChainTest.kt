@@ -428,6 +428,56 @@ class MedicationInteractionChainTest {
         )
     }
 
+    /**
+     * **对乙酰氨基酚不是 NSAID**（v1.2.9 · 审查答复裁决项 1 = A，旧账 P-08/09/10）。
+     *
+     * 改前：`DrugKeyCatalog` 把它登记成 `MedClass.NSAID`，且 `DrugInteractionKeys` 的
+     * `nsaid` / `nsaid_longterm` 家族都收它——于是「塞来昔布 + 泰诺林」这种
+     * 「NSAID + 非抗炎镇痛药」的组合会误触发 nsaid 家族条目（假阳性），
+     * itx-009 的抗炎药计数也会把它多算一支。改后：泰诺林单独在药单上不命中任何
+     * nsaid 键条目；「NSAID + 泰诺林」也不比单用 NSAID 多出条目。
+     */
+    @Test
+    fun `对乙酰氨基酚不再算作 NSAID`() {
+        seedItx()
+        val acetaminophen = med("泰诺林", "acetaminophen", MedClass.ANALGESIC)
+        io { db.medicationDao().upsert(acetaminophen) }
+
+        val alone = hitsOf(acetaminophen)
+        assertFalse(
+            "单用泰诺林不该命中任何 nsaid 家族条目（itx-004/009/011/013/014），实际 $alone",
+            alone.intersect(setOf("itx-004", "itx-009", "itx-011", "itx-013", "itx-014")).isNotEmpty(),
+        )
+
+        val celecoxib = med("塞来昔布", "celecoxib", MedClass.NSAID)
+        io { db.medicationDao().upsert(celecoxib) }
+
+        val withCelecoxib = hitsOf(celecoxib)
+        assertFalse(
+            "塞来昔布 + 泰诺林只有一支真 NSAID：不该出现 itx-009（多药叠加），实际 $withCelecoxib",
+            withCelecoxib.contains("itx-009"),
+        )
+        assertFalse(
+            "泰诺林不算长期高危 NSAID：不该出现 itx-014，实际 $withCelecoxib",
+            withCelecoxib.contains("itx-014"),
+        )
+    }
+
+    /** v1.2.9：`MedClass.ANALGESIC` 与键目录对齐——泰诺林的 nameKey/别名都要能落到 acetaminophen。 */
+    @Test
+    fun `泰诺林的别名都解析到 acetaminophen 键`() {
+        for (token in listOf("acetaminophen", "对乙酰氨基酚", "泰诺林", "扑热息痛", "paracetamol")) {
+            assertTrue(
+                "「$token」应当解析出 acetaminophen 键",
+                DrugInteractionKeys.drugOf(token).contains("acetaminophen"),
+            )
+            assertFalse(
+                "「$token」不该再落进 nsaid 家族",
+                DrugInteractionKeys.drugOf(token).contains("nsaid"),
+            )
+        }
+    }
+
     // ------------------------------------------------------------------
     // 旧实现的失效路径（可执行证据，不是注释转述）
     // ------------------------------------------------------------------

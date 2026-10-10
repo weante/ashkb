@@ -1362,6 +1362,7 @@
     <string name="nutrition_supplement_undo_confirm">撤销「%1$s」今天的打卡？</string>
     <string name="nutrition_supplement_undo_note">撤销后今天这条补剂回到未记录状态（无论此前是「已服」还是「跳过」）；补剂本身与其历史记录不受影响。</string>
     <string name="enum_med_class_nsaid">NSAIDs 消炎镇痛</string>
+    <string name="enum_med_class_analgesic">解热镇痛药</string>
     <string name="enum_med_class_csdmard">传统 DMARD</string>
     <string name="enum_med_class_biologic">生物制剂</string>
     <string name="enum_med_class_jak">JAK 抑制剂</string>

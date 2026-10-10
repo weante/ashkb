@@ -4,6 +4,40 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [v1.2.9] — 2026-10-10
+
+**药物分类修正：对乙酰氨基酚（泰诺林/扑热息痛）从 NSAID 改为 `ANALGESIC`（解热镇痛药）。** 审查答复 §4 裁决项 1 = A。无库结构变更（枚举存 name 字符串），可覆盖安装。
+
+维护者裁决（m01794）：「A」
+
+### 一、为什么改
+
+对乙酰氨基酚是**中枢**作用解热镇痛药，**无抗炎活性**、无 NSAID 的胃肠/血小板风险——把它归入 NSAID 在药理学上是错的。此前两份独立医学报告与第三方代码审查（旧账 P-08/09/10）三方同此结论。
+
+错分类的**真实后果**（相互作用检查器的假阳性）：
+
+- 「塞来昔布 + 泰诺林」这种「1 支真 NSAID + 1 支非抗炎镇痛药」的组合会误触发 `nsaid` 家族条目；
+- itx-009（多药叠加，抗炎药 ≥2 种才报）的抗炎药计数会把泰诺林多算一支；
+- itx-014（长期/高危 NSAID 使用）会把泰诺林也算进去。
+
+### 二、改动清单
+
+| 文件 | 改动 |
+|---|---|
+| `data/entity/Entities.kt` | `MedClass` 新增 `ANALGESIC`（`R.string.enum_med_class_analgesic`），置于 NSAID 之后 |
+| `res/values/strings.xml` / `values-en/strings.xml` | 新增 `enum_med_class_analgesic` =「解热镇痛药」/ "Analgesic (acetaminophen)" |
+| `domain/DrugKeyCatalog.kt:85`（原行号） | `acetaminophen` 条目 `MedClass.NSAID` → `MedClass.ANALGESIC`（附裁决理由注释） |
+| `domain/DrugInteractionKeys.kt` | `nsaid` 家族与 `nsaid_longterm` 名单摘除 `acetaminophen`（各附注释）；`DrugKeyCatalog.kt:102` 的【类别】条目不动 |
+| `MedicationInteractionChainTest.kt` | 新增 2 条回归：`对乙酰氨基酚不再算作 NSAID`（单用泰诺林不命中 itx-004/009/011/013/014；塞来昔布+泰诺林不触发 itx-009/014）、`泰诺林的别名都解析到 acetaminophen 键`（5 个别名全落 acetaminophen 且不落 nsaid） |
+
+影响面核对：单药不触发任何规则（泰诺林没有专属 itx 条目），急救卡「不可骤停」标注只看 `EmergencyMeds` 的四类白名单、不受影响；手工录入「泰诺林」的相互作用提示从「误报 nsaid 家族条目」变为「不误报」。
+
+### 三、版本
+
+`versionCode 121` / `versionName 1.2.9`。提交前门禁见 HANDOFF-STATUS.md 批次 A2 节。
+
+---
+
 ## [v1.2.8] — 2026-10-09
 
 **UI 2.0 批次 A：整份换色——从「暖纸底 + 钢青 + 大地色」换成「冷调瓷白 + 单一临床蓝」。** 无库结构变更，可覆盖安装。
