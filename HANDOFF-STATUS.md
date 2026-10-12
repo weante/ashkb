@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.2.9（versionCode 121）· 2026-10-10 · 裁决项 1、2 + 首页补剂卡**（本地已提交，未推送未发布）；上一版 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」**，已发布为 GitHub **Latest**（release id `408053469`）。⚠️ v1.2.8 **只换色**——设计稿的 ②换形 / ③换件 / ④换图 待维护者看完效果再定。
+> **时点快照**：截至 **v1.2.9（versionCode 121）· 2026-10-12 · 裁决项 1、2 + 首页补剂卡**，**已推送并发布为 GitHub Latest**（release id `410782041`）；上一版 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」**（release id `408053469`）。⚠️ v1.2.8 **只换色**——设计稿的 ②换形 / ③换件 / ④换图 待维护者看完效果再定。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号以 `app/build.gradle.kts` 为准（v1.2.9 起**不再把单测条数抄进文档**，见根 `build.gradle.kts` 里 `verifySpecSync` 的注释）。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -11,13 +11,13 @@
 
 | 项 | 结果 |
 |---|---|
-| 工作树 | 已推送：版本提交 `e4320d8`（v1.2.8 + UI 2.0 批次 A：`Color.kt` 整份换色 + 强提醒按钮对比度回归 + 版本号与四份文档）与指针提交 `e21e4d0` 均在 `origin/main`；附注标签 `v1.2.8` → `e4320d8`（远端 `refs/tags/v1.2.8^{}` 已核对）。发布记录回填（本行所在提交）随后推送 |
+| 工作树 | 已推送：`5ecbf33`（v1.2.9 裁决项 1）、`6285d69`（README 审核）、`86e50df`（裁决项 2 + 首页补剂卡）、`c0ee3b1`（补剂卡「不提醒」文案）均在 `origin/main`（`9d5010d..c0ee3b1`）；附注标签 `v1.2.9` → `c0ee3b1`（远端 `refs/tags/v1.2.9^{}` 已核对）。发布记录回填（本行所在提交）随后推送 |
 | 全量单测 | **全绿，0 失败 / 0 错误 / 0 跳过**（约 101 个测试文件；**实际条数以 CI 为准，文档不记数**——v1.2.9 起如此）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
-| APK 版本 | **当前代码 v1.2.9（versionCode 121 / versionName 1.2.9），尚未构建 APK**（裁决项 1、2 + 首页补剂卡已入代码）。已发布的最新 APK 是 **v1.2.8**：release / debug 经 `aapt dump badging` 核对均为 versionCode 120 / versionName 1.2.8 |
+| APK 版本 | **v1.2.9 已构建并发布**：release / debug 经 `aapt dump badging` 核对均为 versionCode 121 / versionName 1.2.9，正式证书 `38ca80a6…d7d`（未回退 debug 签名）。上一版 v1.2.8 为 versionCode 120 / versionName 1.2.8 |
 | 审查裁决进度 | **裁决项 1、2 已落地（v1.2.9）**。① 对乙酰氨基酚 `MedClass.NSAID` → 新增 `MedClass.ANALGESIC`，`DrugInteractionKeys` 的 `nsaid`/`nsaid_longterm` 摘除 acetaminophen，新增 2 条回归（`MedicationInteractionChainTest`）；②「已结算」统一到 `AdherenceCalc.SETTLED_STATUSES` 唯一口径——删掉 `MedicationRepository.doneSlotRefs`、`ReminderReceiver` 改引 `settledSlotRefs`、`TodayItem` 新增 `partial`/`isSettled`、今日页 partial 不再显示成「漏服」也不计入待办，连带按铁律重写 4 条 detekt 复杂度（不进基线）并清掉 2 条签名过期的基线条目。其余 6 项待裁决 |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
-| GitHub 正式版（Latest） | **v1.2.8**（2026-10-09，release id `408053469`，资产 `ashkb-1.2.8-release.apk` 5220504 B，sha256 `ece175f8…`）；上一版 **v1.2.7**（id `407916739`，5220504 B，`e09e6990…`）、**v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——四条资产摘要与本地 `Get-FileHash` **逐字节一致** |
+| GitHub 正式版（Latest） | **v1.2.9**（2026-10-12，release id `410782041`，资产 `ashkb-1.2.9-release.apk` 5224936 B，sha256 `413f82b8…`）；上一版 **v1.2.8**（id `408053469`，5220504 B，`ece175f8…`）、**v1.2.7**（id `407916739`，5220504 B，`e09e6990…`）、**v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——五条资产摘要与本地 `Get-FileHash` **逐字节一致** |
 | GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 / v1.2.7 / v1.2.8 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |
 
 > **最关键的一句话**：真机走查（Xiaomi 15 Pro / Android 16，被测制品 = v1.0.70 发布资产，SHA-256 逐字节一致）已完成：

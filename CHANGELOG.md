@@ -136,6 +136,8 @@ domain/AdherenceCalc.kt:56  val SETTLED_STATUSES: Set<String> = setOf(DONE, PART
 
 `versionCode 121` / `versionName 1.2.9`。提交前门禁见 HANDOFF-STATUS.md 批次 A2 节。
 
+**已发布**：GitHub Release `v1.2.9`（release id `410782041`，**Latest**，非预发布），资产 `ashkb-1.2.9-release.apk`（5224936 B，sha256 `413f82b80afd095b70f46710e28c19e62bc2a90bafa3b7ac0e62f33ba298ce57`，与本地 `Get-FileHash` 逐字节一致）。附注标签 `v1.2.9` 指向 `c0ee3b1`（已核对远端 `refs/tags/v1.2.9^{}` = 本地 commit）。
+
 ### 顺带：`verifySpecSync` 不再校验单测条数
 
 条数是**构建产物**（`app/build/test-results/` 被 `.gitignore` 忽略，`gradle clean` 即消失），抄进人写文档只会造出必然腐烂的副本——历史上 `README` 同页曾并存 114 / 205 两个矛盾数，也长期停在 264 而别处已到 339。该检查整段删除，`verifySpecSync` 从 3 条降为 2 条（①`README.md` 与 `HANDOFF-STATUS.md` 的版本号必须与 `app/build.gradle.kts` 一致；②`ASHKB_DB_VERSION` 必须有对应 schema json），副产品是不再依赖构建产物、可脱离构建独立运行。文档里的条数一律改为「实际条数以 CI 为准」。
