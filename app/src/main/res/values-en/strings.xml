@@ -613,6 +613,7 @@
     <string name="today_supplement_check_in">Taken</string>
     <string name="today_supplement_skip">Skip</string>
     <string name="today_supplement_undo">Undo</string>
+    <string name="today_supplement_no_reminder">No reminder</string>
     <string name="today_tab">Today</string>
     <string name="trend_down_to">Down to</string>
     <string name="trend_flat">Unchanged at</string>

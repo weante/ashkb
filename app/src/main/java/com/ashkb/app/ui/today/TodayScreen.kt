@@ -625,7 +625,7 @@ private fun TodaySupplementCard(vm: TodayViewModel, onOpenWellness: () -> Unit) 
  *
  * 时刻文案直接显示 [SupplementReminderScheduler.parseTimes] 的结果（JSON 数组口径，与提醒
  * 排程同一份解析）——用户设的提醒时刻必须在首页看得见，否则「设了没反应」的困惑依旧存在。
- * 未设时刻时显示「不提醒」而不是留空，让「有没有设」一眼可辨。
+ * 未设时刻时显式显示「不提醒」而不是留空，让「到底设没设」一眼可辨。
  */
 @Composable
 private fun TodaySupplementRow(
@@ -663,9 +663,20 @@ private fun TodaySupplementRow(
     }
 }
 
-/** 行的副标题：`剂量 · 提醒时刻`；剂量为空时只剩时刻，两者都空时给「不提醒」提示。 */
+/**
+ * 行的副标题：`剂量 · 提醒时刻`。
+ *
+ * 时刻为空时显式给 `today_supplement_no_reminder`（「不提醒」），**不留空**——本卡的存在理由就是
+ * 让用户看见自己设的提醒时刻；如果没设与设了都显示成一片空白，用户仍然分不清「我设的没生效」
+ * 和「我根本还没设」。剂量为空是正常情形(自由文本可不填)，此时就只剩时刻。
+ */
+@Composable
 private fun supplementSubtitle(dose: String, times: List<String>): String {
-    val timeText = if (times.isEmpty()) "" else times.joinToString(" / ")
+    val timeText = if (times.isEmpty()) {
+        stringResource(R.string.today_supplement_no_reminder)
+    } else {
+        times.joinToString(" / ")
+    }
     return listOf(dose, timeText).filter { it.isNotBlank() }.joinToString(" · ")
 }
 
