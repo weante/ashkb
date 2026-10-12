@@ -109,7 +109,14 @@ object ScheduleCalc {
         return takeTimesOf(med).map { PlanSlot(it, it, it) }
     }
 
-    /** 该频次 + 该给药途径是否按「周期日」出卡（见 [isCycleDay]）。 */
+    /**
+     * 该频次 + 该给药途径是否按「周期日」出卡（见 [isCycleDay]）。
+     *
+     * **v1.2.10（审查裁决项 3）：本判定刻意不动**，口服 Q2W 仍按每日。
+     * 与之配套的处置在 UI 层：`ui/me/MedEditSections.kt` 的 `routeVisible` 让「每两周」
+     * 只在注射下可选，`MedEditScreen.onPrimary()` 再拦一次提交。理由见 `routeVisible` 的 KDoc。
+     * 存量数据（旧版本允许选出的「口服 + Q2W」）仍按本行口径正常排程，不会被改写。
+     */
     private fun isCycleGatedBy(freq: MedFrequency, route: String): Boolean =
         freq == MedFrequency.CUSTOM || freq == MedFrequency.MONTHLY ||
             (freq == MedFrequency.Q2W && route == "injection")

@@ -117,6 +117,10 @@ fun MedEditScreen(
     val biwError = rememberSaveable { mutableStateOf(false) }
     // v1.1.2（批次 18）：甲氨蝶呤选到非每周频次时的强提示（与 biwError 同款「提交时才亮」的错误位）
     val mtxFrequencyError = rememberSaveable { mutableStateOf(false) }
+    // v1.2.10（审查裁决项 3）：拦「口服 + 每两周」。频次 chips 已按 route 过滤（`routeVisible`），
+    // 但那挡不住「先选注射 + Q2W、再切回口服」——此时 Q2W 作为当前值仍显示（逃生口），
+    // 故提交处必须再拦一次，否则「禁止」只是没画出来而已。
+    val routeFrequencyError = rememberSaveable { mutableStateOf(false) }
     val cycleDays = rememberSaveable { mutableStateOf("14") }
     val food = rememberSaveable { mutableStateOf("any") }
     val prnReason = rememberSaveable { mutableStateOf("") }
@@ -244,6 +248,12 @@ fun MedEditScreen(
                 biwError.value = true
                 return
             }
+            // v1.2.10（审查裁决项 3）：口服不允许「每两周」——见 `routeVisible` 的依据。
+            // 放在 step 1 拦（与 mtxFrequencyError 同款），新增与编辑走的是同一个 onPrimary。
+            if (!routeVisible(frequency.value, route.value)) {
+                routeFrequencyError.value = true
+                return
+            }
             // v1.1.2（批次 18）：甲氨蝶呤的频次只能是每周一次（itx-001 的行为承诺，第四份审查报告 §一）。
             // 放在 step 1 拦，**新增与编辑走的是同一个 onPrimary**——只拦新增会漏掉
             // 「把 weekly 改成 daily」这条更要命的路径。
@@ -342,7 +352,7 @@ fun MedEditScreen(
                 }
                 // 各 section 只收自己那组 state（读点因此落在 section 内）；顺序与拆分前逐字一致
                 MedBasicsSection(name = name, brand = brand, nameKey = nameKey, medClass = medClass)
-                MedRouteDoseSection(route = route, dose = dose)
+                MedRouteDoseSection(route = route, dose = dose, routeError = routeFrequencyError)
                 MedScheduleSection(
                     frequency = frequency,
                     route = route,
@@ -352,6 +362,7 @@ fun MedEditScreen(
                     startDate = startDate,
                     nameKey = nameKey,
                     mtxError = mtxFrequencyError,
+                    routeError = routeFrequencyError,
                 )
                 MedWeekdaySection(frequency = frequency, weekday = weekday, weekday2 = weekday2, biwError = biwError)
                 MedMealSection(route = route, food = food)

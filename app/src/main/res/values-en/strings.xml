@@ -333,6 +333,7 @@
     <string name="med_inj_site_prompt">Choose the injection site for this dose:</string>
     <string name="med_inj_two_days_error">The two injection days must differ (for example Monday / Thursday). Please adjust.</string>
     <string name="med_mtx_frequency_error">Methotrexate is taken only once a week (itx-001: deaths have been reported when it was taken daily by mistake). Please switch to \"Once a week\"; if you really need a different schedule, check with your doctor first.</string>
+    <string name="med_route_frequency_error">\"Every two weeks\" isn\'t available for oral medication — it would be scheduled daily, so the every-other-week interval wouldn\'t happen. Use \"Injection\" for a two-week interval, or pick a daily-style frequency for oral.</string>
     <string name="med_injection_suffix">" · Injection"</string>
     <string name="med_late_note">(more than 30 minutes later than planned)</string>
     <string name="med_manage_title">Medication list</string>

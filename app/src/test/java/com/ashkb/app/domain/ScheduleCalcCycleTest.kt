@@ -112,7 +112,12 @@ class ScheduleCalcCycleTest {
 
     @Test
     fun `口服 每两周 仍按每日出卡`() {
-        // Q2W 保持旧口径：只有注射按周期出卡
+        // Q2W 保持旧口径：只有注射按周期出卡。
+        //
+        // v1.2.10（审查裁决项 3）：本用例**仍然有效且必须继续绿**。裁决的处置是
+        // 「UI 层禁止新选（`ui/me/MedEditSections.kt` 的 `routeVisible` + `MedEditScreen.onPrimary`
+        // 的提交拦截）」，**不是**改这里的语义——存量数据里已经存在的「口服 + Q2W」仍按本用例
+        // 的口径排程，不得因为 UI 禁止了就把它变成不出卡。若有人把这条改红，说明动错了层。
         val m = med(route = "oral", frequency = "Q2W", injCycleDays = 14, startDate = "2026-08-03")
         assertTrue(ScheduleCalc.slotsFor(m, d("2026-08-03")).isNotEmpty())
         assertTrue(ScheduleCalc.slotsFor(m, d("2026-08-04")).isNotEmpty())

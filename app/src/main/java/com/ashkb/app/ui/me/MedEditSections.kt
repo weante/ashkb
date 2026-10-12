@@ -105,6 +105,31 @@ internal fun isCycleFrequency(frequency: MedFrequency): Boolean =
     frequency == MedFrequency.Q2W || frequency == MedFrequency.CUSTOM ||
         frequency == MedFrequency.MONTHLY
 
+/**
+ * 该频次在当前给药途径下是否**可选**（频次 chips 的可见性）。
+ *
+ * v1.2.10（审查裁决项 3）：**口服下不提供「每两周」**。
+ *
+ * 依据是排程侧的真实行为：`domain/ScheduleCalc.kt:113-115`
+ * `isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")`
+ * ——Q2W 只在注射时按周期出卡，**口服 Q2W 走的是「每日」**（该口径被
+ * `app/src/test/java/com/ashkb/app/domain/ScheduleCalcCycleTest.kt:113-119`
+ * 「口服 每两周 仍按每日出卡」钉成预期，本版**不动 domain**）。同时
+ * [cycleAnchorVisible] 对口服 Q2W 也不给周期入口，于是 UI 上无处可填周期天数与锚点日期。
+ *
+ * 合起来是「选了等于没选、还选错了量级」：一个口服 Q2W 的药会**天天出卡**，
+ * 14 天吃 14 剂而不是 7 剂（口服允许一天多个时刻，见 `single = route != "oral"`）。
+ *
+ * 为什么是「UI 禁止」而不是「给口服 Q2W 补周期入口」：后者要改
+ * `ScheduleCalc` 的既有语义与上述已钉住的测试，风险高于收益；
+ * 前者消除认知错位即可，且**只影响新选择**——存量数据仍按旧口径正常显示与排程
+ * （逃生口见 `MedScheduleSection` 里对 `frequency.value` 的保留）。
+ */
+internal fun routeVisible(frequency: MedFrequency, route: String): Boolean {
+    if (frequency == MedFrequency.Q2W && route != "injection") return false
+    return true
+}
+
 // ===== 第一步：基础信息 =====
 
 /**
@@ -199,17 +224,21 @@ internal fun MedBasicsSection(
 internal fun MedRouteDoseSection(
     route: MutableState<String>,
     dose: MutableState<String>,
+    // v1.2.10（审查裁决项 3）：途径一变，`routeFrequencyError` 必须清零——否则「口服 + 每两周」
+    // 亮过红字之后，用户切到注射（此时组合合法）红字还挂着，看起来像还没改好。
+    // 与 `mtxError` / `biwError` 同款：错误位由「用户的下一次操作」复位，而不是靠重新校验。
+    routeError: MutableState<Boolean> = mutableStateOf(false),
 ) {
     Text(stringResource(R.string.med_route), style = MaterialTheme.typography.labelMedium)
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         FilterChip(
             selected = route.value == "oral",
-            onClick = { route.value = "oral" },
+            onClick = { route.value = "oral"; routeError.value = false },
             label = { Text(stringResource(R.string.med_route_oral)) },
         )
         FilterChip(
             selected = route.value == "injection",
-            onClick = { route.value = "injection" },
+            onClick = { route.value = "injection"; routeError.value = false },
             label = { Text(stringResource(R.string.med_route_injection)) },
         )
     }
@@ -241,16 +270,39 @@ internal fun MedScheduleSection(
     // 与 `biwError` 的做法一致（错误要出现在它约束的那几个控件旁边，不是另找一处）。
     nameKey: MutableState<String> = mutableStateOf(""),
     mtxError: MutableState<Boolean> = mutableStateOf(false),
+    // v1.2.10（审查裁决项 3）：与 `mtxError` 同款的「提交时才亮」错误位——拦「口服 + 每两周」。
+    // 它要挡的是 chips 过滤**挡不住**的那条路径：先把途径选成注射、选好 Q2W，再切回口服，
+    // 此时 `frequency.value` 仍是 Q2W。逃生口（保留当前值）让它在 chips 里看得见，
+    // 校验就必须在提交处再拦一次，否则「UI 禁止」只是没显示而已。
+    routeError: MutableState<Boolean> = mutableStateOf(false),
 ) {
     Text(stringResource(R.string.med_frequency), style = MaterialTheme.typography.labelMedium)
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
         // v1.2.4：`hidden` 项（每 8 小时）不再作为新选项出现；但**当前值若是 hidden 项**
         // 仍要显示出来——否则编辑一张历史「每 8 小时」的药单时，频次区会一片空白，
         // 用户看不出它现在是什么，一保存还可能被别的选项顶掉。
-        MedFrequency.entries.filter { !it.hidden || it == frequency.value }.forEach { f ->
+        //
+        // v1.2.10（审查裁决项 3）：频次 chips 再按 route 过滤——**「口服 + 每两周」不再出现**。
+        // 依据：`domain/ScheduleCalc.kt:113-115 isCycleGatedBy` 里 Q2W 只在 `route == "injection"`
+        // 时才按周期出卡，口服 Q2W **仍按每日**；而 `cycleAnchorVisible`（本文件 `:91-95`）对口服
+        // Q2W 也不给周期入口。于是一个「每两周」的口服药，UI 上没有任何地方能填周期、排程侧又天天出卡
+        // ——「14 天 14 剂」而不是 7 剂（口服可一天多时刻，见下面 `single = route != "oral"`），
+        // 认知与量级双双错位。A 方案（UI 禁止）比 B 方案（给口服 Q2W 补周期入口）风险低：
+        // B 要改 `ScheduleCalc` 的既有语义与 `ScheduleCalcCycleTest.kt:113-119` 钉住的预期。
+        //
+        // 与 `hidden` 同一条逃生口：**当前值若是不该出现的项，仍要显示**。存量药单里可能已经
+        // 有「口服 + Q2W」（旧版本允许选），过滤掉会让用户看不出它现在是什么、一保存还可能被顶掉。
+        val visible = MedFrequency.entries.filter { f ->
+            (!f.hidden || f == frequency.value) && (routeVisible(f, route.value) || f == frequency.value)
+        }
+        visible.forEach { f ->
             FilterChip(
                 selected = frequency.value == f,
-                onClick = { frequency.value = f; mtxError.value = false },
+                onClick = {
+                    frequency.value = f
+                    mtxError.value = false
+                    routeError.value = false
+                },
                 label = { Text(stringResource(f.labelRes)) },
             )
         }
@@ -260,6 +312,13 @@ internal fun MedScheduleSection(
     ) {
         Text(
             stringResource(R.string.med_mtx_frequency_error),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+    if (routeError.value && !routeVisible(frequency.value, route.value)) {
+        Text(
+            stringResource(R.string.med_route_frequency_error),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error,
         )

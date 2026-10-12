@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.2.9（versionCode 121）· 2026-10-12 · 裁决项 1、2 + 首页补剂卡**，**已推送并发布为 GitHub Latest**（release id `410782041`）；上一版 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」**（release id `408053469`）。⚠️ v1.2.8 **只换色**——设计稿的 ②换形 / ③换件 / ④换图 待维护者看完效果再定。
+> **时点快照**：截至 **v1.2.9（versionCode 121）· 2026-10-12 · 裁决项 1、2 + 首页补剂卡**，**已推送并发布为 GitHub Latest**（release id `410782041`）；裁决项 3 **已入代码与测试、未发版**（维护者指示「做完先别发」）；上一版 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」**（release id `408053469`）。⚠️ v1.2.8 **只换色**——设计稿的 ②换形 / ③换件 / ④换图 待维护者看完效果再定。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号以 `app/build.gradle.kts` 为准（v1.2.9 起**不再把单测条数抄进文档**，见根 `build.gradle.kts` 里 `verifySpecSync` 的注释）。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -12,10 +12,10 @@
 | 项 | 结果 |
 |---|---|
 | 工作树 | 已推送：`5ecbf33`（v1.2.9 裁决项 1）、`6285d69`（README 审核）、`86e50df`（裁决项 2 + 首页补剂卡）、`c0ee3b1`（补剂卡「不提醒」文案）均在 `origin/main`（`9d5010d..c0ee3b1`）；附注标签 `v1.2.9` → `c0ee3b1`（远端 `refs/tags/v1.2.9^{}` 已核对）。发布记录回填（本行所在提交）随后推送 |
-| 全量单测 | **全绿，0 失败 / 0 错误 / 0 跳过**（约 101 个测试文件；**实际条数以 CI 为准，文档不记数**——v1.2.9 起如此）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
+| 全量单测 | **全绿，0 失败 / 0 错误 / 0 跳过**（约 102 个测试文件；**实际条数以 CI 为准，文档不记数**——v1.2.9 起如此）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
 | APK 版本 | **v1.2.9 已构建并发布**：release / debug 经 `aapt dump badging` 核对均为 versionCode 121 / versionName 1.2.9，正式证书 `38ca80a6…d7d`（未回退 debug 签名）。上一版 v1.2.8 为 versionCode 120 / versionName 1.2.8 |
-| 审查裁决进度 | **裁决项 1、2 已落地（v1.2.9）**。① 对乙酰氨基酚 `MedClass.NSAID` → 新增 `MedClass.ANALGESIC`，`DrugInteractionKeys` 的 `nsaid`/`nsaid_longterm` 摘除 acetaminophen，新增 2 条回归（`MedicationInteractionChainTest`）；②「已结算」统一到 `AdherenceCalc.SETTLED_STATUSES` 唯一口径——删掉 `MedicationRepository.doneSlotRefs`、`ReminderReceiver` 改引 `settledSlotRefs`、`TodayItem` 新增 `partial`/`isSettled`、今日页 partial 不再显示成「漏服」也不计入待办，连带按铁律重写 4 条 detekt 复杂度（不进基线）并清掉 2 条签名过期的基线条目。其余 6 项待裁决 |
+| 审查裁决进度 | **裁决项 1、2 已落地并发布（v1.2.9）；裁决项 3 已落地（未发布）**。① 对乙酰氨基酚 `MedClass.NSAID` → 新增 `MedClass.ANALGESIC`，`DrugInteractionKeys` 的 `nsaid`/`nsaid_longterm` 摘除 acetaminophen，新增 2 条回归（`MedicationInteractionChainTest`）；②「已结算」统一到 `AdherenceCalc.SETTLED_STATUSES` 唯一口径——删掉 `MedicationRepository.doneSlotRefs`、`ReminderReceiver` 改引 `settledSlotRefs`、`TodayItem` 新增 `partial`/`isSettled`、今日页 partial 不再显示成「漏服」也不计入待办，连带按铁律重写 4 条 detekt 复杂度（不进基线）并清掉 2 条签名过期的基线条目；③ **口服不再提供「每两周」**——新增 `ui/me/MedEditSections.kt` 的 `routeVisible`（chips 按 route 过滤 + 保留当前值逃生口）、`MedEditScreen.onPrimary()` 提交拦截 + `med_route_frequency_error` 红字，**domain 层刻意不动**（`ScheduleCalc.isCycleGatedBy` 只加 KDoc），新增 10 条回归（`MedRouteFrequencyGuardTest`）。其余 5 项待裁决 |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
 | GitHub 正式版（Latest） | **v1.2.9**（2026-10-12，release id `410782041`，资产 `ashkb-1.2.9-release.apk` 5224936 B，sha256 `413f82b8…`）；上一版 **v1.2.8**（id `408053469`，5220504 B，`ece175f8…`）、**v1.2.7**（id `407916739`，5220504 B，`e09e6990…`）、**v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——五条资产摘要与本地 `Get-FileHash` **逐字节一致** |
 | GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 / v1.2.7 / v1.2.8 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |
@@ -510,10 +510,36 @@ release APK = `ashkb-1.2.8-release.apk`（5220504 B，sha256 `ECE175F8CF4A3602CC
 
 **回归测试**：`ReminderSchedulerTest.kt` 新增 `` `今日已结算的槽位不再重建升级重查——partial 与 skipped 同理` ``（对三态各跑一遍；先断言未结算时升级闹钟**确实存在**，让「不存在」有判据，再断言结算后 `escAt(1/2, pastBase)` 均不存在且未来 7 天首次提醒数仍为 7——证明结算只影响今日升级重查、不误伤正常排程）。新增 `app/src/test/java/com/ashkb/app/ui/today/TodaySupplementCardWiringTest.kt` **5 条接线守卫**：这个缺陷的本质是「功能存在但首页没有入口」，不是逻辑算错——逻辑错会有别的测试红，入口缺失不会（`TodayViewModel` 一条不动、`SupplementReminderScheduler` 九条全绿，用户照样看不到）。本模块没有 `androidx.compose.ui:ui-test-junit4` 依赖，起不了 `createComposeRule`，故沿用 `SupplementSkipWiringTest` 的源码文本扫描先例；断言不锁实现细节，只守「卡被登记 / 有三个入口 / 写的是补剂不是药品且打卡后重排 / 复用营养页状态口径并展示提醒时刻」。
 
-**⚠️ 未验证清单（如实记录）**：
+**⚠️ 未验证清单（本批已销账，保留原始记录）**：
 
-1. **本批改动全部没有装机**。构建机 `adb devices -l` 与 `adb mdns services` 的在线状态未复测；依据只有编译 + 单测 + detekt + lint + `verifySpecSync`。
-2. 首页补剂卡**需要真机看两件事**：①没设提醒时刻时副标题是否只剩剂量（应显示为不提醒而非留空）；②打卡后当天其余时刻的通知是否真的撤下（`cancelAllFuture` + 重排，v1.2.4 修过一次同类问题）。
-3. 裁决项 2 的用户可见效果（记「部分完成」后首页**不再**显示红色「漏服」、Hero 待办计数**不再** +1、不再被 +30/+60 升级到全屏锁屏）**只用单测覆盖了重排一侧**——`TodayScreen` 的 `medStatusOf`/`isMissed` 分支没有 UI 测试，需要真机记一次「部分完成」核对。
-4. **存量数据**：药单以枚举 name 字符串存库，升级后已保存的泰诺林**仍是旧分类 `NSAID`**（不崩，但仍是旧类），需手动改一次分类。刻意不做自动迁移——「哪一条是泰诺林」只能靠名称猜，猜错会改坏用户的药单。
-5. 本版**未构建 APK、未推送、未发布**（本地提交 `5ecbf33` v1.2.9 裁决项 1、`6285d69` README 审核修正，及其后本批改动）。
+1. ~~本批改动全部没有装机~~ → **已装机验证**：`assembleRelease` → `adb install -r` 覆盖安装成功，`aapt dump badging` = versionCode 121 / versionName 1.2.9，`apksigner verify` 正式证书 `38ca80a6…d7d`（未回退 debug 签名；**注意 debug 包签名与设备上已装的 release 签名不匹配，必须装 release 包**，否则报 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`）。数据未丢。
+2. ~~首页补剂卡需要真机看两件事~~ → **两项均已验**：①今日页显示「维生素 D3 / 4000IU · 07:00」+「已服」+「撤销」——**提醒时刻直接印在首页**（m02219 的核心诉求）；②打卡后 `dumpsys alarm` 里 `SupplementReminderReceiver` 恰好 7 条（10-13 至 10-19 每天 07:00），**今天 10-12 的 07:00 已撤干净**。撤销 / 打卡 / 「管理」跳转三条路径也都点过（截图 `E:\ASHKB\ui2-shots\v129-{today,undo,checkin,manage}.png`）。
+3. ~~裁决项 2 的用户可见效果只用单测覆盖了重排一侧~~ → **维护者已实机确认**（User said (m02832)：「我测试了，记部分完成不再显示红色漏服，这个正常。」）。
+4. **存量数据**（仍开放）：药单以枚举 name 字符串存库，升级后已保存的泰诺林**仍是旧分类 `NSAID`**（不崩，但仍是旧类），需手动改一次分类。刻意不做自动迁移——「哪一条是泰诺林」只能靠名称猜，猜错会改坏用户的药单。
+5. ~~本版未构建 APK、未推送、未发布~~ → **已发布**：GitHub Release `v1.2.9`（release id `410782041`，Latest，非预发布），资产 `ashkb-1.2.9-release.apk` 5224936 B / sha256 `413f82b8…ce57`；提交 `5ecbf33` / `6285d69` / `86e50df` / `c0ee3b1` / `f68350b` 全部在 `origin/main`。
+
+---
+
+### 批次 A3（未发布）：裁决项 3 —— 口服不再提供「每两周」
+
+维护者指示（m02842）：「你先做3，做完先别发」。**无库结构变更，可覆盖安装。**
+
+**缺陷**：`domain/ScheduleCalc.kt:113-115 isCycleGatedBy` 里 Q2W 只在 `route == "injection"` 时按周期出卡，口服 Q2W **走「每日」**；同时 `ui/me/MedEditSections.kt:93 cycleAnchorVisible` 对口服 Q2W 也不给周期入口。于是「口服 + 每两周」在 UI 上无处填周期、排程侧却天天出卡——14 天吃 **14 剂**而不是 7 剂（口服允许一天多时刻），用户以为隔周服、实际每天吃。
+
+**处置**：**A 方案（UI 层禁止）**，`domain` 层刻意不动（B 方案要改 `ScheduleCalc` 语义，而该语义被 `ScheduleCalcCycleTest.kt`「口服 每两周 仍按每日出卡」钉住）。
+
+| 文件 | 改动 |
+|---|---|
+| `ui/me/MedEditSections.kt` | 新增 `internal fun routeVisible(frequency, route)`（口服下 Q2W 不可选）；chips 过滤加它 + 保留 `\|\| f == frequency.value` 逃生口；`MedScheduleSection` / `MedRouteDoseSection` 各加 `routeError` 形参与红字 |
+| `ui/me/MedEditScreen.kt` | 新增 `routeFrequencyError` 状态位；`onPrimary()` 在 step 1 拦 `!routeVisible(frequency.value, route.value)` 并亮 `med_route_frequency_error` |
+| `res/values/strings.xml` + `values-en/strings.xml` | 新增 `med_route_frequency_error`（中英同序，紧跟 `med_mtx_frequency_error`） |
+| `domain/ScheduleCalc.kt` | **只加 KDoc**（`:112-119`），说明本判定刻意不动、配套处置在 UI 层 |
+| `domain/ScheduleCalcCycleTest.kt` | **只加注释**（`:113-119`），说明本用例仍必须绿、被改红说明动错了层 |
+
+**两条防线必须同时存在**：① chips 过滤让「每两周」在口服下不再出现；② 提交拦截——**① 挡不住「先选注射 + Q2W、再切回口服」这条路径**（此时 `frequency.value` 仍是 Q2W），只做 ① 的话禁止只是没画出来而已、照样存得进库。配套的**逃生口** `|| f == frequency.value` 保证编辑存量「口服 + Q2W」时频次区不会一片空白（与 `hidden` 每 8 小时的既有逃生口同理）。
+
+**门禁**：`cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug verifySpecSync` → **EXITCODE=0 / BUILD SUCCESSFUL in 1m25s**，单测 **892 条 / 102 文件全绿**（本批 +10 条 / +1 文件），detekt **0 条**、lint **0 error**。
+
+**回归测试**：新增 `app/src/test/java/com/ashkb/app/ui/me/MedRouteFrequencyGuardTest.kt` **10 条**——6 条纯函数断言（口服不给 Q2W / 注射仍给 / 其余频次两途径都不受影响，防顺手扩大打击面 / v1.2.4 放开给口服的 CUSTOM 与 MONTHLY 不得被一起收回 / Q8H 归 `hidden` 管、本判定不碰 / 未知途径按不提供处理）+ 4 条接线守卫（chips 确实过 `routeVisible` / 逃生口确实在 / `onPrimary` 确实拦提交且亮可见错误 / 改途径或改频次确实清零错误位）。
+
+**⚠️ 未验证清单**：本批**未装机**，依据只有门禁 + 单测。真机需要看三件事：①添加药品时途径选「口服」，频次 chips 里**不应出现「每两周」**；②选「注射」后「每两周」**应出现**；③编辑一张存量的「口服 + 每两周」药单时，频次区**应仍显示当前值**（不被清空），且点「下一步」**应被拦住并显示红字**。

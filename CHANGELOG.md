@@ -4,6 +4,69 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [未发布] — 裁决项 3：口服不再提供「每两周」
+
+**UI 层禁止「口服 + 每两周」。** 无库结构变更，可覆盖安装。**维护者指示（m02842）：「你先做3，做完先别发」——本节已入代码与测试，尚未构建 APK、未发版。**
+
+### 一、缺陷：一个「选了等于没选、还选错量级」的组合
+
+排程侧的真实行为写在 `domain/ScheduleCalc.kt:113-115`：
+
+```kotlin
+isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
+```
+
+**Q2W 只在注射时按周期出卡；口服 Q2W 走的是「每日」。** 同时 `ui/me/MedEditSections.kt` 的
+`cycleAnchorVisible` 对口服 Q2W 也不给周期入口（`:93 MedFrequency.Q2W -> route == "injection"`）。
+
+于是「口服 + 每两周」这个组合：**UI 上没有任何地方能填周期天数与锚点日期，排程侧却天天出卡**。
+量级是错的——一个标着「每两周」的口服药，14 天吃 **14 剂**而不是 7 剂
+（口服允许一天多个时刻，见 `MedScheduleSection` 的 `single = route != "oral"`）。
+用户以为自己在隔周服药，实际每天都在吃。
+
+### 二、为什么是「UI 禁止」而不是「补周期入口」
+
+审查答复 §4 给了三个选项：A. UI 层禁止；B. 给它补周期入口并按周期出卡；C. 保持现状但把口径写进 KDoc。
+
+**取 A**，理由写在 `routeVisible` 的 KDoc 里：B 要改 `ScheduleCalc` 的既有语义，而那条语义被
+`app/src/test/java/com/ashkb/app/domain/ScheduleCalcCycleTest.kt`「口服 每两周 仍按每日出卡」钉成预期行为，
+改它等于同时改动「存量药单怎么排程」，风险高于收益。A 消除认知错位即可。
+
+### 三、改动清单
+
+| 文件 | 改动 |
+|---|---|
+| `ui/me/MedEditSections.kt` | 新增 `internal fun routeVisible(frequency, route): Boolean` —— 口服下 Q2W 不可选；频次 chips 的过滤加上它 |
+| `ui/me/MedEditSections.kt` | `MedScheduleSection` 加 `routeError` 形参 + 红字提示；`MedRouteDoseSection` 加 `routeError`，切途径时清零 |
+| `ui/me/MedEditScreen.kt` | 加 `routeFrequencyError` 状态位；`onPrimary()` 在 step 1 拦 `!routeVisible(...)` 并亮错误 |
+| `res/values/strings.xml` + `values-en/strings.xml` | 新增 `med_route_frequency_error`（中英同序，紧跟 `med_mtx_frequency_error`） |
+| `domain/ScheduleCalc.kt` | **只加 KDoc**，明确本判定刻意不动、配套处置在 UI 层 |
+| `domain/ScheduleCalcCycleTest.kt` | **只加注释**，说明本用例仍必须绿——若被改红说明动错了层 |
+
+### 四、两条必须一起存在的防线
+
+**① chips 过滤**（`routeVisible`）——让「每两周」在口服下不再出现。
+
+**② 提交拦截**（`onPrimary`）——**因为 ① 挡不住一条路径**：先把途径选成注射、选好 Q2W，
+再切回口服，此时 `frequency.value` 仍然是 Q2W。只做 ① 的话，「禁止」只是没画出来而已，照样存得进库。
+
+配套的是**逃生口**：过滤条件里保留 `|| f == frequency.value`。存量药单里可能已经有「口服 + Q2W」
+（旧版本允许选），若只按 `routeVisible` 过滤，编辑它时频次区会**一片空白**——用户看不出它现在是什么，
+一保存还可能被别的选项顶掉。这与 `hidden`（每 8 小时）的既有逃生口是同一个道理。
+
+### 五、回归测试
+
+新增 `app/src/test/java/com/ashkb/app/ui/me/MedRouteFrequencyGuardTest.kt`（**10 条**）：
+
+- 纯函数断言（直接调 `routeVisible`）：口服不给 Q2W / 注射仍给 / **其余频次两种途径下都不受影响**
+  （防止顺手扩大打击面）/ v1.2.4 特意放开给口服的 CUSTOM 与 MONTHLY **不得被一起收回去** /
+  Q8H 的可见性归 `hidden` 管、本判定不碰它 / 未知途径串按「不提供」处理；
+- 接线守卫（源码文本扫描，理由与 `ui/today/TodaySupplementCardWiringTest.kt` 相同——
+  本模块没有 `ui-test-junit4` 依赖，起不了 `createComposeRule`）：chips 确实过了 `routeVisible` /
+  逃生口确实在 / `onPrimary` 确实拦了提交且亮了可见错误 / 改途径或改频次确实清零错误位。
+
+---
+
 ## [v1.2.9] — 2026-10-10
 
 **两件事：①审查裁决项 2（「已结算」口径三处打架）统一；②首页补剂卡——补剂提醒/打卡从二级页搬到今日页。** 无库结构变更（枚举与状态都存字符串），可覆盖安装。
