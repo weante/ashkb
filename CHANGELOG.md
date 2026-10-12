@@ -6,11 +6,17 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 ## [v1.2.9] — 2026-10-10
 
-**药物分类修正：对乙酰氨基酚（泰诺林/扑热息痛）从 NSAID 改为 `ANALGESIC`（解热镇痛药）。** 审查答复 §4 裁决项 1 = A。无库结构变更（枚举存 name 字符串），可覆盖安装。
+**两件事：①审查裁决项 2（「已结算」口径三处打架）统一；②首页补剂卡——补剂提醒/打卡从二级页搬到今日页。** 无库结构变更（枚举与状态都存字符串），可覆盖安装。
 
-维护者裁决（m01794）：「A」
+维护者裁决（m01794）：「A」（裁决项 1）；维护者裁决（m01814）：「A」（裁决项 2）；维护者反馈（m02219）：「设置了补剂用药提示时间，但是在首页总是看不到，需要到营养与骨健康中打卡 / 之前的方案只是提供了提醒时刻」。
 
-### 一、为什么改
+---
+
+### 裁决项 1：对乙酰氨基酚（泰诺林/扑热息痛）从 NSAID 改为 `ANALGESIC`（解热镇痛药）
+
+审查答复 §4 裁决项 1 = A。
+
+#### 一、为什么改
 
 对乙酰氨基酚是**中枢**作用解热镇痛药，**无抗炎活性**、无 NSAID 的胃肠/血小板风险——把它归入 NSAID 在药理学上是错的。此前两份独立医学报告与第三方代码审查（旧账 P-08/09/10）三方同此结论。
 
@@ -20,7 +26,7 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 - itx-009（多药叠加，抗炎药 ≥2 种才报）的抗炎药计数会把泰诺林多算一支；
 - itx-014（长期/高危 NSAID 使用）会把泰诺林也算进去。
 
-### 二、改动清单
+#### 二、改动清单
 
 | 文件 | 改动 |
 |---|---|
@@ -32,9 +38,107 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 影响面核对：单药不触发任何规则（泰诺林没有专属 itx 条目），急救卡「不可骤停」标注只看 `EmergencyMeds` 的四类白名单、不受影响；手工录入「泰诺林」的相互作用提示从「误报 nsaid 家族条目」变为「不误报」。
 
-### 三、版本
+⚠️ **存量数据**：药单以枚举 name 字符串存库，升级后已保存的泰诺林**仍是旧分类 `NSAID`**（不会崩，但仍是旧类）——需要手动改一次分类。选择不动库、不做自动迁移，是因为「哪一条是泰诺林」只能靠名称匹配猜，猜错会改坏用户的药单。
+
+---
+
+### 裁决项 2：「已结算」只有一份定义
+
+审查答复 §4 裁决项 2 = A（HIGH-1 + M10 + §6.3）。
+
+#### 一、缺陷：同一条状态，四处各算各的
+
+`medication_logs.status` 是三态 `done` / `partial` / `skipped`，项目自 v1.0.77 起就定了「**三者都算已结算**」，唯一来源是：
+
+```
+domain/AdherenceCalc.kt:56  val SETTLED_STATUSES: Set<String> = setOf(DONE, PARTIAL, SKIPPED)
+```
+
+但代码里三处各自重算了一遍，口径互相打架：
+
+| 位置 | 改前认哪些 | 后果 |
+|---|---|---|
+| `MedicationRepository.settledSlotRefs` | done + partial + skipped（对） | 补记卡、漏服补发正确 |
+| `MedicationRepository.doneSlotRefs`（4 个重排调用点用） | **只认 done** | 重排把 partial 当没交代（M10） |
+| `reminder/ReminderReceiver.kt:71-75` | **只认 done \|\| skipped** | 到点不认为已结算（HIGH-1） |
+| `ui/today/TodayScreen.kt` 的 `isMissed` + missed 分支 | **无 partial** | 今日页把 partial 显示成红色「漏服」（§6.3） |
+
+叠加起来是一条完整的用户可见缺陷链：**用户记「部分完成」→ 首页显示红色「漏服」+ 漏服处理指引 → Hero 仍把这一剂算进「待办 N」→ 重排把这剂当没交代重建 → 到点后 +30/+60 一路升级到 `MAX_ESCALATION` 全屏锁屏轰炸。** 同一剂药，卡片说「漏服」、补记卡说「已结算」、提醒链说「没交代」——三个结论。
+
+#### 二、为什么选「统一」而不是「给 partial 单独定口径」
+
+不选「把 partial 从已结算里摘出去」：partial 是用户**已经表过态**的状态（「吃了一部分」），依从率、补记卡、历史流三处早就按已结算处理且行为正确；改它会推翻三处正确实现去迁就两处错误的。真正的缺陷是**代码里有四份判据**，不是判据选错了。所以修法是让所有点都引用同一份定义，并把「同义的第二个函数」删掉——留着 `doneSlotRefs` 就是给口径分叉留后门。
+
+#### 三、改动清单
+
+| 文件 | 改动 |
+|---|---|
+| `reminder/ReminderReceiver.kt:71-80` | 内联 `(it.status == DONE \|\| it.status == SKIPPED)` → `it.status in AdherenceCalc.SETTLED_STATUSES`；KDoc 补「partial 也是已结算，漏它会让用户记了部分完成仍被一路升级到全屏锁屏」 |
+| `data/repo/MedicationRepository.kt` | **删掉 `suspend fun doneSlotRefs(date)`**，只留 `settledSlotRefs(date)`（KDoc：保留两个近义函数就是给口径分叉留后门）。`data class TodayItem` 新增 `val partial: Boolean get() = log?.status == AdherenceCalc.PARTIAL` 与 `val isSettled: Boolean get() = done \|\| partial \|\| skipped`（后者是 `SETTLED_STATUSES` 的「按槽位」视图，抽出来让「进不进待办」「算不算漏服」只写一次） |
+| `reminder/ReminderScheduler.kt` | 形参 `doneSlotRefs` → `settledSlotRefs`（现签名 `fun rescheduleAll(context: Context, meds: List<Medication>, settledSlotRefs: Set<String>, now: LocalDateTime = LocalDateTime.now())`）；`if (slotRef(med.id, slot.key) in settledSlotRefs) continue`。**刻意不给默认值**（v1.0.44 N1 教训：给 `emptySet()` 默认值会让开机广播漏传） |
+| 4 个重排调用点 | `AshkbApplication.kt:93`、`reminder/BootReceiver.kt:47`（局部变量 `doneRefs`→`settledRefs`）、`ui/today/TodayViewModel.kt:205`、`ui/me/MeViewModel.kt:71`——全部由 `doneSlotRefs(` 改 `settledSlotRefs(`（位置传参，改名安全） |
+| `ui/today/TodayScreen.kt:181` | `pendingCount = items.count { !it.isSettled && !it.isPrn }`（partial 不再计入待办） |
+| `ui/today/TodayScreen.kt` | `medStatusOf` 在 `item.skipped ->` 之后、`missed ->` 之前插入 `item.partial -> MedStatus(chip = R.string.med_status_partial_short, tone = StatusTone.Warning, icon = Icons.Rounded.HourglassBottom, detail = R.string.med_partial_detail + …)`，`actionable = false`；`isMissed` 首行改 `if (item.isPrn || item.isSettled) return false`；新增 `skipReasonText(item)` 把原先抄了两遍的原因解析收成一处 |
+| `res/values/strings.xml` / `values-en/strings.xml` | 紧随 `med_history_status_skipped` 之后**同序**新增 `med_status_partial_short`（部分 / "Partial"）、`med_partial_detail`（已记为部分完成，不再提醒 / "Recorded as partially taken — no more reminders"）——同序是为过 `EnglishStringsParityTest` |
+
+#### 四、detekt 复杂度重构（连带）
+
+本批在各加一个分支后触发 4 条 detekt，按铁律**改代码、不进基线**：
+
+- `ReminderScheduler.kt:77` `rescheduleAll` CyclomaticComplexMethod complexity 24 + NestedBlockDepth；
+- `TodayScreen.kt:730` `medStatusOf` complexity 16（阈值 15）；
+- `TodayScreen.kt:792` `isMissed` ComplexCondition 4（阈值 4）。
+
+修法：`rescheduleAll` 瘦身为三行调用 `scheduleFirstReminders(…)` / `rescheduleTodayEscalations(…)` / `rescheduleCrossMidnightEscalations(…)`，每个再拆出「单 med / 单槽位」函数并改用 `forEach { … }` + `return`（detekt 的 `NestedBlockDepth` 阈值是 3，三层循环 + 循环体本身就是 4 层）；`TodayScreen` 侧靠上面新增的 `TodayItem.isSettled` 与 `skipReasonText` 降复杂度。同时清掉 `config/detekt/baseline.xml` 里两条**签名已过期**的 `rescheduleAll` 条目（还引用着已改名的 `doneSlotRefs`）。
+
+#### 五、回归测试
+
+`app/src/test/java/com/ashkb/app/reminder/ReminderSchedulerTest.kt` 新增 `` `今日已结算的槽位不再重建升级重查——partial 与 skipped 同理` ``：对 `DONE`/`PARTIAL`/`SKIPPED` 三态各跑一遍，先断言未结算时升级闹钟**确实存在**（让「不存在」有判据），再断言结算后 `escAt(1/2, pastBase)` 均不存在、且未来 7 天首次提醒数不变（`assertEquals(7, times.size)`，证明结算只影响今日升级重查、不误伤正常排程）。
+
+---
+
+### 首页补剂卡
+
+#### 一、缺陷：设了提醒时刻，首页却什么都看不到
+
+维护者原话（m02219）：「设置了补剂用药提示时间，但是在首页总是看不到，需要到营养与骨健康中打卡 / 之前的方案只是提供了提醒时刻」。
+
+改动前补剂只有两个出口：**到点弹一条通知**，以及「健康 → 营养与骨健康」里的档案卡。今日页（用户每天真正打开的那一屏）整屏一个字都不提补剂。于是「我设了提醒时刻」和「首页什么也没有」并存，用户无从确认提醒到底生效没有，打卡还得先进二级页。
+
+#### 二、改动清单
+
+| 文件 | 改动 |
+|---|---|
+| `ui/today/TodayViewModel.kt` | 新增 `val supplements: StateFlow<List<Supplement>>`（`SupplementDao.observeActive()`）与 `val supplementLogsToday: StateFlow<List<SupplementLog>>`（`todayDate.flatMapLatest { supplementLogDao.observeByDate(it) }`）；新增 `checkInSupplement(sup, status)` 与 `undoSupplementCheckIn(sup)`，写入路径与 `WellnessViewModel` **逐字一致**（`supKey = sup.id`、`takenAt` 仅在 DONE 时落），写完调 `SupplementReminderScheduler.cancelAllFuture` + 重排；`private suspend fun rescheduleSupplementReminders()` 整段在 IO 线程（`rescheduleAll` 是「补剂 × 7 天 × 时刻」量级的 AlarmManager binder 调用） |
+| `ui/today/TodayScreen.kt` | 新增 `TodaySupplementCard(vm, onOpenWellness)`（`SectionCard` + 每人一行）、`TodaySupplementRow(name, dose, times, status, onCheckIn, onSkip, onUndo)`、`supplementSubtitle(dose, times)`；`TodayScreen` 新增形参 `onOpenWellness: () -> Unit = {}` |
+| `ui/AppShell.kt` | `TodayScreen(…)` 传入 `onOpenWellness = { nav.navigate(Wellness) }` |
+| `res/values/strings.xml` / `values-en/strings.xml` | 新增 `today_supplement_section`（今日补剂 / "Today's supplements"）、`today_supplement_count`（%1$d 种）、`today_supplement_manage`（管理 / Manage）、`today_supplement_check_in`（已服 / Taken）、`today_supplement_skip`（跳过 / Skip）、`today_supplement_undo`（撤销 / Undo） |
+| `app/src/test/java/com/ashkb/app/ui/today/TodaySupplementCardWiringTest.kt` | **新增 5 条接线守卫**（见下） |
+
+#### 三、几个刻意的取舍
+
+- **数据直读 DAO，不复用根级 `WellnessViewModel`。** 今日页与营养页是两个独立可进入的界面，今日页不该因为「营养页没被创建过」而拿不到数据。重复订阅同一条 Room `Flow` 的成本由 `InvalidationTracker` 摊薄，不新增查询。
+- **不改导航结构**，只在今日页补一张卡。改造面最小，也与既有的「流下沉到卡片自收」约定一致。
+- **状态口径不另写一套**：今日状态判据 = `SupplementLogStatus.loggedToday`，文案/色调 = 它的 `labelRes`/`tone`。营养页与首页必须逐字一致，否则「首页说已服、营养页说跳过」这类漂移迟早出现（`SupplementLogStatus` 的类注释就是为这个而写）。
+- **时刻展示用 `SupplementReminderScheduler.parseTimes`**（JSON 口径，与排程同一份解析）而不是自己 `split(',')`。营养页的 `mergedTimeline` 用的是 CSV 口径——**同库两套解析**是审查 CRITICAL-1 的同源问题，本批不动它，但首页这张卡从一开始就不引入第三套。
+- **没有在用补剂时整卡不渲染**（`return`）。营养页的空态是「这里可以记补剂」的引导；首页是每日打卡主场，对不吃补剂的人挂一张永远空的引导卡，是往每天的必经之路上塞噪音。
+- **时刻没设时显示「不提醒」而不是留空**，让「到底设没设」一眼可辨。
+
+#### 四、为什么补一条「源码文本扫描」测试
+
+这个缺陷的本质是「**功能存在，但首页没有任何入口**」——不是逻辑算错。逻辑错会有别的测试红；入口缺失不会：`TodayViewModel` 一条不动、`SupplementReminderScheduler` 九条全绿，用户照样在首页看不到补剂。所以必须守住接线本身。
+
+本模块**没有** `androidx.compose.ui:ui-test-junit4` 依赖（测试依赖只有 junit / json / robolectric / room-testing），起不了 `createComposeRule`；同款做法的先例是 `ui/wellness/SupplementSkipWiringTest.kt`（其类注释给了完全相同的理由）。断言刻意不锁实现细节（不查函数名、行号、具体控件类型），只守四件事：①今日页确实登记了这张卡；②卡上有打卡/跳过/撤销三个入口；③写入的是**补剂**（`SupplementLog`）不是药品，且打卡后重排补剂提醒；④复用营养页的状态口径、并展示提醒时刻。
+
+---
+
+### 版本
 
 `versionCode 121` / `versionName 1.2.9`。提交前门禁见 HANDOFF-STATUS.md 批次 A2 节。
+
+### 顺带：`verifySpecSync` 不再校验单测条数
+
+条数是**构建产物**（`app/build/test-results/` 被 `.gitignore` 忽略，`gradle clean` 即消失），抄进人写文档只会造出必然腐烂的副本——历史上 `README` 同页曾并存 114 / 205 两个矛盾数，也长期停在 264 而别处已到 339。该检查整段删除，`verifySpecSync` 从 3 条降为 2 条（①`README.md` 与 `HANDOFF-STATUS.md` 的版本号必须与 `app/build.gradle.kts` 一致；②`ASHKB_DB_VERSION` 必须有对应 schema json），副产品是不再依赖构建产物、可脱离构建独立运行。文档里的条数一律改为「实际条数以 CI 为准」。
 
 ---
 

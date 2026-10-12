@@ -601,6 +601,13 @@
     <string name="today_profile_not_built">先完成健康档案建档</string>
     <string name="today_recorded">今日已记录</string>
     <string name="today_supplement_log">补记</string>
+    <!-- v1.2.9：首页补剂卡（维护者反馈 m02219：设了补剂提醒时刻，首页却看不到、要进营养页才能打卡）。 -->
+    <string name="today_supplement_section">今日补剂</string>
+    <string name="today_supplement_count">%1$d 种</string>
+    <string name="today_supplement_manage">管理</string>
+    <string name="today_supplement_check_in">已服</string>
+    <string name="today_supplement_skip">跳过</string>
+    <string name="today_supplement_undo">撤销</string>
     <string name="today_tab">今日</string>
     <string name="trend_down_to">降至</string>
     <string name="trend_flat">持平于</string>
@@ -741,6 +748,11 @@
     <string name="med_history_status_done">已服</string>
     <string name="med_history_status_partial">部分</string>
     <string name="med_history_status_skipped">跳过</string>
+    <!-- v1.2.9（裁决项 2 = A）：今日页的「部分完成」态。此前 partial 没有独立分支，
+         用户记了部分完成却看到红色「漏服」+ 漏服处理指引，还被算进 Hero 待办计数；
+         而补记卡与提醒链早已按「已结算」处理 —— 同一剂药三个结论。 -->
+    <string name="med_status_partial_short">部分</string>
+    <string name="med_partial_detail">已记为部分完成，不再提醒</string>
     <string name="med_history_edit_hint">记错了？点右侧铅笔可修正该条记录</string>
     <string name="med_log_edit_action">修正这条记录</string>
     <string name="med_log_edit_title">修正 %1$s 的记录</string>

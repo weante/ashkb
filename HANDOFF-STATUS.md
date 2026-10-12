@@ -1,8 +1,8 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.2.9（versionCode 121）· 2026-10-10 · 裁决项 1「对乙酰氨基酚改 ANALGESIC」**（本地已提交，未推送未发布）；上一版 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」**，已发布为 GitHub **Latest**（release id `408053469`）。⚠️ v1.2.8 **只换色**——设计稿的 ②换形 / ③换件 / ④换图 待维护者看完效果再定。
+> **时点快照**：截至 **v1.2.9（versionCode 121）· 2026-10-10 · 裁决项 1、2 + 首页补剂卡**（本地已提交，未推送未发布）；上一版 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」**，已发布为 GitHub **Latest**（release id `408053469`）。⚠️ v1.2.8 **只换色**——设计稿的 ②换形 / ③换件 / ④换图 待维护者看完效果再定。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
-> ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号与测试条数以 `app/build.gradle.kts` 与 `app/build/test-results/testDebugUnitTest/*.xml` 为准。
+> ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号以 `app/build.gradle.kts` 为准（v1.2.9 起**不再把单测条数抄进文档**，见根 `build.gradle.kts` 里 `verifySpecSync` 的注释）。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
 
 ---
@@ -12,10 +12,10 @@
 | 项 | 结果 |
 |---|---|
 | 工作树 | 已推送：版本提交 `e4320d8`（v1.2.8 + UI 2.0 批次 A：`Color.kt` 整份换色 + 强提醒按钮对比度回归 + 版本号与四份文档）与指针提交 `e21e4d0` 均在 `origin/main`；附注标签 `v1.2.8` → `e4320d8`（远端 `refs/tags/v1.2.8^{}` 已核对）。发布记录回填（本行所在提交）随后推送 |
-| 全量单测 | **876 条，0 失败 / 0 错误 / 0 跳过**（100 个测试文件）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
+| 全量单测 | **全绿，0 失败 / 0 错误 / 0 跳过**（约 101 个测试文件；**实际条数以 CI 为准，文档不记数**——v1.2.9 起如此）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
-| APK 版本 | release / debug 经 `aapt dump badging` 核对**均为 versionCode 120 / versionName 1.2.8**（UI 2.0 批次 A 换色 + 批次 14 六项清扫 + 英文支持三层 + 安全链 + 知识库闸门 + 分级释义）。⚠️ v1.2.9（121）尚未构建 APK |
-| 审查裁决进度 | **裁决项 1 已落地（v1.2.9）**：对乙酰氨基酚 `MedClass.NSAID` → 新增 `MedClass.ANALGESIC`，`DrugInteractionKeys` 的 `nsaid`/`nsaid_longterm` 摘除 acetaminophen，新增 2 条回归（`MedicationInteractionChainTest`）；其余 7 项待裁决 |
+| APK 版本 | **当前代码 v1.2.9（versionCode 121 / versionName 1.2.9），尚未构建 APK**（裁决项 1、2 + 首页补剂卡已入代码）。已发布的最新 APK 是 **v1.2.8**：release / debug 经 `aapt dump badging` 核对均为 versionCode 120 / versionName 1.2.8 |
+| 审查裁决进度 | **裁决项 1、2 已落地（v1.2.9）**。① 对乙酰氨基酚 `MedClass.NSAID` → 新增 `MedClass.ANALGESIC`，`DrugInteractionKeys` 的 `nsaid`/`nsaid_longterm` 摘除 acetaminophen，新增 2 条回归（`MedicationInteractionChainTest`）；②「已结算」统一到 `AdherenceCalc.SETTLED_STATUSES` 唯一口径——删掉 `MedicationRepository.doneSlotRefs`、`ReminderReceiver` 改引 `settledSlotRefs`、`TodayItem` 新增 `partial`/`isSettled`、今日页 partial 不再显示成「漏服」也不计入待办，连带按铁律重写 4 条 detekt 复杂度（不进基线）并清掉 2 条签名过期的基线条目。其余 6 项待裁决 |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
 | GitHub 正式版（Latest） | **v1.2.8**（2026-10-09，release id `408053469`，资产 `ashkb-1.2.8-release.apk` 5220504 B，sha256 `ece175f8…`）；上一版 **v1.2.7**（id `407916739`，5220504 B，`e09e6990…`）、**v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——四条资产摘要与本地 `Get-FileHash` **逐字节一致** |
 | GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 / v1.2.7 / v1.2.8 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |
@@ -41,7 +41,7 @@
 | v1.0.43 / v1.0.52 | 升级链「取消-重建」修复 / 计划用药时间改时间选择器 | ☑ 已验（历史版本） |
 | v1.0.35 / v1.0.36 | 附件接入 WebDAV 备份（v3 格式）/ 远端校验与补传 | ☑ 已验 |
 
-**规划缺口池已全部结项**（明细见 `HANDOFF.md` §8）：
+**规划缺口池已全部结项**（逐条台账见 `HANDOFF-ARCHIVE.md` §三）：
 
 - **A 类安全**：A1 紧急卡当前用药（v1.0.26）· A2 备份恢复码 v2 信封双密钥槽（v1.0.27）· A3 KDF 决策文档化（不引入 Argon2id，架构已铺路）
 - **B 类功能**：B2 / B3 / B4 / B5 / B7 / B8 / B9 / B10 / B11 / B12 / B13 **全部落地**；**B1 已取消**（用户拍板）
@@ -276,7 +276,8 @@ gh release edit v1.0.70 --prerelease=false --latest
 | # | 操作 | 预期 |
 |---|---|---|
 | 1 | 「我的 → 提醒可靠性自检」 | 第 5 行「闹钟注册（最近一次重排）」显示「尝试注册 N 个 · 无失败」；入口摘要为 
-/5（release 包不可 un-as，台账文件无法脚本读取） |
+/5（release 包不可 
+un-as，台账文件无法脚本读取） |
 | 2 | 复诊页新增疫苗记录 | 「医生确认」默认＝**待确认**；存**活疫苗**后应出现 high 级安全警报（改前永不触发） |
 | 3 | 体征弹层：留空保存 / 填 体温 99 | 保存按钮禁用 + 提示；越界被拦（改前空表单可直接覆盖当天数据） |
 | 4 | 打开备份页（恢复码弹窗 / WebDAV 口令 Sheet） | 该窗口 FLAG_SECURE 生效（dumpsys window 可查），离开后清除 |
@@ -290,17 +291,20 @@ gh release edit v1.0.70 --prerelease=false --latest
 > 「昨天还有 N 剂未记录」补记卡**（写入槽位所属日）；④ PendingDoses 的 startDate 防假阳性。
 > 单测 **527 条全绿**；APK shkb-1.0.74-release.apk（sha256 606f70aa…）。
 
-- 修 v1.0.73 引入的回归：cancelAllFuture 扫 	oday-1 后，昨天跨零点的追问链会被重排清空且不重建 → escheduleAll 新增第 3 步重建「昨天尚未到点的升级重查」
+- 修 v1.0.73 引入的回归：cancelAllFuture 扫 	oday-1 后，昨天跨零点的追问链会被重排清空且不重建 → 
+escheduleAll 新增第 3 步重建「昨天尚未到点的升级重查」
 - 设备现状：versionCode **79** / versionName 1.0.74，APK shkb-1.0.74-release.apk（sha256 9a62e73…）；GitHub Latest 仍是 v1.0.73
 - 待验：今晚 23:55 测试药 → 00:10 打开应用 → 00:25 / 00:55 仍应追问；打卡记录应落在 09-30
 ### 批次 2 完成（v1.0.75，2026-10-01）
 
-- **Room schema 导出并入库**：pp/schemas/com.ashkb.app.data.db.AppDatabase/17.json（90 KB）；AppDatabase 早有 xportSchema = true 却从未配 oom.schemaLocation
+- **Room schema 导出并入库**：pp/schemas/com.ashkb.app.data.db.AppDatabase/17.json（90 KB）；AppDatabase 早有 xportSchema = true 却从未配 
+oom.schemaLocation
 - **迁移链单一来源**：顶层 ASHKB_DB_VERSION + AppDatabase.ALL_MIGRATIONS
 - **两条机器可判检查**：MigrationCoverageTest（4 条，链完整/无缺口/schema 存在/版本一致）、SchemaDriftTest（Robolectric，28 张表 DDL 与导出 schema 逐字一致 + 反向查多余表）
 - **androidTest 源集落地**：首个用例 RealDatabaseSchemaTest（生产工厂 + 真实库文件）；基础设施 runner / room-testing / schemas 挂 assets 均已就位
 - **CI 四道门**：erifySpecSync（版本号与条数四处一致）、schema 漂移（git diff app/schemas）、验签、detekt（312 条历史问题进基线）+ Android Lint
-- **缺正式签名不再静默产包**：ssembleRelease 无 keystore 直接失败，CI 用 ASHKB_ALLOW_DEBUG_SIGNING=1 放行并告警；配套 elease-tooling/verify-release.ps1
+- **缺正式签名不再静默产包**：ssembleRelease 无 keystore 直接失败，CI 用 ASHKB_ALLOW_DEBUG_SIGNING=1 放行并告警；配套 
+elease-tooling/verify-release.ps1
 - **本机绕行**：官方 Maven 不可达 → 用户级 ~/.gradle/init.gradle 指向国内镜像（项目文件保持官方地址）
 - 待办（诚实边界）：历史 16 个版本的 schema 需按 git 历史逐版本导出补录，之后才能真正测试「从旧版本升级」路径
 ### 批次 3b + 批次 4（逻辑部分）完成并发布（v1.0.77，2026-10-01）
@@ -464,9 +468,9 @@ AI 标记：正常；本地参考范围判读：偏高             ← v1.0.78 �
 
 **静态校验**（`E:\ASHKB\verify-palette-contrast.ps1`，只读、可复跑）：**48 × 2 个角色与设计稿表逐条一致**（0 缺失 / 0 不符 / 0 多余）；**18 组文本对全部 ≥ AA**，最低 **4.85:1**（浅色 `onSurfaceVariant` `#5A6B78` on `surfaceVariant` `#EDF1F4`），深色最低 6.67:1，浅色 `onPrimary`/`primary` = 5.62:1。
 
-**门禁**：`cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug` → **BUILD SUCCESSFUL in 3m14s**；单测 **874 条 / 100 个文件全绿**（本版不动逻辑，条数与 v1.2.7 相同），detekt 干净、lint 0 error。
+**门禁**：`cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug` → **BUILD SUCCESSFUL in 3m14s**；单测全绿（约 100 个文件；v1.2.8 当时实测 874 条，**v1.2.9 起文档不再记数**），detekt 干净、lint 0 error。
 中途被 detekt 拦下过一次（`ReminderFullScreenActivity.kt` 改动首版超出 `MaxLineLength`，拆行后通过）；**本版没有向 detekt 基线添加任何条目**。
-构建：`assembleRelease assembleDebug verifySpecSync` → **BUILD SUCCESSFUL in 2m34s**，`verifySpecSync` 通过（"实际单测 874 条，版本 v1.2.8（120）"）。
+构建：`assembleRelease assembleDebug verifySpecSync` → **BUILD SUCCESSFUL in 2m34s**，`verifySpecSync` 通过（"版本 v1.2.8（120）"；当时该任务还校验单测条数，v1.2.9 起已去掉）。
 release APK = `ashkb-1.2.8-release.apk`（5220504 B，sha256 `ECE175F8CF4A3602CC10BAD7A8867D944E45727CB4B15DB5E6C49819E0064399`），`apksigner verify --print-certs` → 正式证书 `38ca80a6…`（**未回退 debug 签名**）。
 
 **真机验证**（Xiaomi 15 Pro / Android 16 / API 36 / 1440×3200，无线调试）：`adb install -r` 覆盖安装 → `versionCode=120 / versionName=1.2.8`，**数据未丢**（知识库 48 条 / 化验 171 项 / 档案 / BASDAI / 症状记录均在）。按 §7 的教训，**改到的界面逐个读屏 + 截双主题图**：
@@ -484,3 +488,32 @@ release APK = `ashkb-1.2.8-release.apk`（5220504 B，sha256 `ECE175F8CF4A3602CC
 2. 深色下**卡片比页面底略暗**（`surfaceContainerLowest` `#0A0F14` on `background` `#0C1218`；全仓 **12 处**把 `surfaceContainerLowest` 当"卡片底"用）——**与旧配色同构**（旧 `#130D09` on `#18120E`），**不是本版引入**；设计稿本意是"卡片比底亮"，这条属于**批次 C 的"角色取色"问题**。
 3. 本版**只换色**：形（圆角 `10/14/18/28`、Dock 圆角 20、数据字号上限 36sp）、件（卡片发线 / 42dp 图标瓦片 / 分段控件 / 表单凹陷填充）、图（Today 用药卡时间轨）、**启动图标**（`ic_launcher_background.xml` 仍是旧钢青 `#416476`）全部保持原样 —— 逐条列在 `CHANGELOG.md` 的 v1.2.8「本版没有做的事」。
 4. **发布事实**：`git push` 远端 main = `e21e4d0` → 附注标签 `v1.2.8` → `e4320d8`（远端 `refs/tags/v1.2.8^{}` 已核对）→ `gh api -X POST releases --input rel-v128.json`（`make_latest=true`）→ 资产 `ashkb-1.2.8-release.apk`（5220504 B，sha256 `ece175f8…`）与本地 `Get-FileHash` **逐字节一致**（release id `408053469`，资产 id `625371828`）。
+
+### 批次 A2（v1.2.9）：裁决项 1、2 收尾 + 首页补剂卡 —— 静态全绿，**真机验证 0 项**
+
+三件事捆在一版：审查裁决项 1（对乙酰氨基酚改 `ANALGESIC`，已先行提交 `5ecbf33`）、审查裁决项 2（「已结算」口径统一，用户 m01814 裁决 = A）、以及维护者报告的新缺陷「补剂提醒在首页看不到」（m02219）。逐项动机与改动清单见 `CHANGELOG.md` 的 v1.2.9 节，此处只记**验证事实**。
+
+**裁决项 2 的核心**：`medication_logs.status` 的三态 done / partial / skipped 自 v1.0.77 起就定「三者都算已结算」，唯一来源 `domain/AdherenceCalc.kt:56 val SETTLED_STATUSES: Set<String> = setOf(DONE, PARTIAL, SKIPPED)`；但 `MedicationRepository.doneSlotRefs`（只认 done）、`ReminderReceiver`（只认 done||skipped）、`TodayScreen.isMissed`（无 partial）各算了一遍。用户可见后果是一条链：记「部分完成」→ 首页显示红色「漏服」+ 漏服指引 → Hero 仍算进「待办 N」→ 重排当没交代重建 → +30/+60 一路升级到 `MAX_ESCALATION` 全屏锁屏轰炸。修法是**统一到唯一口径并删掉 `doneSlotRefs`**，而不是给 partial 另定规则。
+
+**首页补剂卡**：改动前补剂只有「到点弹通知」和「健康 → 营养与骨健康」两个出口，今日页一个字都不提，用户设了提醒时刻也无从确认、打卡要进二级页。今日页新增一张自收流量的卡（`TodaySupplementCard`），数据面在 `TodayViewModel`（不依赖营养页是否被创建过），状态口径复用 `SupplementLogStatus`，时刻展示用 `SupplementReminderScheduler.parseTimes`（与排程同一份解析）。
+
+**门禁**：`cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug` → **BUILD SUCCESSFUL in 2m32s**，单测**全绿 0 失败 / 0 错误**（101 个文件；**条数不落文档**，v1.2.9 起如此），detekt **0 条**、lint **0 error**。`verifySpecSync` → **BUILD SUCCESSFUL**。
+
+**本版按铁律改代码、不进 detekt 基线**，并**删掉**了两条签名已过期的基线条目（`config/detekt/baseline.xml` 里 `rescheduleAll` 的 `CyclomaticComplexMethod` 与 `NestedBlockDepth` 仍引用着已改名的 `doneSlotRefs`）：
+
+| detekt 条目（改前） | 修法 |
+|---|---|
+| `ReminderScheduler.kt:77` `rescheduleAll` CyclomaticComplexMethod 24 + NestedBlockDepth | `rescheduleAll` 瘦身为三行调用（`scheduleFirstReminders` / `rescheduleTodayEscalations` / `rescheduleCrossMidnightEscalations`），每个再拆出「单 med / 单槽位」函数并改用 `forEach { … }` + `return`——detekt 的 `NestedBlockDepth` 阈值是 3，三层循环 + 循环体本身就是 4 层 |
+| `TodayScreen.kt:730` `medStatusOf` complexity 16（阈值 15） | 新增 `TodayItem.isSettled`（`done \|\| partial \|\| skipped`，`SETTLED_STATUSES` 的「按槽位」视图）+ 把抄了两遍的跳因解析收成 `skipReasonText(item)` |
+| `TodayScreen.kt:792` `isMissed` ComplexCondition 4（阈值 4） | 首行改 `if (item.isPrn || item.isSettled) return false` |
+| `TodayViewModel.kt:362` NewLineAtEndOfFile | 文件补末尾换行 |
+
+**回归测试**：`ReminderSchedulerTest.kt` 新增 `` `今日已结算的槽位不再重建升级重查——partial 与 skipped 同理` ``（对三态各跑一遍；先断言未结算时升级闹钟**确实存在**，让「不存在」有判据，再断言结算后 `escAt(1/2, pastBase)` 均不存在且未来 7 天首次提醒数仍为 7——证明结算只影响今日升级重查、不误伤正常排程）。新增 `app/src/test/java/com/ashkb/app/ui/today/TodaySupplementCardWiringTest.kt` **5 条接线守卫**：这个缺陷的本质是「功能存在但首页没有入口」，不是逻辑算错——逻辑错会有别的测试红，入口缺失不会（`TodayViewModel` 一条不动、`SupplementReminderScheduler` 九条全绿，用户照样看不到）。本模块没有 `androidx.compose.ui:ui-test-junit4` 依赖，起不了 `createComposeRule`，故沿用 `SupplementSkipWiringTest` 的源码文本扫描先例；断言不锁实现细节，只守「卡被登记 / 有三个入口 / 写的是补剂不是药品且打卡后重排 / 复用营养页状态口径并展示提醒时刻」。
+
+**⚠️ 未验证清单（如实记录）**：
+
+1. **本批改动全部没有装机**。构建机 `adb devices -l` 与 `adb mdns services` 的在线状态未复测；依据只有编译 + 单测 + detekt + lint + `verifySpecSync`。
+2. 首页补剂卡**需要真机看两件事**：①没设提醒时刻时副标题是否只剩剂量（应显示为不提醒而非留空）；②打卡后当天其余时刻的通知是否真的撤下（`cancelAllFuture` + 重排，v1.2.4 修过一次同类问题）。
+3. 裁决项 2 的用户可见效果（记「部分完成」后首页**不再**显示红色「漏服」、Hero 待办计数**不再** +1、不再被 +30/+60 升级到全屏锁屏）**只用单测覆盖了重排一侧**——`TodayScreen` 的 `medStatusOf`/`isMissed` 分支没有 UI 测试，需要真机记一次「部分完成」核对。
+4. **存量数据**：药单以枚举 name 字符串存库，升级后已保存的泰诺林**仍是旧分类 `NSAID`**（不崩，但仍是旧类），需手动改一次分类。刻意不做自动迁移——「哪一条是泰诺林」只能靠名称猜，猜错会改坏用户的药单。
+5. 本版**未构建 APK、未推送、未发布**（本地提交 `5ecbf33` v1.2.9 裁决项 1、`6285d69` README 审核修正，及其后本批改动）。

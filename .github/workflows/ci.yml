@@ -6,7 +6,8 @@
 #   1. `testDebugUnitTest` —— 含迁移链完整性、schema 导出一致性等新增单测
 #   2. `detekt`            —— 静态分析（基线见 config/detekt/baseline.xml，新问题会失败）
 #   3. `lint`              —— Android Lint（错误即失败）
-#   4. `verifySpecSync`    —— 版本号 / 单测条数在代码与 README、HANDOFF、HANDOFF-STATUS 四处必须一致
+#   4. `verifySpecSync`    —— 版本号在代码与 README、HANDOFF-STATUS 两处文档必须一致
+#                            （HANDOFF.md 自 v1.2.9 起不再记版本号；单测条数不再校验，见 build.gradle.kts）
 #   5. `git diff app/schemas` —— 改了实体就必须提交导出的 schema（否则库结构变更无人评审）
 #   6. 验签               —— 打印签名摘要；配置 ASHKB_EXPECTED_CERT_SHA256 后严格比对
 #
@@ -43,7 +44,7 @@ jobs:
       - name: Build + unit tests + detekt + lint
         run: gradle assembleDebug assembleRelease testDebugUnitTest detekt lint --console=plain
 
-      - name: Spec sync gate (version + test count across docs)
+      - name: Spec sync gate (version + schema across docs)
         run: gradle verifySpecSync --console=plain
 
       - name: Schema drift gate (commit app/schemas when entities change)

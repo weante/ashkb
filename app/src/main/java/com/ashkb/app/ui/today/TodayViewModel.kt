@@ -9,16 +9,20 @@ import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.entity.Alert
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.Profile
+import com.ashkb.app.data.entity.Supplement
+import com.ashkb.app.data.entity.SupplementLog
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.data.repo.MinimalPromptStore
 import com.ashkb.app.data.repo.TodayItem
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.domain.MinimalMode
 import com.ashkb.app.domain.PendingDoses
 import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
+import com.ashkb.app.reminder.SupplementReminderScheduler
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -202,7 +206,9 @@ class TodayViewModel(
         val meds = AppDatabase.get(app).medicationDao().listActive()
         val today = LocalDate.now()
 
-        ReminderScheduler.rescheduleAll(app, meds, repo.doneSlotRefs(today))
+        // v1.2.9（审查答复裁决项 2 = A）：传**已结算**集合（done / partial / skipped）——
+        // 用户记过「部分完成 / 跳过」的槽位不该被重排重建升级重查。
+        ReminderScheduler.rescheduleAll(app, meds, repo.settledSlotRefs(today))
         // v1.0.77（批次 3b）：与提醒同批补物化——打卡 / 跳过 / 顺延之后计划可能变（注射顺延会挪槽位），
         // 窗口里缺的行在这里补齐；已有行由唯一索引 + IGNORE 挡住，重复调用不会重复插入。
         val win = repo.plannedSlotWindow(today)
@@ -251,6 +257,98 @@ class TodayViewModel(
             rescheduleInternal()
             refreshYesterdayPending()
         }
+    }
+
+    // ---- v1.2.9：今日补剂（维护者 m02219 反馈：补剂提醒只能在「营养与骨健康」里打卡） ----
+
+    /**
+     * 在用的补剂档案。
+     *
+     * 维护者原话（m02219）：「设置了补剂用药提示时间，但是在首页总是看不到，需要到营养与骨健康中打卡 /
+     * 之前的方案只是提供了提醒时刻」。
+     *
+     * 数据直接取自 `SupplementDao`（而不是复用根级 `WellnessViewModel`）：今日页与营养页是两个
+     * 独立可进入的界面，今日页不该因为「营养页没被创建过」而拿不到数据；而 `WellnessViewModel`
+     * 的 `supplements` 也只是同一个 DAO 的同名流，重复订阅一条 Room `Flow` 的成本由 Room 的
+     * InvalidationTracker 摊薄，不新增查询。
+     */
+    val supplements: StateFlow<List<Supplement>> =
+        AppDatabase.get(app).supplementDao().observeActive()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** 今日的补剂打卡行（可能同一补剂多行，取最后表态者由 `SupplementLogStatus.loggedToday` 决定）。 */
+    val supplementLogsToday: StateFlow<List<SupplementLog>> =
+        todayDate.flatMapLatest { AppDatabase.get(app).supplementLogDao().observeByDate(it.toString()) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * 今日补剂打卡 / 跳过。
+     *
+     * 写库是同一条路径（`HealthRepository.checkInSupplement`，按「天 × 补剂」幂等），
+     * **必须跟着重排补剂提醒**——补剂打卡按天记，记过当天其余时刻的提醒要立刻撤下，
+     * 否则用户刚打完卡还会被后面几个时刻连着提醒（这正是「打卡了还响」的老坑）。
+     * 重排入口与营养页共用 [SupplementReminderScheduler.rescheduleAll]，参数一致。
+     */
+    fun checkInSupplement(sup: Supplement, status: String) {
+        viewModelScope.launch {
+            healthRepo.checkInSupplement(
+                SupplementLog(
+                    id = "",
+                    date = date.toString(),
+                    recordedAt = nowIso(),
+                    backfill = false,
+                    supId = sup.id,
+                    // 与营养页逐字一致（`WellnessViewModel.checkInSupplement`）：补剂没有通用名键
+                    // 概念，`supKey` 直接落 `sup.id`
+                    supKey = sup.id,
+                    supName = sup.name,
+                    doseSnapshot = sup.dose,
+                    // 打卡不绑定具体时刻（slotKey 恒 NULL，见 SupplementLog 的按天口径）
+                    scheduledTime = null,
+                    slotKey = null,
+                    status = status,
+                    reason = null,
+                    takenAt = if (status == AdherenceCalc.DONE) nowIso() else null,
+                    notes = null,
+                ),
+            )
+            // 撤掉今天该补剂已挂的通知（若有），再整体重排未来 7 天：
+            // 补剂打卡按天记，记过当天其余时刻的提醒要立刻撤下，否则用户刚打完卡还会被
+            // 后面几个时刻连着提醒（v1.2.4 修过的「打卡了还响」）。
+            SupplementReminderScheduler.cancelAllFuture(app, supplements.value, date)
+            rescheduleSupplementReminders()
+        }
+    }
+
+    /** 撤销今日补剂打卡：删掉当天全部行，并把提醒重新排回来。 */
+    fun undoSupplementCheckIn(sup: Supplement) {
+        viewModelScope.launch {
+            val today = date.toString()
+            AppDatabase.get(app).supplementLogDao().byDate(today)
+                .filter { it.supId == sup.id }
+                .forEach { healthRepo.deleteSupplementLog(it.id) }
+            rescheduleSupplementReminders()
+        }
+    }
+
+    /**
+     * 重排补剂提醒（与 `WellnessViewModel.rescheduleSupplementReminders` 同一口径）。
+     *
+     * 整段在 IO 线程：`rescheduleAll` 是「补剂 × 7 天 × 时刻」量级的 AlarmManager binder 调用。
+     */
+    private suspend fun rescheduleSupplementReminders() = withContext(Dispatchers.IO) {
+        runCatching {
+            val db = AppDatabase.get(app)
+            val today = date
+            SupplementReminderScheduler.rescheduleAll(
+                app,
+                db.supplementDao().listActive(),
+                db.supplementLogDao().byDate(today.toString()).mapNotNull { it.supId }.toSet(),
+                today,
+                LocalDateTime.now(),
+            )
+        }
+        Unit
     }
 
     companion object {

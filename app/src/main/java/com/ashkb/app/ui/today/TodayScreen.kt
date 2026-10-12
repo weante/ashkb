@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.AcUnit
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.FitnessCenter
+import androidx.compose.material.icons.rounded.HourglassBottom
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
@@ -66,11 +67,14 @@ import com.ashkb.app.data.entity.InjSite
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.SkipReason
 import com.ashkb.app.data.repo.TodayItem
+import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.MinimalMode
 import com.ashkb.app.domain.MissedDose
 import com.ashkb.app.domain.PendingDoses
 import com.ashkb.app.domain.ResText
 import com.ashkb.app.domain.ScheduleCalc
+import com.ashkb.app.domain.SupplementLogStatus
+import com.ashkb.app.reminder.SupplementReminderScheduler
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.DisclaimerNote
 import com.ashkb.app.ui.components.EmptyState
@@ -145,6 +149,8 @@ fun TodayScreen(
     onMedListNeeded: () -> Unit,
     onOpenSymptom: () -> Unit = {},
     onOpenExercise: () -> Unit = {},
+    /** v1.2.9：首页补剂卡的「管理」入口——跳营养与骨健康（补剂档案的增删改在那里）。 */
+    onOpenWellness: () -> Unit = {},
 ) {
     // ---- 根级仅存的 3 条 Flow（整屏骨架 / 跨 section 胶水 / 列表内容）----
     val profile by vm.profile.collectAsStateWithLifecycle()
@@ -178,7 +184,9 @@ fun TodayScreen(
                 who = profile?.let { "${it.displayName} · ${it.diagnosis}" }
                     ?: stringResource(R.string.today_profile_not_built),
                 // 两个计数只喂这一行：它们随 `items` 变，放根部算等于每次打卡都让整屏跟着重组
-                pendingCount = items.count { !it.done && !it.skipped && !it.isPrn },
+                // v1.2.9（裁决项 2 = A）：`partial` 不再计入待办——用户已记「部分完成」，
+                // 与 done / skipped 同属已结算（`TodayItem.isSettled`），再挂进「待办 N」等于催第二次。
+                pendingCount = items.count { !it.isSettled && !it.isPrn },
                 scheduledCount = items.count { !it.isPrn },
             )
         }
@@ -223,6 +231,11 @@ fun TodayScreen(
                 onMissedGuide = { missedGuideTarget = it },
             ),
         )
+
+        // v1.2.9：今日补剂卡。维护者反馈（m02219）补剂提醒时刻只能在「健康 → 营养与骨健康」
+        // 里打卡，首页看不到任何补剂入口。这里给一张自收流量的卡：数据面在 TodayViewModel
+        // （不依赖营养页是否被创建过），状态文案复用 SupplementLogStatus（与营养页同一套口径）。
+        item { TodaySupplementCard(vm = vm, onOpenWellness = onOpenWellness) }
 
         item { Spacer(Modifier.height(Spacing.xxl)) }
     }
@@ -557,6 +570,106 @@ private fun MedsEmptyCard(profileMissing: Boolean, onMedListNeeded: () -> Unit) 
 }
 
 /**
+ * 首页补剂卡（v1.2.9）。
+ *
+ * 背景——维护者原话（m02219）：「设置了补剂用药提示时间，但是在首页总是看不到，需要到营养与
+ * 骨健康中打卡 / 之前的方案只是提供了提醒时刻」。改动前补剂只有两个出口：到点弹通知、
+ * 以及「健康 → 营养与骨健康」里的档案卡；首页整屏只有一个字都不提补剂，用户设了提醒时刻
+ * 却在首页找不到打卡处，自然会以为没生效。
+ *
+ * 口径与营养页**逐字共用**，不另写一套：
+ *  · 今日状态判据 = [SupplementLogStatus.loggedToday]（同一天多行取 `recordedAt` 最大者）；
+ *  · 状态文案 / 色调 = [SupplementLogStatus.labelRes] / [SupplementLogStatus.tone]；
+ *  · 打卡写入 = `HealthRepository.checkInSupplement`，并按天重排提醒（见 `TodayViewModel`）。
+ *
+ * 自收两条流（`supplements` / `supplementLogsToday`），与首页其余卡片同构：根部不再多收一次，
+ * 打卡引起的重组就只落在本卡内部。
+ *
+ * 空档处理：没有在用补剂时**整卡不渲染**（`return`）。营养页的空态是「这里可以记补剂」的引导，
+ * 而首页是每日打卡主场——对不吃补剂的人挂一张永远空的引导卡，是往每天的必经之路上塞噪音。
+ */
+@Composable
+private fun TodaySupplementCard(vm: TodayViewModel, onOpenWellness: () -> Unit) {
+    val supplements by vm.supplements.collectAsStateWithLifecycle()
+    val logs by vm.supplementLogsToday.collectAsStateWithLifecycle()
+    if (supplements.isEmpty()) return
+
+    SectionCard(
+        title = stringResource(R.string.today_supplement_section),
+        subtitle = stringResource(R.string.today_supplement_count, supplements.size),
+        action = {
+            // 增删改都在营养页的补剂档案里，首页只给打卡与一个「管理」出口
+            TextButton(onClick = onOpenWellness) {
+                Text(stringResource(R.string.today_supplement_manage))
+            }
+        },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            supplements.forEach { sup ->
+                TodaySupplementRow(
+                    name = sup.name,
+                    dose = sup.dose,
+                    times = SupplementReminderScheduler.parseTimes(sup.times),
+                    status = SupplementLogStatus.loggedToday(logs, sup.id),
+                    onCheckIn = { vm.checkInSupplement(sup, AdherenceCalc.DONE) },
+                    onSkip = { vm.checkInSupplement(sup, AdherenceCalc.SKIPPED) },
+                    onUndo = { vm.undoSupplementCheckIn(sup) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 补剂卡里的一行：名称 + 剂量 + 提醒时刻 + 今日状态 / 打卡按钮。
+ *
+ * 时刻文案直接显示 [SupplementReminderScheduler.parseTimes] 的结果（JSON 数组口径，与提醒
+ * 排程同一份解析）——用户设的提醒时刻必须在首页看得见，否则「设了没反应」的困惑依旧存在。
+ * 未设时刻时显示「不提醒」而不是留空，让「有没有设」一眼可辨。
+ */
+@Composable
+private fun TodaySupplementRow(
+    name: String,
+    dose: String,
+    times: List<String>,
+    status: String?,
+    onCheckIn: () -> Unit,
+    onSkip: () -> Unit,
+    onUndo: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchComfort),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = name, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = supplementSubtitle(dose = dose, times = times),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (status == null) {
+            TextButton(onClick = onSkip) { Text(stringResource(R.string.today_supplement_skip)) }
+            Button(onClick = onCheckIn) { Text(stringResource(R.string.today_supplement_check_in)) }
+        } else {
+            StatusChip(
+                text = stringResource(SupplementLogStatus.labelRes(status)),
+                tone = SupplementLogStatus.tone(status),
+            )
+            TextButton(onClick = onUndo) { Text(stringResource(R.string.today_supplement_undo)) }
+        }
+    }
+}
+
+/** 行的副标题：`剂量 · 提醒时刻`；剂量为空时只剩时刻，两者都空时给「不提醒」提示。 */
+private fun supplementSubtitle(dose: String, times: List<String>): String {
+    val timeText = if (times.isEmpty()) "" else times.joinToString(" / ")
+    return listOf(dose, timeText).filter { it.isNotBlank() }.joinToString(" · ")
+}
+
+/**
  * v1.0.65 B12：连续 3 天无核心记录 → 问原因；身体不适 / 住院 → 极简模式。
  *
  * v1.0.87（批次 12）：自己收 `minimalPrompt`，但**语句留在根部**——它不是某个分区的渲染内容，
@@ -744,11 +857,18 @@ private fun medStatusOf(item: TodayItem, missed: Boolean): MedStatus = when {
         chip = stringResource(R.string.med_status_skipped),
         tone = StatusTone.Neutral,
         icon = Icons.Rounded.RemoveCircleOutline,
-        detail = stringResource(R.string.backup_skipped_prefix) + (
-            SkipReason.entries.firstOrNull { it.name.equals(item.log?.reason, true) }
-                ?.let { stringResource(it.labelRes) }
-                ?: item.log?.reason ?: ""
-            ),
+        detail = stringResource(R.string.backup_skipped_prefix) + skipReasonText(item),
+        actionable = false,
+    )
+    // v1.2.9（审查答复裁决项 2 = A）：**部分完成**独立成一态，不再掉进 `missed` 分支。
+    // 此前没有 partial 分支，用户记了「部分完成」看到的是红色「漏服」+ 漏服处理指引，
+    // 而补记卡与提醒链都已按「已结算」处理——同一剂药三个结论。
+    // 文案与历史流水（`MedsScreen` 的 `med_history_status_partial`）同源，避免两种说法。
+    item.partial -> MedStatus(
+        chip = stringResource(R.string.med_status_partial_short),
+        tone = StatusTone.Warning,
+        icon = Icons.Rounded.HourglassBottom,
+        detail = stringResource(R.string.med_partial_detail) + skipReasonText(item),
         actionable = false,
     )
     missed -> MedStatus(
@@ -767,8 +887,28 @@ private fun medStatusOf(item: TodayItem, missed: Boolean): MedStatus = when {
     )
 }
 
+/**
+ * v1.2.9（裁决项 2 = A）：跳过 / 部分完成两种状态都要显示同一个「原因」尾巴
+ * （已服不留原因、部分·跳过必填原因——见 `MedicationRepository` 的修正不变量），
+ * 原先把同一段 `SkipReason` 解析在 `medStatusOf` 里抄了两遍，多一个分支就顶破
+ * detekt 的 `CyclomaticComplexMethod` 阈值，抽成一个私有 @Composable。
+ *
+ * 认不出枚举名时**回退显示原始存库值**（存库键稳定性约定：改了枚举 key 也不能让老记录消失）。
+ */
+@Composable
+private fun skipReasonText(item: TodayItem): String =
+    SkipReason.entries.firstOrNull { it.name.equals(item.log?.reason, true) }
+        ?.let { stringResource(it.labelRes) }
+        ?: item.log?.reason ?: ""
+
 private fun isMissed(item: TodayItem, today: LocalDate): Boolean {
-    if (item.isPrn || item.done || item.skipped) return false
+    // v1.2.9（裁决项 2 = A）：`partial` 已结算，不是漏服。
+    // 此前 `TodayItem` 只有 done / skipped，partial 的剂量会走到下面变成「未记录」，
+    // 再被 missed 分支渲染成红色「漏服」+ 漏服处理指引 ——
+    // 而补记卡与提醒链（ReminderReceiver，已同批改）都按已结算处理，三个子系统三个结论。
+    // 三个状态的合并判据收在 `TodayItem.isSettled` 一处（此前这里写四个条件，
+    // 触发 detekt `ComplexCondition`，且每加一态都要改多处）。
+    if (item.isPrn || item.isSettled) return false
     val t = item.slotTime ?: return false
     // v1.1.1（MEDIUM-4）：判据从「今天 == 系统日期 且 现在时刻 > 计划时刻」改为
     // **「槽位所属日 + 计划时刻」这个瞬间已经过去**——日期只来自入参（VM 的 DateProvider 日期流），

@@ -354,6 +354,8 @@ fun AppShell() {
                     onMedListNeeded = { nav.navigate(MedEdit()) },   // 修：直达表单，不再只切 tab
                     onOpenSymptom = { nav.navigate(Symptom) },
                     onOpenExercise = { nav.navigate(Exercise) },
+                    // v1.2.9：首页补剂卡的「管理」入口 → 补剂档案（增删改都在营养页）
+                    onOpenWellness = { nav.navigate(Wellness) },
                 )
             }
             composable<Health> {

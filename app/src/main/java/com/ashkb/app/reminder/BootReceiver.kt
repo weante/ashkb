@@ -44,8 +44,10 @@ class BootReceiver : BroadcastReceiver() {
                 // 此前漏传 → 重启发生在「已打卡槽位的 +30/+60 未到点」窗口内时，会给已服药的
                 // 槽位重建升级重查，用户明明吃过药却收到「未服药」提醒。
                 val repo = MedicationRepository(context)
-                val doneRefs = repo.doneSlotRefs(LocalDate.now())
-                ReminderScheduler.rescheduleAll(context, meds, doneRefs)
+                // v1.2.9（裁决项 2 = A）：集合取「已结算」（done / partial / skipped），
+                // 不再只认 done——否则开机重排会把用户记过「部分完成」的槽位重新排上 +30 / +60。
+                val settledRefs = repo.settledSlotRefs(LocalDate.now())
+                ReminderScheduler.rescheduleAll(context, meds, settledRefs)
 
                 // v1.0.77（批次 3b）：与启动路径对称——开机也要物化计划槽位快照，
                 // 否则重启后当天（乃至昨天）的计划口径完成度与漏服补发都无据可依。

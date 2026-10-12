@@ -68,7 +68,9 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val list = com.ashkb.app.data.db.AppDatabase.get(context).medicationDao().listActive()
             val today = LocalDate.now()
-            ReminderScheduler.rescheduleAll(context, list, repo.doneSlotRefs(today))
+            // v1.2.9（审查答复裁决项 2 = A）：传**已结算**集合（done / partial / skipped）——
+            // 用户记过「部分完成 / 跳过」的槽位不该被重排重建升级重查。
+            ReminderScheduler.rescheduleAll(context, list, repo.settledSlotRefs(today))
             // v1.0.77（批次 3b）：与提醒同批物化计划槽位快照。改药单（改时刻 / 换频次 / 新增）与
             // 停药都走这里，新的计划从今天起就能被计划口径的完成度看见（停药时另有清理，见 repo）。
             val win = repo.plannedSlotWindow(today)

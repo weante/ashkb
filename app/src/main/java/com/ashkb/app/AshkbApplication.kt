@@ -90,7 +90,9 @@ class AshkbApplication : Application() {
                 val db = AppDatabase.get(this@AshkbApplication)
                 val meds = db.medicationDao().observeActive().first()
                 ReminderScheduler.rescheduleAll(
-                    this@AshkbApplication, meds, medicationRepository.doneSlotRefs(today),
+                    // v1.2.9（裁决项 2 = A）：已结算集合（done / partial / skipped）——
+                    // partial / skipped 的槽位同样不该被重建升级重查。
+                    this@AshkbApplication, meds, medicationRepository.settledSlotRefs(today),
                 )
                 // v1.0.77（批次 3b）：**与提醒同批**物化计划槽位快照（今天-1 .. 今天+7）。
                 // 挂在这个位置而不是 ReminderScheduler 里：那是提醒层，不该反向依赖 DAO；

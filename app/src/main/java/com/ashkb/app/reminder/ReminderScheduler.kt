@@ -7,6 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.ashkb.app.data.entity.Medication
+import com.ashkb.app.domain.AdherenceCalc
+import com.ashkb.app.domain.PlanSlot
 import com.ashkb.app.domain.ScheduleCalc
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -58,10 +60,15 @@ object ReminderScheduler {
      * 今日「已过点但未打卡」槽位尚未到时的升级重查。此前只重建 `escalation = 0` 且跳过已过时刻，
      * 于是每次冷启动 / 打卡 / 改药单都会把当天后续的 +30 / +60 提醒静默清掉（M10 升级链失效）。
      *
-     * @param doneSlotRefs 今日已打卡的槽位（[slotRef] 形态）——这些不再重建升级重查。
+     * @param settledSlotRefs 今日**已结算**的槽位（[slotRef] 形态）——这些不再重建升级重查。
      *   **刻意不设默认值**（v1.0.44）：v1.0.43 引入本参数时给了 `emptySet()` 默认值，
      *   结果开机广播那条调用路径漏传，重启后已服药的槽位仍会被排上 +30 / +60 误提醒。
-     *   去掉默认值后，任何新增调用点都必须显式想一次「哪些槽位今天已完成」。
+     *   去掉默认值后，任何新增调用点都必须显式想一次「哪些槽位今天已经交代过了」。
+     *   v1.2.9（审查答复裁决项 2 = A）：语义与形参名一并从「已打卡（done）」改为「已结算」——
+     *   口径取 [AdherenceCalc.SETTLED_STATUSES]（done / partial / skipped），来源是
+     *   `MedicationRepository.settledSlotRefs`。此前本参数只装 done，partial / skipped 的槽位
+     *   会被重排重建，再叠加 `ReminderReceiver` 同样漏 partial，就成了「用户记了部分完成
+     *   仍被全屏锁屏轰炸」。
      * @param now 「现在」。刻意留成可注入参数（默认真实当下）以便**确定性地**回归本方法：
      *   本方法的可观察效果完全由「现在」决定（哪些槽位已过点、哪些升级重查还没到），
      *   而 Robolectric **改不动 `java.time` 的挂钟**（`ShadowSystemClock` 只影响
@@ -72,65 +79,145 @@ object ReminderScheduler {
     fun rescheduleAll(
         context: Context,
         meds: List<Medication>,
-        doneSlotRefs: Set<String>,
+        settledSlotRefs: Set<String>,
         now: LocalDateTime = LocalDateTime.now(),
     ) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         cancelAllFuture(context, meds, now.toLocalDate())
         val today = now.toLocalDate()
 
-        // 1) 未来（含今日未到点）槽位：按 esc=0 排首次提醒
+        scheduleFirstReminders(context, am, meds, today, now)
+        rescheduleTodayEscalations(context, am, meds, today, now, settledSlotRefs)
+        rescheduleCrossMidnightEscalations(context, am, meds, today, now)
+    }
+
+    /**
+     * 第 1 步：未来（含今日未到点）槽位 —— 按 `escalation = 0` 排首次提醒。
+     *
+     * v1.2.9（裁决项 2）：从 [rescheduleAll] 抽出的纯搬运，行为一字未改。
+     * 抽出原因是 `rescheduleAll` 的三段循环 + 多个 `continue` 已达
+     * detekt `CyclomaticComplexMethod` 复杂度 24（阈值 15）与 `NestedBlockDepth` 上限——
+     * 本批为「已结算」多加一个分支就顶破了。**两处 detekt 规则都禁止进基线**，
+     * 只能靠把「一段一个职责」拆开解决。
+     */
+    private fun scheduleFirstReminders(
+        context: Context,
+        am: AlarmManager,
+        meds: List<Medication>,
+        today: LocalDate,
+        now: LocalDateTime,
+    ) {
         for (dayOffset in 0..HORIZON_DAYS) {
             val date = today.plusDays(dayOffset)
-            for (med in meds) {
-                for (slot in ScheduleCalc.slotsFor(med, date)) {
-                    val time = slot.time ?: continue
-                    val fire = LocalDateTime.of(date, LocalTime.parse(time))
-                    if (fire.isBefore(now.minusMinutes(1))) continue
-                    schedule(context, am, med.id, slot.key, time, date, fire, escalation = 0)
-                }
+            // 平铺调用（而不是三层 for + continue）：detekt `NestedBlockDepth` 阈值是 3，
+            // 三层循环 + 循环体本身就是 4 层。抽成 per-med 的内联 lambda 后每层职责单一。
+            meds.forEach { med -> scheduleFirstRemindersFor(context, am, med, date, now) }
+        }
+    }
+
+    /** [scheduleFirstReminders] 的单个药品部分：槽位循环体一层。 */
+    private fun scheduleFirstRemindersFor(
+        context: Context,
+        am: AlarmManager,
+        med: Medication,
+        date: LocalDate,
+        now: LocalDateTime,
+    ) {
+        ScheduleCalc.slotsFor(med, date).forEach { slot ->
+            val time = slot.time ?: return@forEach
+            val fire = LocalDateTime.of(date, LocalTime.parse(time))
+            if (fire.isBefore(now.minusMinutes(1))) return@forEach
+            schedule(context, am, med.id, slot.key, time, date, fire, escalation = 0)
+        }
+    }
+
+    /**
+     * 第 2 步：今日已过点但**未结算**的槽位 —— 重建尚未到时的升级重查
+     * （幂等：request code 稳定，覆盖旧值）。
+     *
+     * 「已结算」取 [settledSlotRefs]（done / partial / skipped），见 [rescheduleAll] 的 @param 说明。
+     */
+    private fun rescheduleTodayEscalations(
+        context: Context,
+        am: AlarmManager,
+        meds: List<Medication>,
+        today: LocalDate,
+        now: LocalDateTime,
+        settledSlotRefs: Set<String>,
+    ) {
+        meds.forEach { med ->
+            ScheduleCalc.slotsFor(med, today).forEach { slot ->
+                scheduleTodayEscalation(context, am, med, slot, today, now, settledSlotRefs)
             }
         }
+    }
 
-        // 2) 今日已过点但未打卡的槽位：重建尚未到时的升级重查（幂等：request code 稳定，覆盖旧值）
-        for (med in meds) {
-            for (slot in ScheduleCalc.slotsFor(med, today)) {
-                val time = slot.time ?: continue
-                val base = LocalDateTime.of(today, LocalTime.parse(time))
-                if (base.isAfter(now)) continue                        // 未到点：已在第 1 步排好
-                if (slotRef(med.id, slot.key) in doneSlotRefs) continue // 已打卡：无需重查
-                for (esc in 1..MAX_ESCALATION) {
-                    val fire = base.plusMinutes(ESCALATION_STEP_MINUTES * esc)
-                    // v1.0.73：槽位日期一并传给排程——跨零点的 +30/+60 归**今天**这个槽位，
-                    // 而不是它触发时所在的明天。
-                    if (fire.isAfter(now)) schedule(context, am, med.id, slot.key, time, today, fire, esc)
-                }
-            }
+    /** [rescheduleTodayEscalations] 的单个槽位：判断「已过点且未结算」后重建两条重查。 */
+    private fun scheduleTodayEscalation(
+        context: Context,
+        am: AlarmManager,
+        med: Medication,
+        slot: PlanSlot,
+        today: LocalDate,
+        now: LocalDateTime,
+        settledSlotRefs: Set<String>,
+    ) {
+        val time = slot.time ?: return
+        val base = LocalDateTime.of(today, LocalTime.parse(time))
+        if (base.isAfter(now)) return                        // 未到点：已在第 1 步排好
+        if (slotRef(med.id, slot.key) in settledSlotRefs) return // 已结算：无需重查
+        for (esc in 1..MAX_ESCALATION) {
+            val fire = base.plusMinutes(ESCALATION_STEP_MINUTES * esc)
+            // v1.0.73：槽位日期一并传给排程——跨零点的 +30/+60 归**今天**这个槽位，
+            // 而不是它触发时所在的明天。
+            if (fire.isAfter(now)) schedule(context, am, med.id, slot.key, time, today, fire, esc)
         }
+    }
 
-        // 3) v1.0.73.1（D2 补漏）：**昨天跨零点过来的、尚未到时的升级重查**必须重建。
-        //
-        // 为什么非有这一步不可：[cancelAllFuture] 现在会从 `today-1` 起扫（修 D2 的孤儿闹钟），
-        // 于是「23:55 那剂药」的 00:25 / 00:55 两个升级闹钟会在**任何一次重排**时被取消——
-        // 而第 1、2 步只重建 today 起的槽位，昨天那个槽位不在其中。净效果是：
-        // 用户在 00:10 打开一次应用（或打卡任何一剂药、或手机重启），**跨零点的追问链就被清空且不再重建**，
-        // 那剂漏服的药再也不会被追问（这比修复前的孤儿闹钟更糟：旧行为至少还能响一次）。
-        //
-        // 这里刻意**不**传「昨天已打卡槽位」：升级重查是否该静默，由接收器在触发时刻按
-        // `slotDate`（槽位所属日）查库决定（见 ReminderReceiver 的 settled 判定）。
-        // 代价是可能为已结算的槽位多排一个闹钟，触发时静默取消——换来的是调用方（4 处）无需各自
-        // 再算一遍「昨天的完成集合」，少一处漏传的机会（v1.0.44 的 N1 教训正是漏传导致的误提醒）。
+    /**
+     * 第 3 步：v1.0.73.1（D2 补漏）—— **昨天跨零点过来的、尚未到时的升级重查**必须重建。
+     *
+     * 为什么非有这一步不可：[cancelAllFuture] 现在会从 `today-1` 起扫（修 D2 的孤儿闹钟），
+     * 于是「23:55 那剂药」的 00:25 / 00:55 两个升级闹钟会在**任何一次重排**时被取消——
+     * 而第 1、2 步只重建 today 起的槽位，昨天那个槽位不在其中。净效果是：
+     * 用户在 00:10 打开一次应用（或打卡任何一剂药、或手机重启），**跨零点的追问链就被清空且不再重建**，
+     * 那剂漏服的药再也不会被追问（这比修复前的孤儿闹钟更糟：旧行为至少还能响一次）。
+     *
+     * 这里刻意**不**传「昨天已结算槽位」：升级重查是否该静默，由接收器在触发时刻按
+     * `slotDate`（槽位所属日）查库决定（见 ReminderReceiver 的 settled 判定）。
+     * 代价是可能为已结算的槽位多排一个闹钟，触发时静默取消——换来的是调用方（4 处）无需各自
+     * 再算一遍「昨天的完成集合」，少一处漏传的机会（v1.0.44 的 N1 教训正是漏传导致的误提醒）。
+     */
+    private fun rescheduleCrossMidnightEscalations(
+        context: Context,
+        am: AlarmManager,
+        meds: List<Medication>,
+        today: LocalDate,
+        now: LocalDateTime,
+    ) {
         val yesterday = today.minusDays(1)
-        for (med in meds) {
-            for (slot in ScheduleCalc.slotsFor(med, yesterday)) {
-                val time = slot.time ?: continue
-                val base = LocalDateTime.of(yesterday, LocalTime.parse(time))
-                for (esc in 1..MAX_ESCALATION) {
-                    val fire = base.plusMinutes(ESCALATION_STEP_MINUTES * esc)
-                    // 只重建「还没到点」的：已过点的早已触发或已无意义
-                    if (fire.isAfter(now)) schedule(context, am, med.id, slot.key, time, yesterday, fire, esc)
-                }
+        meds.forEach { med ->
+            ScheduleCalc.slotsFor(med, yesterday).forEach { slot ->
+                scheduleCrossMidnightEscalation(context, am, med, slot, yesterday, now)
             }
+        }
+    }
+
+    /** [rescheduleCrossMidnightEscalations] 的单个槽位：只重建「还没到点」的两条重查。 */
+    private fun scheduleCrossMidnightEscalation(
+        context: Context,
+        am: AlarmManager,
+        med: Medication,
+        slot: PlanSlot,
+        yesterday: LocalDate,
+        now: LocalDateTime,
+    ) {
+        val time = slot.time ?: return
+        val base = LocalDateTime.of(yesterday, LocalTime.parse(time))
+        for (esc in 1..MAX_ESCALATION) {
+            val fire = base.plusMinutes(ESCALATION_STEP_MINUTES * esc)
+            // 只重建「还没到点」的：已过点的早已触发或已无意义
+            if (fire.isAfter(now)) schedule(context, am, med.id, slot.key, time, yesterday, fire, esc)
         }
     }
 

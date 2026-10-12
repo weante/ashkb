@@ -606,6 +606,13 @@
     <string name="today_profile_not_built">Set up your health profile first</string>
     <string name="today_recorded">Logged today</string>
     <string name="today_supplement_log">Backfill</string>
+    <!-- v1.2.9: home-page supplement card (owner feedback m02219). -->
+    <string name="today_supplement_section">Today\'s supplements</string>
+    <string name="today_supplement_count">%1$d tracked</string>
+    <string name="today_supplement_manage">Manage</string>
+    <string name="today_supplement_check_in">Taken</string>
+    <string name="today_supplement_skip">Skip</string>
+    <string name="today_supplement_undo">Undo</string>
     <string name="today_tab">Today</string>
     <string name="trend_down_to">Down to</string>
     <string name="trend_flat">Unchanged at</string>
@@ -746,6 +753,8 @@
     <string name="med_history_status_done">Taken</string>
     <string name="med_history_status_partial">Partial</string>
     <string name="med_history_status_skipped">Skipped</string>
+    <string name="med_status_partial_short">Partial</string>
+    <string name="med_partial_detail">Recorded as partially taken — no more reminders</string>
     <string name="med_history_edit_hint">Recorded it wrong? Tap the pencil on the right to fix that record</string>
     <string name="med_log_edit_action">Fix this record</string>
     <string name="med_log_edit_title">Fix the %1$s record</string>

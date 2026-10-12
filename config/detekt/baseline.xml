@@ -25,7 +25,6 @@
     <ID>CyclomaticComplexMethod:RegexLiteralGuardTest.kt$internal fun extractRegexLiterals(src: String): List&lt;String&gt;</ID>
     <ID>CyclomaticComplexMethod:ReminderCheckScreen.kt$@Composable fun ReminderCheckScreen(onBack: () -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:ReminderReceiver.kt$ReminderReceiver$override fun onReceive(context: Context, intent: Intent)</ID>
-    <ID>CyclomaticComplexMethod:ReminderScheduler.kt$ReminderScheduler$fun rescheduleAll( context: Context, meds: List&lt;Medication&gt;, doneSlotRefs: Set&lt;String&gt;, now: LocalDateTime = LocalDateTime.now(), )</ID>
     <ID>CyclomaticComplexMethod:ReportPdfWriter.kt$ReportPdfWriter$fun writeCheckupReport(context: Context, r: ReportRepository.CheckupReport): File</ID>
     <ID>CyclomaticComplexMethod:ReportPdfWriter.kt$ReportPdfWriter$fun writeEmergencyCard(context: Context, c: ReportRepository.EmergencyCard): File</ID>
     <ID>CyclomaticComplexMethod:ReportScreen.kt$@Composable private fun OverviewPage(o: ReportRepository.Overview?)</ID>
@@ -290,7 +289,6 @@
     <ID>NestedBlockDepth:ExercisePlanTemplates.kt$ExercisePlanTemplates$private fun indexOfObjectEnd(s: String, open: Int): Int</ID>
     <ID>NestedBlockDepth:RegexLiteralGuardTest.kt$internal fun extractRegexLiterals(src: String): List&lt;String&gt;</ID>
     <ID>NestedBlockDepth:ReminderScheduler.kt$ReminderScheduler$fun cancelAllFuture(context: Context, meds: List&lt;Medication&gt;, today: LocalDate = LocalDate.now())</ID>
-    <ID>NestedBlockDepth:ReminderScheduler.kt$ReminderScheduler$fun rescheduleAll( context: Context, meds: List&lt;Medication&gt;, doneSlotRefs: Set&lt;String&gt;, now: LocalDateTime = LocalDateTime.now(), )</ID>
     <ID>NestedBlockDepth:SupplementTiming.kt$SupplementTiming$fun conflicts(supplements: List&lt;Supplement&gt;, medications: List&lt;Medication&gt;): List&lt;Conflict&gt;</ID>
     <ID>NestedBlockDepth:VaultCipher.kt$VaultCipher$private fun decryptSlotted(magic: String, secret: CharArray, header: JSONObject, headerBytes: ByteArray, ct: ByteArray): Decrypted</ID>
     <ID>NewLineAtEndOfFile:MorningWarmup.kt$com.ashkb.app.domain.MorningWarmup.kt</ID>

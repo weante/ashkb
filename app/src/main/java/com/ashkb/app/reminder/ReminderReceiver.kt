@@ -65,13 +65,19 @@ class ReminderReceiver : BroadcastReceiver() {
                 }
                 // v1.0.73（P1-1）：done 与 skipped **都算已结算**。此前只认 "done"，于是用户
                 // 主动「跳过（有原因）」后，+30 加急与 +60 锁屏全屏照样轰炸——这正是
-                // 「骚扰 → 用户关掉通知权限 → 提醒彻底失效」的路径。判定常量化，避免裸字符串漂移。
+                // 「骚扰 → 用户关掉通知权限 → 提醒彻底失效」的路径。
                 // v1.0.73（P1-4）：查的是**槽位所属日**的记录（跨零点时 LocalDate.now() 已是次日，
                 // 会查不到 23:50 那个槽位的打卡，从而对已服的药补发提醒）。
+                // v1.2.9（审查答复裁决项 2 = A）：**partial 也是已结算**。此前这里内联
+                // `DONE || SKIPPED` 漏掉 partial，而项目自 v1.0.77（批次 3b）起就以
+                // [AdherenceCalc.SETTLED_STATUSES] 为唯一事实来源（补记卡、漏服补发都按它算）。
+                // 漏它的后果：用户明明记了「部分完成」，这一剂仍会被 +30 / +60 一路升级，
+                // 到 [ReminderScheduler.MAX_ESCALATION] 时**拉起全屏锁屏**轰炸。
+                // 改用集合常量，避免第三份「已结算」口径与前两处分叉。
                 val settled = repo.logsForDate(slotDate)
                     .any {
                         it.medId == medId && it.slotKey == slotKey &&
-                            (it.status == AdherenceCalc.DONE || it.status == AdherenceCalc.SKIPPED)
+                            it.status in AdherenceCalc.SETTLED_STATUSES
                     }
                 if (settled) {
                     NotificationHelper.cancel(context, medId, slotKey)

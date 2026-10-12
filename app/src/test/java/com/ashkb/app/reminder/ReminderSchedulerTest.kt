@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.Application
 import android.content.Context
 import com.ashkb.app.data.entity.Medication
+import com.ashkb.app.domain.AdherenceCalc
 import java.time.LocalDateTime
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
@@ -117,7 +118,7 @@ class ReminderSchedulerTest {
     @Test
     fun `今日已打卡的槽位不再重建升级重查（N1 回归锁）`() {
         val m = med(pastSlot)
-        // v1.0.44：doneSlotRefs 是唯一判据；开机广播若漏传，已服药的槽位会被排上 +30 / +60 误提醒
+        // v1.0.44：settledSlotRefs 是唯一判据；开机广播若漏传，已服药的槽位会被排上 +30 / +60 误提醒
         reschedule(listOf(m), setOf(ReminderScheduler.slotRef(m.id, pastSlot)))
 
         val times = alarmTimes()
@@ -125,6 +126,39 @@ class ReminderSchedulerTest {
         assertTrue("已打卡槽位仍被排了 +60 升级重查（N1 复发）", !times.contains(escAt(2, pastBase)))
         // 未来 7 天的首次提醒不受影响——打卡只影响今天
         assertEquals(7, times.size)
+    }
+
+    @Test
+    fun `今日已结算的槽位不再重建升级重查——partial 与 skipped 同理`() {
+        // 改前：重排口径只认 `done`（MedicationRepository.doneSlotRefs，已删），
+        // 用户记「部分完成 / 跳过」的槽位会被重排重建 +30 / +60 升级重查，
+        // 再叠加 ReminderReceiver 同样漏 partial → 一路升级到全屏锁屏轰炸。
+        // 改后：口径 = AdherenceCalc.SETTLED_STATUSES（done / partial / skipped），
+        // 由 MedicationRepository.settledSlotRefs 提供；本用例断言「集合里有它就不重建」。
+        val m = med(pastSlot)
+        val ref = ReminderScheduler.slotRef(m.id, pastSlot)
+
+        for (status in listOf(AdherenceCalc.DONE, AdherenceCalc.PARTIAL, AdherenceCalc.SKIPPED)) {
+            // 前置：同一 slotRef 不传时会被排上升级重查——否则本用例的「没排」没有判据
+            reschedule(listOf(m), emptySet())
+            assertTrue(
+                "前置失效：未传集合时 +30 重查应存在（status=$status）",
+                alarmTimes().contains(escAt(1, pastBase)),
+            )
+
+            reschedule(listOf(m), setOf(ref))
+            val times = alarmTimes()
+            assertTrue(
+                "status=$status 已结算却仍被排了 +30 重查（裁决项 2 = A 未落地）",
+                !times.contains(escAt(1, pastBase)),
+            )
+            assertTrue(
+                "status=$status 已结算却仍被排了 +60 重查（裁决项 2 = A 未落地）",
+                !times.contains(escAt(2, pastBase)),
+            )
+            // 未来 7 天首次提醒不受影响——结算只作用于今天
+            assertEquals("结算只应影响今日的升级重查", 7, times.size)
+        }
     }
 
     @Test

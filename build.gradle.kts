@@ -19,11 +19,17 @@ plugins {
  * HANDOFF 头部还写着 v1.0.70/versionCode 75）。人工核对迟早会漏，故做成机器门。
  *
  * 检查项：
- *  1. 四个文件里的 **versionCode / versionName** 必须与 `app/build.gradle.kts` 一致
- *  2. 三个文档里的**单测条数**必须与 `app/build/test-results/testDebugUnitTest` 的实际条数一致
- *  3. `AppDatabase.kt` 的 `ASHKB_DB_VERSION` 必须有对应的 `app/schemas/.../<n>.json`
+ *  1. `README.md` 与 `HANDOFF-STATUS.md` 里的 **versionCode / versionName** 必须与
+ *     `app/build.gradle.kts` 一致（`HANDOFF.md` 不参与——见下面 §1 的注释）
+ *  2. `AppDatabase.kt` 的 `ASHKB_DB_VERSION` 必须有对应的 `app/schemas/.../<n>.json`
  *
- * 用法：`gradle verifySpecSync`（需先跑过 `testDebugUnitTest`，CI 里顺序即如此）
+ * **v1.2.9 起不再校验「单测条数」**：条数是**构建产物**（`app/build/test-results/` 被 .gitignore
+ * 忽略，`gradle clean` 即消失），把它抄进人写的文档只会造出一条必然腐烂的副本——历史上它曾在
+ * README 同页并存 114 / 205 两个互相矛盾的数，也长期停在 264 而别处已到 339。而 CI 上一步的
+ * `testDebugUnitTest` 已经证明测试通过，文档再存一遍是**重复且更易腐**的。副产品：本任务不再
+ * 依赖任何构建产物，可脱离构建独立运行。
+ *
+ * 用法：`gradle verifySpecSync`
  */
 tasks.register("verifySpecSync") {
     group = "verification"
@@ -40,7 +46,6 @@ tasks.register("verifySpecSync") {
             ?: throw GradleException("在 app/build.gradle.kts 里找不到 versionName")
 
         val readme = read("README.md")
-        val handoff = read("HANDOFF.md")
         val status = read("HANDOFF-STATUS.md")
         val problems = mutableListOf<String>()
 
@@ -51,37 +56,13 @@ tasks.register("verifySpecSync") {
             }
         }
         expectVersion(readme, "README.md", "当前 `v$versionName`（versionCode $versionCode）")
-        expectVersion(handoff, "HANDOFF.md", "**v$versionName（versionCode $versionCode）")
         expectVersion(status, "HANDOFF-STATUS.md", "截至 **v$versionName（versionCode $versionCode）")
         expectVersion(status, "HANDOFF-STATUS.md", "versionCode $versionCode / versionName $versionName")
+        // HANDOFF.md 不再校验版本号：v1.2.9 起它是**按主题组织、不按版本追加**的长期工程约定，
+        // 已刻意删掉「记录截至 vX」那一行（它历史上烂在 v1.0.73 没人回改）。
+        // 版本号单一事实来源是 app/build.gradle.kts，展示口径是 README 与 HANDOFF-STATUS。
 
-        // ---- 2. 单测条数（以实际测试报告为准） ----
-        val resultsDir = File(root, "app/build/test-results/testDebugUnitTest")
-        if (!resultsDir.exists()) {
-            problems += "找不到单测报告目录 app/build/test-results/testDebugUnitTest——请先运行 testDebugUnitTest"
-        } else {
-            var tests = 0
-            resultsDir.listFiles { f -> f.name.endsWith(".xml") }?.forEach { f ->
-                val m = Regex("""tests="(\d+)"""").find(f.readText())
-                if (m != null) tests += m.groupValues[1].toInt()
-            }
-            if (tests == 0) {
-                problems += "单测报告里没有用例（tests=0）——报告可能未生成"
-            } else {
-                if (!readme.contains("$tests 条 JVM 单元测试")) {
-                    problems += "README.md 的单测条数与实际不一致（实际 $tests 条，应写「$tests 条 JVM 单元测试」）"
-                }
-                if (!handoff.contains("**$tests 条单测全绿**")) {
-                    problems += "HANDOFF.md 的单测条数与实际不一致（实际 $tests 条，应写「**$tests 条单测全绿**」）"
-                }
-                if (!status.contains("**$tests 条，0 失败")) {
-                    problems += "HANDOFF-STATUS.md 的单测条数与实际不一致（实际 $tests 条，应写「**$tests 条，0 失败」）"
-                }
-                logger.lifecycle("verifySpecSync：实际单测 $tests 条，代码版本 v$versionName（$versionCode）")
-            }
-        }
-
-        // ---- 3. 库版本 ↔ schema 导出文件 ----
+        // ---- 2. 库版本 ↔ schema 导出文件 ----
         val dbSrc = read("app/src/main/java/com/ashkb/app/data/db/AppDatabase.kt")
         val dbVersion = Regex("""ASHKB_DB_VERSION\s*=\s*(\d+)""").find(dbSrc)?.groupValues?.get(1)
         if (dbVersion == null) {
@@ -97,9 +78,9 @@ tasks.register("verifySpecSync") {
             throw GradleException(
                 "规范一致性校验未通过（${problems.size} 项）：\n" +
                     problems.joinToString("\n") { "  · $it" } +
-                    "\n（发版前请同步 README / HANDOFF / HANDOFF-STATUS 的版本号与单测条数）"
+                    "\n（发版前请同步 README / HANDOFF / HANDOFF-STATUS 的版本号）"
             )
         }
-        logger.lifecycle("✅ verifySpecSync 通过：版本号与单测条数在代码与文档之间一致。")
+        logger.lifecycle("✅ verifySpecSync 通过：版本号与库 schema 在代码与文档之间一致。")
     }
 }

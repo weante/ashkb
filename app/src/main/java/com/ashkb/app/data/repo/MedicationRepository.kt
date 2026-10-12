@@ -46,6 +46,29 @@ data class TodayItem(
     } ?: false
     val done: Boolean get() = log?.status == "done"
     val skipped: Boolean get() = log?.status == "skipped"
+
+    /**
+     * v1.2.9（审查答复裁决项 2 = A）：**部分完成**。
+     *
+     * 此前 `TodayItem` 只有 `done` / `skipped` 两个"已交代"派生属性，于是今日页把 `partial`
+     * 掉进了"未记录"分支：显示成红色「漏服」+ 附漏服处理指引，还被算进 Hero 的待办计数。
+     * 同一剂药在补记卡（`TodayViewModel.refreshYesterdayPending` 走 `settledSlotRefs`）里被当作
+     * **已结算**，在提醒链（`ReminderReceiver`，本批同批改）里却被当作未提醒 —— 三个子系统三个结论。
+     *
+     * 口径统一后：`partial` 与 `done` / `skipped` 同属 [AdherenceCalc.SETTLED_STATUSES]，
+     * 既不进"漏服"，也不进"待办"。
+     */
+    val partial: Boolean get() = log?.status == AdherenceCalc.PARTIAL
+
+    /**
+     * v1.2.9（裁决项 2）：**这剂药今天已经有交代了**（已服 / 部分完成 / 跳过）。
+     *
+     * 与 [AdherenceCalc.SETTLED_STATUSES] 同义，是它的「按槽位」视图。抽出来是为了让
+     * 「进不进待办」「算不算漏服」这类判断只写一次——此前 `TodayScreen` 里三个条件各写各的
+     * （`pendingCount` 一套、`isMissed` 一套），加一个 `partial` 就要改三处，还撑爆了
+     * detekt 的 `ComplexCondition` / `CyclomaticComplexMethod` 阈值。
+     */
+    val isSettled: Boolean get() = done || partial || skipped
 }
 
 class MedicationRepository(private val context: Context) {
@@ -395,31 +418,22 @@ class MedicationRepository(private val context: Context) {
     )
 
     /**
-     * v1.0.44（N1）：今日**已打卡**槽位集合（[ReminderScheduler.slotRef] 形态），
-     * 供 [ReminderScheduler.rescheduleAll] 判断「该槽位无需重建升级重查」。
+     * 某日**已结算**的槽位（[ReminderScheduler.slotRef] 形态），供 [ReminderScheduler.rescheduleAll]
+     * 判断「该槽位无需重建升级重查」。
      *
-     * 抽到一处的原因：这个集合此前在 Application / TodayViewModel / MeViewModel 各写一遍，
-     * 于是开机广播（BootReceiver）那条路径漏传就成了必然。现在只有一个实现，
-     * 且 `rescheduleAll` 的该参数**无默认值**——任何新增调用点都必须显式取一次。
-     */
-    suspend fun doneSlotRefs(date: LocalDate): Set<String> =
-        logsForDate(date)
-            .filter { it.status == "done" }
-            .map { ReminderScheduler.slotRef(it.medId, it.slotKey) }
-            .toSet()
-
-    /**
-     * v1.0.74：某日**已结算**的槽位（done 或 skipped）。
+     * **唯一事实来源**：状态集合取 [AdherenceCalc.SETTLED_STATUSES]（done / partial / skipped），
+     * 与补记卡（`TodayViewModel`）、漏服补发通知（`MissedDoses.unsettled`）**共用同一份定义**。
      *
-     * 与 [doneSlotRefs] 的区别：那个只认 `done`（用于「重排时不再重建升级重查」——
-     * 用户主动跳过的槽位在 v1.0.73 之后也不该重建，故新代码一律用本方法）。
-     * 今日页的「昨天还有 N 剂未记录」卡必须用**已结算**口径，否则用户昨天明确跳过（写了原因）的
-     * 剂量会天天挂在卡片上催他补记。
+     * v1.2.9（审查答复裁决项 2 = A）：**删掉了此前的 `doneSlotRefs`**（只认 `done`）。
+     * 那份「只认 done」的副本有 4 个调用点（`AshkbApplication:93` 冷启动、`BootReceiver:47` 开机、
+     * `TodayViewModel:205` 打卡/跳过/顺延后、`MeViewModel:71` 改药单后），它们是 M10 指出的分叉点：
+     * partial / skipped 的槽位在这些路径里会被重排重建。后果与 `ReminderReceiver` 的已结算判定
+     * 漏 partial 叠加后 = 用户记了「部分完成」仍被 +30 / +60 升级到全屏锁屏轰炸。
+     * 保留两个函数（语义相近）就是给这种分叉留后门，故合并为一个。
      *
-     * v1.0.77（批次 3b）：状态集合改为 [AdherenceCalc.SETTLED_STATUSES]（done / partial / skipped），
-     * 与漏服补发通知（`MissedDoses.unsettled`）**共用同一份定义**。
-     * 此前这里只认 done / skipped，于是「部分完成」的剂量会同时出现在补记卡上（说漏了）
-     * 与漏服判定里（说没漏）——同一剂药两个结论。改为一处定义后两者不可能再分叉。
+     * 抽到一处的原因（v1.0.44 N1）：这个集合此前在 Application / TodayViewModel / MeViewModel
+     * 各写一遍，于是开机广播那条路径漏传就成了必然。现在只有一个实现，
+     * 且 `rescheduleAll` 的该参数**无默认值**：任何新增调用点都必须显式取一次。
      */
     suspend fun settledSlotRefs(date: LocalDate): Set<String> =
         logsForDate(date)
