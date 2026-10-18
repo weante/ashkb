@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  v1.2.10：显式钉住窗口背景（详见 values/colors.xml 的注释）。
+  `android:windowBackground` 是 App 启动首帧与「页面没画底色」时的兜底，
+  必须与 `ui/theme/Color.kt` 的 `backgroundLight` 同值。
+-->
 <resources>
     <style name="Theme.Ashkb" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/ashkb_window_background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>

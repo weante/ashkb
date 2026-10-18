@@ -56,8 +56,20 @@ object SupplementTiming {
         return h * 60 + m
     }
 
+    /**
+     * `times` / `take_times` → 当日分钟数列表。
+     *
+     * v1.2.10（审查 CRITICAL-1）：**实现换掉了**。此前是 `raw?.split(',')?.mapNotNull { minutesOf(it) }`
+     * —— 而写入侧（`MedEditScreen` 的 `JSONArray(times).toString()`、`WellnessScreen` 同理）存的是
+     * **JSON 数组**，`["08:00"]` 按 `,` 切只有一段、`minutesOf` 要求 `HH:mm` 两段 → 全部 null
+     * → 此函数恒返回空表 → [conflicts] 恒空 → **「矿物补剂与螯合类药物同服」的提示从未生效过**。
+     * 现在走 [ScheduleCalc.parseTimes]，与排程、营养页时间轴同一份解析。
+     *
+     * 注意 `minutesOf` 仍然保留：它服务于**用户手输单值**的场景（例如表单里正在编辑的字符串），
+     * 与"库里那串 JSON"是两件事。
+     */
     private fun timesOf(raw: String?): List<Int> =
-        raw?.split(',')?.mapNotNull { minutesOf(it) } ?: emptyList()
+        ScheduleCalc.parseTimes(raw).mapNotNull { minutesOf(it) }
 
     /** 钙 / 矿物类补剂（需要与上述药物错开）。 */
     fun isMineral(category: String): Boolean {
@@ -72,11 +84,20 @@ object SupplementTiming {
         return CHELATION_KEYS.any { key.contains(it) }
     }
 
-    /** 找出「矿物类补剂与螯合类用药同服、且间隔 < 2 小时」的组合（同名去重）。 */
+    /**
+     * 找出「矿物类补剂与螯合类用药同服、且间隔 < 2 小时」的组合（同名去重）。
+     *
+     * v1.2.10（审查 L4）：去重时**取最短的那个间隔**，而不是第一次碰上的那个。
+     *
+     * 多槽位交叉会命中同一对名字若干次（钙 08:00/20:00 × 优甲乐 07:30/09:00 就有 4 种组合），
+     * 旧的 `distinctBy { … }` 保留**遍历顺序里的第一条**——迭代是「药时刻在外、补剂时刻在内」，
+     * 于是报出来的可能是 90 分钟，而真实最短间隔是 30 分钟。提示文案与「差多少」的判读
+     * 都建立在这个数字上，取错等于把最严重的那次同服说轻了。
+     */
     fun conflicts(supplements: List<Supplement>, medications: List<Medication>): List<Conflict> {
         val mineralSupps = supplements.filter { isMineral(it.category) }
         val chelating = medications.filter { isChelatingMed(it) }
-        val out = mutableListOf<Conflict>()
+        val worst = linkedMapOf<Pair<String, String>, Conflict>()
         mineralSupps.forEach { s ->
             val sTimes = timesOf(s.times)
             chelating.forEach { m ->
@@ -84,11 +105,14 @@ object SupplementTiming {
                     sTimes.forEach { st ->
                         // v1.1.1（M2）：环形距离——23:50 与 00:15 的间隔是 25 分钟，不是 1415
                         val gap = circularGapMinutes(st, mt)
-                        if (gap < MIN_GAP_MINUTES) out.add(Conflict(s.name, m.name, gap))
+                        if (gap >= MIN_GAP_MINUTES) return@forEach
+                        val key = s.name to m.name
+                        val prev = worst[key]
+                        if (prev == null || gap < prev.gapMinutes) worst[key] = Conflict(s.name, m.name, gap)
                     }
                 }
             }
         }
-        return out.distinctBy { it.supplementName to it.medName }
+        return worst.values.toList()
     }
 }

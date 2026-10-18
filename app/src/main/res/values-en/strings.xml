@@ -201,6 +201,7 @@
     <string name="emergency_record_event">Record emergency event</string>
     <string name="emergency_relation">Relationship</string>
     <string name="emergency_scenario">Scenario</string>
+    <string name="emergency_scene_unrecognized">This record’s scenario is not one this app knows; it is left as is — please pick a scenario.</string>
     <string name="emergency_seek_care">Seek care</string>
     <string name="emergency_share_card">Share emergency card</string>
     <string name="emergency_tab">Emergency</string>
@@ -229,7 +230,7 @@
     <string name="exercise_no_stage_hint">Complete the disease phase in your health profile and today\'s prescription will be generated from the R27 matrix</string>
     <string name="exercise_none_today">No recommended exercise today</string>
     <string name="exercise_notes_reaction">Notes / reaction</string>
-    <string name="exercise_pain_rule_note">Once filled in, the system uses the \"pain 2 hours after exercise\" rule (exc-010) to decide whether to reduce the load</string>
+    <string name="exercise_pain_rule_note">Once both are filled in, a suggestion for your next session appears below</string>
     <string name="exercise_post_pain">Pain after exercise</string>
     <string name="exercise_reduce_action">Reduce load</string>
     <string name="exercise_reduce_amount">Reduction</string>
@@ -334,6 +335,7 @@
     <string name="med_inj_two_days_error">The two injection days must differ (for example Monday / Thursday). Please adjust.</string>
     <string name="med_mtx_frequency_error">Methotrexate is taken only once a week (itx-001: deaths have been reported when it was taken daily by mistake). Please switch to \"Once a week\"; if you really need a different schedule, check with your doctor first.</string>
     <string name="med_route_frequency_error">\"Every two weeks\" isn\'t available for oral medication — it would be scheduled daily, so the every-other-week interval wouldn\'t happen. Use \"Injection\" for a two-week interval, or pick a daily-style frequency for oral.</string>
+    <string name="med_cycle_days_min_error">A cycle must be at least 1 day. Entering 0 would make this medication stop showing up under Today and in every reminder (the app counts “every N days”, and 0 days never produces a next dose).</string>
     <string name="med_injection_suffix">" · Injection"</string>
     <string name="med_late_note">(more than 30 minutes later than planned)</string>
     <string name="med_manage_title">Medication list</string>
@@ -347,6 +349,7 @@
     <string name="med_postpone_reschedule_note">; later injections and reminders are rescheduled automatically. Today\'s card moves to the new date.</string>
     <string name="med_postpone_to_date">Postpone to this date</string>
     <string name="med_prn_note">As-needed medications have no reminders — just log when you use them</string>
+    <string name="med_prn_done_note">Logged for today — you can log again tomorrow</string>
     <string name="med_prn_reason_field">Reason for as-needed use (e.g. backup pain relief)</string>
     <string name="med_prn_short">As needed</string>
     <string name="med_prn_suffix">" · As needed"</string>
@@ -485,6 +488,7 @@
     <string name="report_avg_pain">Average pain</string>
     <string name="report_avg_stiffness">Average morning stiffness</string>
     <string name="report_basdai_section">Disease activity (BASDAI)</string>
+    <string name="report_basdai_stable">Stable</string>
     <string name="report_basdai_trend">BASDAI total score trend</string>
     <string name="report_completed_count">Times completed</string>
     <string name="report_exercise_section">Exercise adherence</string>
@@ -632,6 +636,7 @@
     <string name="vaccine_empty">No vaccine records yet</string>
     <string name="vaccine_hospital">Hospital / clinic</string>
     <string name="vaccine_live">Live vaccine</string>
+    <string name="vaccine_live_pending_alert">Live vaccine needs confirmation</string>
     <string name="vaccine_name_field">Vaccine name</string>
     <string name="vaccine_record_action">Record a vaccination</string>
     <string name="vaccine_record_short">Record vaccine</string>
@@ -709,6 +714,7 @@
     <string name="knowledge_evidence_meta">Evidence tier %1$s · adapted %2$s · reviewed %3$s · v%4$s</string>
     <string name="knowledge_overdue_count">%1$s items are past their review date</string>
     <string name="knowledge_source_line">Source: %1$s</string>
+    <string name="kb_overline">Local medical knowledge · offline search</string>
     <string name="knowledge_title_count">AS knowledge base (%1$s items)</string>
     <string name="lab_count_abnormal">%1$s items · %2$s abnormal</string>
     <string name="lab_count_plain">%1$s items</string>
@@ -758,6 +764,7 @@
     <string name="med_status_partial_short">Partial</string>
     <string name="med_partial_detail">Recorded as partially taken — no more reminders</string>
     <string name="med_history_edit_hint">Recorded it wrong? Tap the pencil on the right to fix that record</string>
+    <string name="med_history_truncated">Only the most recent %1$d are listed; earlier records are not shown</string>
     <string name="med_log_edit_action">Fix this record</string>
     <string name="med_log_edit_title">Fix the %1$s record</string>
     <string name="med_log_edit_status">Dose status</string>
@@ -939,7 +946,7 @@
     <string name="pdf_lab_flag_high">↑ High</string>
     <string name="pdf_lab_flag_low">↓ Low</string>
     <string name="pdf_lab_flag_abnormal">⚠ Abnormal</string>
-    <string name="pdf_lab_ref_range">(Reference %1$.2f–%2$.2f)</string>
+    <string name="pdf_lab_ref_range">(Reference %1$s–%2$s)</string>
     <string name="pdf_labs_more">…%1$d more abnormal items not listed</string>
     <string name="pdf_section_checkups">Follow-up visits in the last 180 days (%1$d)</string>
     <string name="pdf_no_checkups">(No follow-up visit records)</string>
@@ -1333,6 +1340,8 @@
     <string name="enum_med_frequency_prn_plain">As needed</string>
     <string name="enum_med_frequency_custom">Custom schedule</string>
     <string name="enum_med_frequency_custom_plain">Custom schedule</string>
+    <string name="med_frequency_unrecognized">Frequency not recognized</string>
+    <string name="med_frequency_unrecognized_detail">This medication’s recorded frequency “%1$s” is not one this app knows; it will be reminded daily. Please tap edit and pick a frequency.</string>
     <string name="enum_check_status_done">Done</string>
     <string name="enum_check_status_partial">Partially done</string>
     <string name="enum_check_status_skipped">Skipped</string>
@@ -1368,6 +1377,7 @@
     <string name="enum_stop_reason_financial">Financial reasons</string>
     <string name="enum_stop_reason_financial_note">If cost is the reason for stopping, discuss alternatives with your doctor — do not interrupt treatment on your own.</string>
     <string name="enum_stop_reason_other">Other</string>
+    <string name="enum_stop_reason_postpone">Postponed</string>
     <string name="enum_dose_state_fixed">Fixed</string>
     <string name="enum_dose_state_prn">As needed</string>
     <string name="enum_dose_state_tapering">Tapering</string>

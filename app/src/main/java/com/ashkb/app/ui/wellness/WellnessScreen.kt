@@ -34,7 +34,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.util.Locale
 
 import com.ashkb.app.data.entity.DietProfile
 import com.ashkb.app.data.entity.FoodAvoidItem
@@ -62,6 +63,7 @@ import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.Labels
+import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.domain.SupplementLimits
 import com.ashkb.app.domain.SupplementLogStatus
 import com.ashkb.app.domain.SupplementTiming
@@ -337,7 +339,7 @@ private fun VitalsHero(vitals: Vitals?, onEdit: () -> Unit) {
                 Box(Modifier.weight(1f)) {
                     StatTile(
                         label = stringResource(R.string.vitals_temperature_short),
-                        value = temp?.let { "%.1f".format(it) } ?: stringResource(R.string.common_not_recorded),
+                        value = temp?.let { String.format(Locale.US, "%.1f", it) } ?: stringResource(R.string.common_not_recorded),
                         unit = temp?.let { "℃" },
                         tone = tempTone,
                     )
@@ -809,7 +811,7 @@ private fun SupplementStatusSlot(status: String, icon: ImageVector) {
 }
 
 /** 数值显示：整数不带小数点，其余一位小数（补剂剂量与体重提示共用）。 */
-internal fun fmtNum(v: Double): String = if (v == v.toLong().toDouble()) v.toLong().toString() else "%.1f".format(v)
+internal fun fmtNum(v: Double): String = if (v == v.toLong().toDouble()) v.toLong().toString() else String.format(Locale.US, "%.1f", v)
 
 /**
  * B11 合并时间表的一行：时刻 + 名称 + 类别（药 / 补）。
@@ -823,6 +825,11 @@ private data class TimelineRow(val time: String, val name: String, val isMed: Bo
 /**
  * B11：把药单 `takeTimes` 与补剂 `times` 展平、按时刻升序合并成时间表；
  * 非法时刻直接丢弃（不抛异常）。
+ *
+ * v1.2.10（审查 CRITICAL-1）：**解析口径换成 [ScheduleCalc.parseTimes]**。此前是
+ * `raw?.split(',')`（CSV），而写入侧存的是 JSON 数组 `["08:00"]` —— 单段、`minutesOf` 判非法
+ * → 全部丢弃 → **这张「今日服药 / 补剂时间表」在生产中恒为空**。同一个 bug 与
+ * `SupplementTiming.timesOf` 是同源的（写入侧 JSON、读取侧 CSV），两处都在本次修掉。
  */
 private fun mergedTimeline(
     medications: List<Medication>,
@@ -830,8 +837,7 @@ private fun mergedTimeline(
 ): List<TimelineRow> {
     val rows = mutableListOf<TimelineRow>()
     fun add(raw: String?, name: String, isMed: Boolean) {
-        raw?.split(',')?.forEach { slot ->
-            val t = slot.trim()
+        ScheduleCalc.parseTimes(raw).forEach { t ->
             if (SupplementTiming.minutesOf(t) != null) rows.add(TimelineRow(t, name, isMed))
         }
     }
@@ -883,15 +889,15 @@ private fun VitalsSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
     GlassSheet(onDismissRequest = onDismiss) {
         SheetColumn {
             Text(stringResource(R.string.vitals_record_action), style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(temp, { temp = it }, label = { Text(stringResource(R.string.vitals_temperature_field)) }, singleLine = true)
+            AshkbTextField(temp, { temp = it }, label = { Text(stringResource(R.string.vitals_temperature_field)) }, singleLine = true)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OutlinedTextField(sys, { sys = it }, label = { Text(stringResource(R.string.vitals_bp_systolic)) },
+                AshkbTextField(sys, { sys = it }, label = { Text(stringResource(R.string.vitals_bp_systolic)) },
                     singleLine = true, modifier = Modifier.weight(1f))
-                OutlinedTextField(dia, { dia = it }, label = { Text(stringResource(R.string.vitals_bp_diastolic)) },
+                AshkbTextField(dia, { dia = it }, label = { Text(stringResource(R.string.vitals_bp_diastolic)) },
                     singleLine = true, modifier = Modifier.weight(1f))
             }
-            OutlinedTextField(hr, { hr = it }, label = { Text(stringResource(R.string.vitals_heart_rate_field)) }, singleLine = true)
-            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
+            AshkbTextField(hr, { hr = it }, label = { Text(stringResource(R.string.vitals_heart_rate_field)) }, singleLine = true)
+            AshkbTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
             // v1.0.73（D4）：空表单 / 越界数值一律不允许提交（此前无 enabled 门，可直接覆盖当天数据）
             if (!canSave) {
                 Text(
@@ -943,8 +949,8 @@ private fun WeightSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
     GlassSheet(onDismissRequest = onDismiss) {
         SheetColumn {
             Text(stringResource(R.string.vitals_record_weight), style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(weight, { weight = it }, label = { Text(stringResource(R.string.vitals_weight_field)) }, singleLine = true)
-            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
+            AshkbTextField(weight, { weight = it }, label = { Text(stringResource(R.string.vitals_weight_field)) }, singleLine = true)
+            AshkbTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
                 enabled = weight.toDoubleOrNull() != null,
@@ -983,17 +989,17 @@ private fun BodyMeasureSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
     GlassSheet(onDismissRequest = onDismiss) {
         SheetColumn {
             Text(stringResource(R.string.vitals_body_measures), style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(height, { height = it }, label = { Text(stringResource(R.string.vitals_height_cm)) }, singleLine = true)
-            OutlinedTextField(waist, { waist = it }, label = { Text(stringResource(R.string.vitals_waist_cm)) }, singleLine = true)
-            OutlinedTextField(hip, { hip = it }, label = { Text(stringResource(R.string.vitals_hip_cm)) }, singleLine = true)
-            OutlinedTextField(bmi, { bmi = it }, label = { Text(stringResource(R.string.profile_bmi_auto)) }, singleLine = true)
+            AshkbTextField(height, { height = it }, label = { Text(stringResource(R.string.vitals_height_cm)) }, singleLine = true)
+            AshkbTextField(waist, { waist = it }, label = { Text(stringResource(R.string.vitals_waist_cm)) }, singleLine = true)
+            AshkbTextField(hip, { hip = it }, label = { Text(stringResource(R.string.vitals_hip_cm)) }, singleLine = true)
+            AshkbTextField(bmi, { bmi = it }, label = { Text(stringResource(R.string.profile_bmi_auto)) }, singleLine = true)
             Text(
-                if (weightKg != null) stringResource(R.string.vitals_bmi_auto_note, "%.1f".format(weightKg))
+                if (weightKg != null) stringResource(R.string.vitals_bmi_auto_note, String.format(Locale.US, "%.1f", weightKg))
                 else stringResource(R.string.vitals_bmi_need_weight),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
+            AshkbTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
                 onClick = {
@@ -1048,13 +1054,16 @@ private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, 
                 stringResource(if (current == null) R.string.nutrition_add_supplement else R.string.common_edit),
                 style = MaterialTheme.typography.titleLarge,
             )
-            OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.common_name)) }, singleLine = true)
-            OutlinedTextField(brand, { brand = it }, label = { Text(stringResource(R.string.nutrition_brand_field)) }, singleLine = true)
-            OutlinedTextField(dose, { dose = it }, label = { Text(stringResource(R.string.nutrition_dose_field)) }, singleLine = true)
+            AshkbTextField(name, { name = it }, label = { Text(stringResource(R.string.common_name)) }, singleLine = true)
+            AshkbTextField(brand, { brand = it }, label = { Text(stringResource(R.string.nutrition_brand_field)) }, singleLine = true)
+            AshkbTextField(dose, { dose = it }, label = { Text(stringResource(R.string.nutrition_dose_field)) }, singleLine = true)
             // B11：量化剂量三输入——单次剂量 / 单位 / 每日参考上限（上限由用户自填，App 不内置医学数值）
-            OutlinedTextField(doseAmount, { doseAmount = it }, label = { Text(stringResource(R.string.supp_dose_amount_label)) }, singleLine = true)
-            OutlinedTextField(doseUnit, { doseUnit = it }, label = { Text(stringResource(R.string.supp_dose_unit_label)) }, singleLine = true)
-            OutlinedTextField(dailyMax, { dailyMax = it }, label = { Text(stringResource(R.string.supp_daily_max_label)) }, singleLine = true)
+            AshkbTextField(
+                doseAmount, { doseAmount = it }, label = { Text(stringResource(R.string.supp_dose_amount_label)) },
+                singleLine = true,
+            )
+            AshkbTextField(doseUnit, { doseUnit = it }, label = { Text(stringResource(R.string.supp_dose_unit_label)) }, singleLine = true)
+            AshkbTextField(dailyMax, { dailyMax = it }, label = { Text(stringResource(R.string.supp_daily_max_label)) }, singleLine = true)
             Text(
                 stringResource(R.string.supp_daily_max_hint),
                 style = MaterialTheme.typography.labelSmall,
@@ -1066,7 +1075,7 @@ private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, 
                 selected = category.name,
                 onSelect = { key -> category = SupplementCategory.fromKey(key) },
             )
-            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
+            AshkbTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
             // v1.2.4：提醒时刻。复用「添加药品」的 PlanTimePicker（口服可多选）——
             // 补剂的 `times` 本来就是 JSON 数组，一天多次是它支持过的形状，不必另造一个单值输入。
             Text(stringResource(R.string.supp_reminder_time_field), style = MaterialTheme.typography.labelMedium)
@@ -1157,7 +1166,7 @@ private fun DietSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
                 selected = dairy,
                 onSelect = { dairy = it },
             )
-            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
+            AshkbTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes_optional)) })
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
                 onClick = {
@@ -1283,7 +1292,7 @@ private fun AvoidAddStep(current: FoodAvoidItem? = null, onSave: (FoodAvoidItem)
             stringResource(if (current == null) R.string.nutrition_add_avoid_item else R.string.common_edit),
             style = MaterialTheme.typography.titleLarge,
         )
-        OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.nutrition_food_name)) }, singleLine = true)
+        AshkbTextField(name, { name = it }, label = { Text(stringResource(R.string.nutrition_food_name)) }, singleLine = true)
         Text(stringResource(R.string.common_category), style = MaterialTheme.typography.labelMedium)
         ChipGroup(
             options = listOf(
@@ -1385,7 +1394,7 @@ private fun WeightManageSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
                         verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
                     ) {
                         Text(
-                            stringResource(R.string.wellness_weight_entry, log.date, "%.1f".format(log.weightKg)),
+                            stringResource(R.string.wellness_weight_entry, log.date, String.format(Locale.US, "%.1f", log.weightKg)),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         log.notes?.let {

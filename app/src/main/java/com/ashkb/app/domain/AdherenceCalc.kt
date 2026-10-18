@@ -87,9 +87,17 @@ object AdherenceCalc {
      * 留给**没有 PRN 语义**的调用方（补剂）与纯数值计算：无记录时仍返回 0（旧行为，报表的
      * 补剂卡片自己在 `total == 0` 时走「暂无」分支）。要区分「0 分」与「没有记录」，
      * 请用 [Completion.ratePct]（无记录为 `null`）。
+     *
+     * v1.2.10（审查 L1）：**改为整数运算**。此前是 `((done + partial * 0.5) / total * 100).toInt()`
+     * —— `partial * 0.5` 把整个式子拖进 double，而 `100/25` 这类除不尽的值在二进制里没有精确表示：
+     * `done=4 / partial=21 / total=25` 的数学结果是 58，double 算出 `57.99999999999999`，
+     * `.toInt()` 截断成 **57**。穷举 `d,p ≤ 80 / t ≤ 120` 有 67 组不一致（临床的 70/90 两档
+     * 恰好一组都没踩到，所以症状是「偶尔差 1 个百分点」而不是错判）。整数式
+     * `(done * 2 + partial) * 100 / (total * 2)` 把 ×0.5 变成 ×1/×2，全程无浮点，
+     * 截断方向与非负数的 floor 一致，与旧式在「算得准」的输入上逐个相等。
      */
     fun ratePct(done: Int, partial: Int, total: Int): Int =
-        if (total <= 0) 0 else ((done + partial * 0.5) / total * 100).toInt()
+        if (total <= 0) 0 else (done * 2 + partial) * 100 / (total * 2)
 
     /**
      * 按状态词表汇总（顺序无关）——纯状态口径，不含 PRN 语义（补剂走这条）。
@@ -122,6 +130,12 @@ object AdherenceCalc {
      * （用户 2026-09-27 拍板：PRN 单独统计）。排除依据是记录自带的 [MedicationLog.prnFlag]
      * （写入侧 `slotKey == null` 即为按需），所以调用方传全量记录即可，不必也不该自己过滤——
      * 过滤规则只有这一处，界面上的「共 N 条记录」与这里的分母永远同源。
+     *
+     * v1.2.10（审查 §6.10）：**报表侧也改走这里**。此前 `ReportRepository` 的 overview / periodicReport
+     * 是三条写死状态字面量的 `COUNT(*)` 再求和，分母只认它列举得出的三态；而药单页弹层一直走本函数
+     * （[completionByStatus] 把认不出的状态也计入 `total`）。同一批用药记录因此在两张页面上算出**两个**
+     * 完成度——用户不会同时看到这两个数，所以它比"同一张卡片上两个百分比打架"更隐蔽。
+     * 现在两侧共用本函数：分母怎么算只有这一处，报表面板的「共 N 条记录」与药单页的同一个数。
      */
     fun completion(logs: List<MedicationLog>): Completion =
         completionByStatus(logs.filterNot { it.prnFlag }.map { it.status })

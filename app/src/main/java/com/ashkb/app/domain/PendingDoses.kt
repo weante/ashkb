@@ -19,7 +19,12 @@ import java.time.LocalTime
  * 「昨天还有 N 剂未记录」卡渲染与补记（补记写入**槽位所属日**）。
  *
  * 纯函数、无 Android 依赖，可单测（判定口径与 `ReminderScheduler` 的结算判定保持一致：
- * done 与 skipped 都算已结算）。
+ * **已结算 = `AdherenceCalc.SETTLED_STATUSES`，即 done / partial / skipped 三态都算**）。
+ *
+ * v1.2.10（审查 L5）：上面这行此前写的是「done 与 skipped 都算已结算」——**代码是对的、注释是旧的**。
+ * v1.0.77（批次 3b）引入 `settledSlotRefs` 时把 partial 纳入了已结算，但两处 KDoc 没跟着改
+ * （本文件与 `ui/today/TodayViewModel.kt`）。这种漂移很危险：下一个维护者会照着注释
+ * 把 partial 从已结算里剔出去，于是「记了部分完成仍被当成没记录」——正是裁决项 2 修掉的那个 bug。
  */
 object PendingDoses {
 
@@ -39,8 +44,9 @@ object PendingDoses {
      * @param date 要检查的归属日（跨零点补记场景传**昨天**）
      * @param meds 在用药品
      * @param now 现在（可注入，便于确定性地单测）
-     * @param isSettled 该槽位是否已有记录（done / skipped 都算）——由调用方用仓库查询构造，
-     *   避免领域层依赖 `ReminderScheduler.slotRef` 的字符串格式（少一处格式漂移的机会）
+     * @param isSettled 该槽位是否已有记录（`AdherenceCalc.SETTLED_STATUSES`：done / partial / skipped
+     *   三态都算）——由调用方用仓库查询构造，避免领域层依赖 `ReminderScheduler.slotRef` 的字符串格式
+     *   （少一处格式漂移的机会）
      */
     fun unsettledOn(
         date: LocalDate,

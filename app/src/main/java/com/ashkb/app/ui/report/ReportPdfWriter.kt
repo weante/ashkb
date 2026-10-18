@@ -10,6 +10,7 @@ import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.R
 import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.domain.Labels
+import java.util.Locale
 import java.io.File
 import java.time.LocalDate
 
@@ -232,19 +233,19 @@ object ReportPdfWriter {
         d.kv(context.getString(R.string.pdf_label_symptom_days), "${o.symptom.daysRecorded} / 30")
         d.kv(
             context.getString(R.string.pdf_label_avg_pain),
-            o.symptom.avgPain?.let { "%.1f / 10".format(it) }
+            o.symptom.avgPain?.let { String.format(Locale.US, "%.1f / 10", it) }
                 ?: context.getString(R.string.pdf_value_not_recorded)
         )
         d.kv(
             context.getString(R.string.pdf_label_avg_stiffness),
             o.symptom.avgStiffnessMin?.let {
-                context.getString(R.string.pdf_value_minutes, "%.0f".format(it))
+                context.getString(R.string.pdf_value_minutes, String.format(Locale.US, "%.0f", it))
             } ?: context.getString(R.string.pdf_value_not_recorded)
         )
         d.kv(context.getString(R.string.pdf_label_night_pain_days), "${o.symptom.nightPainDays}")
         d.kv(
             context.getString(R.string.pdf_label_avg_fatigue),
-            o.symptom.avgFatigue?.let { "%.1f / 10".format(it) }
+            o.symptom.avgFatigue?.let { String.format(Locale.US, "%.1f / 10", it) }
                 ?: context.getString(R.string.pdf_value_not_recorded)
         )
         d.kv(
@@ -265,13 +266,13 @@ object ReportPdfWriter {
             val avg = bas.map { it.total }.average()
             d.kv(
                 context.getString(R.string.pdf_label_latest),
-                context.getString(R.string.pdf_value_latest, bas.last().date, "%.1f".format(bas.last().total))
+                context.getString(R.string.pdf_value_latest, bas.last().date, String.format(Locale.US, "%.1f", bas.last().total))
             )
-            d.kv(context.getString(R.string.pdf_label_average), "%.1f / 10".format(avg))
-            o.basdaiDelta?.let { d.kv(context.getString(R.string.pdf_label_change), "%+.1f".format(it)) }
+            d.kv(context.getString(R.string.pdf_label_average), String.format(Locale.US, "%.1f / 10", avg))
+            o.basdaiDelta?.let { d.kv(context.getString(R.string.pdf_label_change), String.format(Locale.US, "%+.1f", it)) }
             if (bas.size > 1) {
                 bas.takeLast(8).forEach {
-                    d.line("  ${it.date}  ${"%.1f".format(it.total)}" +
+                    d.line("  ${it.date}  ${String.format(Locale.US, "%.1f", it.total)}" +
                         if (ClinicalThresholds.basdaiHigh(it.total)) "  " + context.getString(R.string.pdf_basdai_high) else "")
                 }
             }
@@ -284,7 +285,7 @@ object ReportPdfWriter {
         else if (abnormal.isEmpty()) d.line(context.getString(R.string.pdf_labs_all_normal))
         else {
             abnormal.take(20).forEach { l ->
-                val v = l.value?.let { "%.2f".format(it) } ?: (l.valueText ?: "-")
+                val v = l.value?.let { String.format(Locale.US, "%.2f", it) } ?: (l.valueText ?: "-")
                 val flag = when (l.abnormal) {
                     "high" -> " " + context.getString(R.string.pdf_lab_flag_high)
                     "low" -> " " + context.getString(R.string.pdf_lab_flag_low)
@@ -293,8 +294,16 @@ object ReportPdfWriter {
                 }
                 d.line("  ${l.date} ${l.testName}" + context.getString(R.string.ui_value_colon, v) +
                     (l.unit?.let { " $it" } ?: "") + flag +
+                    // v1.2.10 审查 HIGH-2：参考区间先按 Locale.US 收敛，资源里只留 %s，
+                    // 否则德语/法语等系统语言下 PDF 里的小数点会变成逗号。
                     (l.refLow?.let { lo ->
-                        l.refHigh?.let { hi -> context.getString(R.string.pdf_lab_ref_range, lo, hi) }
+                        l.refHigh?.let { hi ->
+                            context.getString(
+                                R.string.pdf_lab_ref_range,
+                                String.format(Locale.US, "%.2f", lo),
+                                String.format(Locale.US, "%.2f", hi)
+                            )
+                        }
                     } ?: ""), flag.isNotBlank())
             }
             if (abnormal.size > 20) {

@@ -17,6 +17,7 @@ import com.ashkb.app.data.entity.LedgerStatus
 import com.ashkb.app.data.entity.LedgerType
 import com.ashkb.app.domain.AttachmentPath
 import com.ashkb.app.domain.RecoveryCode
+import com.ashkb.app.domain.ScheduleCalc
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
@@ -424,7 +425,26 @@ class BackupRepository(private val context: Context) {
 
     // ======================= 档案 JSON（模块导出） =======================
 
-    /** 健康档案明文 JSON（换机建档导入用，协议 §3 模块导出）。 */
+    /**
+     * 健康档案明文 JSON（换机建档导入用，协议 §3 模块导出）。
+     *
+     * v1.2.10（审查第二批 §5-HIGH-4）：**导出字段从 8 个补到 15 个**。
+     *
+     * 原先只写 8 键，而 [com.ashkb.app.data.entity.Profile] 有 20 个字段。漏掉的那几个里
+     * 有一个不是「少带点信息」，而是**功能性失效**：`spine_mobility` 是
+     * `domain/ExerciseEngine.kt` 的 `cervicalInvolved(spineMobility)` 的唯一输入，
+     * 只认 `moderate` / `severe`——漏了它，换机之后颈椎禁忌动作的黑榜**静默失效**
+     * （不报错、不提示，只是不再过滤）。其余几个（合并症 / 生活方式 / 紧急卡两段文字 /
+     * 体重目标区间）同样只在「换机建档」这一条路径上丢，用户要到下次打开对应页面才发现。
+     *
+     * 仍然**不导出**的 5 个：`id` / `ui_mode` / `minimal_since` / `created_at` / `updated_at`。
+     * 前四个是设备本地的运行态（`ui_mode` 是「这台设备现在要不要极简」，不该跟着档案走；
+     * `minimal_since` 与它成对），时间戳由导入侧按导入时刻重新生成。
+     * 这个取舍写在这里，是为了让下一个人看到「20 个字段只导 15 个」时知道那是决定，不是遗漏。
+     *
+     * ⚠️ 作用域：**只有这条档案 JSON 通道**会受字段清单影响。整库加密备份 / 恢复
+     * （本地 `.ashkb`、WebDAV、恢复）走的是全表载荷，20 个字段一个不少。
+     */
     suspend fun exportProfileJson(): String = withContext(Dispatchers.IO) {
         val o = JSONObject()
         o.put("format", "ashkb-profile")
@@ -436,9 +456,16 @@ class BackupRepository(private val context: Context) {
                 p.diagnoseYear?.let { put("diagnose_year", it) }
                 put("hla_b27", p.hlaB27)
                 put("disease_stage", p.diseaseStage)
+                p.spineMobility?.let { put("spine_mobility", it) }
                 p.sacroiliitisGrade?.let { put("sacroiliitis_grade", it) }
+                p.comorbidities?.let { put("comorbidities", it) }
                 p.allergies?.let { put("allergies", it) }
+                p.lifestyle?.let { put("lifestyle", it) }
                 p.emergencyBloodType?.let { put("emergency_blood_type", it) }
+                p.emergencyMedSummary?.let { put("emergency_med_summary", it) }
+                p.emergencyNote?.let { put("emergency_note", it) }
+                p.weightTargetLow?.let { put("weight_target_low", it) }
+                p.weightTargetHigh?.let { put("weight_target_high", it) }
             })
         }
         val meds = db.medicationDao().listActive()
@@ -465,6 +492,18 @@ class BackupRepository(private val context: Context) {
         o.toString(2)
     }
 
+    /**
+     * 导入档案 JSON。
+     *
+     * v1.2.10（审查第二批 §5-HIGH-4）：补上新增的 7 个字段，并统一「缺键即保原值」的写法。
+     *
+     * **为什么是「缺键保原值」而不是「缺键写默认」**：旧版本导出的 JSON 里根本没有这些键
+     * （它们是分批加进导出清单的），而导入是 upsert 整行——若把缺键读成默认值，
+     * 用一份旧 JSON 导入就会把**本机已经填好的**合并症、生活方式、紧急卡备注、体重目标
+     * 全部清空。用户看到的是「导入一份三个月前的档案，最近补的资料全没了」。
+     * `existing?.x` 作兜底正是为此；而**新机（`existing == null`）**时兜底自然是 null，
+     * 落到 Profile 的列默认值，也是正确行为。
+     */
     suspend fun importProfileJson(json: String): Pair<String, Int> = withContext(Dispatchers.IO) {
         val root = JSONObject(json)
         if (root.optString("format") != "ashkb-profile")
@@ -483,41 +522,75 @@ class BackupRepository(private val context: Context) {
             // R1：旧档案 JSON 的 active 归一化为 controlled（与迁移 v7→v8 同义；其余未识别值原样透传，引擎按 flare 保守处理）
             diseaseStage = po.optString("disease_stage", existing?.diseaseStage ?: "unknown")
                 .let { if (it == "active") "controlled" else it },
+            // v1.2.10（§5-HIGH-4）：颈椎门控的唯一输入，缺键必须保原值——写默认 null 等于
+            // 「导入一次旧档案就把颈椎黑榜重新打开」（ExerciseEngine.cervicalInvolved 只认 moderate/severe）
+            spineMobility = po.optString("spine_mobility").ifBlank { existing?.spineMobility },
             sacroiliitisGrade = po.optString("sacroiliitis_grade").ifBlank { existing?.sacroiliitisGrade },
+            comorbidities = po.optString("comorbidities").ifBlank { existing?.comorbidities },
             allergies = po.optString("allergies").ifBlank { existing?.allergies },
+            lifestyle = po.optString("lifestyle").ifBlank { existing?.lifestyle },
             emergencyBloodType = po.optString("emergency_blood_type").ifBlank { existing?.emergencyBloodType },
+            emergencyMedSummary = po.optString("emergency_med_summary").ifBlank { existing?.emergencyMedSummary },
+            emergencyNote = po.optString("emergency_note").ifBlank { existing?.emergencyNote },
+            // 体重目标是 Double?：不能用 optString（"72.5" 变字符串再解析会引入第二条解析路径），
+            // 用 has() 判存在 + getDouble，语义与上面的 ifBlank 兜底一致
+            weightTargetLow = if (po.has("weight_target_low")) po.getDouble("weight_target_low") else existing?.weightTargetLow,
+            weightTargetHigh = if (po.has("weight_target_high")) po.getDouble("weight_target_high") else existing?.weightTargetHigh,
         )
         db.profileDao().upsert(profile)
         var medCount = 0
         root.optJSONArray("medications")?.let { arr ->
             val now = nowIso()
             for (i in 0 until arr.length()) {
-                val m = arr.getJSONObject(i)
-                db.medicationDao().upsert(
-                    com.ashkb.app.data.entity.Medication(
-                        id = Ids.new("med"), name = m.getString("name"),
-                        brandName = m.optString("brand_name").ifBlank { null },
-                        nameKey = m.optString("name_key", m.getString("name").lowercase()),
-                        medClass = m.optString("med_class", "OTHER"),
-                        route = m.optString("route", "oral"),
-                        dose = m.optString("dose", ""),
-                        frequency = m.optString("frequency", "DAILY"),
-                        takeTimes = m.optString("take_times").ifBlank { null },
-                        weeklyWeekday = if (m.has("weekly_weekday")) m.getInt("weekly_weekday") else null,
-                        weeklyWeekday2 = if (m.has("weekly_weekday2")) m.getInt("weekly_weekday2") else null,
-                        startDate = m.optString("start_date", LocalDate.now().toString()),
-                        endDate = m.optString("end_date").ifBlank { null },
-                        injCycleDays = if (m.has("inj_cycle_days")) m.getInt("inj_cycle_days") else null,
-                        notes = m.optString("notes").ifBlank { null },
-                        createdAt = now, updatedAt = now,
-                    )
-                )
+                upsertImportedMedication(arr.getJSONObject(i), now)
                 medCount++
             }
         }
         log(LedgerType.EXPORT, true, "import-profile", null, medCount, null,
             context.getString(R.string.backup_detail_profile_import))
         Pair(profile.displayName, medCount)
+    }
+
+    /**
+     * v1.2.10（审查第二批 §5-MEDIUM-6）：导入一支药——**同名药复用 id**。
+     *
+     * 抽成独立函数有两个理由：① 让 [importProfileJson] 的主干只剩「读 JSON → 走一遍」，
+     * 复杂度不随导入字段的增加而增长；② 复用 id 这条规则本身需要被单独读到（见
+     * [com.ashkb.app.data.db.MedicationDao.activeByNameKey] 的 KDoc）。
+     *
+     * 复用 id 时**保留 `createdAt`**：药单按 `created_at` 排序，若每次导入都刷新它，
+     * 「导入一份档案」会让药单顺序整体重排。`createdAt` 是身份的一部分，跟着 id 走。
+     * 其余字段按 JSON 覆盖——导入的语义是「以这份档案为准」，不是「补空白」。
+     */
+    private suspend fun upsertImportedMedication(m: JSONObject, now: String) {
+        val nameKey = m.optString("name_key", m.getString("name").lowercase())
+        val existing = db.medicationDao().activeByNameKey(nameKey)
+        db.medicationDao().upsert(
+            com.ashkb.app.data.entity.Medication(
+                id = existing?.id ?: Ids.new("med"),
+                name = m.getString("name"),
+                brandName = m.optString("brand_name").ifBlank { null },
+                nameKey = nameKey,
+                medClass = m.optString("med_class", "OTHER"),
+                route = m.optString("route", "oral"),
+                dose = m.optString("dose", ""),
+                frequency = m.optString("frequency", "DAILY"),
+                takeTimes = m.optString("take_times").ifBlank { null },
+                weeklyWeekday = if (m.has("weekly_weekday")) m.getInt("weekly_weekday") else null,
+                weeklyWeekday2 = if (m.has("weekly_weekday2")) m.getInt("weekly_weekday2") else null,
+                startDate = m.optString("start_date", LocalDate.now().toString()),
+                endDate = m.optString("end_date").ifBlank { null },
+                // v1.2.10（审查 M1）：导入侧也要钳——这份 JSON 可能来自手改、来自更早的版本、
+                // 或来自一台表单不设下界的设备。`0` 落库后这支药会从今日卡与所有提醒里消失。
+                injCycleDays = if (m.has("inj_cycle_days")) {
+                    ScheduleCalc.clampCycleDays(m.getInt("inj_cycle_days"))
+                } else {
+                    null
+                },
+                notes = m.optString("notes").ifBlank { null },
+                createdAt = existing?.createdAt ?: now, updatedAt = now,
+            )
+        )
     }
 
     suspend fun logExportJson(fileName: String, rows: Int) {

@@ -12,13 +12,49 @@ data class PlanSlot(val key: String, val time: String?, val label: String)
 
 object ScheduleCalc {
 
-    /** 解析 take_times JSON → List<"HH:mm">，空安全；过滤非法时刻（如 25:99——防 LocalTime.parse 崩溃） */
-    fun takeTimesOf(med: Medication): List<String> {
-        val raw = med.takeTimes ?: return emptyList()
+    /**
+     * 周期天数（`inj_cycle_days`）的合法下界：**至少 1 天**。
+     *
+     * v1.2.10（审查 M1）：此前写入侧不设下界（表单照收 `0`、导入侧照存 JSON 里的任意整数），
+     * 而读取侧 [isInjectionDay] 遇到 `cycle <= 0` 直接 `return false` —— 于是这支药在
+     * 计划槽位、今日卡、提醒重排里**全部消失**（用户以为药没了），但药单列表、锁屏急救卡
+     * （[EmergencyMeds]）、PDF 里还看得见，且周期段会印成「每 0 天」。
+     *
+     * 上界取 3 位数字（表单本来就 `take(3)`）：3650 天 ≈ 十年，够任何临床周期，同时挡住
+     * 「把 999 敲成 9999999」这类输入。
+     */
+    const val MIN_CYCLE_DAYS = 1
+    const val MAX_CYCLE_DAYS = 999
+
+    /**
+     * 把任意来源的周期天数钳到合法区间。
+     *
+     * **唯一钳制点**：表单写入（`MedEditScreen.buildMed`）与备份导入（`BackupRepository`）都走它。
+     * 读侧刻意**不**再兜一次底——若哪天历史库里已经躺着 0，钳制的正确位置是让它显示出来
+     * （急救卡与 PDF 印「每 0 天」比静默消失更容易被用户发现），而不是在读的时候假装它是 1。
+     */
+    fun clampCycleDays(raw: Int?): Int? = raw?.coerceIn(MIN_CYCLE_DAYS, MAX_CYCLE_DAYS)
+
+    /**
+     * `take_times` / `times` 的**唯一解析口径**：JSON 数组字符串 → `List<"HH:mm">`。
+     *
+     * v1.2.10（审查 CRITICAL-1）：本函数是从 [takeTimesOf] 里抽出来的。此前写入侧一律
+     * `JSONArray(list).toString()`，而**读取侧有三处各写一遍**、其中两处按 CSV（`split(',')`）
+     * 解析 —— 于是「矿物类补剂与螯合类药物同服」的提示在生产中**从未触发过**（有 16 条绿色测试
+     * 钉着一个不存在的格式）。抽成一处后，任何新的读取方都只能走这里。
+     *
+     * 脏数据（`not-json`、`25:99`、非字符串元素）一律丢弃而不是抛异常：`times` 会走备份恢复路径，
+     * 历史脏值完全可能进来，崩在 `LocalTime.parse` 上比少一条提示严重得多。
+     */
+    fun parseTimes(raw: String?): List<String> {
+        if (raw.isNullOrBlank()) return emptyList()
         return runCatching {
             JSONArray(raw).let { arr -> (0 until arr.length()).map { arr.getString(it) } }
         }.getOrDefault(emptyList()).filter { TIME_PATTERN.matches(it) }
     }
+
+    /** 解析 take_times JSON → List<"HH:mm">，空安全；过滤非法时刻（如 25:99——防 LocalTime.parse 崩溃） */
+    fun takeTimesOf(med: Medication): List<String> = parseTimes(med.takeTimes)
 
     /** 合法时刻：00:00–23:59（P5 修订：原 \d{2}:\d{2} 会放行 25:99 → 提醒重排崩溃） */
     val TIME_PATTERN = Regex("([01]\\d|2[0-3]):[0-5]\\d")

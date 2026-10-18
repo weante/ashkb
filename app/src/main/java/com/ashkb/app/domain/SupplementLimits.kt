@@ -13,11 +13,19 @@ import com.ashkb.app.data.entity.Supplement
 object SupplementLimits {
 
     /**
-     * 每日服用次数：优先按 `times`（形如 `"08:00,20:00"`）的槽位数，
+     * 每日服用次数：优先按 `times` 的**槽位数**（真实格式是 JSON 数组，如 `["08:00","20:00"]`），
      * 否则按 frequency 粗判（daily=1 / bid=2 / tid=3）。
+     *
+     * v1.2.10（审查 CRITICAL-1 / §5-MEDIUM-4）两处修正：
+     * ① KDoc 此前写 `"08:00,20:00"`（CSV）—— **格式是假的**，下一个维护者会照抄，
+     *    这正是 CRITICAL-1 的成因（写入侧 JSON、读取侧 CSV）；
+     * ② 实现此前是 `times?.split(',')?.count { isNotBlank() }`。它**看起来**对——`["08:00","20:00"]`
+     *    切出 2 段恰等于长度——但空数组 `"[]"` 切出的是 1 段（`"[]"` 本身非空），
+     *    于是「设了频次 bid、没设具体时刻」的补剂会被算成**每天 1 次**而不是 2 次，
+     *    当日累计剂量被低估一半 → 超上限警示该响的时候不响。现在走 [ScheduleCalc.parseTimes]。
      */
     fun dosesPerDay(sup: Supplement): Int {
-        val slots = sup.times?.split(',')?.count { it.trim().isNotBlank() } ?: 0
+        val slots = ScheduleCalc.parseTimes(sup.times).size
         if (slots > 0) return slots
         return when (sup.frequency.lowercase()) {
             "bid", "twice_daily" -> 2

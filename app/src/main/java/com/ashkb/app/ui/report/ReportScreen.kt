@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.util.Locale
 
 
 import com.ashkb.app.data.repo.ReportRepository
@@ -58,11 +59,13 @@ import com.ashkb.app.ui.components.LoadingBlock
 import com.ashkb.app.ui.components.NavRow
 import com.ashkb.app.ui.components.DoseCompletionBlock
 import com.ashkb.app.ui.components.SectionCard
-import com.ashkb.app.ui.components.ScreenTitleCard
+import com.ashkb.app.ui.components.PageHeader
+import com.ashkb.app.ui.components.SegmentedTabs
 import com.ashkb.app.ui.components.sharedWindow
 import com.ashkb.app.ui.components.SmallTrendChart
 import com.ashkb.app.ui.components.StatusChip
-import com.ashkb.app.ui.components.TabChips
+import com.ashkb.app.ui.components.StatTile
+import com.ashkb.app.ui.components.Trend
 import com.ashkb.app.ui.components.TrendChart
 import com.ashkb.app.ui.components.TrendPoint
 import com.ashkb.app.ui.components.WeightedTrailingRow
@@ -73,6 +76,7 @@ import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /** P4 M9 报表页：概览 / 趋势 / 周月报 / 报告导出 四页签。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -112,10 +116,9 @@ fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
     LaunchedEffect(Unit) { vm.onEnterReport() }
 
     Column(Modifier.fillMaxSize()) {
-        // v1.2.3：标题从「裸 Row 铺在米色底上」改为**圆角卡片**，与知识库页、以及下方那些
-        // 数据卡片同一套容器。维护者反馈「要和其他页面一样圆角矩形」。
-        Spacer(Modifier.height(Spacing.sm))
-        ScreenTitleCard(
+        // v1.2.10（UI 2.0 批次 C「换件」）：标题卡片退役，改直排页头（设计稿 §5.13 的 L1）。
+        // 刷新按钮仍在动作槽里，位置从卡片右侧变成页头右侧，语义不变。
+        PageHeader(
             title = stringResource(R.string.me_report_nav),
             subtitle = stringResource(R.string.report_subtitle),
         ) {
@@ -123,17 +126,18 @@ fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
                 Text(stringResource(R.string.common_refresh))
             }
         }
-        Spacer(Modifier.height(Spacing.md))
+        Spacer(Modifier.height(Spacing.sm))
 
-        // v1.2.3：页签从 `ScrollableTabRow`（下划线式）改为**胶囊**，依据是维护者自己的设计稿
-        // （`ASHKB-毛玻璃UI预览.html` 的 `.tchip`：未选中白底细描边、选中深青渐变底 + 白字）。
-        // 下划线式的未选中文字几乎与背景同色，维护者反馈「颜色需要对比度」。
-        TabChips(
+        // v1.2.10（UI 2.0 批次 C）：这里是**页面级视图切换**（概览/趋势/周月报/导出），
+        // 按设计稿 §5.7 改用 `SegmentedTabs`（surface-2 槽 + 白色滑块）。
+        // 原 `TabChips` 的深青渐变胶囊按红线 8「功能控件一律实心」退场。
+        SegmentedTabs(
             labels = tabs,
             selectedIndex = pager.currentPage,
             onSelect = { i -> scope.launch { pager.animateScrollToPage(i) } },
-            modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.sm),
+            modifier = Modifier.padding(horizontal = Spacing.lg),
         )
+        Spacer(Modifier.height(Spacing.sm))
 
         HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
             when (page) {
@@ -238,9 +242,18 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
         item {
             SectionCard(title = stringResource(R.string.report_exercise_section)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCell(stringResource(R.string.report_completed_count), "${o.exercise.doneCount}", Modifier.weight(1f))
-                    StatCell(stringResource(R.string.report_total_duration), stringResource(R.string.report_exercise_minutes, o.exercise.totalMinutes), Modifier.weight(1f))
-                    StatCell(stringResource(R.string.med_skip), "${o.exercise.skippedCount}", Modifier.weight(1f))
+                    Box(Modifier.weight(1f)) {
+                        StatTile(stringResource(R.string.report_completed_count), "${o.exercise.doneCount}")
+                    }
+                    Box(Modifier.weight(1f)) {
+                        StatTile(
+                            stringResource(R.string.report_total_duration),
+                            stringResource(R.string.report_exercise_minutes, o.exercise.totalMinutes),
+                        )
+                    }
+                    Box(Modifier.weight(1f)) {
+                        StatTile(stringResource(R.string.med_skip), "${o.exercise.skippedCount}")
+                    }
                 }
             }
         }
@@ -248,17 +261,34 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
         item {
             SectionCard(title = stringResource(R.string.symptom_overview_title)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCell(stringResource(R.string.report_record_days), "${o.symptom.daysRecorded}/30", Modifier.weight(1f))
-                    StatCell(stringResource(R.string.report_avg_pain), o.symptom.avgPain?.let { "%.1f/10".format(it) } ?: "—", Modifier.weight(1f))
-                    val stiffness = o.symptom.avgStiffnessMin
-                        ?.let { stringResource(R.string.ui_report_stiffness_score, it) } ?: "—"
-                    StatCell(stringResource(R.string.report_avg_stiffness), stiffness, Modifier.weight(1f))
+                    Box(Modifier.weight(1f)) {
+                        StatTile(stringResource(R.string.report_record_days), "${o.symptom.daysRecorded}/30")
+                    }
+                    Box(Modifier.weight(1f)) {
+                        val pain = o.symptom.avgPain?.let { String.format(Locale.US, "%.1f/10", it) } ?: "—"
+                        StatTile(stringResource(R.string.report_avg_pain), pain)
+                    }
+                    // v1.2.10 审查 HIGH-2：先在本行按 Locale.US 收敛，资源里只留 %s。
+                    // Resources.getString 内部是 String.format(config.locales[0], …)，小数点会跟着系统语言
+                    // 变成逗号（德语/法语等），所以小数格式不能写在 XML 的占位符里。
+                    Box(Modifier.weight(1f)) {
+                        val stiffness = o.symptom.avgStiffnessMin
+                            ?.let { stringResource(R.string.ui_report_stiffness_score, String.format(Locale.US, "%.0f", it)) }
+                            ?: "—"
+                        StatTile(stringResource(R.string.report_avg_stiffness), stiffness)
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCell(stringResource(R.string.symptom_night_pain_days), "${o.symptom.nightPainDays}", Modifier.weight(1f))
-                    StatCell(stringResource(R.string.symptom_eye_symptoms), stringResource(R.string.report_eye_days, o.symptom.eyeDays), Modifier.weight(1f))
-                    StatCell(stringResource(R.string.report_fever_days), "${o.symptom.feverDays}", Modifier.weight(1f))
+                    Box(Modifier.weight(1f)) {
+                        StatTile(stringResource(R.string.symptom_night_pain_days), "${o.symptom.nightPainDays}")
+                    }
+                    Box(Modifier.weight(1f)) {
+                        StatTile(stringResource(R.string.symptom_eye_symptoms), stringResource(R.string.report_eye_days, o.symptom.eyeDays))
+                    }
+                    Box(Modifier.weight(1f)) {
+                        StatTile(stringResource(R.string.report_fever_days), "${o.symptom.feverDays}")
+                    }
                 }
                 if (o.symptom.eyeDays > 0) {
                     Spacer(Modifier.height(Spacing.xs))
@@ -277,11 +307,32 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
                     Text(stringResource(R.string.report_no_basdai), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        StatCell(stringResource(R.string.report_latest), "%.1f/10".format(o.basdaiLatest.total), Modifier.weight(1f))
-                        StatCell(stringResource(R.string.report_mom), o.basdaiDelta?.let { "%+.1f".format(it) } ?: "—", Modifier.weight(1f))
-                        StatCell(stringResource(R.string.exercise_count), "${o.basdaiCount30}", Modifier.weight(1f))
+                        // v1.2.10（UI 2.0 批次 D「换图」）：环比从「另一格数字」收进「最新」的增量行。
+                        // 拆成两格时，环比那格只有一个孤立差值，看不出它相对谁；收成增量行后
+                        // 「最新 4.2/10 ▼ 环比 0.4」一眼就是一句话。方向着色遵循医学语义：
+                        // BASDAI 是疾病活动度，**下降才是好转**，所以 < 0 标 success、> 0 标 danger。
+                        val d = o.basdaiDelta
+                        Box(Modifier.weight(1f)) {
+                            StatTile(
+                                label = stringResource(R.string.report_latest),
+                                value = String.format(Locale.US, "%.1f/10", o.basdaiLatest.total),
+                                delta = d?.let {
+                                    stringResource(R.string.report_mom) + " " + String.format(Locale.US, "%.1f", abs(it))
+                                },
+                                deltaTone = when {
+                                    d == null -> StatusTone.Neutral
+                                    d < 0 -> StatusTone.Success
+                                    d > 0 -> StatusTone.Danger
+                                    else -> StatusTone.Neutral
+                                },
+                                trend = trendOf(d),
+                            )
+                        }
+                        Box(Modifier.weight(1f)) {
+                            StatTile(stringResource(R.string.exercise_count), "${o.basdaiCount30}")
+                        }
                     }
-                    if (o.basdaiLatest.total >= 4.0) {
+                    if (ClinicalThresholds.basdaiHigh(o.basdaiLatest.total)) {
                         Spacer(Modifier.height(Spacing.xs))
                         StatusChip(
                             text = stringResource(R.string.basdai_high_alert_note),
@@ -296,9 +347,25 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
         item {
             SectionCard(title = stringResource(R.string.report_flare_weight_section)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCell(stringResource(R.string.report_flare_count), "${o.flareCount}" + if (o.flareActive) stringResource(R.string.stage_active_paren) else "", Modifier.weight(1f))
-                    StatCell(stringResource(R.string.wellness_latest_weight), o.weightLatest?.let { "${it.weightKg} kg" } ?: "—", Modifier.weight(1f))
-                    StatCell(stringResource(R.string.trend_vs_last), o.weightDelta?.let { "%+.1f kg".format(it) } ?: "—", Modifier.weight(1f))
+                    Box(Modifier.weight(1f)) {
+                        StatTile(
+                            stringResource(R.string.report_flare_count),
+                            "${o.flareCount}" + if (o.flareActive) stringResource(R.string.stage_active_paren) else "",
+                        )
+                    }
+                    // 体重增减本身没有「好坏」的医学方向（与症状、血压不同），
+                    // 所以增量恒为 Neutral，只由箭头表达方向——设计稿 §5.8 的「医学语义」原则。
+                    Box(Modifier.weight(1f)) {
+                        val wd = o.weightDelta
+                        StatTile(
+                            label = stringResource(R.string.wellness_latest_weight),
+                            value = o.weightLatest?.let { "${it.weightKg} kg" } ?: "—",
+                            delta = wd?.let {
+                                stringResource(R.string.trend_vs_last) + " " + String.format(Locale.US, "%.1f", abs(it))
+                            },
+                            trend = trendOf(wd),
+                        )
+                    }
                 }
             }
         }
@@ -307,13 +374,12 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
     }
 }
 
-@Composable
-private fun StatCell(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(value, style = MaterialTheme.typography.titleLarge)
-        Text(label, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+/** 增量方向 → 箭头；null 与 0 都不画箭头（0 画箭头等于凭空造出一个「没变」的结论）。 */
+private fun trendOf(delta: Double?): Trend = when {
+    delta == null -> Trend.None
+    delta > 0 -> Trend.Up
+    delta < 0 -> Trend.Down
+    else -> Trend.Flat
 }
 
 // ======================= 趋势 =======================
@@ -393,8 +459,21 @@ private fun TrendCharts(t: ReportRepository.Trends) {
     val noDataText = stringResource(R.string.common_no_data)
     val noLabText = stringResource(R.string.report_no_lab_data)
 
+    // UI 2.0 §06 ④：BASDAI 走势图标题行右侧的「稳定期」结论胶囊。判据与下方高危胶囊
+    // 互补——高危胶囊说「≥ 4.0 需要讨论」，这里说「< 4.0 处在稳定期」，两者不会同时出现。
+    val basdaiStable = t.basdai.lastOrNull()?.let { !ClinicalThresholds.basdaiHigh(it.total) } == true
+
     val vitalsSeries = listOf(
-        MiniSeries("basdai", stringResource(R.string.report_basdai_trend), "", basdaiPoints, ClinicalThresholds.BASDAI_HIGH, cs.primary, noDataText),
+        MiniSeries(
+            key = "basdai",
+            title = stringResource(R.string.report_basdai_trend),
+            unit = "",
+            points = basdaiPoints,
+            threshold = ClinicalThresholds.BASDAI_HIGH,
+            accent = cs.primary,
+            emptyText = noDataText,
+            badge = if (basdaiStable) stringResource(R.string.report_basdai_stable) else null,
+        ),
         MiniSeries("pain", stringResource(R.string.symptom_pain_score), stringResource(R.string.exercise_minute_suffix), painPoints, null, cs.secondary, noDataText),
         MiniSeries("stiff", stringResource(R.string.symptom_morning_stiffness), stringResource(R.string.exercise_minute_space_suffix), stiffPoints, null, cs.secondary, noDataText),
         MiniSeries("weight", stringResource(R.string.vitals_weight), " kg", weightPoints, null, cs.primary, noDataText),
@@ -518,6 +597,13 @@ private data class MiniSeries(
     val caveat: String? = null,
     /** 展开成大图时的标题（格子窄，这里可以带英文缩写）。默认与格子标题相同。 */
     val sheetTitle: String = title,
+    /**
+     * 标题行右侧的结论胶囊文案（UI 2.0 §06 ④：BASDAI 格的「稳定期」）。
+     *
+     * 存**文案**而不是资源 id，是为了守住本类「资源在组合期解析」的约定；
+     * `null` 表示本格没有结论胶囊（其余 11 格都是这样）。
+     */
+    val badge: String? = null,
 )
 
 /** 单格：包一层浅容器（小多图靠边界彼此区分），点开进入大图。 */
@@ -544,6 +630,14 @@ private fun MiniSeriesCell(
             caveat = s.caveat,
             onClick = onExpand,
             modifier = Modifier.padding(Spacing.sm),
+            // UI 2.0 §06 ④：带结论的格子（BASDAI「稳定期」）在标题行右侧挂 Success 胶囊。
+            // 走 [StatusChip] 而不是自绘：设计稿 `.st-ok` 就是「软底 + 6dp 状态点 + 文字」
+            // 三重编码，与 StatusChip 的既有形态逐项对应（圆角/内边距由组件统一给）。
+            trailing = if (s.badge != null) {
+                { StatusChip(text = s.badge, tone = StatusTone.Success) }
+            } else {
+                null
+            },
         )
     }
 }
@@ -578,7 +672,7 @@ private fun labCaveat(lab: LabTrend): String? {
  * B4 周报 / 月报的均值口径：统一保留 1 位小数（与概览页 "%.1f/10" 同精度）。
  * 均值天然是小数，不做"整值去尾"，否则疼痛/晨僵/BASDAI/体重在图上与列表里的精度会不一致。
  */
-private fun avg1(v: Double): String = "%.1f".format(v)
+private fun avg1(v: Double): String = String.format(Locale.US, "%.1f", v)
 
 /**
  * B4 周月报页：7 天 / 30 天窗口的结构化小结。

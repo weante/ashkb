@@ -50,6 +50,7 @@ import com.ashkb.app.ui.theme.Clinical
 import com.ashkb.app.ui.theme.Motion
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
+import java.util.Locale
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.abs
@@ -109,20 +110,34 @@ fun TrendChart(
     val chartHeight = Size.chartHeight * density.fontScale.coerceIn(1f, 1.6f)
 
     val axisStyle: TextStyle = MaterialTheme.typography.labelSmall.copy(color = cs.onSurfaceVariant)
-    val lastValueStyle: TextStyle = MaterialTheme.typography.labelMedium.copy(color = cs.onSurface)
 
-    val gridDash = remember { PathEffect.dashPathEffect(floatArrayOf(6f, 6f)) }
-    val thresholdDash = remember { PathEffect.dashPathEffect(floatArrayOf(10f, 8f)) }
+    // v1.2.10（UI 2.0 批次 D「换图」）：读数气泡改成**深色实心**（设计稿 §5.10
+    // 「端点白环强调 + 深色气泡读数（tnum）」）。取 brand-strong #084F73（设计稿 §2.1），
+    // 深浅两主题都用同一个值——它是品牌深色，在浅底上对比 8:1 以上，在深底上也比
+    // surfaceContainerLowest 更"重"，是图上唯一需要被读到的数字。
+    val bubbleBg = Color(0xFF084F73)
+    val bubbleFg = Color.White
+    val lastValueStyle: TextStyle = MaterialTheme.typography.labelMedium.copy(color = bubbleFg)
+
+    // v1.2.10（UI 2.0 批次 D「换图」）：网格与轴一律**实线 hairline**，不再用虚线。
+    // 设计稿 §5.10：「网格只留横线、hairline 色」——虚线在真机高密度屏上会与数据线的
+    // 圆头短划混淆，实线发线则退成背景纹理，读数时不会被误当成数据。
+    // 阈值线反过来：它是**结论线**，按 §5.10 用 danger 虚线并直接标注数值，
+    // 与网格在"线型"上彻底分开（网格实线 / 阈值虚线）。
     val linePx = with(density) { 2.dp.toPx() }
     val lineStroke = remember(linePx) {
         Stroke(width = linePx, cap = StrokeCap.Round, join = StrokeJoin.Round)
     }
+    // 阈值虚线：与网格（实线）在线型上分开，一眼能认出"这是结论线不是背景纹理"
+    val thresholdDash = remember { PathEffect.dashPathEffect(floatArrayOf(10f, 8f)) }
     val linePath = remember { Path() }
     val fillPath = remember { Path() }
+    // 面积渐变 12% alpha（原 16%）：批次 A 把页面底换成冷瓷白后，16% 的填充在新底色上
+    // 偏"重"，压过了 2px 主线的可读性；12% 是设计稿给的规范值。
     val fillBrush = remember(accent) {
-        Brush.verticalGradient(colors = listOf(accent.copy(alpha = 0.16f), Color.Transparent))
+        Brush.verticalGradient(colors = listOf(accent.copy(alpha = 0.12f), Color.Transparent))
     }
-    val thresholdTextStyle = remember(axisStyle, cl.warning) { axisStyle.copy(color = cl.warning) }
+    val thresholdTextStyle = remember(axisStyle, cl.danger) { axisStyle.copy(color = cl.danger) }
     val dotPx = with(density) { Size.chartDot.toPx() }
 
     // ---- 刻度数自适应：按「画布净高 ÷ (实测字高 + 间隙)」决定最多几段 ----
@@ -201,7 +216,7 @@ fun TrendChart(
                 values = indices.map { points[it].value },
                 unit = unit,
             )
-            textMeasurer.measure(txt, axisStyle.copy(color = cs.onSurface))
+            textMeasurer.measure(txt, axisStyle.copy(color = bubbleFg))
         }
     }
 
@@ -275,7 +290,7 @@ fun TrendChart(
             }
             val showDots = minGapPx >= dotPx * 3f
 
-            // ---- 虚线网格 + Y 轴刻度（与阈值同高时让位，避免两层文字叠在一起）----
+            // ---- 横网格（实线 hairline）+ Y 轴刻度（与阈值同高时让位，避免两层文字叠在一起）----
             ticks.forEachIndexed { i, v ->
                 val y = yAt(v)
                 drawLine(
@@ -283,7 +298,6 @@ fun TrendChart(
                     start = Offset(left, y),
                     end = Offset(right, y),
                     strokeWidth = gridPx,
-                    pathEffect = gridDash,
                 )
                 if (thrY != null && abs(y - thrY) < tickHeightPx * 0.9f) return@forEachIndexed
                 val layout = tickLayouts[i]
@@ -297,10 +311,13 @@ fun TrendChart(
             drawLine(cs.outlineVariant, Offset(left, top), Offset(left, bottom), gridPx)
             drawLine(cs.outlineVariant, Offset(left, bottom), Offset(right, bottom), gridPx)
 
-            // ---- 阈值线 + 左侧轴槽标签（不再压在数据上）----
+            // ---- 阈值线（danger 虚线）+ 左侧轴槽标签（不再压在数据上）----
+            // v1.2.10（UI 2.0 批次 D「换图」）：原用 warning 色，设计稿 §5.10 与红线 2
+            // 都要求阈值线用 **danger**——阈值是"越过去就不正常"的界线，与"提醒注意"的
+            // warning 是两个语义；同一张图里两者都用会分不清哪条才是界限。
             if (threshold != null && thrY != null) {
                 drawLine(
-                    color = cl.warning,
+                    color = cl.danger,
                     start = Offset(left, thrY),
                     end = Offset(right, thrY),
                     strokeWidth = Size.chartStroke.toPx(),
@@ -356,12 +373,17 @@ fun TrendChart(
             // ---- 末点高亮 + 数值（不拖动也能读数）----
             // v1.0.46：仅入场动画播完后绘制——动画期间折线尚未扫到末点，末点圆与数值气泡
             // 若无条件绘制，会提前悬在折线终点位置（v1.0.45 的缺陷）。
+            // v1.2.10（UI 2.0 批次 D「换图」）：末点改成**白环**（accent 实心 + 白环）——
+            // 设计稿 §5.10「端点白环强调」。原实现是 accent 实心 + surfaceContainerLowest 内芯，
+            // 在批次 A 的冷白底上"内芯"与背景同色，看起来像空心圆环；改成外圈白环 + 内芯实心后，
+            // 末点在折线与渐变填充之上仍是最高对比的一点。
             if (visible >= points.size) {
                 val lastIdx = points.lastIndex
                 val lx = xAt(lastIdx)
                 val ly = yAt(points[lastIdx].value)
+                // 白环：先画一圈比点大的背景色，再把实心点压上去
+                drawCircle(cs.surfaceContainerLowest, dotPx * 1.5f, Offset(lx, ly))
                 drawCircle(accent, dotPx * 0.9f, Offset(lx, ly))
-                drawCircle(cs.surfaceContainerLowest, dotPx * 0.45f, Offset(lx, ly))
 
                 // 拖动选中时（且选中的正是最后那天）不画末点数值，避免与气泡叠字
                 if (selIdx == null || points[selIdx].date != points[lastIdx].date) {
@@ -373,8 +395,13 @@ fun TrendChart(
                     var by = ly - bh - padBoxV * 2
                     if (by < top) by = ly + padBoxV * 2
                     if (by + bh > bottom) by = (bottom - bh).coerceAtLeast(top)
+                    // v1.2.10（UI 2.0 批次 D「换图」）：气泡底色从「背景同色」改成**深色实心**。
+                    // 设计稿 §5.10 的读数是「深色气泡读数（tnum）」——demo 里是 brand-strong 底 + 白字。
+                    // 原用 surfaceContainerLowest，与卡片底色同色，气泡只靠一圈留白"浮"出来；
+                    // 换成 brand-strong 后读数成为图上对比最强的一处，也符合红线 1「警示色永不透明」
+                    // 之外的一般原则：需要被读到的数字，底色要么够深要么够浅，不能与背景同色。
                     drawRoundRect(
-                        color = cs.surfaceContainerLowest,
+                        color = bubbleBg,
                         topLeft = Offset(bx, by),
                         size = GeometrySize(bw, bh),
                         cornerRadius = CornerRadius(Spacing.xs.toPx()),
@@ -389,8 +416,9 @@ fun TrendChart(
                 drawLine(cs.outline, Offset(x, top), Offset(x, bottom), gridPx)
                 selectedIndices?.forEach { i ->
                     val y = yAt(points[i].value)
+                    // 与末点同一套：白环 + 实心点（批次 D「换图」）
+                    drawCircle(cs.surfaceContainerLowest, dotPx * 1.6f, Offset(x, y))
                     drawCircle(accent, dotPx, Offset(x, y))
-                    drawCircle(cs.surfaceContainerLowest, dotPx / 2, Offset(x, y))
                 }
 
                 selectedLayout?.let { l ->
@@ -400,7 +428,7 @@ fun TrendChart(
                     val bh = l.size.height + padBoxV * 2
                     val bx = (x - bw / 2f).coerceIn(left, (right - bw).coerceAtLeast(left))
                     drawRoundRect(
-                        color = cs.surfaceContainerHigh,
+                        color = bubbleBg,
                         topLeft = Offset(bx, top),
                         size = GeometrySize(bw, bh),
                         cornerRadius = CornerRadius(Spacing.sm.toPx()),
@@ -561,10 +589,10 @@ internal fun niceScale(
 }
 
 private fun tickLabel(v: Float, step: Float): String =
-    if (step >= 1f && step == floor(step)) v.roundToInt().toString() else "%.1f".format(v)
+    if (step >= 1f && step == floor(step)) v.roundToInt().toString() else String.format(Locale.US, "%.1f", v)
 
 private fun fmtValue(v: Float): String =
-    if (v == v.roundToInt().toFloat()) v.roundToInt().toString() else "%.1f".format(v)
+    if (v == v.roundToInt().toFloat()) v.roundToInt().toString() else String.format(Locale.US, "%.1f", v)
 
 /** 跨年时显示完整日期，否则只显示 MM-dd（旧实现 `takeLast(5)` 会掉年份）。 */
 private fun dateTick(first: String, last: String, date: String): String =

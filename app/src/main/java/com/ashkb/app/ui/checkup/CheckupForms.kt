@@ -9,7 +9,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -60,16 +60,16 @@ internal fun CheckupItemFormSheet(
                 stringResource(if (existing == null) R.string.checkup_add_item_button else R.string.checkup_edit_item_title),
                 style = MaterialTheme.typography.titleLarge,
             )
-            OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.checkup_item_name)) }, singleLine = true)
+            AshkbTextField(name, { name = it }, label = { Text(stringResource(R.string.checkup_item_name)) }, singleLine = true)
             ChipGroupLabel(stringResource(R.string.common_type))
             ChipGroup(
                 options = CheckupType.entries.map { it.name to stringResource(it.labelRes) },
                 selected = type.name,
                 onSelect = { type = CheckupType.valueOf(it) },
             )
-            OutlinedTextField(cycleDays, { cycleDays = it },
+            AshkbTextField(cycleDays, { cycleDays = it },
                 label = { Text(stringResource(R.string.med_cycle_days_field)) }, singleLine = true)
-            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes)) })
+            AshkbTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes)) })
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
                 enabled = name.isNotBlank(),
@@ -131,7 +131,7 @@ internal fun CheckupRecordFormSheet(
                 stringResource(if (existing == null) R.string.checkup_record_visit else R.string.checkup_edit_record_title),
                 style = MaterialTheme.typography.titleLarge,
             )
-            OutlinedTextField(itemName, { itemName = it },
+            AshkbTextField(itemName, { itemName = it },
                 label = { Text(stringResource(R.string.checkup_item_name)) }, singleLine = true)
             ChipGroupLabel(stringResource(R.string.common_type))
             ChipGroup(
@@ -140,17 +140,17 @@ internal fun CheckupRecordFormSheet(
                 onSelect = { checkType = CheckupType.valueOf(it) },
             )
             DateTextField(value = date, onValueChange = { date = it }, label = stringResource(R.string.common_date))
-            OutlinedTextField(hospital, { hospital = it },
+            AshkbTextField(hospital, { hospital = it },
                 label = { Text(stringResource(R.string.common_hospital)) }, singleLine = true)
-            OutlinedTextField(doctor, { doctor = it },
+            AshkbTextField(doctor, { doctor = it },
                 label = { Text(stringResource(R.string.checkup_doctor_short)) }, singleLine = true)
             DateTextField(
                 value = nextDate, onValueChange = { nextDate = it },
                 label = stringResource(R.string.checkup_next_date_field), required = false,
             )
-            OutlinedTextField(conclusion, { conclusion = it },
+            AshkbTextField(conclusion, { conclusion = it },
                 label = { Text(stringResource(R.string.imaging_conclusion)) })
-            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes)) })
+            AshkbTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes)) })
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
                 enabled = itemName.isNotBlank() && dateOk && nextDateOk,
@@ -265,7 +265,7 @@ internal fun VaccineFormSheet(
                 stringResource(if (existing == null) R.string.vaccine_record_action else R.string.vaccine_edit_title),
                 style = MaterialTheme.typography.titleLarge,
             )
-            OutlinedTextField(name, { name = it },
+            AshkbTextField(name, { name = it },
                 label = { Text(stringResource(R.string.vaccine_name_field)) }, singleLine = true)
             ChipGroupLabel(stringResource(R.string.common_type))
             ChipGroup(
@@ -274,9 +274,9 @@ internal fun VaccineFormSheet(
                 onSelect = { type = VaccineType.valueOf(it) },
             )
             DateTextField(value = date, onValueChange = { date = it }, label = stringResource(R.string.vaccine_date))
-            OutlinedTextField(dose, { dose = it },
+            AshkbTextField(dose, { dose = it },
                 label = { Text(stringResource(R.string.vaccine_dose_field)) }, singleLine = true)
-            OutlinedTextField(hospital, { hospital = it },
+            AshkbTextField(hospital, { hospital = it },
                 label = { Text(stringResource(R.string.vaccine_hospital)) }, singleLine = true)
             ChipGroupLabel(stringResource(R.string.vaccine_doctor_confirm))
             ChipGroup(
@@ -288,7 +288,7 @@ internal fun VaccineFormSheet(
                 value = nextDue, onValueChange = { nextDue = it },
                 label = stringResource(R.string.vaccine_booster_date), required = false,
             )
-            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.exercise_notes_reaction)) })
+            AshkbTextField(notes, { notes = it }, label = { Text(stringResource(R.string.exercise_notes_reaction)) })
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
                 enabled = name.isNotBlank() && dateOk && nextDueOk,

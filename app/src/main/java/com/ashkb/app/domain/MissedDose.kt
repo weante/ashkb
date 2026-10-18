@@ -3,6 +3,7 @@ package com.ashkb.app.domain
 import androidx.annotation.StringRes
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.Medication
+import java.util.Locale
 
 /**
  * 漏服 / 延迟处理指引（v1.0.33，规划缺口 C7）。
@@ -147,7 +148,7 @@ object MissedDose {
     }
 
     /** 人话化的时间跨度：< 1 小时报分钟，否则报小时（保留一位小数）。 */
-    private fun hoursText(minutesLate: Long): String = "%.1f".format(minutesLate / 60.0)
+    private fun hoursText(minutesLate: Long): String = String.format(Locale.US, "%.1f", minutesLate / 60.0)
 
     /** 从「现在」与计划时刻算已过分钟数（同一归属日内）。计划时刻非法 / 未到点返回 0。 */
     fun minutesLate(scheduledTime: String?, nowMinutesOfDay: Int): Long {

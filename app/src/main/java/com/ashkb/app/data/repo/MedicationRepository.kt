@@ -251,7 +251,15 @@ class MedicationRepository(private val context: Context) {
                         R.string.ui_med_prn_detail,
                         med.prnReason ?: context.getString(R.string.ui_med_prn_backup),
                     )
-                    items.add(TodayItem(med, null, null, prnDetail, null))
+                    // v1.2.10（维护者指令）：按需药常驻首页，但**每天只记一次**——
+                    // 把当天的按需记录挂到卡上，卡片据此显示「已服 HH:mm」并撤掉「记录使用」按钮。
+                    // 此前这里恒传 null，于是 `item.done` 永远为 false：按需卡永远一副「还没记」的样子，
+                    // 用户点几次就落几行，卡上却看不出已经记过。
+                    // 取 `recordedAt` 最大的那条（旧版本允许一天多行），与写入侧 `findPrn` 的
+                    // `ORDER BY recorded_at DESC LIMIT 1` 同一条，卡上显示的和点下去更新的是同一行。
+                    val prnLog = logs.filter { it.medId == med.id && it.prnFlag }
+                        .maxByOrNull { it.recordedAt }
+                    items.add(TodayItem(med, null, null, prnDetail, prnLog))
                 }
                 continue
             }
@@ -269,7 +277,8 @@ class MedicationRepository(private val context: Context) {
         return items.sortedWith(compareBy({ !it.done && !it.skipped }, { it.slotTime ?: "99:99" }))
     }
 
-    // ---- 打卡写入（幂等：date+medId+slotKey 唯一；PRN 的 slotKey 为 NULL，SQLite 中 NULL 互不相等，故按需用药可多次记录） ----
+    // ---- 打卡写入（幂等：date+medId+slotKey 唯一。按需药的 slot_key 为 NULL，SQL 里 `= NULL` 恒不成立，
+    //      故按需行走 `findPrn` 单独定位当天那一条——v1.2.10（维护者指令）起按需用药每天只记一次） ----
     /**
      * @param date v1.0.73（P1-4）：**槽位所属日期**。默认今天（应用内打卡），但从通知动作 /
      *   全屏页打卡时必须传入槽位那天的日期——跨零点时 `LocalDate.now()` 已是次日，会把日志记到
@@ -281,7 +290,14 @@ class MedicationRepository(private val context: Context) {
         date: LocalDate = LocalDate.now(),
     ) {
         val dateStr = date.toString()
-        val existing = slotKey?.let { logDao.find(med.id, dateStr, it) }
+        // 计划槽位按 (date, med_id, slot_key) 定位；按需行没有槽位键，走 findPrn（`slot_key IS NULL`）。
+        // v1.2.10（维护者指令「按需用药限制只能每天一次」）：找到当天那条就更新它，而不是再插一行——
+        // 存量的旧行（同一天多行）不改写，只是从此不再新增；卡上展示与这里更新的都是 recorded_at 最新那条。
+        val existing = if (slotKey != null) {
+            logDao.find(med.id, dateStr, slotKey)
+        } else {
+            logDao.findPrn(med.id, dateStr)
+        }
         val now = nowIso()
         val log = (existing ?: MedicationLog(
             id = Ids.new("mlog"),
@@ -313,9 +329,21 @@ class MedicationRepository(private val context: Context) {
         }
     }
 
-    /** 补录 / 修正跳过：跳过必须有原因（红线三） */
-    suspend fun skip(med: Medication, slotKey: String?, slotTime: String?, reason: String, note: String? = null) {
-        val date = LocalDate.now().toString()
+    /**
+     * 补录 / 修正跳过：跳过必须有原因（红线三）
+     *
+     * @param date v1.2.10（审查 L6）：与 [checkIn] 对称——**槽位所属日期**，默认今天。
+     *   此前这里写死 `LocalDate.now()`，只有默认值这一条路；今日页的日期恒为"今天"所以正常
+     *   路径看不出差别，但「23:59 打开今日页、00:01 点跳过」会把跳过记到第二天，原槽位永远
+     *   空缺。打卡侧早在 v1.0.73（P1-4）就为这个窄窗加了参数与 KDoc，跳过侧漏了同一件事。
+     *   今天还没有第二个调用方需要传日期，但把口子留着比将来在某处再写一遍 `LocalDate.now()`
+     *   直接，也让两侧的签名长得一样（读代码的人不必猜"为什么一个有 date 一个没有"）。
+     */
+    suspend fun skip(
+        med: Medication, slotKey: String?, slotTime: String?, reason: String, note: String? = null,
+        date: LocalDate = LocalDate.now(),
+    ) {
+        val date = date.toString()
         val existing = slotKey?.let { logDao.find(med.id, date, it) }
         val now = nowIso()
         val log = (existing ?: MedicationLog(
@@ -601,9 +629,10 @@ class MedicationRepository(private val context: Context) {
                 oldSnapshot = medSnapshot(before, archived = false),
                 newSnapshot = medSnapshot(after, archived = false),
                 effectiveDate = toDate.toString(),
-                // reason 一列按实体注释是停药原因（StopReason 小写）；非停药行填本条变更的类别，
-                // 供台账/导出辨认，没有任何读取方按它分支（UI 只查 change_type='stop'）。
-                reason = "postpone",
+                // reason 一列按实体注释只存 StopReason 的小写名；本行是「非停药」的类别标记，
+                // 用枚举成员而非字面量，避免以后改枚举名时这行被漏掉（v1.2.10 审查 §6.7）。
+                // 落库值与历史行逐字相同（`POSTPONE` → "postpone"），无需迁移。
+                reason = StopReason.POSTPONE.name.lowercase(),
                 source = "self",
             )
         )

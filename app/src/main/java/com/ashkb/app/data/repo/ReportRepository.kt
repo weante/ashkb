@@ -15,6 +15,7 @@ import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.data.entity.WeightLog
 import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.EmergencyMeds
+import com.ashkb.app.domain.ExerciseLogStatus
 import com.ashkb.app.domain.LabTrend
 import com.ashkb.app.domain.LabTrends
 import com.ashkb.app.domain.SupplementLogStatus
@@ -109,12 +110,17 @@ class ReportRepository(private val context: Context) {
         val f = from.toString(); val t = to.toString()
 
         val logDao = db.medicationLogDao()
-        // v1.0.76（批次 3a）：完成度的分母只算计划打卡；按需（PRN）另计，不混进这个比率
-        val done = logDao.countScheduledBetweenStatus(f, t, "done")
-        val partial = logDao.countScheduledBetweenStatus(f, t, "partial")
-        val skipped = logDao.countScheduledBetweenStatus(f, t, "skipped")
-        val total = done + partial + skipped
-        val prnCount = logDao.countPrnBetween(f, t)
+        // v1.2.10（审查 §6.10）：**整行取一次**，用药侧的所有指标都从这一份记录算。
+        // 旧写法是三条 `countScheduledBetweenStatus(f, t, 状态)` 字面量 SQL 再求和——分母只认
+        // 它能列举的那三个字面量，而药单页（`MedsScreen`）走 `AdherenceCalc.completion(logs)`
+        // （认不出的状态也进分母），同一批记录在两张页面上于是有两个完成度。现在两页共用同一个函数。
+        val medLogs = logDao.listBetween(f, t)
+        val record = AdherenceCalc.completion(medLogs)
+        val done = record.done
+        val partial = record.partial
+        val skipped = record.skipped
+        val total = record.total
+        val prnCount = AdherenceCalc.prnCount(medLogs)
         // v1.0.48：公式收拢到 AdherenceCalc（此前本文件内联 4 遍，必然漂移）
         val rate = AdherenceCalc.ratePct(done, partial, total)
 
@@ -122,7 +128,7 @@ class ReportRepository(private val context: Context) {
         // 先滤掉「今天还没到点」的槽位：否则每天早上的完成度都会因为今日未到点的剂量假性掉一截。
         val planNow = LocalDateTime.now()
         val planned = db.plannedSlotDao().between(f, t).filter { AdherenceCalc.isDue(it, planNow) }
-        val planDose = AdherenceCalc.doseCompletion(planned, logDao.listBetween(f, t))
+        val planDose = AdherenceCalc.doseCompletion(planned, medLogs)
 
         // C2（v1.0.37）：补剂（营养）依从——与用药同口径（部分完成计 0.5）
         // v1.1.1（HIGH-1）：**先按「天 × 补剂」去重再计数**。旧实现是三条 `COUNT(*)`（按行数），
@@ -138,10 +144,13 @@ class ReportRepository(private val context: Context) {
         val supTotal = supCount.total
         val supRate = AdherenceCalc.ratePct(supDone, supPartial, supTotal)
 
+        // v1.2.10（审查 §6.5）：状态判定收拢到 ExerciseLogStatus。
+        // 旧写法 `count { it.status != "done" }` 把「认不出的状态」当成用户主动跳过报给用户。
         val exLogs = db.exerciseLogDao().between(f, t)
-        val exDone = exLogs.count { it.status == "done" }
-        val exSkipped = exLogs.count { it.status != "done" }
-        val exMin = exLogs.filter { it.status == "done" }.sumOf { it.durationMin ?: 0 }
+        val exDoneLogs = exLogs.filter { ExerciseLogStatus.isDone(it.status) }
+        val exDone = exDoneLogs.size
+        val exSkipped = exLogs.count { ExerciseLogStatus.isSkipped(it.status) }
+        val exMin = exDoneLogs.sumOf { it.durationMin ?: 0 }
 
         val symptoms = db.symptomDailyDao().between(f, t)
         val pains = symptoms.mapNotNull { it.painScore }
@@ -168,7 +177,7 @@ class ReportRepository(private val context: Context) {
                 medDone = done, medPartial = partial, medSkipped = skipped,
                 medTotal = total, medRatePct = rate,
                 medPrnCount = prnCount,
-                record = AdherenceCalc.Completion(done, partial, skipped, total),
+                record = record,
                 plan = planDose,
             ),
             supplement = SupplementAdherence(supDone, supPartial, supSkipped, supTotal, supRate),
@@ -213,12 +222,14 @@ class ReportRepository(private val context: Context) {
         val f = from.toString(); val t = to.toString()
 
         val logDao = db.medicationLogDao()
-        // v1.0.76（批次 3a）：同 overview()——完成度只含计划打卡，按需（PRN）单独报数
-        val md = logDao.countScheduledBetweenStatus(f, t, "done")
-        val mp = logDao.countScheduledBetweenStatus(f, t, "partial")
-        val ms = logDao.countScheduledBetweenStatus(f, t, "skipped")
-        val mt = md + mp + ms
-        val mPrn = logDao.countPrnBetween(f, t)
+        // v1.2.10（审查 §6.10）：与 overview() 同一份取数与同一处口径（整行一次 + AdherenceCalc.completion）
+        val medLogs = logDao.listBetween(f, t)
+        val medRecord = AdherenceCalc.completion(medLogs)
+        val md = medRecord.done
+        val mp = medRecord.partial
+        val ms = medRecord.skipped
+        val mt = medRecord.total
+        val mPrn = AdherenceCalc.prnCount(medLogs)
         val mr = AdherenceCalc.ratePct(md, mp, mt)
 
         val supDao = db.supplementLogDao()
@@ -234,8 +245,9 @@ class ReportRepository(private val context: Context) {
         val st = supCount.total
         val sr = AdherenceCalc.ratePct(sd, sp, st)
 
+        // v1.2.10（审查 §6.5）：与 overview() 同一份判据
         val exLogs = db.exerciseLogDao().between(f, t)
-        val exDone = exLogs.filter { it.status == "done" }
+        val exDone = exLogs.filter { ExerciseLogStatus.isDone(it.status) }
 
         val symptoms = db.symptomDailyDao().between(f, t)
         val pains = symptoms.mapNotNull { it.painScore }
@@ -330,6 +342,8 @@ class ReportRepository(private val context: Context) {
         val meds = EmergencyMeds.summarize(
             db.medicationDao().listActive(), LocalDate.now().toString(),
             freqLabel = { context.getString(it.plainRes) },
+            // v1.2.10（审查 §6.9）：读不出来的频次原样印出存库值（不印「每日」）
+            unknownFreqLabel = { context.getString(R.string.ui_emergency_meds_unknown_freq, it) },
             // v1.2.6（i18n）：注射周期文案同样按系统语言解析
             injCycleLabel = { context.getString(R.string.ui_emergency_meds_inj_cycle, it) },
             // v1.2.6（i18n）：商品名括号随语言换全角 / 半角

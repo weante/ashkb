@@ -34,7 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -63,6 +63,7 @@ import com.ashkb.app.data.entity.StopReason
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.MedDeletion
+import com.ashkb.app.domain.MedHistory
 import com.ashkb.app.domain.MedLogEdit
 import com.ashkb.app.domain.StopWarning
 import com.ashkb.app.ui.checkup.SheetColumn
@@ -246,12 +247,25 @@ private fun MedRow(
             ) {
                 Text(
                     buildString {
-                        append(stringResource(MedFrequency.fromKey(med.frequency).labelRes))
+                        // v1.2.10（审查 §6.9）：频次读不出来时**不伪造**标签——原先 fromKey 悄悄退回
+                        // 每日，卡片上就印着「每日」，用户看到的是一支本应用从没存过的频次。
+                        // 现在印原始存库值，旁边由下面那枚胶囊说明要怎么处理。
+                        val known = MedFrequency.labelResOrNull(med.frequency)
+                        if (known != null) append(stringResource(known)) else append(med.frequency)
                         if (med.route == "injection") append(stringResource(R.string.med_injection_suffix))
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                // v1.2.10（审查 §6.9）：脏频次的可见出口。排程侧刻意 fail-open（退回每日，
+                // 让「每周一次变成天天提醒」这种错**看得见**），前提是这里真的把它说出来。
+                if (MedFrequency.fromKeyOrNull(med.frequency) == null) {
+                    StatusChip(
+                        stringResource(R.string.med_frequency_unrecognized),
+                        StatusTone.Warning,
+                        Icons.Rounded.WarningAmber,
+                    )
+                }
                 if (needsCheck) {
                     StatusChip(stringResource(R.string.med_verify_todo_tag), StatusTone.Warning, Icons.Rounded.WarningAmber)
                 }
@@ -259,6 +273,15 @@ private fun MedRow(
                 if (DoseState.of(med) == DoseState.TAPERING) {
                     StatusChip(stringResource(DoseState.TAPERING.labelRes), StatusTone.Info)
                 }
+            }
+            // v1.2.10（审查 §6.9）：胶囊只说"读不出来"，这行说清"那会怎样、怎么修"。
+            // 两枚一起出现才有可操作性——只报警不给出口等于把问题留给用户自己猜。
+            if (MedFrequency.fromKeyOrNull(med.frequency) == null) {
+                Text(
+                    stringResource(R.string.med_frequency_unrecognized_detail, med.frequency),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
         // v1.0.31：编辑在用药品参数（剂量 / 频次 / 时刻 / 周期等）
@@ -288,7 +311,9 @@ private fun StopMedDialog(
             Column {
                 Text(stringResource(R.string.med_deactivate_reason_note), style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(Spacing.xs))
-                StopReason.entries.forEach { r ->
+                // v1.2.10（审查 §6.7）：只列可选原因——StopReason.POSTPONE 是台账 key，不是
+                // 患者能选的停药原因（见 Entities.kt 的 pickable）。
+                StopReason.pickable().forEach { r ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth(),
@@ -298,7 +323,7 @@ private fun StopMedDialog(
                     }
                 }
                 if (reason == StopReason.OTHER) {
-                    OutlinedTextField(
+                    AshkbTextField(
                         value = note, onValueChange = { note = it },
                         label = { Text(stringResource(R.string.med_deactivate_reason_field)) },
                         modifier = Modifier.fillMaxWidth(),
@@ -465,6 +490,9 @@ private fun MedicationHistorySheet(vm: MeViewModel, med: Medication, onDismiss: 
     // 零分母由 Completion.ratePct == null 表达，界面因此不能再顺手给出 0% / 达标判定。
     val completion = remember(logs) { AdherenceCalc.completion(logs) }
     val prnCount = remember(logs) { AdherenceCalc.prnCount(logs) }
+    // v1.2.10（审查第二批 M8）：弹层没有虚拟化，90 天 × 一天最多 3 剂能组合出近 270 行。
+    // 只截断列表，不动上面两个吃全量 logs 的统计。
+    val visible = remember(logs) { MedHistory.visible(logs) }
     // 按需药没有「计划剂量」这个概念（频次键与存库值同为 "PRN"，走枚举避免拼写漂移）
     val isPrnMed = MedFrequency.fromKey(med.frequency) == MedFrequency.PRN
     // v1.0.77（批次 3b）：计划槽位快照（与日志同为近 90 天、同一个闭区间），与日志配对算**计划口径**完成度。
@@ -500,8 +528,18 @@ private fun MedicationHistorySheet(vm: MeViewModel, med: Medication, onDismiss: 
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(Spacing.sm))
-            DividerList(logs, key = { it.id }) { log ->
+            // v1.2.10（审查第二批 M8）：这里**只把截断后的行交给 DividerList**。
+            // 上面的 completion / prnCount / dose 仍然吃全量 logs——被截断的样本喂给依从率，
+            // 用户会看到一个凭空变好的百分比，那比不显示更糟（见 MedHistory 的 KDoc）。
+            DividerList(visible, key = { it.id }) { log ->
                 MedicationLogRow(log, medRoute = med.route, onEdit = { editTarget = log })
+            }
+            if (MedHistory.isTruncated(logs.size)) {
+                Text(
+                    stringResource(R.string.med_history_truncated, visible.size),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -520,8 +558,13 @@ private fun MedicationHistorySheet(vm: MeViewModel, med: Medication, onDismiss: 
     }
 }
 
-/** 用药记录窗口（天）。与 [MedicationRepository.observeLogsForMed] 默认值一致。 */
-private const val MED_HISTORY_DAYS = 90
+/**
+ * 用药记录窗口（天）。与 [MedicationRepository.observeLogsForMed] 默认值一致。
+ *
+ * v1.2.10（审查第二批 M8）：改为引用 [MedHistory.MED_HISTORY_WINDOW_DAYS]，不再写字面量 90——
+ * 截断规则与窗口长度必须同步（上限按「90 天最坏情况」定的），两份 90 迟早会分叉。
+ */
+private const val MED_HISTORY_DAYS = MedHistory.MED_HISTORY_WINDOW_DAYS
 
 /**
  * 用药记录弹层顶部的**指标位**——一个位置，两套口径。
@@ -684,7 +727,7 @@ private fun MedicationLogEditDialog(
                         }
                     }
                 }
-                OutlinedTextField(
+                AshkbTextField(
                     value = note,
                     onValueChange = { note = it },
                     label = { Text(stringResource(R.string.med_log_edit_notes)) },

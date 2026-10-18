@@ -140,21 +140,38 @@ fun MedEditScreen(
 
     val prnFallback = stringResource(R.string.med_reason_backup)
 
-    // ---- 编辑模式：预填在用药品参数（仅按 editId 跑一次，不覆盖用户后续输入） ----
+    // ---- 编辑模式：预填在用药品参数（只在**首次**组合时写字段，不覆盖用户后续输入） ----
+    // v1.2.10（审查第二批 M6）：原文写「仅按 editId 跑一次」——这句是错的，`LaunchedEffect`
+    // 的键只保证「键不变时不重启」，而转屏会让整个组合重建、effect 必然重跑。
     // v1.0.43 修复：原先在 vm.meds（**仅「在用」列表**）上 `first { 含该 id }`——目标药若已停用、
     // 或恢复备份后 id 漂移，谓词永不为真 → 协程永久挂起 → original 恒为 null → 保存时
     // id = Ids.new("med")，把「编辑」静默变成**新建一条重复药**，并丢掉病史核对记录。
     // 改为按 id 一次性直查（不限在用）；查不到则明确提示并禁止保存，绝不静默新建。
     val original = remember { mutableStateOf<Medication?>(null) }
     val editMissing = rememberSaveable { mutableStateOf(false) }
+    // v1.2.10（审查第二批 M6）：预填「已经跑过」的标记。
+    // 原写法只有 `LaunchedEffect(editId)` 一个键——它的契约是「每次进入**这个组合**跑一次」，
+    // 而转屏（Activity 重建）会让组合整体重建、effect 随之重跑：用户改过的字段被数据库原值
+    // 覆盖回去，而 KDoc 却写着「不覆盖用户后续输入」。进程被杀后重建同理。
+    // 用 `rememberSaveable` 而不是普通 `remember`：正是要它跨 Activity 重建存活——
+    // 用 `remember` 的话转屏后标记归 false，等于没修。
+    // 带 `editId` 作 input：换一个药（同一屏复用）时必须重新预填。
+    val prefillDone = rememberSaveable(editId) { mutableStateOf(false) }
     LaunchedEffect(editId) {
         if (editId == null) return@LaunchedEffect
+        // **取原值这一步每次都要跑**：`original` 是普通 `remember`，转屏后归 null，
+        // 而它是保存时的身份来源（`buildMed()` 的 id / createdAt / isArchived）。
+        // 若因为「已预填」跳过它，编辑就会静默变成新建一条重复药——正是 v1.0.43 修过的坑。
         val med = vm.medicationById(editId)
         if (med == null) {
             editMissing.value = true
             return@LaunchedEffect
         }
         original.value = med
+        editMissing.value = false
+        // 字段只写一遍：用户此时的输入才是真相
+        if (prefillDone.value) return@LaunchedEffect
+        prefillDone.value = true
         name.value = med.name
         brand.value = med.brandName ?: ""
         nameKey.value = med.nameKey
@@ -206,7 +223,10 @@ fun MedEditScreen(
         injCycleDays = if (cycleAnchorVisible(route.value, frequency.value) &&
             frequency.value != MedFrequency.MONTHLY
         ) {
-            cycleDays.value.toIntOrNull() ?: 14
+            // v1.2.10（审查 M1）：经唯一钳制点——空值回落 14、`0` 抬到 1、超大值压到 999。
+            // 原来这里只挡了"空"，`0` 会被原样落库，而排程侧把 `cycle <= 0` 判成"永远不是周期日"，
+            // 这支药于是从今日卡与所有提醒里静默消失（详见 ScheduleCalc.clampCycleDays）。
+            ScheduleCalc.clampCycleDays(cycleDays.value.toIntOrNull() ?: 14)
         } else {
             null
         },
@@ -227,40 +247,61 @@ fun MedEditScreen(
     )
 
     /**
+     * step 1 的校验链：返回 true = 本步不许进入核对（已按需亮出对应的错误位）。
+     *
+     * v1.2.10（审查 detekt ReturnCount）：这条链原先以 7 个 `return` 直接写在 [onPrimary]
+     * 里，而 `config/detekt/detekt.yml` 的 `ReturnCount` 上限是 6——**新代码不得进基线**，
+     * 故本批把它收成一条 `when` 表达式（表达式体函数，`return` 计数为 0）。
+     *
+     * `when` 分支自上而下求值、命中即停，与拆分前「先判谁」的次序**逐字一致**；
+     * 三处错误位（biwError / routeFrequencyError / mtxFrequencyError）的副作用也留在
+     * 原位置。抽成独立函数的另一处收益：[onPrimary] 从此只剩「走哪一步」这一件事。
+     */
+    fun stepOneBlocked(): Boolean = when {
+        // v1.0.43：必填三项——按钮已置灰，这里再拦一次是因为「置灰」只挡点击
+        name.value.isBlank() || nameKey.value.isBlank() || dose.value.isBlank() -> true
+        // v1.0.78（批次 4 收尾）：锚点日期非法时不许进入核对步骤（按钮已同步置灰）
+        cycleAnchorVisible(route.value, frequency.value) &&
+            !DateFieldRules.requiredOk(startDate.value) -> true
+        frequency.value == MedFrequency.BIW && weekday.value == weekday2.value -> {
+            biwError.value = true
+            true
+        }
+        // v1.2.10（审查 M1）：周期天数 ≥1。输入框已亮红字、按钮已置灰，这里再拦一次是因为
+        // 「按钮置灰」在 Compose 里只挡点击、不挡任何其它调用路径，而 `0` 落库的后果是
+        // 这支药从今日卡与所有提醒里消失（`ScheduleCalc.isInjectionDay` 的 `cycle <= 0`）。
+        cycleAnchorVisible(route.value, frequency.value) &&
+            frequency.value != MedFrequency.MONTHLY &&
+            !cycleDaysOk(cycleDays.value) -> true
+        // v1.2.10（审查裁决项 3）：口服不允许「每两周」——见 `routeVisible` 的依据。
+        // 放在 step 1 拦（与 mtxFrequencyError 同款），新增与编辑走的是同一个 onPrimary。
+        !routeVisible(frequency.value, route.value) -> {
+            routeFrequencyError.value = true
+            true
+        }
+        // v1.1.2（批次 18）：甲氨蝶呤的频次只能是每周一次（itx-001 的行为承诺，第四份审查报告 §一）。
+        // 放在 step 1 拦，**新增与编辑走的是同一个 onPrimary**——只拦新增会漏掉
+        // 「把 weekly 改成 daily」这条更要命的路径。
+        frequency.value != MedFrequency.WEEKLY &&
+            DrugInteractionKeys.requiresWeeklyFrequency(nameKey.value) -> {
+            mtxFrequencyError.value = true
+            true
+        }
+        else -> false
+    }
+
+    /**
      * 底部主按钮的动作（v1.0.92 从 `Button` 的内联 lambda 抽出）。
      *
      * 抽出来的**唯一**目的是把"读全表单"这件事留在回调里：回调不在组合上下文里执行，
      * 因此这 20 个 `.value` 读不会让任何 composable 订阅它们——这正是本批要的形状。
-     * 校验规则与拆分前逐字一致（包括 `return` 的时机）。
+     * 校验规则与拆分前逐字一致（`return` 的时机见 [stepOneBlocked]）。
      */
     fun onPrimary() {
         // v1.0.43：编辑目标查不到时禁止保存——否则会静默新建一条重复药
         if (editMissing.value) return
         if (step.value == 1) {
-            if (name.value.isBlank() || nameKey.value.isBlank() || dose.value.isBlank()) return
-            // v1.0.78（批次 4 收尾）：锚点日期非法时不许进入核对步骤（按钮已同步置灰）
-            if (cycleAnchorVisible(route.value, frequency.value) &&
-                !DateFieldRules.requiredOk(startDate.value)
-            ) {
-                return
-            }
-            if (frequency.value == MedFrequency.BIW && weekday.value == weekday2.value) {
-                biwError.value = true
-                return
-            }
-            // v1.2.10（审查裁决项 3）：口服不允许「每两周」——见 `routeVisible` 的依据。
-            // 放在 step 1 拦（与 mtxFrequencyError 同款），新增与编辑走的是同一个 onPrimary。
-            if (!routeVisible(frequency.value, route.value)) {
-                routeFrequencyError.value = true
-                return
-            }
-            // v1.1.2（批次 18）：甲氨蝶呤的频次只能是每周一次（itx-001 的行为承诺，第四份审查报告 §一）。
-            // 放在 step 1 拦，**新增与编辑走的是同一个 onPrimary**——只拦新增会漏掉
-            // 「把 weekly 改成 daily」这条更要命的路径。
-            if (frequency.value != MedFrequency.WEEKLY && DrugInteractionKeys.requiresWeeklyFrequency(nameKey.value)) {
-                mtxFrequencyError.value = true
-                return
-            }
+            if (stepOneBlocked()) return
             val draft = buildMed()
             scope.launch {
                 hits.value = vm.interactionsFor(draft)
@@ -295,6 +336,11 @@ fun MedEditScreen(
             // 这根操作条（它本来就依赖它们，见下方 `enabled`）。
             val cycleAnchorShown = cycleAnchorVisible(route.value, frequency.value)
             val anchorDateOk = DateFieldRules.requiredOk(startDate.value)
+            // v1.2.10（审查 M1）：与「周期天数 ≥1」同一份判定（`cycleDaysOk`）。每月一次不填天数，
+            // 故只在真的显示那个输入框时参与置灰；置灰之外输入框自己也会亮红字（两处都要，
+            // 只置灰会让用户不知道是哪一格的问题）。
+            val cycleDaysShown = cycleAnchorShown && frequency.value != MedFrequency.MONTHLY
+            val cycleDaysOkNow = !cycleDaysShown || cycleDaysOk(cycleDays.value)
             Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Row(
                     modifier = Modifier
@@ -314,7 +360,7 @@ fun MedEditScreen(
 
                     Button(
                         onClick = ::onPrimary,
-                        enabled = !editMissing.value && (!cycleAnchorShown || anchorDateOk),
+                        enabled = !editMissing.value && (!cycleAnchorShown || anchorDateOk) && cycleDaysOkNow,
                         modifier = Modifier.weight(1f).heightIn(min = Size.touchMin),
                     ) {
                         Text(

@@ -196,6 +196,7 @@
     <string name="emergency_record_event">记录紧急事件</string>
     <string name="emergency_relation">关系</string>
     <string name="emergency_scenario">场景</string>
+    <string name="emergency_scene_unrecognized">这条记录的场景本应用不认识，保持原样不动；请重新选一个场景。</string>
     <string name="emergency_seek_care">是否就医</string>
     <string name="emergency_share_card">分享紧急卡</string>
     <string name="emergency_tab">应急</string>
@@ -224,7 +225,7 @@
     <string name="exercise_no_stage_hint">完善健康档案中的病情分期后，会按 R27 矩阵生成当日处方</string>
     <string name="exercise_none_today">今日没有推荐运动</string>
     <string name="exercise_notes_reaction">备注 / 反应</string>
-    <string name="exercise_pain_rule_note">填写后系统按「运动后 2 小时疼痛规则」（exc-010）判读是否需要减量</string>
+    <string name="exercise_pain_rule_note">填完这两项，下面会给出下一次该怎么练的建议</string>
     <string name="exercise_post_pain">运动后疼痛</string>
     <string name="exercise_reduce_action">减量执行</string>
     <string name="exercise_reduce_amount">减量</string>
@@ -329,6 +330,7 @@
     <string name="med_inj_two_days_error">两针星期需不同（如周一 / 周四），请调整</string>
     <string name="med_mtx_frequency_error">甲氨蝶呤只能每周服用一次（itx-001：误按每日服用已有致死通报）。请改选「每周一次」；确需调整请先与医生确认。</string>
     <string name="med_route_frequency_error">口服不支持「每两周」——只按每日给你排药，起不到隔周的效果。每两周的间隔请改用「注射」，口服请改选「每日」等频次。</string>
+    <string name="med_cycle_days_min_error">周期天数至少 1 天。填 0 会让这支药不再出现在「今日」和任何提醒里（本应用按「每 N 天」算下一次，0 天算不出下一次）。</string>
     <string name="med_injection_suffix">" · 注射"</string>
     <string name="med_late_note">（晚于计划 30 分钟以上）</string>
     <string name="med_manage_title">药单管理</string>
@@ -342,6 +344,7 @@
     <string name="med_postpone_reschedule_note">，后续注射与提醒自动重排。今日卡将移至新日期。</string>
     <string name="med_postpone_to_date">顺延至此日</string>
     <string name="med_prn_note">按需药不设提醒，记录实际使用即可</string>
+    <string name="med_prn_done_note">今天已记录，明天可再记一次</string>
     <string name="med_prn_reason_field">按需原因（如：备用镇痛）</string>
     <string name="med_prn_short">按需</string>
     <string name="med_prn_suffix">" · 按需"</string>
@@ -480,6 +483,7 @@
     <string name="report_avg_pain">平均疼痛</string>
     <string name="report_avg_stiffness">平均晨僵</string>
     <string name="report_basdai_section">疾病活动度（BASDAI）</string>
+    <string name="report_basdai_stable">稳定期</string>
     <string name="report_basdai_trend">BASDAI 总分走势</string>
     <string name="report_completed_count">完成次数</string>
     <string name="report_exercise_section">运动执行</string>
@@ -627,6 +631,7 @@
     <string name="vaccine_empty">暂无疫苗记录</string>
     <string name="vaccine_hospital">接种医院</string>
     <string name="vaccine_live">活疫苗</string>
+    <string name="vaccine_live_pending_alert">活疫苗待确认</string>
     <string name="vaccine_name_field">疫苗名称</string>
     <string name="vaccine_record_action">记录疫苗接种</string>
     <string name="vaccine_record_short">记录疫苗</string>
@@ -704,6 +709,7 @@
     <string name="knowledge_evidence_meta">证据层级 %1$s · 适配 %2$s · 复核 %3$s · v%4$s</string>
     <string name="knowledge_overdue_count">%1$s 条内容已过复核日</string>
     <string name="knowledge_source_line">来源：%1$s</string>
+    <string name="kb_overline">本地医学知识 · 离线检索</string>
     <string name="knowledge_title_count">AS 知识库（%1$s 条）</string>
     <string name="lab_count_abnormal">%1$s 项 · %2$s 项异常</string>
     <string name="lab_count_plain">%1$s 项</string>
@@ -756,6 +762,11 @@
     <string name="med_status_partial_short">部分</string>
     <string name="med_partial_detail">已记为部分完成，不再提醒</string>
     <string name="med_history_edit_hint">记错了？点右侧铅笔可修正该条记录</string>
+    <!-- v1.2.10（审查第二批 M8）：列表按 MedHistory.MAX_ROWS 截断。
+         明写「上限是 %1$d 条」而不是只说「还有更多」，用户可以据此判断要不要翻更早的记录；
+         同时刻意**不写**「共 N 条」——头部的完成度与按需次数已经报的是窗口内真实条数，
+         这里再报一次会让两个数字看起来像在互相矛盾。 -->
+    <string name="med_history_truncated">仅列出最近 %1$d 条，更早的记录未显示</string>
     <string name="med_log_edit_action">修正这条记录</string>
     <string name="med_log_edit_title">修正 %1$s 的记录</string>
     <string name="med_log_edit_status">服药状态</string>
@@ -963,7 +974,7 @@
     <string name="pdf_lab_flag_high">↑ 高</string>
     <string name="pdf_lab_flag_low">↓ 低</string>
     <string name="pdf_lab_flag_abnormal">⚠ 异常</string>
-    <string name="pdf_lab_ref_range">（参考 %1$.2f–%2$.2f）</string>
+    <string name="pdf_lab_ref_range">（参考 %1$s–%2$s）</string>
     <string name="pdf_labs_more">…另有 %1$d 项异常未列出</string>
     <string name="pdf_section_checkups">近 180 天复诊记录（%1$d 次）</string>
     <string name="pdf_no_checkups">（无复诊记录）</string>
@@ -1400,6 +1411,11 @@
     <string name="enum_med_frequency_prn_plain">按需服用</string>
     <string name="enum_med_frequency_custom">自定义周期</string>
     <string name="enum_med_frequency_custom_plain">自定义周期</string>
+    <!-- v1.2.10（审查 §6.9）：频次读不出来时**不伪造**一个频次，直接把原始存库值印出来。
+         原先 `MedFrequency.fromKey` 悄悄地退回「每日」，界面于是显示“每日”——用户看到的是
+         一个本应用根本没存过的值，且没有任何线索指向“这支药的频次有问题”。 -->
+    <string name="med_frequency_unrecognized">频次无法识别</string>
+    <string name="med_frequency_unrecognized_detail">这支药记录的频次「%1$s」本应用不认识，会按每日提醒。请点编辑重选频次。</string>
     <string name="enum_check_status_done">完成</string>
     <string name="enum_check_status_partial">部分完成</string>
     <string name="enum_check_status_skipped">跳过</string>
@@ -1435,6 +1451,7 @@
     <string name="enum_stop_reason_financial">经济原因</string>
     <string name="enum_stop_reason_financial_note">因经济原因停药请与医生沟通替代方案，不建议自行中断治疗。</string>
     <string name="enum_stop_reason_other">其他</string>
+    <string name="enum_stop_reason_postpone">顺延</string>
     <string name="enum_dose_state_fixed">固定</string>
     <string name="enum_dose_state_prn">按需</string>
     <string name="enum_dose_state_tapering">减量中</string>

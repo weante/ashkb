@@ -18,7 +18,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,6 +63,9 @@ internal fun EmergencyEventSheet(
 ) {
     val draft = EventDraft.of(existing)
     var scene by remember(draft) { mutableStateOf(draft.scene) }
+    // v1.2.10（审查 §6.9）：只有用户**自己点过**场景单选，才允许把场景按枚举落库。
+    // 否则一条 scene 字段损坏的旧记录，打开看一眼再保存就会被改写成「感染发热」。
+    var sceneTouched by remember(draft) { mutableStateOf(false) }
     var date by remember(draft) { mutableStateOf(draft.date) }
     var symptoms by remember(draft) { mutableStateOf(draft.symptoms) }
     var actions by remember(draft) { mutableStateOf(draft.actions) }
@@ -89,38 +92,45 @@ internal fun EmergencyEventSheet(
             Text(stringResource(titleRes), style = MaterialTheme.typography.titleLarge)
 
             Text(stringResource(R.string.emergency_scenario), style = MaterialTheme.typography.labelLarge)
-            EmergencyScenePicker(selected = scene, onSelect = { scene = it })
+            UnrecognizedSceneHint(raw = draft.sceneRaw, touched = sceneTouched)
+            EmergencyScenePicker(selected = scene, onSelect = { scene = it; sceneTouched = true })
 
-            OutlinedTextField(
+            AshkbTextField(
                 date, { date = it }, label = { Text(stringResource(R.string.common_date)) }, singleLine = true,
                 isError = attempted && !dateOk,
                 supportingText = { if (attempted && !dateOk) Text(stringResource(R.string.common_date_format_hint2)) },
             )
-            OutlinedTextField(symptoms, { symptoms = it }, label = { Text(stringResource(R.string.symptom_description)) })
-            OutlinedTextField(
-                symptoms, { symptoms = it },
-                label = { Text(stringResource(R.string.symptom_description)) },
+            AshkbTextField(symptoms, { symptoms = it }, label = { Text(stringResource(R.string.symptom_description)) })
+            // v1.2.10：这一格曾经**整格消失**。v1.2.2 拆文件时是按行号"目测"截断的（那次提交
+            // 的说明自己记了这件事：`git diff --shortstat` 显示删了 912 行而本意只删 167 行，
+            // 靠 diff 自己发现并从 git 恢复重做），结果把上面那格「症状描述」复制成了两份、
+            // 而「已采取措施」那一格没了。后果不是显示问题：`actions` 变成没有任何输入能写进去的
+            // 状态变量，`toEvent` 于是每次都把 `actionsTaken` 写成 null ——
+            // 用户填的现场处置（吃了什么药、冷敷、去了急诊）在保存时被静默丢掉，且无任何提示。
+            AshkbTextField(
+                actions, { actions = it },
+                label = { Text(stringResource(R.string.emergency_actions_taken)) },
             )
 
             EventToggleRow(stringResource(R.string.emergency_seek_care), hospitalVisit) { hospitalVisit = it }
             if (hospitalVisit) {
-                OutlinedTextField(
-                hospitalName, { hospitalName = it },
-                label = { Text(stringResource(R.string.checkup_hospital_field)) },
-                singleLine = true,
-            )
+                AshkbTextField(
+                    hospitalName, { hospitalName = it },
+                    label = { Text(stringResource(R.string.checkup_hospital_field)) },
+                    singleLine = true,
+                )
             }
 
             EventToggleRow(stringResource(R.string.symptom_outcome_recovered), resolved) { resolved = it }
             if (resolved) {
-                OutlinedTextField(
-                outcome, { outcome = it },
-                label = { Text(stringResource(R.string.symptom_outcome_label)) },
-                singleLine = true,
-            )
+                AshkbTextField(
+                    outcome, { outcome = it },
+                    label = { Text(stringResource(R.string.symptom_outcome_label)) },
+                    singleLine = true,
+                )
             }
 
-            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes)) })
+            AshkbTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes)) })
 
             Button(
                 onClick = {
@@ -129,6 +139,8 @@ internal fun EmergencyEventSheet(
                         onSave(
                             EventDraft(
                                 scene, date, symptoms, actions, hospitalVisit, hospitalName, outcome, resolved, notes,
+                                sceneRaw = draft.sceneRaw,
+                                sceneTouched = sceneTouched,
                             ).toEvent(existing)
                         )
                     }
@@ -140,6 +152,23 @@ internal fun EmergencyEventSheet(
             ) { Text(stringResource(R.string.common_save)) }
         }
     }
+}
+
+/**
+ * v1.2.10（审查 §6.9）：脏值（本应用读不出的场景存库值）必须先说出来再让用户选。
+ * 不提示的话单选会停在「感染发热」上，用户以为记录本来就是这样。
+ *
+ * 抽成独立组件而不是内联 `if`：那个 `if` 的四个条件把 [EmergencyEventSheet] 顶过了
+ * detekt 的 LongMethod 阈值（86 > 80），而这里的文案与判据都只服务于这一件事。
+ */
+@Composable
+private fun UnrecognizedSceneHint(raw: String?, touched: Boolean) {
+    if (raw == null || touched || EmergencyScene.fromKeyOrNull(raw) != null) return
+    Text(
+        stringResource(R.string.emergency_scene_unrecognized),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /**
@@ -196,6 +225,16 @@ internal data class EventDraft(
     val outcome: String,
     val resolved: Boolean,
     val notes: String,
+    /**
+     * 原记录的**原始**场景存库值（新增时为 null）。v1.2.10（审查 §6.9）新增。
+     *
+     * 存在的唯一理由：`EmergencyScene.fromKey` 是 fail-open 的，一个读不出来的脏值会被静默
+     * 当成「感染发热」。若这里不把原值留住，用户打开一条旧记录再按保存，脏值就被**就地改写**
+     * 成 `INFECTION_FEVER` 落库——原始信息永久丢失且零提示。
+     */
+    val sceneRaw: String? = null,
+    /** 用户本次是否动过场景单选。没动过 = 不替用户做决定，见 [sceneValue]。 */
+    val sceneTouched: Boolean = false,
 ) {
     companion object {
         /**
@@ -205,7 +244,9 @@ internal data class EventDraft(
          * 直接顶穿 detekt 的 `CyclomaticComplexMethod` 阈值（表单里本就有勾选 / 条件项的嵌套分支）。
          */
         fun of(existing: EmergencyEvent?): EventDraft = EventDraft(
-            // fromKey(null) 落到 INFECTION_FEVER，与新增时的默认场景一致
+            // fromKey(null) 落到 INFECTION_FEVER，与新增时的默认场景一致。
+            // v1.2.10（§6.9）：这只在**原值为 null**（新增）时才是对的；原值是脏值时
+            // 单选会显示成「感染发热」，但落库值由 sceneValue() 保住原样，且界面另有提示。
             scene = EmergencyScene.fromKey(existing?.scene),
             date = existing?.date ?: LocalDate.now().toString(),
             symptoms = existing?.symptoms ?: "",
@@ -215,13 +256,26 @@ internal data class EventDraft(
             outcome = existing?.outcome ?: "",
             resolved = existing?.resolvedDate != null,
             notes = existing?.notes ?: "",
+            sceneRaw = existing?.scene,
         )
+    }
+
+    /**
+     * 场景落库值。
+     *
+     * v1.2.10（审查 §6.9）：**用户没动过单选、且原值本应用不认识时，原样写回**。
+     * 其余情况按用户选中的枚举落库（含"脏值 → 用户重新选了场景"这条正常路径）。
+     */
+    private fun sceneValue(): String {
+        if (sceneTouched) return scene.name
+        val raw = sceneRaw
+        return if (raw != null && EmergencyScene.fromKeyOrNull(raw) == null) raw else scene.name
     }
 
     fun toEvent(existing: EmergencyEvent?): EmergencyEvent = EmergencyEvent(
         id = existing?.id ?: "", date = date.trim(),
         recordedAt = existing?.recordedAt ?: nowIso(),
-        scene = scene.name, severity = existing?.severity ?: "high",
+        scene = sceneValue(), severity = existing?.severity ?: "high",
         onsetTime = existing?.onsetTime,
         symptoms = symptoms.ifBlank { null },
         actionsTaken = actions.ifBlank { null },

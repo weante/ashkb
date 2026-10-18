@@ -31,7 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.util.Locale
 
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.ExerciseLog
@@ -346,7 +347,7 @@ private fun PrescriptionHero(
                 StatTile(
                     label = stringResource(R.string.symptom_yesterday_fever),
                     value = when {
-                        yesterday?.feverTemp != null -> "%.1f".format(yesterday.feverTemp)
+                        yesterday?.feverTemp != null -> String.format(Locale.US, "%.1f", yesterday.feverTemp)
                         feverish -> stringResource(R.string.symptom_fever_self)
                         else -> stringResource(R.string.symptom_no_fever)
                     },
@@ -487,7 +488,7 @@ private fun CheckInDialog(
         title = { Text(stringResource(R.string.exercise_checkin_title, excName)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OutlinedTextField(
+                AshkbTextField(
                     value = duration,
                     onValueChange = { duration = it.filter { c -> c.isDigit() }.take(3) },
                     label = { Text(stringResource(R.string.exercise_duration_field)) },
@@ -504,7 +505,7 @@ private fun CheckInDialog(
                         FilterChip(selected = intensity == k, onClick = { intensity = k }, label = { Text(l) })
                     }
                 }
-                OutlinedTextField(
+                AshkbTextField(
                     value = note, onValueChange = { note = it },
                     label = { Text(stringResource(R.string.common_notes_optional)) }, modifier = Modifier.fillMaxWidth(),
                 )
@@ -567,7 +568,7 @@ private fun FeedbackSheet(
                     label = { Text(stringResource(R.string.symptom_inflammation)) },
                 )
             }
-            OutlinedTextField(
+            AshkbTextField(
                 value = note, onValueChange = { note = it },
                 label = { Text(stringResource(R.string.common_notes_optional)) }, modifier = Modifier.fillMaxWidth(),
             )

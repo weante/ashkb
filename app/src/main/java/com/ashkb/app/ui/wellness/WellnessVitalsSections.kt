@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.util.Locale
 
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.Profile
@@ -128,7 +129,7 @@ private fun WeightCard(vm: WellnessViewModel, sheets: MutableState<WellnessSheet
         }
         StatTile(
             label = stringResource(R.string.vitals_today_weight),
-            value = weight?.weightKg?.let { "%.1f".format(it) } ?: stringResource(R.string.common_not_recorded),
+            value = weight?.weightKg?.let { String.format(Locale.US, "%.1f", it) } ?: stringResource(R.string.common_not_recorded),
             unit = weight?.let { "kg" },
         )
         // v10（C9）：体重目标区间提示（区间由档案设定）
@@ -157,10 +158,10 @@ private fun BodyCompositionCard(vm: WellnessViewModel, sheets: MutableState<Well
         if (bm != null) {
             // 每行都拆成「先取值与缺省文案、再渲染」两段：原实现把 `?.let { … } ?: …` 全塞在一行，
             // 长度超过 detekt 的 140 字符上限（基线里记的就是这几行）。拆分只换行，取值与文案逐字不变。
-            val height = bm!!.heightCm?.let { "%.0f cm".format(it) } ?: stringResource(R.string.common_unfilled)
-            val waist = bm!!.waistCm?.let { "%.0f cm".format(it) } ?: stringResource(R.string.common_unfilled)
-            val hip = bm!!.hipCm?.let { "%.0f cm".format(it) } ?: stringResource(R.string.common_unfilled)
-            val bmi = bm!!.bmi?.let { "%.1f".format(it) } ?: stringResource(R.string.common_unfilled)
+            val height = bm!!.heightCm?.let { String.format(Locale.US, "%.0f cm", it) } ?: stringResource(R.string.common_unfilled)
+            val waist = bm!!.waistCm?.let { String.format(Locale.US, "%.0f cm", it) } ?: stringResource(R.string.common_unfilled)
+            val hip = bm!!.hipCm?.let { String.format(Locale.US, "%.0f cm", it) } ?: stringResource(R.string.common_unfilled)
+            val bmi = bm!!.bmi?.let { String.format(Locale.US, "%.1f", it) } ?: stringResource(R.string.common_unfilled)
             KeyValueRow(stringResource(R.string.vitals_height_short), height)
             KeyValueRow(stringResource(R.string.vitals_waist), waist)
             KeyValueRow(stringResource(R.string.vitals_hip), hip)

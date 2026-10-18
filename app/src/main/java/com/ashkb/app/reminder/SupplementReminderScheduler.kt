@@ -11,7 +11,6 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
-import org.json.JSONArray
 
 /**
  * 补剂提醒调度（v1.2.4）。
@@ -68,16 +67,11 @@ object SupplementReminderScheduler {
     /**
      * `times` JSON 数组 → List<"HH:mm">。
      *
-     * 与 [ScheduleCalc.takeTimesOf] 同一口径（`runCatching` + [ScheduleCalc.TIME_PATTERN]）：
-     * 脏数据（`not-json`、`25:99`）必须被丢弃而不是崩在 `LocalTime.parse` 上——
-     * 补剂的 times 走的是备份恢复路径，历史脏值完全可能进来。
+     * v1.2.10（审查 CRITICAL-1）：改为直接委托 [ScheduleCalc.parseTimes] —— 本函数与
+     * [ScheduleCalc.takeTimesOf] 此前是**两份逐字重复的实现**，重复的代价就是 CRITICAL-1：
+     * 写入侧改了格式、读取侧漏改一处，而绿色的测试钉着旧假设。留一份实现，漏改就不可能发生。
      */
-    fun parseTimes(raw: String?): List<String> {
-        if (raw.isNullOrBlank()) return emptyList()
-        return runCatching {
-            JSONArray(raw).let { arr -> (0 until arr.length()).map { arr.getString(it) } }
-        }.getOrDefault(emptyList()).filter { ScheduleCalc.TIME_PATTERN.matches(it) }
-    }
+    fun parseTimes(raw: String?): List<String> = ScheduleCalc.parseTimes(raw)
 
     fun rescheduleAll(
         context: Context,

@@ -44,7 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -336,6 +336,8 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                             EmergencyMeds.summarize(
                                 meds, today.toString(),
                                 freqLabel = { context.getString(it.plainRes) },
+                                // v1.2.10（审查 §6.9）：读不出来的频次原样印出存库值（不印「每日」）
+                                unknownFreqLabel = { context.getString(R.string.ui_emergency_meds_unknown_freq, it) },
                                 // v1.2.6（i18n）：注射周期文案同样按系统语言解析
                                 injCycleLabel = { context.getString(R.string.ui_emergency_meds_inj_cycle, it) },
                                 // v1.2.6（i18n）：商品名括号随语言换全角 / 半角
@@ -538,8 +540,11 @@ private fun RowScope.EventRow(
 ) {
     Column(Modifier.weight(1f)) {
         Text(event.date, style = MaterialTheme.typography.titleSmall)
+        // v1.2.10（审查 §6.9）：场景读不出来时印**原始存库值**，不退回「感染发热」。
+        // 退回等于把一支读不懂的值显示成一个明确诊断——用户会以为记录本来就是感染发热。
+        val sceneLabel = EmergencyScene.fromKeyOrNull(event.scene)?.labelRes
         Text(
-            stringResource(EmergencyScene.fromKey(event.scene).labelRes),
+            if (sceneLabel != null) stringResource(sceneLabel) else event.scene,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -669,18 +674,24 @@ private fun ContactFormDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OutlinedTextField(
+                AshkbTextField(
                     name, { name = it }, label = { Text(stringResource(R.string.profile_name)) }, singleLine = true,
                     isError = attempted && name.isBlank(),
                     supportingText = { if (attempted && name.isBlank()) Text(stringResource(R.string.common_required)) },
                 )
-                OutlinedTextField(relation, { relation = it }, label = { Text(stringResource(R.string.emergency_relation)) }, singleLine = true)
-                OutlinedTextField(
+                AshkbTextField(
+                    relation, { relation = it }, label = { Text(stringResource(R.string.emergency_relation)) },
+                    singleLine = true,
+                )
+                AshkbTextField(
                     phone, { phone = it }, label = { Text(stringResource(R.string.emergency_phone)) }, singleLine = true,
                     isError = attempted && phone.isBlank(),
                     supportingText = { if (attempted && phone.isBlank()) Text(stringResource(R.string.common_required)) },
                 )
-                OutlinedTextField(hospital, { hospital = it }, label = { Text(stringResource(R.string.imaging_hospital_label)) }, singleLine = true)
+                AshkbTextField(
+                    hospital, { hospital = it }, label = { Text(stringResource(R.string.imaging_hospital_label)) },
+                    singleLine = true,
+                )
                 Row(
                     Modifier
                         .fillMaxWidth()

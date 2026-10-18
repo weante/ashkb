@@ -13,6 +13,7 @@ import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.data.repo.nowIso
+import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.domain.ExerciseEngine
 import com.ashkb.app.domain.Lifestyle
@@ -123,8 +124,10 @@ class ExerciseViewModel(
                 ExerciseLog(
                     id = Ids.new("elog"), date = date.toString(), recordedAt = nowIso(),
                     excId = card.entry.id, excKey = card.entry.id, excName = card.entry.title,
+                    // v1.2.10（审查 §6.5）：写的是 AdherenceCalc.DONE——「什么算练过了」只有
+                    // domain/ExerciseLogStatus 一处定义，写入侧不再自己抄一份字面量
                     grade = card.grade, durationMin = durationMin, intensity = intensity,
-                    status = "done", notes = notes,
+                    status = AdherenceCalc.DONE, notes = notes,
                 )
             )
             // v1.0.59 B5：运动打卡后即时重排提醒（今日已完成 → slotsFor 返回空，自然清掉今日升级）

@@ -26,6 +26,16 @@ object DerivedAlerts {
     const val FLARE_DAY7 = "flare_day7"
 
     /**
+     * v1.2.10（审查 §6.6）：知识库条目到期复核的提醒。
+     *
+     * 补这个常量是审查里一条**顺带纠正**：报告说「`DerivedAlerts` 定义了 6 种告警」，实际这里
+     * 只有 5 个常量，`review_due` 是 `HealthRepository` 里的裸字符串——所以 UI 侧的 `when` 分支
+     * 也没法引用常量，只能再抄一遍字面量。两份字面量各自对得上时看不出问题，对不上时是
+     * 「警报标题显示成通用的『提醒』」这种谁也不会去查的角落。
+     */
+    const val REVIEW_DUE = "review_due"
+
+    /**
      * 症状记录派生的全部警报类型。
      *
      * v1.1.2（批次 18）起**不再整体照单删除**：发热警报（[SYMPTOM_ABNORMAL]）有第二个来源——

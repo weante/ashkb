@@ -30,7 +30,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -392,7 +392,7 @@ private fun RecipeFormSheet(
                 stringResource(if (current == null) R.string.recipes_add else R.string.recipes_edit),
                 style = MaterialTheme.typography.titleLarge,
             )
-            OutlinedTextField(
+            AshkbTextField(
                 value = title,
                 onValueChange = { title = it },
                 label = { Text(stringResource(R.string.recipes_field_title)) },
@@ -414,21 +414,21 @@ private fun RecipeFormSheet(
                     )
                 }
             }
-            OutlinedTextField(
+            AshkbTextField(
                 value = ingredients,
                 onValueChange = { ingredients = it },
                 label = { Text(stringResource(R.string.recipes_field_ingredients)) },
                 minLines = 4,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            AshkbTextField(
                 value = steps,
                 onValueChange = { steps = it },
                 label = { Text(stringResource(R.string.recipes_field_steps)) },
                 minLines = 4,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            AshkbTextField(
                 value = notes,
                 onValueChange = { notes = it },
                 label = { Text(stringResource(R.string.recipes_field_notes)) },

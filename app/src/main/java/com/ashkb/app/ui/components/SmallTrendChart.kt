@@ -34,6 +34,7 @@ import com.ashkb.app.R
 import com.ashkb.app.ui.theme.Clinical
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
+import java.util.Locale
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
@@ -54,6 +55,7 @@ import kotlin.math.roundToInt
  *   被排除的数据必须说出来，否则「图上看不见」会被误读成「没测过」。
  * @param emptyText 无数据时的占位文案。**必须由调用方给对**——v1.0.55 之前这里写死成
  *   「暂无化验数据」，于是收缩压 / 心率这些**非化验**指标的空格子也在说「暂无化验数据」（用户实测发现）。
+ * @param trailing 标题行右侧的结论槽（UI 2.0 §06 ④：BASDAI 格的「稳定期」胶囊）。空数据时不渲染。
  */
 @Composable
 fun SmallTrendChart(
@@ -68,9 +70,13 @@ fun SmallTrendChart(
     accent: Color = MaterialTheme.colorScheme.primary,
     caveat: String? = null,
     onClick: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val cs = MaterialTheme.colorScheme
-    val warning = Clinical.colors.warning
+    // v1.2.10（UI 2.0 批次 D「换图」）：阈值线改用 **danger**，与 [TrendChart] 同口径。
+    // 原用 warning 是语义错位——阈值是「越过去就不正常」的界线，而 warning 表达的是
+    // 「提醒注意」，两者不是同一件事（设计稿 §5.10 + 安全红线 2「danger 专色专用」）。
+    val danger = Clinical.colors.danger
     val density = LocalDensity.current
     val titleStyle = MaterialTheme.typography.labelMedium.copy(color = cs.onSurfaceVariant)
     val axisStyle = MaterialTheme.typography.labelSmall.copy(color = cs.onSurfaceVariant)
@@ -78,11 +84,15 @@ fun SmallTrendChart(
 
     val dotPx = with(density) { Size.chartDot.toPx() }
     val dash = remember { PathEffect.dashPathEffect(floatArrayOf(8f, 6f)) }
+    // v1.2.10（批次 D）：主线宽 1.5dp → **2dp** 圆头，与设计稿 §5.10
+    // 「主系列 brand 2px 圆头折线」及 [TrendChart] 的 2dp 主线统一。
     val stroke = remember(density) {
-        Stroke(width = with(density) { Size.chartStroke.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        Stroke(width = with(density) { 2.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
     }
+    // 面积渐变 18% → **12%**（设计稿 §5.10）：批次 A 把页面底换成冷瓷白后，
+    // 18% 的填充在新底色上偏「重」，与主线的对比被压掉。
     val fillBrush = remember(accent) {
-        Brush.verticalGradient(listOf(accent.copy(alpha = 0.18f), Color.Transparent))
+        Brush.verticalGradient(listOf(accent.copy(alpha = 0.12f), Color.Transparent))
     }
 
     val lastLabel = remember(points, unit) {
@@ -116,6 +126,7 @@ fun SmallTrendChart(
             if (lastLabel != null) {
                 Text(lastLabel, style = valueStyle, maxLines = 1)
             }
+            trailing?.invoke()
         }
 
         if (points.isEmpty()) {
@@ -172,7 +183,7 @@ fun SmallTrendChart(
                 if (threshold != null && threshold in vMin..vMax) {
                     val ty = padY + (1f - (threshold - vMin) / range) * plotH
                     drawLine(
-                        color = warning,
+                        color = danger,
                         start = Offset(0f, ty),
                         end = Offset(w, ty),
                         strokeWidth = 1.dp.toPx(),
@@ -210,6 +221,13 @@ fun SmallTrendChart(
                         center = Offset(p.xFraction * w, padY + p.yFraction * plotH),
                     )
                 }
+                // v1.2.10（批次 D）：端点白环强调（设计稿 §5.10「端点白环强调 + 深色气泡读数」），
+                // 与 [TrendChart] 同一手法——先在端点上盖一圈底色环，再压回实心点。
+                miniPoints.lastOrNull()?.let { p ->
+                    val c = Offset(p.xFraction * w, padY + p.yFraction * plotH)
+                    drawCircle(color = cs.surfaceContainerLowest, radius = dotPx * 1.5f, center = c)
+                    drawCircle(color = accent, radius = dotPx * 0.9f, center = c)
+                }
             }
         }
 
@@ -224,7 +242,7 @@ private val MINI_AXIS_WIDTH = 40.dp
 private const val MIN_RANGE = 1e-3f
 
 private fun fmtMini(v: Float): String =
-    if (v == v.roundToInt().toFloat()) v.roundToInt().toString() else "%.1f".format(v)
+    if (v == v.roundToInt().toFloat()) v.roundToInt().toString() else String.format(Locale.US, "%.1f", v)
 
 /**
  * 一个数据点在画布上的**相对**位置，两轴都已归一化到 0..1（y 轴 0 在顶部）。

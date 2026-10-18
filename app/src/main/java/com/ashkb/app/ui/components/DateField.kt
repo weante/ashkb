@@ -1,6 +1,5 @@
 package com.ashkb.app.ui.components
 
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -50,7 +49,7 @@ internal fun DateTextField(
         value.isBlank() -> stringResource(R.string.date_field_required)
         else -> stringResource(R.string.date_field_invalid)
     }
-    OutlinedTextField(
+    AshkbTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },

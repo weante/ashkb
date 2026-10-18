@@ -37,6 +37,7 @@ import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.knowledge.KbDetailDialog
 import com.ashkb.app.ui.theme.Spacing
+import java.util.Locale
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -159,7 +160,9 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
                             stringResource(
                                 R.string.ui_symptom_basdai_recorded,
                                 selectedDate.toString(),
-                                basdaiExisting.total,
+                                // v1.2.10 审查 HIGH-2：BASDAI 总分先按 Locale.US 收敛再交给资源，
+                                // 否则德语/法语等系统语言下小数点会变成逗号。
+                                String.format(Locale.US, "%.1f", basdaiExisting.total),
                             ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,

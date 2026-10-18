@@ -539,10 +539,27 @@ abstract class AppDatabase : RoomDatabase() {
 }
 
 object Ids {
+
+    private const val BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+    /**
+     * 随机尾长度。v1.2.10（审查 L8）由 3 位（36³ ≈ 4.7 万）加长到 8 位（36⁸ ≈ 2.8 万亿）。
+     *
+     * 原来的 3 位只够「同一毫秒内两次调用基本不撞」，而物化一次计划槽位要在同一两毫秒内生成
+     * 几十行；项目自己也发现了这件事——`MedicationRepository` 的 [uniqueSlotId] 专门为此加了
+     * 计数后缀，注释写着「取一个**本批内唯一**的主键……撞尾时加计数后缀而不是重摇随机数」。
+     * 那道防线**只在物化槽位这一条路上**，其它 30 多处调用点（用药记录、症状、体重、附件、
+     * 化验、疫苗、急诊事件……）走的是裸 [new]，而撞尾的后果是主键冲突后 `INSERT OR IGNORE`
+     * 静默丢行。加长随机尾比给每个写入点都套一层去重便宜得多，也修得住根本原因。
+     *
+     * 格式不变（`前缀-时间基36进制的毫秒数+随机尾`）：主键只要求本地唯一，不参与任何解析。
+     */
+    private const val RANDOM_TAIL_CHARS = 8
+
     /** 语义化主键：前缀 + 时间基 36 进制 + 随机尾，本地唯一即可 */
     fun new(prefix: String): String {
         val t = System.currentTimeMillis().toString(36)
-        val r = (0..2).map { "0123456789abcdefghijklmnopqrstuvwxyz"[(0..35).random()] }.joinToString("")
+        val r = (0 until RANDOM_TAIL_CHARS).map { BASE36[(0..35).random()] }.joinToString("")
         return "$prefix-$t$r"
     }
 }

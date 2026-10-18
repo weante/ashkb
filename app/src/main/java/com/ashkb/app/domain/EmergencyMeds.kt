@@ -71,6 +71,8 @@ object EmergencyMeds {
      * `ui_emergency_meds_inj_cycle`），本对象不再持有患者可见文案。
      *
      * @param freqLabel 把频次枚举解析成当前语言文案；急救卡必须用 `plainRes`（不是 `labelRes`）。
+     * @param unknownFreqLabel 频次**读不出来**时把原始存库值原样交回调用方（v1.2.10 审查 §6.9）。
+     *   必须显式传：这张卡是给医生看的，「每日」印在一支 Q7D 的药上比印一个读不懂的原始值更危险。
      * @param injCycleLabel 把注射周期天数（`injCycleDays`）解析成「 · 每 N 天」形式的文案。
      * @param brandParen 把商品名包成当前语言的括号形式（资源 `ui_brand_paren`：中文全角、英文半角）。
      */
@@ -78,14 +80,15 @@ object EmergencyMeds {
         meds: List<Medication>,
         today: String,
         freqLabel: (MedFrequency) -> String,
+        unknownFreqLabel: (String) -> String,
         injCycleLabel: (Int) -> String,
         brandParen: (String) -> String,
         maxLines: Int = MAX_LINES,
     ): Summary {
         val active = meds.filter { isActive(it, today) }
         val (immuno, rest) = active.partition { isImmunosuppressant(it.medClass) }
-        val head = immuno.map { entry(it, freqLabel, injCycleLabel, brandParen) }
-        val tail = rest.map { entry(it, freqLabel, injCycleLabel, brandParen) }
+        val head = immuno.map { entry(it, freqLabel, unknownFreqLabel, injCycleLabel, brandParen) }
+        val tail = rest.map { entry(it, freqLabel, unknownFreqLabel, injCycleLabel, brandParen) }
         val kept = (head + tail).take(maxLines.coerceAtLeast(0))
         val keptHead = kept.count { it.immunosuppressant }
         return Summary(
@@ -98,6 +101,7 @@ object EmergencyMeds {
     private fun entry(
         m: Medication,
         freqLabel: (MedFrequency) -> String,
+        unknownFreqLabel: (String) -> String,
         injCycleLabel: (Int) -> String,
         brandParen: (String) -> String,
     ): Entry {
@@ -105,7 +109,10 @@ object EmergencyMeds {
         // v1.2.1：读 `plainRes` 而非 `labelRes`——`labelRes` 含面向患者的表单提示（如「如甲氨蝶呤」），
         // 会印到急救卡上（医生看的那张）。详见 MedFrequency 的注释。
         // v1.2.5（i18n）：解析交给调用方注入的 `freqLabel`，本对象不碰 Android 资源。
-        val freq = freqLabel(MedFrequency.fromKey(m.frequency))
+        // v1.2.10（审查 §6.9）：读不出来的频次**不再退回「每日」**。`fromKey` 的 fail-open 是
+        // 为排程侧留的（退回 DAILY 会天天提醒，但看得见、改得动）；这里没有"看得见"可言——
+        // 医生只会读到「每日」，而这是一支每两周一次的药。
+        val freq = MedFrequency.fromKeyOrNull(m.frequency)?.let(freqLabel) ?: unknownFreqLabel(m.frequency)
         val cycle = m.injCycleDays?.let(injCycleLabel) ?: ""
         return Entry(
             name = name,

@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.2.9（versionCode 121）· 2026-10-12 · 裁决项 1、2 + 首页补剂卡**，**已推送并发布为 GitHub Latest**（release id `410782041`）；裁决项 3 **已入代码与测试、未发版**（维护者指示「做完先别发」）；上一版 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」**（release id `408053469`）。⚠️ v1.2.8 **只换色**——设计稿的 ②换形 / ③换件 / ④换图 待维护者看完效果再定。
+> **时点快照**：截至 **v1.2.10（versionCode 122）· 2026-10-19 · 审查第二批 / 第三批 + 裁决项 3、6、7 + §6.7 + 按需用药每天一次 + UI 2.0 批次 B–E + §06 双主题验收 + 真机启动崩溃修复**，**已全部落地、门禁全绿；本批提交后推送并发布为 GitHub Latest**（Release id / 资产摘要随后回填；逐批取证见文末「批次 B」「批次 C」「批次 B–E（UI 2.0）」「真机崩溃修复」「健康 Hub「今日体征」面板 + 紧急卡 danger-soft 瓦片」「UI 2.0 §06 ④⑤ 收尾」六节）；本版把此前积压的六批改动一次合并发布，**无库结构变更**（仍 v19），可覆盖安装。上一版 **v1.2.9（versionCode 121）· 2026-10-10 · 裁决项 1、2 + 首页补剂卡**（release id `410782041`），更早 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」**（release id `408053469`）。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号以 `app/build.gradle.kts` 为准（v1.2.9 起**不再把单测条数抄进文档**，见根 `build.gradle.kts` 里 `verifySpecSync` 的注释）。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -14,8 +14,8 @@
 | 工作树 | 已推送：`5ecbf33`（v1.2.9 裁决项 1）、`6285d69`（README 审核）、`86e50df`（裁决项 2 + 首页补剂卡）、`c0ee3b1`（补剂卡「不提醒」文案）均在 `origin/main`（`9d5010d..c0ee3b1`）；附注标签 `v1.2.9` → `c0ee3b1`（远端 `refs/tags/v1.2.9^{}` 已核对）。发布记录回填（本行所在提交）随后推送 |
 | 全量单测 | **全绿，0 失败 / 0 错误 / 0 跳过**（约 102 个测试文件；**实际条数以 CI 为准，文档不记数**——v1.2.9 起如此）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
-| APK 版本 | **v1.2.9 已构建并发布**：release / debug 经 `aapt dump badging` 核对均为 versionCode 121 / versionName 1.2.9，正式证书 `38ca80a6…d7d`（未回退 debug 签名）。上一版 v1.2.8 为 versionCode 120 / versionName 1.2.8 |
-| 审查裁决进度 | **裁决项 1、2 已落地并发布（v1.2.9）；裁决项 3 已落地（未发布）**。① 对乙酰氨基酚 `MedClass.NSAID` → 新增 `MedClass.ANALGESIC`，`DrugInteractionKeys` 的 `nsaid`/`nsaid_longterm` 摘除 acetaminophen，新增 2 条回归（`MedicationInteractionChainTest`）；②「已结算」统一到 `AdherenceCalc.SETTLED_STATUSES` 唯一口径——删掉 `MedicationRepository.doneSlotRefs`、`ReminderReceiver` 改引 `settledSlotRefs`、`TodayItem` 新增 `partial`/`isSettled`、今日页 partial 不再显示成「漏服」也不计入待办，连带按铁律重写 4 条 detekt 复杂度（不进基线）并清掉 2 条签名过期的基线条目；③ **口服不再提供「每两周」**——新增 `ui/me/MedEditSections.kt` 的 `routeVisible`（chips 按 route 过滤 + 保留当前值逃生口）、`MedEditScreen.onPrimary()` 提交拦截 + `med_route_frequency_error` 红字，**domain 层刻意不动**（`ScheduleCalc.isCycleGatedBy` 只加 KDoc），新增 10 条回归（`MedRouteFrequencyGuardTest`）。其余 5 项待裁决 |
+| APK 版本 | **v1.2.10 已构建**：release 经 `aapt dump badging` 核对为 versionCode 122 / versionName 1.2.10，正式证书 `38ca80a6…d7d`（未回退 debug 签名）。上一版 v1.2.9 为 versionCode 121 / versionName 1.2.9 |
+| 审查裁决进度 | **裁决项 1、2 已落地并发布（v1.2.9）；裁决项 3 已落地（未发布）**。① 对乙酰氨基酚 `MedClass.NSAID` → 新增 `MedClass.ANALGESIC`，`DrugInteractionKeys` 的 `nsaid`/`nsaid_longterm` 摘除 acetaminophen，新增 2 条回归（`MedicationInteractionChainTest`）；②「已结算」统一到 `AdherenceCalc.SETTLED_STATUSES` 唯一口径——删掉 `MedicationRepository.doneSlotRefs`、`ReminderReceiver` 改引 `settledSlotRefs`、`TodayItem` 新增 `partial`/`isSettled`、今日页 partial 不再显示成「漏服」也不计入待办，连带按铁律重写 4 条 detekt 复杂度（不进基线）并清掉 2 条签名过期的基线条目；③ **口服不再提供「每两周」**——新增 `ui/me/MedEditSections.kt` 的 `routeVisible`（chips 按 route 过滤 + 保留当前值逃生口）、`MedEditScreen.onPrimary()` 提交拦截 + `med_route_frequency_error` 红字，**domain 层刻意不动**（`ScheduleCalc.isCycleGatedBy` 只加 KDoc），新增 10 条回归（`MedRouteFrequencyGuardTest`）。其余 5 项待裁决；其中**裁决项 6、7 与审查第二、三批（含 §6.7）已落地、门禁全绿、未发版**（见文末「批次 B」）；另按维护者指令（m00936）落地**按需用药常驻首页 + 每天只记一次**（见文末「批次 C」） |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
 | GitHub 正式版（Latest） | **v1.2.9**（2026-10-12，release id `410782041`，资产 `ashkb-1.2.9-release.apk` 5224936 B，sha256 `413f82b8…`）；上一版 **v1.2.8**（id `408053469`，5220504 B，`ece175f8…`）、**v1.2.7**（id `407916739`，5220504 B，`e09e6990…`）、**v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——五条资产摘要与本地 `Get-FileHash` **逐字节一致** |
 | GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 / v1.2.7 / v1.2.8 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |
@@ -543,3 +543,339 @@ release APK = `ashkb-1.2.8-release.apk`（5220504 B，sha256 `ECE175F8CF4A3602CC
 **回归测试**：新增 `app/src/test/java/com/ashkb/app/ui/me/MedRouteFrequencyGuardTest.kt` **10 条**——6 条纯函数断言（口服不给 Q2W / 注射仍给 / 其余频次两途径都不受影响，防顺手扩大打击面 / v1.2.4 放开给口服的 CUSTOM 与 MONTHLY 不得被一起收回 / Q8H 归 `hidden` 管、本判定不碰 / 未知途径按不提供处理）+ 4 条接线守卫（chips 确实过 `routeVisible` / 逃生口确实在 / `onPrimary` 确实拦提交且亮可见错误 / 改途径或改频次确实清零错误位）。
 
 **⚠️ 未验证清单**：本批**未装机**，依据只有门禁 + 单测。真机需要看三件事：①添加药品时途径选「口服」，频次 chips 里**不应出现「每两周」**；②选「注射」后「每两周」**应出现**；③编辑一张存量的「口服 + 每两周」药单时，频次区**应仍显示当前值**（不被清空），且点「下一步」**应被拦住并显示红字**。
+
+---
+
+### 批次 B（审查第二批 + 第三批 + 裁决项 6、7 + §6.7）：门禁全绿，已回填 CHANGELOG，未 bump 版本号
+
+> **本节补记于 2026-10-14**，原因是原会话崩溃：`session-6f36587f-5b0a-41c0-bbf7-9d6f5ee64617`（工作目录 `E:\ASHKB`）在 2026-10-13 23:28 连续三个回合以 `413 preflight_compress_failed` 失败（核心文本约 6.56 MB / ≥ 约 875k tokens > 模型窗口 750k），期间本通道的 dsh 原生压缩被代理拒绝（`dsh_compaction_refused`：*bili owns compression on this lane*），**连 compress 工具也因预检不过而无法执行**；维护者随后输入「停止」并让原 goal 作废。**崩溃未损坏任何文件**——本批全部改动仍在工作树上，只是从未构建、从未发版、从未写进 CHANGELOG。
+> 触发本批的原 goal（`goal-322ef44a-7f97-474b-a467-75a870c83b67`，已于 23:27 由维护者 clear）：*完成 ASHKB v1.2.10 的剩余审查整改：裁决项 6/7/8、审查第二批、审查第三批、UI 2.0 批次 B–E，每批跑通门禁并回填 CHANGELOG.md 与 HANDOFF-STATUS.md；未经用户明确指示不推送、不发版。* 其中 **UI 2.0 批次 B–E（换形 / 换件 / P1 项 / 换图 + 启动图标底色）本次一行未动**——`app/src/main/java/com/ashkb/app/ui/theme` 在工作树中零改动。
+> 依据：`release-tooling/review-2026-10-09-reply.md` §4（裁决表）与 §5（三批排期）。**无库结构变更**：`AppDatabase.ASHKB_DB_VERSION` 仍为 19，`app/schemas/…/` 4..19.json 全部未动，可覆盖安装。
+
+**工作树现状**（**2026-10-15 更新**）：`git status --porcelain` = 63 modified + 12 untracked；`git diff --shortstat` = 63 files changed, 1596 insertions(+), 374 deletions(-)。HEAD = `b1781c8`「v1.2.10: 口服不再提供「每两周」（审查裁决项 3）」，`app/build.gradle.kts:31-32` 仍 `versionCode = 121 / versionName = "1.2.9"`。**`CHANGELOG.md` 已补入「未发布 — 审查第二批 + 第三批 + 裁决项 6、7」一节**；`HANDOFF.md`、`README.md`、版本文件仍零改动（版本号未 bump，故 `verifySpecSync` 的字面量校验仍按 v1.2.9 通过）。
+
+#### 一、第一批（口径统一）——已落地
+
+| 项 | 文件 · 关键改动 |
+|---|---|
+| CRITICAL-1 补剂时刻 JSON 解析 | `domain/SupplementTiming.kt:62/:90` 改按 JSON 解析（`minByOrNull` 替 `distinctBy`，即 L4）；`ui/wellness/WellnessScreen.kt:829` 口径换成 `ScheduleCalc.parseTimes`；`reminder/SupplementReminderScheduler.kt:70` 直接委托 `ScheduleCalc.parseTimes`；`domain/ScheduleCalc.kt:41` 抽出 `takeTimesOf`；`domain/SupplementLimits.kt:19` 同步 |
+| §6.5 运动「算完成」唯一判据 | 新增 `domain/ExerciseLogStatus.kt`；`data/db/Daos.kt:406` 改传状态过滤参数（不再硬编码 `status='done'`）；`data/repo/ReportRepository.kt:147/:248`、`ui/exercise/ExerciseViewModel.kt:127` 改引它 |
+| §6.10 依从率 / 报告分母分叉 | `domain/AdherenceCalc.kt:134`、`data/repo/ReportRepository.kt:113/:225`、`data/db/Daos.kt:112/:144` 统一口径 |
+| L1 整数运算 | `domain/AdherenceCalc.kt:91` |
+| L5 注释订正 | `domain/PendingDoses.kt:24`、`ui/today/TodayViewModel.kt:243` |
+
+#### 二、第二批（内存与列表）——已落地
+
+| 项 | 文件 · 关键改动 |
+|---|---|
+| CRITICAL-2 本地备份体积上限 | `data/backup/BackupEngine.kt:87 PICK_LIMIT_BYTES = 64 MiB`、`:90 withinPickLimit`、`:112 readBounded`；`ui/backup/BackupScreen.kt:185-200` 先 `querySize` 预检再 `withContext(Dispatchers.IO)` 读入；`ui/backup/BackupViewModel.kt:284` 二次守卫。新增 `test/data/backup/BackupPickLimitTest.kt` |
+| HIGH-3 待恢复状态泄漏 | `ui/backup/BackupViewModel.kt:349-351` 成功/失败**两路**都清 `_pendingRestore` / `_pendingFileName` / `wipeRestorePassword`；`:364-371 override fun onCleared()` 兜底；`ui/backup/BackupScreen.kt:280-285` `DisposableEffect { onDispose { pickedBytes = null } }` |
+| HIGH-5 冷启动 I/O | `ui/AppShell.kt:172-173` 移入 `LaunchedEffect`；`CrashLogger.kt:135 suspend fun takeLast`（`withContext(Dispatchers.IO)`）、`:53 MAX_NONFATAL_CHARS = 32 * 1024`、`:110-114` 超限保留尾部 |
+| M5 分享失败提示 | 新增 `ui/components/Share.kt:30-32 shareOrReport`（`runCatching{…}.onFailure{ GlobalMessages.post(getString(report_share_fail)) }`）；`ui/report/ReportExportPage.kt:63/:85`、`ui/backup/BackupScreen.kt:355/:546` 两处目标点均已接入（原 BackupScreen 连 `onFailure` 都没有） |
+| M6 预填只跑一次 | `ui/me/MedEditScreen.kt:159 val prefillDone = rememberSaveable(editId){ mutableStateOf(false) }`、`:173-174` |
+| M7 底部弹层可滚 | `ui/backup/BackupScreen.kt:1070` 加 `.verticalScroll(rememberScrollState())`（第二处 `:1148/:1155` 同） |
+| M8 90 天用药史 | 新增 `domain/MedHistory.kt:30 MED_HISTORY_WINDOW_DAYS = 90`、`:38 MAX_ROWS = 60`、`:46 visible = logs.take(MAX_ROWS)`、`:53 isTruncated`；`ui/me/MedsScreen.kt:532/:535-537/:565` 用截断 + `med_history_truncated` 文案（照 `SupplementHistory` 先例，未虚拟化） |
+| §5-HIGH-4 档案导出补 7 字段 | `data/repo/BackupRepository.kt:459-468` 导出 `spine_mobility` / `comorbidities` / `lifestyle` / `emergency_med_summary` / `emergency_note` / `weight_target_low` / `weight_target_high`；`:527-538` 导入侧 `optString(...).ifBlank { existing?.x }`、`has(...)` 保 existing |
+| §5-MEDIUM-6 导入按 name_key 复用药品 id | `data/repo/BackupRepository.kt:565-570 upsertImportedMedication`：`nameKey → medicationDao().activeByNameKey → id = existing?.id ?: Ids.new("med")` |
+| §6.9 fromKey 区分 null / 无法识别 | `data/entity/Entities.kt:80 fromKeyOrNull`、`:93 fromKey = fromKeyOrNull(k) ?: DAILY`、`:99 labelResOrNull`、`:141 SkipReason.fromKey` 返回可空、`:163 Reaction.fromKey`、`:857-866 EmergencyScene.fromKeyOrNull`；消费方 `ui/emergency/EmergencyEventSheet.kt:95/:165-168 UnrecognizedSceneHint`、`:272` 保留原始串。新增 `test/data/entity/EnumFromKeyTest.kt` |
+
+#### 三、第三批（文案与格式清理）——除两项外已落地
+
+| 项 | 文件 · 关键改动 |
+|---|---|
+| HIGH-2 统一 Locale.US | 现 **54 处 / 约 20 文件**（`WellnessVitalsSections.kt`、`ExerciseScreen.kt`、`MedEditSections.kt`、`WellnessScreen.kt`、`TodayScreen.kt`、`SymptomScreen.kt`、`SymptomDialogs.kt`、`TrendChart.kt`、`SmallTrendChart.kt`、`MissedDose.kt`、`ReportPdfWriter.kt`、`ReportScreen.kt`、`AttachmentSheet.kt`、`BackupScreen.kt`、`CheckupLabForms.kt`、`CheckupLabImaging.kt`、`HealthRepository.kt` 等，多数带「v1.2.10 审查 HIGH-2」注释）；资源侧 `%f → %s`（`values/strings.xml pdf_lab_ref_range`、`values/strings_ui.xml` 总分×2 + 僵硬分），res 中已无 `%f`。新增 `test/i18n/FormatLocaleGuardTest.kt` 静态守卫（只守 `"…".format(`，放行 `%x`） |
+| M1 周期天数下界 + 导入钳制 | `domain/ScheduleCalc.kt:26-27 MIN_CYCLE_DAYS = 1 / MAX_CYCLE_DAYS = 999`、`:36 clampCycleDays`；提交侧 `ui/me/MedEditScreen.kt:229`；导入侧 `data/repo/BackupRepository.kt:586`；红字 `ui/me/MedEditSections.kt:403` |
+| L2 DndWindow 容错 | `domain/DndWindow.kt:38-39 runCatching { LocalTime.parse(...) }.getOrNull() ?: return false` |
+| L6 skip()/checkIn 对称 | `data/repo/MedicationRepository.kt:319-329`（`skip(..., date: LocalDate = LocalDate.now())` + 跨零点 KDoc） |
+| L8 Ids.new 随机尾加长 | `data/db/AppDatabase.kt:557 RANDOM_TAIL_CHARS = 8`、`:562`（36⁸ ≈ 2.8 万亿） |
+| §6.4 reaction 统一 | `data/entity/Entities.kt:163`（`fromKey` 大小写不敏感）；写入侧默认值改 `Reaction.NONE.name`：`ui/today/TodayViewModel.kt:176`、`data/repo/MedicationRepository.kt:280`；历史行靠 `fromKey` 兼容 |
+| §6.6 vaccine_live_pending | `ui/symptom/SymptomCards.kt:68` 文案 `vaccine_live_pending_alert`、`:78 Icons.Rounded.Vaccines`；`domain/DerivedAlerts.kt:29` |
+| §5-MEDIUM-5 csvToJson 转义 | 实现移到新增 `domain/ProfileLists.kt:24-28`（`JSONArray(items).toString()` 转义）、`:36-40`（解析失败原样返回）；`ui/me/ProfileEditScreen.kt:318/:323` 改为调用 |
+| 裁决项 6 零引用枚举标注「预留」 | `data/entity/Entities.kt:106`（CheckStatus）、`:512`（FeedbackChange），注释「当前零引用（预留）」 |
+| 裁决项 7 写读往返测试 | 新增 `test/domain/WriteReadRoundTripTest.kt`（覆盖 `take_times` / `times` / `allergies` / `lifestyle` / `comorbidities`） |
+| §6.2 迁移起点说明 | 已由既有文字满足：`HANDOFF.md:450`「从 v4 起的所有升级路径都有自动化覆盖」、`:459`「没有 1/2/3.json 就建不出对应旧库…故不做」——**非本次新增**，工作树无 `.md` 改动 |
+
+**新增 12 个文件**：`domain/ExerciseLogStatus.kt`（§6.5 唯一判据）· `domain/MedHistory.kt`（90 天窗 / ≤60 行纯函数）· `domain/ProfileLists.kt`（档案 allergies/comorbidities 唯一编解码）· `ui/components/Share.kt`（M5 落地）· `test/data/backup/BackupPickLimitTest.kt` · `test/data/entity/EnumFromKeyTest.kt` · `test/data/repo/MedAdherenceParityTest.kt`（L1 对拍）· `test/domain/ExerciseLogStatusTest.kt` · `test/domain/MedHistoryTest.kt` · `test/domain/WriteReadRoundTripTest.kt` · `test/i18n/FormatLocaleGuardTest.kt` · `test/ui/emergency/EmergencyEventSheetFieldsTest.kt`。
+
+#### 四、本批未落地
+
+- ~~**§6.7**（`StopReason` 的 `"postpone"`）~~ → **2026-10-15 已落地**（本批最后一处代码缺陷）。`data/entity/Entities.kt` 的 `StopReason` 补 `POSTPONE(..., hidden = true)` 与 `pickable()`（口径同 `MedFrequency.Q8H` 的 `hidden`：枚举项保留、不可选）；`data/repo/MedicationRepository.kt:618` 由字面量 `"postpone"` 改为 `StopReason.POSTPONE.name.lowercase()`（**落库值逐字不变，无需数据迁移**，历史行仍靠 `fromKey` 兼底）；`ui/me/MedsScreen.kt:314` 停药弹层单选改 `StopReason.pickable()`，否则「顺延」会混进患者的停药原因列表；`values/strings.xml` 与 `values-en/strings.xml` 各补一条 `enum_stop_reason_postpone`（插在 `_other` 之后以保持中英顺序一致）。回归：`domain/StopWarningTest.kt` 新增 1 条（`fromKey("postpone") == POSTPONE`、`hidden` 为真、不在 `pickable()` 内、`OTHER` 兜底不变），`data/repo/PostponeInjectionSlotTest.kt` 顺延用例补 `reason` 断言。
+- **L7（可选）**：`ui/emergency/EmergencyScreen.kt:97-99` 的 `tel:` 无格式校验（审查答复标「可选」）。
+- **M7 残留（可选升级）**：`ui/backup/BackupScreen.kt:1097` 仍是 `DividerList`（非惰性），只修了滚动 / 尾部可达。
+- **裁决项 5**：`domain/ClinicalThresholds.kt:34-35` 目前只有 `const val LAB_NEAR_BOUNDARY_RATIO = 0.05f` 与 KDoc，**「临界」显示未实现**；该文件在「子代理不得改」清单内，须维护者本人动手或明确授权。
+- **裁决项 8**：报告 §九 需维护者提供原件。
+- **UI 2.0 批次 B–E**：换形 / 换件 / P1 项 / 换图 + 启动图标底色，**本次零改动**。
+
+#### 五、门禁现状
+
+- **2026-10-15 已重跑并全绿**：`cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug verifySpecSync` → **BUILD SUCCESSFUL in 4m 1s**（`E:\ASHKB\v1210-gate1.log`，42 actionable tasks: 27 executed, 15 up-to-date）。单测 **965 条 / 110 文件全绿**（failures=0 / errors=0）；detekt **0 条**；lint **0 error**（184 条全为 Information/Warning）；`verifySpecSync` 通过。
+- **本次修掉的门禁红项**：09:28 之后那批未过门禁的改动引入了 `ui/me/MedEditScreen.kt:256:9 Function onPrimary has 7 return statements which exceeds the limit of 6. [ReturnCount]`（`config/detekt/detekt.yml:46-47 ReturnCount: max: 6`）。按铁律**在代码里修、不进基线**：把 7 个 `return` 的校验链收成表达式体 `fun stepOneBlocked(): Boolean = when { … }`，分支次序与三处错误位副作用逐字保留，`onPrimary` 只剩 2 个 `return`。`MedRouteFrequencyGuardTest.kt:138` 钉的 `!routeVisible(frequency.value, route.value)` 字面量原样保留。
+- **历史门禁基线**：上一批最后一次完整门禁 = 2026-10-13 09:28（`E:\ASHKB\batch2-gate2.log`：`BUILD SUCCESSFUL in 2m / 42 actionable tasks: 17 executed, 25 up-to-date`）；同批 `batch1-gate2.log`（08:10，2m45s）、`adj3-gate2.log`（00:14，1m25s）、`detekt-fix.log`（08:07，13s，只跑 `compileDebugUnitTestKotlin`，无 lint）均 SUCCESSFUL。**09:30 → 21:07 那约 12 小时改动的门禁缺口，已由本次重跑补上**（含 21:06–21:07 的运动判读反馈文案与 `ExerciseEngineTest.kt`）。
+- ⚠️ **构建必须在沙箱外运行**：workspace-write 沙箱下 Gradle 无法初始化 native services（`Failed to load native library 'native-platform.dll'`，因 `%USERPROFILE%\.gradle\native\…\.dll.lock` 被拒写）。命令：`. E:\ASHKB\build-env\env.ps1; & "E:\ASHKB\build-env\gradle-8.7\bin\gradle.bat" -p E:\ASHKB\patient-health-app <tasks> --console=plain`，且**不要覆盖 `GRADLE_USER_HOME`**（AGP 8.5.2 / Robolectric 4.13 缓存与 `%USERPROFILE%\.m2` 的 android-all-instrumented(API 34) 都在默认位置，覆盖会失去离线能力）。
+
+#### 六、⚠️ 未验证清单（本批）
+
+1. **未装机、未构建 APK、未推送、未发布**；维护者指示「未经明确指示不推送、不发版」。版本号仍是 `1.2.9 / versionCode 121`。
+2. **门禁缺口已补**（见上），但依据仍只有门禁 + 单测，无真机证据。
+3. 真机看点：本地备份选文件的 64 MiB 上限提示；档案导出 / 导入新增 7 字段往返（尤其 `spine_mobility`）；用药史弹层 90 天窗 + ≤60 行截断文案；急诊事件草稿各字段都有输入格；运动判读反馈文案已无 `exc-010` / `L1`；**停药弹层里不应出现「顺延」**；顺延注射后台账 `reason` 存的是 `postpone`。
+4. 存量数据：药单以枚举 name 存库，**历史 `"postpone"` 行、旧分类行**都靠 `fromKey` 兼底，升级后不崩但仍是旧值（与 A3 节第 4 条同类）。
+5. 接手时注意：`session-43a23810-8482-4dfa-ac2e-3c11cbbddf19`（13.58 MB / 216 轮）**也在 `E:\ASHKB\patient-health-app` 上推进另一条「四批次工程改造」goal**，动手前先确认主线，避免两个会话互相覆盖。
+### 批次 C（未发布 · 未入 CHANGELOG 之外 · 未 bump 版本号）：按需用药常驻首页 + 每天只记一次
+
+**维护者指示**（m00936，逐字）：「按需用药可否直接永久在主页上显示，但是限制只能每天一次。」
+
+**缺陷**（两个半边，缺一不可）：
+
+1. **读侧**：`data/repo/MedicationRepository.kt` 的 `buildTodayItems` 给按需卡**恒传 `log = null`** → `TodayItem.done` 永远为 false → 卡片永远显示「记录使用」按钮、永远没有「已服 HH:mm」。
+2. **写侧**：`checkIn` 定位旧行靠 `MedicationLogDao.find(..., slot_key = :slotKey)`，而按需行的 `slot_key` 是 NULL——SQL 里 `NULL = NULL` 不为真 → 守卫永远匹配不到 → **每点一次插一行**（旧注释把这条写成了「按需用药可多次记录」的设计意图，实际后果是"点几次落几行，而卡上什么都看不出来"）。
+
+「常驻首页」这半本来就成立（`buildTodayItems` 对每条在用按需药每天发一张卡），缺的是**已记录状态**与**每天一次的守卫**。这与 v1.1.1（HIGH-1）修掉的**补剂打卡**缺陷是同一个根因，当时只修了补剂一侧。
+
+**处置**：
+
+| 文件 | 改动 |
+| --- | --- |
+| `data/db/Daos.kt` | `MedicationLogDao` 新增 `findPrn(medId, date)`：`... AND slot_key IS NULL ORDER BY recorded_at DESC LIMIT 1`——**必须写 `IS NULL`**（`= NULL` 恒不成立）；取 `recorded_at` 最新那条，与今日卡展示同源 |
+| `data/repo/MedicationRepository.kt` | ① `checkIn` 定位旧行改为 `if (slotKey != null) find(...) else findPrn(...)`——按需药找到当天那条就**更新它**，不再新增行；② `buildTodayItems` 把当天按需记录（`recordedAt` 最大者）挂到卡上，`item.done` 由此成立 |
+| `ui/today/TodayViewModel.kt` | `checkIn` 显式传 `date = todayDate.value`（与 `skip` 的 L6 同口径）——跨零点时按需药记到页面显示的那一天；「每天一次」按同一天判定 |
+| `ui/today/TodayScreen.kt` | 按需卡文案随状态分叉：未记 → `med_prn_note`；已记 → `med_prn_done_note`。按钮仍由 `!item.done` 控制 |
+| `res/values/strings.xml` + `values-en/strings.xml` | 各补 `med_prn_done_note`（「今天已记录，明天可再记一次」/「Logged for today — you can log again tomorrow」），插在 `med_prn_note` 之后保持中英顺序一致 |
+| `test/data/repo/PrnDailyCapTest.kt`（新增） | 5 个用例（见下） |
+
+**口径边界**（刻意不动）：上限是「**每天一次**」不是「一共一次」（次日可再记）；**不改写存量数据**（旧版本历史上落的同日多行原样保留，卡与写入都取最新那条）；依从率口径不变（`AdherenceCalc.prnCount` 单独报数、`prnFlag` 仍排除在完成度分母外）；提醒链不变（`ScheduleCalc.slotsFor` 对 PRN 返回空）。
+
+**回归测试**（新增 `test/data/repo/PrnDailyCapTest.kt`，Robolectric + 真库）：
+
+1. 同一天连点三次「记录使用」只留一行（并锁 `prn_flag` / `slot_key IS NULL` / `status = done`）；
+2. 上限是每天一次——**次日可以再记**，两条日志主键不同；
+3. 今日卡挂上当天记录后 `done` 成立、仍认得出 `isPrn`、且 `isSettled`（不进待办计数）；
+4. 存量同一天多行时，卡与写入**都取 `recorded_at` 最新那条**（不新增第三行）；
+5. `find(..., null)` 查不到按需行、`findPrn` 查得到——把 `NULL = NULL` 这个根因钉死在测试里。
+
+**门禁**：`cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug verifySpecSync` → **BUILD SUCCESSFUL in 2m 48s**（`E:\ASHKB\prn-gate1.log`，42 actionable tasks: 12 executed, 30 up-to-date）。单测 **970 条 / 111 文件全绿**（failures=0 / errors=0）；detekt **0 条**；lint **0 error**（184 条全为 Information/Warning）；`verifySpecSync` 通过。
+
+**真机验证（2026-10-17，Xiaomi 2410DPN6CC / Android，无线调试，v1.2.9+批次 B/C 的 release APK 覆盖安装）**：
+
+制品：`app/build/outputs/apk/release/app-release.apk`（5,248,644 B，2026-10-16 21:02:42），`adb install -r` → `Success`，装后 `versionCode=121 / versionName=1.2.9`、`lastUpdateTime=2026-10-16 21:03:47`；与手机上旧包的证书 SHA-256 一致（`38CA80A6…012D7D`，即 `ashkb-release.jks`），属原地升级。**已核对 APK 比批次 C 全部源码新**（`Daos.kt` / `MedicationRepository.kt` / `TodayViewModel.kt` / `TodayScreen.kt` / 两个 `strings.xml` 均为 10-15 21:2x），故该包确实含本批改动。
+
+走查方式：`uiautomator dump` 逐屏读 XML + 截图，A/B 对比点按前后的同一块卡片（不是只看一眼）。
+
+| 真机看点 | 结果 |
+| --- | --- |
+| ①按需卡常驻首页（新建一支口服 · 按需 · 400mg · 通用名键 `ibuprofen` · 按需原因 `backup`） | ✅ 首页出现 `ibuprofen 400mg` / `按需 · backup` / `计划 按需` / `按需药不设提醒，记录实际使用即可` + 「记录使用」按钮 |
+| ②点一次「记录使用」→ 变已服态、按钮消失、文案变「今天已记录，明天可再记一次」 | ✅ 同一卡片区域 A/B 对比：`计划 按需` → `已服 21:06`；`按需药不设提醒…` → `今天已记录，明天可再记一次`；「记录使用」按钮（`[120,1734][527,1914]`）消失 |
+| ③同日再无入口可再记 | ✅ 已服态下卡片内**没有任何可点节点**（可点区域只剩底部导航与「今日补剂 · 管理」），按需卡上不再有「记录使用」入口 |
+| ④药单详情里该记录可见、未被改写 | ✅ 我的 → 药单管理 → 该药详情：`按需用药 · 近 90 天记录 1 次`，列表一行 `2026-10-17 / 已服 / 按需`（`MedHistory` 90 天窗与按需标记都按预期） |
+| ⑤次日恢复可记 | ✅ **2026-10-18 补验通过**。设备无 root（`date` 设置被拒、`setprop` 失败），改用 `service call alarm 3 s16 Pacific/Kiritimati` 把内核时区前推到 10-18（**不是**改 App 时钟，`DateProvider.refreshIfStale()` 读到的是真实的新系统日期）；重启 App 后首页变 `10月18日 星期日`，按需卡回到未记录态（`计划 按需` + 「记录使用」），点一次后变 `已服 03:50` + `今天已记录，明天可再记一次`。⇒ **「每天一次」是每天一次，不是一共一次**。验完立刻把设备时区恢复为 `Asia/Hong_Kong` |
+| ⑥存量同日多行未被改写 | ⬜ **仍未验**（设备上没有旧版本遗留的多行按需记录；单测用例 4 覆盖）。设备上两天各 1 行共存已验：药单详情 `按需用药 · 近 90 天记录 2 次`，两行 `2026-10-18 / 已服 / 按需`、`2026-10-17 / 已服 / 按需` |
+| ⑦（顺带）停用弹层不含「顺延」 | ✅ 批次 B 的 §6.7 顺带真机确认：停用原因弹层正好 **9 个**单选项（医嘱计划停 / 医嘱调整 / 自行停药 / 副作用 / 检查结果调整 / 感染发热 / 准备手术 / 经济原因 / 其他），**没有「顺延」** ⇒ `StopReason.POSTPONE` 的 `hidden` + `pickable()` 生效 |
+
+**⚠️ 未验证清单（本批）**：
+
+1. **未推送、未发布**；版本号仍是 `1.2.9 / versionCode 121`。（**已构建 release APK 并装机**——见上表。）
+2. 真机看点 ①②③④⑤⑦ 已验（见上表）；**只有 ⑥存量同日多行未被改写仍未验**（设备上没有旧版本遗留的多行按需记录），依据是单测用例 4。
+3. 走查期间无线调试三度掉线（手机 Wi-Fi 断/重连导致 `adb` 目标消失），⑤的补验因此拖到 10-18 才做（用 `service call alarm 3 s16 <zone>` 前推内核时区，验完已恢复 `Asia/Hong_Kong`）。
+4. 走查期间在真机上建过一支测试药 `ibuprofen`，**已连同其 2 条打卡记录删除**，首页与药单已回到走查前状态（设备自带数据「依那西普 25mg / 停用于 2026-10-08 · 原因：经济原因」与维生素 D3 记录均未触碰）。
+
+---
+
+### 批次 B–E（UI 2.0「换形 / 换件 / 换图」+ 启动图标底色，未发布 · 未 bump 版本号）：门禁全绿，已回填 CHANGELOG
+
+**维护者指令（m02212）：「UI 2.0 批次 B–E（换形/换件/换图 + 启动图标底色）——ui/theme 工作树零改动，完全没开始；release-bodies/v1.2.9.md:143 也写着「批次 B–E 仍待定」。先做这个UI的。」**
+
+设计源：`ashkb-ui2-handoff.md`（369 行交接包）+ `ashkb-ui2-clarity.html`（1443 行设计稿）。**无库结构变更、无版本号变更**（仍 `versionCode 121 / versionName "1.2.9"`），可覆盖安装。
+
+**批次 B「换形」**：`Shape.kt` 四档圆角收敛（small 8 / medium 12 / large 16 / extraLarge 24）⇒ 卡片 16、按钮·输入框·行 12、弹层 24；`Dimens.kt` `dockCorner 20→22`，新增 `Spacing.huge 40`、`Size.iconTile 42`；`Type.kt` `DataHero 36→40`、`DataLarge 28→30`、`headlineLarge 28→26`，新增 `Overline`（12sp/16sp/Medium/0.12sp 字距，按 CJK 重新推导，不入 `Typography`）。
+
+**批次 C「换件」**（九项全部落地）：
+
+1. `SectionCard` 描边化（`shapes.large` + 1dp `outlineVariant`，保持 `surfaceContainerLowest`，**无阴影**）；
+2. `NavRow` 42dp 图标瓦片（`primaryContainer` 底 + 22dp `primary` 图标）；
+3. `ScreenTopBar` 去底色（`containerColor` / `scrolledContainerColor` 均 `background`）；
+4. 标签页拆分：新增 `SegmentedTabs` 与 `FilterChips`，**旧 `TabChips` 已删除**（`ReportScreen` 用前者、`KnowledgeScreen` 用后者）；
+5. `StatusChip` 前导矢量图标 → 6dp 状态点（`Size.statusDot`），其余样式不变；
+6. `AlertBanner` KDoc 追加「⚠️ 容器永不透明、永不毛玻璃」（结构零改动）；
+7. Dock：选中胶囊 → `primaryContainer`，**未选中图标补 `onSurfaceVariant`**（原来两态同色）；**未引入 `Modifier.shadow`**，继续 `drawBehind` 淡描边；
+8. `EmptyState` 56dp `primaryContainer` 圆托底；`LoadingBlock` 转圈 → 骨架屏（签名不变）；
+9. **`AshkbTextField` + 全仓 99 处调用点迁移**——`ui/components/Forms.kt` 新增「凹陷填充」输入框（常态 `surfaceVariant`、聚焦升 `surface` + 1.5dp `primary` 描边、12dp 圆角、label 常驻顶部、值 15sp `bodyMedium`），`OutlinedTextField` 的 99 处调用 + 18 处 import 全部替换（含 `TodayScreen.kt` 两处全限定调用）。**两处有意偏离交接包**：圆角取 12（设计稿 §4.2/§5.9 两处都写 12）、label 取 12sp（设计稿 §4.4 label 梯度 15/13/12 + `Type.kt`「12sp 是硬下限」，交接包的 11.5sp 与之冲突）。
+
+**批次 D「换图」**：
+
+- `TrendChart`：2dp 圆头折线、面积渐变 16%→12%、**网格虚线→实线 hairline**、**阈值线 `warning→danger`** 并移入左侧轴槽、端点**白环**、读数气泡**深色实心**（`#084F73` + 白字）；顺带把 `tickLabel`/`fmtValue` 改为 `String.format(Locale.US, …)` 消除 locale 小数分隔符差异。轴标签**未**降到 9.5sp 例外（12sp 是全 App 硬下限）。
+- `StatTile`（`DataDisplay.kt`）：新增 `delta` + `deltaTone`，补齐设计稿 §5.8 的**增量三件套**（label 12sp + 数据 `DataMedium` + 增量文字）；**方向着色由调用点按医学语义传入**，组件不猜涨跌。
+- `MedCheckCard` 重构为 **DoseCard 时间轨**：52dp 恒宽右对齐时刻列（`Size.doseRailWidth` + 新增 `TimeRail` 13sp Bold tnum）+ 2dp 脊柱线（`Row(Modifier.height(IntrinsicSize.Min))` + `fillMaxHeight()`，复用 `AlertBanner` 唯一先例）+ 8dp 状态点（`Size.doseDot`；已服 success / 待服 primary / 漏服 danger，跳过 `onSurfaceVariant`、部分完成 `warning` 为设计稿未命名状态的显式补充）。**v1.2.10 批次 C 的按需「每天只记一次」行为未回归**。
+- `SmallTrendChart` 对齐同一规范（阈值 `warning→danger`、渐变 18%→12%、主线 1.5dp→2dp、末点白环）；**「横轴由共享窗口决定」的约定与其纯函数一字未动**。
+
+**批次 E 启动图标底色**：`res/drawable/ic_launcher_background.xml` 旧钢青 `#416476` → 品牌梯度 `linear-gradient(135deg, #06283A 0%, #084F73 55%, #0B6E9E 100%)`（与设计稿 Hero 同源），`aapt:attr` 实现；自适应图标安全区与前景脊柱未动。
+
+**§06 双主题验收（2026-10-18）—— 照出一个批次 A 遗留真缺陷并已修复**：
+
+按验收要求对五个 L1 页（今日 / 健康 / 报表 / 知识 / 我的）逐页取浅色 + 深色截图，与设计稿 §06 比对，证据留档 `E:\ASHKB\ui2-shots\ui20\{light,dark}\01-today … 05-me`（png + `uiautomator` dump）。
+
+**深色一帧当场暴露**：卡片正确变深，但**每张卡周围都是白边**，页面底色仍是 `#FAFAFA`。
+
+| | |
+| --- | --- |
+| 症状 | 深色页面底 `#FAFAFA`（浅），卡片是深色 ⇒ 每张卡一圈白边 |
+| 根因 1 | `ui/AppShell.kt` 的 `Scaffold(containerColor = Color.Transparent)`（v1.1.6 为消手势区横带而定）⇒ 页面底**由窗口背景兜底**；`Theme.Ashkb` 的 parent 是 `android:Theme.Material.Light.NoActionBar`，其 `android:windowBackground` = `background_material_light` = `#FAFAFA` |
+| 根因 2 | 全仓 `ui/` 下只有 `ReminderFullScreenActivity` / `DisclaimerScreen` / `ScreenTopBar` 三处绘制 `colorScheme.background`，**没有任何 L1 页绘制它** ⇒ 批次 A「换色」把 `backgroundLight/Dark` 改成瓷白 `#F3F6F8` / 深墨 `#0C1218` **从未真正生效**（浅色下 `#FAFAFA` 与瓷白极接近，肉眼看不出来） |
+| 根因 3 | `values-night/themes.xml` 是「深色主题挂浅色 parent」，只靠 `windowLightStatusBar=false` 打了个单点补丁 |
+
+**修法**（零结构改动；刻意不碰交接包 §5「明确不改」的 `ui/theme/Theme.kt`，也不动 `AppShell.kt` 的 L2/L3 early return 结构）：
+
+1. 新增 `res/values/colors.xml`（`ashkb_window_background` = `#FFF3F6F8`）与 `res/values-night/colors.xml`（`#FF0C1218`），与 `Color.kt` 的 `backgroundLight` / `backgroundDark` 同值；
+2. 两个 `themes.xml` 都加 `android:windowBackground` → `@color/ashkb_window_background`，并补 `android:windowLightNavigationBar`（三键导航机型在深色下原本会拿到深色图标，压在深底上不可见）；
+3. `values-night/themes.xml` parent 由 `android:Theme.Material.Light.NoActionBar` → `android:Theme.Material.NoActionBar`。
+
+**防漂移测试**：同一组颜色现在有 Kotlin 令牌 + XML 资源**两份副本**，故新增 `app/src/test/java/com/ashkb/app/ui/theme/WindowBackgroundParityTest.kt`（4 条）：浅/深两份 XML 色值与 `Color.kt` 令牌逐字节相等、两个主题都引用同一个 `@color`、深色主题的 parent 不含 `Light`。这 4 条正是单测从 970 → **974** 的增量。
+
+**真机复核**（Xiaomi 2410DPN6CC / Android 16 / 1440×3200，无线调试）：重新 `:app:assembleRelease` → `app-release.apk` **5,212,848 B @ 2026-10-18 11:59:43** → `adb install -r` Success → `cmd uimode night yes`。深色页面底实测 **`#0D1217`**（≈ `backgroundDark` `#0C1218`）、浅色 **`#F4F6F8`**（≈ `backgroundLight` `#F3F6F8`），白边消失；五个 L1 页浅/深各 5 张全部重拍并覆盖留档。**顺带修正**：浅色页面底由 Material 默认 `#FAFAFA` 变为设计稿要求的冷调瓷白 `#F3F6F8`——批次 A 本来就想改这个值。
+
+**门禁**：深色修复后重跑 `cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug verifySpecSync` → **BUILD SUCCESSFUL in 2m 24s**（`E:\ASHKB\ui2-gate2.log`，42 actionable tasks: 12 executed, 30 up-to-date）。单测 **974 条 / 112 文件全绿**；detekt **0 条**；lint **0 error**（184 条全为 Information/Warning）；`verifySpecSync` 通过。
+
+**⚠️ 未验证清单（本批）**：
+
+1. **未推送、未发版**；版本号仍是 `1.2.9 / versionCode 121`（**未 bump**）。release APK 已构建并装机用于验收（5,212,848 B @ 2026-10-18 11:59:43）。
+2. 五个 L1 页双主题截图**已拍、已留档、已比对**，但**是否达到发版标准需维护者本人过目**。
+3. 批次 D 图表的动态交互（气泡选中、端点白环在高密度屏的观感）只做静态截图核验，未逐点走查。
+4. §06 之外的设计稿分节（§5.5–§5.7 等本批未触及的组件）未逐帧比对。
+5. 本轮新暴露的 detekt 问题（`AshkbTextField` 的 `CyclomaticComplexMethod` 19>15，以及 3 条随字段改名产生的 `MaxLineLength`）**已全部改代码修掉，未进基线**——做法是把三组状态 `when` 抽成 `private fun fieldVisuals(...)` 返回 `FieldVisuals`，行为零变化。
+
+---
+
+### 真机崩溃修复（2026-10-18，release 包间歇启动闪退 · 未发布 · 未 bump 版本号）
+
+**现象**：release（R8 混淆）包冷启动偶发闪退，首页顶部浮出「上次异常：…」遮罩（`AppShell.kt:168-176` 读 `filesDir/last_crash.txt`）：
+
+```
+java.lang.NullPointerException: Attempt to invoke virtual method
+'java.lang.Class java.lang.Object.getClass()' on a null object reference
+	at W1.I.u(Unknown Source:353)
+	at e2.a.s(Unknown Source:7)
+	at x2.D.run(Unknown Source:112)
+	at C2.i.run(Unknown Source:34)
+	at E2.j.run(Unknown Source:2)
+	at E2.a.run(Unknown Source:91)
+	Suppressed: C2.g: [m0{Cancelling}@6b25eb, Dispatchers.Main.immediate]
+```
+
+首现 2026-10-18 12:30:52（PID 5331），制品 `versionCode=121 / versionName=1.2.9`（12:00:16 安装）。
+
+**定位（mapping + dex 双证，可复用）**：
+
+| 步 | 做法 | 结论 |
+| --- | --- | --- |
+| 1 | `Select-String 'W1\.I' app/build/outputs/mapping/release/mapping.txt` | 唯一命中 `:358303 com.ashkb.app.ui.today.TodayViewModel$refreshYesterdayPending$2 -> W1.I:`；`:358392` 有 `353:356:java.lang.Object invokeSuspend(java.lang.Object):255:255 -> u` |
+| 2 | 同文件 `TodayViewModel -> W1.U:` 块 | `MutableStateFlow _yesterdayPending -> o`（`residualsignature LA2/Z;`，`A2.Z` = `StateFlowImpl`） |
+| 3 | 从 `app-release.apk` 解出 `classes.dex` → `dexdump.exe -d` | `LW1/I.u`：`0x30` 先 `LW1/U;.e:(LW1/U;)Ljava/time/LocalDate;` 取 `date`（v5 = `this$0`），`0x6b` 才 `iget-object v5, v5, LW1/U;.o:LA2/Z;` 换成 `_yesterdayPending`，至 `0x161` 空检查前未被覆写 |
+
+⇒ NPE 接收者 = `_yesterdayPending` 为 **null**，崩溃点 = `ui/today/TodayViewModel.kt:255` 的 `_yesterdayPending.value = PendingDoses.unsettledOn(…)`。
+
+> ⚠️ **取证溯源（复现须知，2026-10-18 独立复核者提出）**：上表第 1 步引用的 `mapping.txt` 是**构建产物、不入 git**，且**已被 14:58 含修复的构建覆盖**——同一帧现在映射为 `:266:266`（`6:47 → :260`），旧的 `:255:255` 已无法从盘上复现。**复现请以崩溃 APK 本体为准**：副本 `C:\Users\weant\AppData\Local\Temp\ashkb-dex\app.zip`（5,212,848 B，mtime 11:59:43，SHA-256 `0DBEB9D06498E41B2F6F022460E955033228E4872003AB7B06C4E44CBF4550D3`），与修复后的 `app-release.apk`（SHA-256 `F64E90D4768EAFB49EDA6011667C57F8960F2829822BBC825FCE7152B758E388`，14:58:37）**不同一份**。下表第 3 步（`dexdump` 逐指令）与「独立对抗性复核」一节的全部结论都只依赖这份崩溃 dex，不依赖已丢失的旧 mapping。
+
+**独立对抗性复核（2026-10-18，fresh 队友 `crash-analyst` 对着崩溃 APK 的 dex 反汇编，未改文件、未跑 Gradle）**：
+
+| 复核项 | 结论 | 关键证据 |
+| --- | --- | --- |
+| 协程同步内联语义 | **成立** | `viewModelScope` = `CloseableCoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)`；主线程上 `isDispatchNeeded()==false` ⇒ `launch`（默认 `CoroutineStart.DEFAULT`）**就地执行**到第一个真挂起点（`withContext(Dispatchers.IO)`）后返回。崩溃 dex：`W1/U.<init>` 于 pc `0x0036` 调 `Lx2/y;.r(...)`（launch），而 `_yesterdayPending`（字段 `o`）直到 pc `0x0120` 才 `iput-object v0, v0, LW1/U;.o:LA2/Z` —— 中间约 234 字节构造工作（5 条 `stateIn` 链 + DAO/DB 初始化），IO 线程有整段窗口先跑到 `_yesterdayPending.value =` |
+| `getClass()` 形态 NPE 的来源 | **接收者已钉死；R8 具体 pass 不确定** | 崩点是一条**返回值被丢弃**的 `Object.getClass()`：`0x0161: invoke-virtual {v5}, Ljava/lang/Object;.getClass`，即 R8 为 `_yesterdayPending.value = …` 生成的**接收者空检查**；紧随 `0x0165: invoke-virtual {v5, v1(=null), v0}, LA2/Z;.l:(...)Z` 即内联后的 `StateFlowImpl.setValue → updateState`（对应 mapping `357:359:setValue:316 -> u`）。`v5` 由 `0x006b` 的 `iget-object v5, v5, LW1/U;.o:LA2/Z` 载入后至崩点前无任何写入。**Kotlin `!!` / `checkNotNull` / `requireNotNull` 只会编成 `if-eqz` + `throw NullPointerException(<文案>)`，不会出现 `Object.getClass()`** ⇒ 不能按「某处 `!!` 命中 null」收口。唯一未闭合点：R8 为何选 getClass 形态，不影响结论 |
+| 修复是否充分 | **就本 NPE 充分** | 字段上移到 `init` 之前后，构造器在调 `launch` 前已完成 `o` 赋值 ⇒ IO 线程不可能读到 null；`refreshYesterdayPending()` 另只读 `date`(→`dateProvider`)、`repo`、`app`，全是构造参数或 init 前已赋值字段。**重入亦安全**：日期回调由 `DateProvider.onDateKnown` 在**主线程**触发（`start()` / 广播 / `refreshDateIfStale` 均主线程），无法与同在主线程的构造器交错，且回调体不依赖任何 init 后字段；`onCleared` 读的 `unregisterDateListener` 本就可空 |
+| 同类形状复核 | **无其他未修点** | 复核者独立核过 `ui/backup/BackupViewModel.kt:72`（只写 `_davUrl:51` / `_davUser:52`，均在前）、`ui/exercise/ExerciseViewModel.kt:74`（`library` 在 `:71`，在 init 之前）、`ui/symptom/SymptomViewModel.kt:56`（只注册回调，回调读的 `_selectedDate` 在 `:47`）、`ui/DateProvider.kt:56`（只读 `scope.coroutineContext`） |
+| 新旧归属 | **pre-existing，非本批引入** | `git log -S '_yesterdayPending'` → 字段由 `022892e v1.0.74` 引入；本批对 `TodayViewModel.kt` 的改动（KDoc、`Reaction.NONE.name`、`date = todayDate.value`）不触碰字段声明与 L249–261 函数体 ⇒ 与崩溃无因果 |
+
+**根因**：`_yesterdayPending` / `yesterdayPending` 原先声明在 `init { … }` **之后**。Kotlin 按声明顺序初始化属性；`init` 里 `viewModelScope.launch { refreshYesterdayPending() }` 在 `Dispatchers.Main.immediate` 上**同步内联**到第一句 `withContext(Dispatchers.IO)` 就派发 IO 协程并返回，此时构造还没走到字段声明 ⇒ IO 线程读到 null。**该顺序自 v1.0.74 起一直如此，不是本批引入**：作者已在 `unregisterDateListener` 的 KDoc 写明「声明在 init 之前」，却漏了 `_yesterdayPending`（工作树与 HEAD `b1781c8` 同形，`git show 022892e` 亦同）。**为什么间歇**：屏关 / Doze 下 IO 派发被推迟，构造窗口拉长，命中率上升——复现实验里浅色 5 次、深色 5 次、20 次快速 force-stop 冷启动均 0 次，**只有「屏幕关闭状态下冷启动」8 轮中崩 1 次**。
+
+**修法**：把 `private val _yesterdayPending = MutableStateFlow<List<PendingDoses.Pending>>(emptyList())` 与 `val yesterdayPending: StateFlow<List<PendingDoses.Pending>> = _yesterdayPending` 从 `:234`/`:237` 上移到 `init` 之前（现 `:66-80`），补 ⚠️ KDoc 记录崩溃与规则。**行为零变化**（该字段仍是同一实例、同一初值）。
+
+**回归**：新增两个守卫测试，共 6 条断言。
+
+1. `app/src/test/java/com/ashkb/app/ui/today/TodayViewModelInitOrderTest.kt`（3 条，逐点钉住 TodayViewModel）：① `_yesterdayPending` 不在 `init {` 之后；② `yesterdayPending` 不在 `init {` 之后；③ `init` 块与 `refreshYesterdayPending()` 不得引用任何「声明在 `init` 之后、缩进正好 4 空格」的类成员（自动扫描，防下次新增字段再踩）。
+2. `app/src/test/java/com/ashkb/app/ui/ViewModelInitOrderGuardTest.kt`（3 条，**全仓扫描**）：① 遍历 `app/src/main` 下全部 `*ViewModel.kt`，凡有 `    init {` 的，其块内不得出现任何「声明在 init 之后、缩进正好 4 空格」的成员名（另含「扫到的 ViewModel 数 ≥ 10」「至少扫到一个带 init 的 ViewModel」两条自检，防止守卫因目录/标记假设失效而静默通过）；② 具名钉住今天全仓唯一带 `init` 的四个 ViewModel（`ui/backup/BackupViewModel.kt:72`、`ui/exercise/ExerciseViewModel.kt:74`、`ui/symptom/SymptomViewModel.kt:56`、`ui/today/TodayViewModel.kt:88`）仍在扫描范围内；③ `SymptomViewModel` 的 `private val _selectedDate` 仍声明在 `init` 之前。
+
+> **全仓核过的结论**：12 个 ViewModel 里只有上述 4 个有 `init` 块。`BackupViewModel` 的 init 只写 `_davUrl` / `_davUser`（均声明在 init 之前）⇒ 安全；`ExerciseViewModel` 的 `private val library = MutableStateFlow<List<KbEntry>>(emptyList())` 在 `:71`，**在 init `:74` 之前** ⇒ 安全；`SymptomViewModel` 的 init 只**注册日期回调**（回调不是同步执行的，与 `viewModelScope.launch` 的同步内联有本质区别）⇒ 安全。⇒ **`TodayViewModel` 是唯一真受害者**，同类形状全仓已无第二处。
+
+`readSource` / `repoRoot` 上溯找 `settings.gradle.kts` 的写法抄自 `ui/me/MedRouteFrequencyGuardTest.kt:102-111`。
+
+> ⚠️ **教训（负向对照失败）**：想证明守卫会报错，临时在 `init` 之后插了一份重复声明——结果 `:app:compileDebugKotlin` **先失败**（`Overload resolution ambiguity` / `Unresolved reference 'value'`），Gradle 中止、测试根本没跑，而读到的 `TEST-*.xml` 是**上一轮**留下的全绿。⇒ 静态源码守卫不能用「插入重复声明」做负向对照（Kotlin 编译先拦）；要造能编译的违规形状（把声明挪到 init 之后并删掉重复）才能真正验证。**凡是 `--tests` 过滤运行，结论必须读 `TEST-*.xml`，不能只看 exit code。**
+
+**门禁**：`E:\ASHKB\npe-gate2.log`（含全仓守卫）→ **BUILD SUCCESSFUL in 2m 48s**（42 tasks: 7 executed）。单测 **980 条 / 114 文件全绿**；detekt **0**；lint **0 error**（184 = 176 Warning + 8 Information）；`verifySpecSync` 通过。（修复当轮为 `E:\ASHKB\npe-gate1.log`：4m 7s，单测 977 / 113。）release APK 已用修复后代码重建：`app-release.apk` **5,212,848 B @ 2026-10-18 14:58:37**（**未装机复验**——间歇缺陷无法用有限次启动证明已消，只能靠代码级证据 + 守卫测试）。
+
+> ⚠️ `app/build/reports/lint-results-debug.html` 本次是 UP-TO-DATE **未重写**（mtime 仍是 12:06:50）——判断某次门禁结果要看 `lint-results-debug.xml`，不要看这个 HTML 的 mtime。
+
+---
+
+### UI 2.0 §06 ④⑤ 收尾：报表「稳定期」结论胶囊 + 知识库类别徽章（2026-10-18 · 未发布 · 未 bump 版本号）
+
+**背景**：§06 双主题验收比对设计稿还剩两块缺口——④ 报表页 BASDAI 走势卡缺设计稿要求的「稳定期」状态胶囊（当时只有 ≥4.0 的高危胶囊），⑤ 知识库条目的类别标签渲染成了卡片内左上角的胶囊，而设计稿要的是**行右侧的软底小徽章**。维护者裁决（m05521）两项都做。**复核后推翻了此前「这两块要先解除 `domain/`+`data/` 禁改」的判断**：所需数据（`KbEntry.category`、`BasdaiRecord.total`）与阈值常量（`ClinicalThresholds.BASDAI_HIGH` / `basdaiHigh`）**在现有模型里全都已经存在**，两块都只改 `ui/` 层。
+
+| 项 | 设计稿 §06 要求 | 落地 | 证据 |
+| --- | --- | --- | --- |
+| ④「稳定期」胶囊 | 报表 BASDAI 走势卡标题行右侧一个 `st st-ok` 胶囊（`ok-soft` 底 + `ok-on` 字 + 前置圆点） | `SmallTrendChart` 新增末位可选形参 `trailing: (@Composable () -> Unit)? = null`，在标题行 `Row(…, verticalAlignment = Alignment.Bottom)` 的 `if (lastLabel != null)` 之后 `trailing?.invoke()`；`MiniSeries` 加 `badge: String? = null`（存**文案**不存资源 id），`MiniSeriesCell` 传 `trailing = { StatusChip(text = s.badge, tone = StatusTone.Success) }` | `ui/components/SmallTrendChart.kt:72`（形参）、`:130`（调用）；`ui/report/ReportScreen.kt` 的 `MiniSeries` / `MiniSeriesCell` |
+| ④ 判据 | 走势给出「当前区间」结论 | `val basdaiStable = t.basdai.lastOrNull()?.let { !ClinicalThresholds.basdaiHigh(it.total) } == true` ⇒ 取**最近一次** BASDAI 与 `BASDAI_HIGH (4.0)` 比较；同时把 BASDAI 高危胶囊原来的裸字面量 `total >= 4.0` 收敛为 `ClinicalThresholds.basdaiHigh(...)`，两处同源 | 新增串 `report_basdai_stable`（`稳定期` / `Stable`），**插在 `report_basdai_section` 与 `report_basdai_trend` 之间**，中英同名同序 |
+| ④ 为何不复用既有串 | —— | ⚠️ `stage_stable`（`缓解期` / `Remission`）是 profile 的**病情分期**字段，与「BASDAI 走势当前区间」不是同一概念；`dom_thr_adherence_good`（`达标`）是**用药依从率 ≥90%** 的判定 ⇒ 两者都不可复用，必须新增 | 全仓此前无「稳定期」串 |
+| ⑤ 类别徽章位置 | 条目**行右侧**的软底小徽章（`.kb` flex 行 + `.tier` 尾部 `flex:none`） | `KnowledgeScreen` 新增 `@Composable private fun CategoryBadge(category: String)`；`KbListCard` 把类别胶囊**从 `FlowRow` 移出**，改为标题行 `Row(verticalAlignment = Alignment.CenterVertically)`：标题 `Text(…, Modifier.weight(1f))` + 徽章非权重排在其后 | `ui/knowledge/KnowledgeScreen.kt` 的 `CategoryBadge` 与 `KbListCard` |
+| ⑤ 徽章形态 | `.tier{font-size:10px; font-weight:800; padding:3px 8px; border-radius:6px}` 三色（指南 brand-soft / 相互作用 warn-soft / 应急 bad-soft） | `Box(clip(shapes.extraSmall).background(tone.colors().first).padding(horizontal = Spacing.sm, vertical = Spacing.xxs))` + `labelSmall.copy(fontWeight = FontWeight.Bold)`；颜色一律走 `StatusTone.colors()`（`Tone.kt` KDoc 明令「禁止各屏幕自己写 `when (tone)`」）。**字号取 12sp 而非设计稿 10px**（`Type.kt` 12sp 是硬下限）；**刻意不复用 `StatusChip`**（它是 `CircleShape` + 28dp 下限的胶囊，挂标题行右侧会比标题还重、并顶起行高） | 设计稿三色与项目 `successContainerLight`/`onSuccessContainerLight` 等**逐字节同值** ⇒ 零新增颜色令牌 |
+| ⑤ 保留项 | 设计稿要加类别徽章，不是替换证据等级 | 条目底部 `"${tierShortLabel(entry.sourceTier)} · ${entry.sourceName}"` 证据等级行**原样保留**；`FlowRow` 现只剩三枚状态胶囊（高风险 / 有备注 / 已过复核日） | —— |
+| 附带还掉一处基线豁免 | —— | `categoryLabel` 原来 6 支 `when` 有 3 支挤在同一行（超 140 字符，是 `baseline.xml` 的一条 `MaxLineLength`），本次重排为**每支一行** ⇒ 该旧条目因文本形态改变而失配，且新行都远短于 140 ⇒ **不会被重新上报** | —— |
+
+**回归**：新增 `app/src/test/java/com/ashkb/app/ui/Ui2ConclusionBadgesTest.kt`（6 条静态源码断言，沿用 `HealthHubVitalsPanelTest.kt` 的 `readSource` 上溯 `settings.gradle.kts` 写法）：① 标题行保留结论槽且 `trailing?.invoke()` 落在标题行内、权重标题列在其**之前**；② 「稳定期」只在 `!basdaiHigh(it.total)` 时挂上；③ 高危胶囊判据已收敛到 `basdaiHigh` 且**裸字面量 `total >= 4.0` 不得回潮**；④ 类别徽章在标题行右侧、标题 index < 徽章 index，且 `FlowRow` 内不得再有 `categoryLabel(entry.category)`；⑤ 徽章走 `shapes.extraSmall` + `labelSmall`+Bold + `categoryTone(category).colors()`，**徽章实现内不得出现 `StatusChip(`**；⑥ 证据等级行原样保留。
+
+> ⚠️ **负向对照已做两轮（都是「能编译的违规形状」，即 `:799` 教训的正解）**：把 `CategoryBadge(entry.category)` 换成 `CategoryBadge("")` ⇒ 6 条里**正好 1 条 FAIL**、正是「行右侧徽章」那条；把 `trailing?.invoke()` 注释掉 ⇒ **正好 1 条 FAIL**、正是「trailing 必须真的渲染」那条。两轮其余 5 条仍 pass ⇒ 守卫钉住目标形状且无过宽误报，标记随后已核为零命中。
+
+**detekt 基线记账（重要：这是「同步既存条目签名」，不是「新增豁免」）**：首轮门禁 `E:\ASHKB\ui2-45-gate1.log` 在 detekt 失败（BUILD FAILED in 21s）——`SmallTrendChart.kt:60:5` 报 `LongMethod (131 > 80)` 与 `CyclomaticComplexMethod (complexity 17 > 15)`。**这两条本来就是 `config/detekt/baseline.xml:31` / `:80` 的既存豁免**，只因加了 `trailing` 形参使**签名漂移**而失配、于是老问题重新上报（`trailing?.invoke()` 让复杂度 16→17）。按 `release-tooling/release-bodies/v1.2.7.md:86-92` 的既有先例（`KbDetailDialog` 加 `today: String` 后同步更新基线签名字串、**未新增任何豁免条目**），本次只把那两条 ID 的**签名字符串同步**加上 `trailing: (@Composable () -> Unit)? = null,`。对照改动前的备份 `E:\ASHKB\_baseline-before.xml`：**diff 恰为这 2 行**，基线 316 → 316 行、42502 → 42596 B、**零新增条目**（核对通过后该临时备份已删除）。同时把 `trailing` 的文档从「形参内嵌注释」改为规范 `@param`（KDoc 内嵌注释会**逐字进入基线 ID**，把文档写进基线不可接受）。
+
+**门禁**：`E:\ASHKB\ui2-45-gate2.log` → **BUILD SUCCESSFUL in 3m 17s**（42 tasks: 15 executed, 27 up-to-date）。单测 **993 条 / 116 文件全绿**（`failures=0 errors=0 skipped=0`；987 → 993 的增量就是新增的 6 条）；detekt **0**；lint **0 error**（184 = 176 Warning + 8 Information）；`verifySpecSync` 通过。
+
+**仍未做**：这两块的**真机观感**需维护者本人过目（设备侧无线调试未开，本轮未装机）；**未推送、未发版**；版本号仍 `versionCode 121 / versionName "1.2.9"`。release APK 已随本批重建：`app/build/outputs/apk/release/app-release.apk` **5,213,288 B @ 2026-10-18 22:17:53**，SHA-256 `4F0FC93B890F830FC93624D985762738BFCF531E5FB6E7B753634DC40CFFD8F8`（日志 `E:\ASHKB\ui2-45-apk1.log`，4m 8s）。
+
+---
+
+### 健康 Hub「今日体征」面板 + 紧急卡 danger-soft 瓦片（2026-10-18，UI 2.0 §06 ③ 收尾 · 未发布 · 未 bump 版本号）
+
+**背景**：§06 双主题验收比对设计稿时，健康 Hub（③）还差两块——首屏没有「今日体征」面板，三个入口瓦片里**紧急卡没做 danger-soft**。维护者裁决（m05132）只做这两项、**不碰 `domain/` 与 `data/`**，其余缺口（报表「稳定期」胶囊、知识库信源等级徽章）暂缓。
+
+| 项 | 设计稿 §06 ③ 要求 | 落地 | 证据 |
+| --- | --- | --- | --- |
+| 「今日体征」面板 | Hub 首屏新增四格（血压 / 心率 / 体温 / 体重），不点进二级页也能看到核心数值 | `ui/AppShell.kt` 的 `HealthHub` 在标题栏 item 之后插入 `item { VitalsPanel(…) }`；文件末新增 `@Composable private fun VitalsPanel(vitals: Vitals?, weight: WeightLog?, onOpen: () -> Unit)`，复用既有 `SectionCard` + `StatTile`（零新组件、零新令牌），**两列 × 两行**、格子顺序照设计稿 `grid-template-columns:1fr 1fr`（血压 / 心率 → 体温 / 体重） | `AppShell.kt:539-546`（调用点）、`:599` 起（`VitalsPanel`） |
+| 四格判色 | 与体征二级页同一口径 | 抽成三个纯函数 `temperatureTone` / `bloodPressureTone` / `heartRateTone`，**逐支照抄** `WellnessScreen.VitalsHero`，全部引用 `domain/ClinicalThresholds` 具名常量（`FEVER_ALERT 38.5` / `FEVER_LOW 37.3` / `BP_HIGH_SYS 140` / `BP_HIGH_DIA 90` / `BP_LOW_SYS 90` / `HR_LOW 60` / `HR_HIGH 100`）⇒ UI 层无魔数；**未记录给 Neutral**（不染警示色） | 抽出纯函数的理由：三组 `when` 内联会让 `CyclomaticComplexMethod` 超阈值 15，与批次 C `AshkbTextField`（19>15）同一失败模式 |
+| 未记录态 | —— | 没记的格显示「未记录」而**不隐藏**：面板的价值是让用户看出「哪项今天还没量」，留白反而看不出缺口；四格取数统一 `?: notRecorded` | 复用 `common_not_recorded` |
+| 浮点渲染 | —— | `String.format(Locale.US, "%.1f", …)`（`FormatLocaleGuardTest` 只拦 `"…".format(` 隐式 locale，显式 Locale.US 才保证法语等区域不出现逗号小数点）；单位沿用项目既有硬编码惯例 `"℃"` / `"kg"`（同 `WellnessVitalsSections.kt` 的 `WeightCard`）；血压 `"$sys/$dia"` | —— |
+| 紧急卡 danger-soft | 紧急卡用 danger-soft 瓦片提示其特殊地位 | `HealthHub` 的紧急卡 `NavRow` 加 `tone = StatusTone.Danger` ⇒ 走 `Tone.kt:23` 的 `dangerContainer to onDangerContainer`，**零新令牌**（`NavRow` 的 `tone` 参数本就是为这类「入口本身有语义」的场合而加） | `AppShell.kt:574` |
+| 另两个入口 | —— | 营养与骨健康 / 复诊管理**保持默认 primaryContainer 配色**——语义色只留给紧急卡，否则「特殊地位」不成立（已加**反向断言**钉住） | —— |
+
+**零新增字符串资源**：四格标题与「记录 / 编辑」按钮全部复用既有串（`vitals_today_title` / `vitals_temperature_short` / `vitals_bp` / `vitals_heart_rate` / `vitals_today_weight` / `vitals_bpm_unit` / `common_not_recorded` / `common_edit` / `common_record`）⇒ `EnglishStringsParityTest` / `SeedStringsParityTest` 天然不受影响；也未改任何 XML ⇒ `WindowBackgroundParityTest` / `MigrationTableParityTest` 不受影响。
+
+**回归**：新增 `app/src/test/java/com/ashkb/app/ui/HealthHubVitalsPanelTest.kt`（7 条静态源码断言，`readSource` 上溯 `settings.gradle.kts` 的写法抄自 `ui/me/MedRouteFrequencyGuardTest.kt:102-111`）：① `HealthHub` 里真的调用了 `VitalsPanel` 且标题用 `vitals_today_title`；② 四格标题资源都在；③ 四格取数都有 `?: notRecorded` 回退；④ 判色引用全部 7 个 `ClinicalThresholds` 具名常量且含 `StatusTone.Neutral`；⑤ 紧急卡 `NavRow` 含 `tone = StatusTone.Danger`；⑥ **反向断言**另两个入口不含 `tone =`；⑦ 体温/体重走 `String.format(Locale.US, "%.1f", it)`。
+
+> ⚠️ **负向对照已做（这次做对了，正是上一节教训的正解）**：按 `:799` 记下的教训——静态守卫不能用「插入重复声明」做负向对照（Kotlin 编译会先拦），要造**能编译的违规形状**。做法是临时删掉紧急卡那行 `tone = StatusTone.Danger`（可编译），过滤跑 `--tests HealthHubVitalsPanelTest` ⇒ **7 条里正好 1 条 FAIL、就是「紧急卡是 danger-soft 瓦片」那条**（结果文件 tests=7 failures=1 errors=0），其余 6 条仍 pass ⇒ 守卫确实钉住了目标形状、且没有过宽误报。随后恢复该行（`NEGATIVE-CONTROL-TEMP` 标记已核为零命中）。
+
+**门禁**：`E:\ASHKB\ui2-hub-gate3.log` → **BUILD SUCCESSFUL in 1m 56s**（42 tasks: 16 executed）。单测 **987 条 / 115 文件全绿**（`failures=0 errors=0 skipped=0`；980 → 987 的增量就是新增的 7 条）；detekt **0**；lint **0 error**（184 = 176 Warning + 8 Information）；`verifySpecSync` 通过。（首次落地后未加守卫那轮为 `E:\ASHKB\ui2-hub-gate1.log`：3m 46s，单测 980 / 114；加守卫后改布局前为 `E:\ASHKB\ui2-hub-gate2.log`：1m 43s，单测 987 / 115。）
+
+> ⚠️ 同上节：判断门禁结果看 `lint-results-debug.xml`，不要看 `lint-results-debug.html` 的 mtime（该 HTML 本轮仍 UP-TO-DATE 未重写）。
+
+**仍未做**：这两个缺口的**真机观感**需维护者本人过目（设备侧链路断，本轮未装机）；**未推送、未发版**；版本号仍 `versionCode 121 / versionName "1.2.9"`。release APK 当时为 **5,212,848 B @ 2026-10-18 17:50:49**、SHA-256 `32A844FA018BA4713A58F525A7C75E0E99DADD0BD123404FC765CEF93DE980DF`（`E:\ASHKB\ui2-hub-apk1.log`，1m 47s）；**其后 §06 ④⑤ 那批又重建过一次，当前盘上 APK 以 `:829` 的 5,213,288 B / `4F0FC93B…` 为准**。
+
+---
+
+### 裁决项 8 结项：审查报告 §九「无法从代码判定的事项」七条答复（2026-10-18）
+
+**背景**：审查报告原件 `C:\Users\weant\Documents\Qoder\2026-09-28\a6159f90\ASHKB-代码审查报告.md:248-256`（维护者 m04098 提供），其 §九 列出 7 条「仅凭代码无法判定」的事项。此前文档里一直记「报告正文只有『见对话正文』，需要原件」；**原件已到手，七条全部给出取证结论，裁决项 8 据此销项。**
+
+| # | 报告原文（§九） | 取证结论 | 证据 / 方法 |
+| --- | --- | --- | --- |
+| 1 | 目标设备（Xiaomi/HyperOS）上 MIUI appops 10014/10020/10021 的**实际**默认值与拦截时机；对齐唤醒/Doze 顺延策略；force-stop 后闹钟是否被清除 | `MIUIOP(10020)=allow`、`MIUIOP(10021)=allow`；**10014 在该机型上不存在**；应用已在电池优化白名单内；闹钟全部为 `RTC_WAKEUP`；**force-stop 后闹钟未被清除**（HyperOS 只杀进程） | 真机 `appops get com.ashkb.app` / `dumpsys deviceidle whitelist`（含 `user,com.ashkb.app,10490`）/ `dumpsys alarm` 过滤本应用 |
+| 2 | 出厂 APK 是否真用正式 keystore 构建（CI 不验签，无从证明） | **CI 产物确为 debug 签名**：`.github/workflows/ci.yml:14-15` 显式设 `ASHKB_ALLOW_DEBUG_SIGNING=1`，且只打印证书不严格比对；本机 release 用 `ashkb-release.jks`，SHA-256 `38ca80a61760208e1f0c9d81c2caf5c7c90da0e3bd759150ccdf641ec9012d7d`（DN `CN=ASHKB, OU=Personal, O=weante, L=Shenzhen, ST=Guangdong, C=CN`）⇒ 已发布的正式版资产须以本地 `Get-FileHash` 与 `apksigner verify --print-certs` 为准，不能信 CI | 读 `.github/workflows/ci.yml`；`keytool`/`apksigner` 查本机 keystore |
+| 3 | Android 目标 ROM 上 `HttpURLConnection` 跨主机重定向是否转发 `Authorization`（S-8 因此标记为待验证） | **跨主机重定向不转发 `Authorization`**：本机双 loopback 端口实验（8091 → 302 → 8092 回显请求头）证明 `HttpURLConnection` 默认 follow 重定向但**丢弃** `Authorization`；且 `WebDavClient.kt:68-83` 从未调用 `setInstanceFollowRedirects` ⇒ S-8 的「重定向后凭据丢失」成立（**同主机**重定向不受影响） | 宿主双端口 HTTP 回显实验（可复用；Android 侧 dex 因设备掉线未补跑，见下方未完成项） |
+| 4 | Keystore 密钥是否硬件背书 / 是否可证明（无 attestation） | **无 attestation、无 StrongBox 请求**：`KeystoreCipher.kt` 只 `setBlockModes(GCM)` / `setKeySize(256)` / `setRandomizedEncryptionRequired`；而设备 `pm list features` 同时具备 `hardware_keystore=300` 与 `strongbox_keystore=300` ⇒ **硬件能力具备，但代码不可证明**（要证明须加 `setIsStrongBoxBacked(true)` + attestation 链校验） | 读 `KeystoreCipher.kt`；真机 `pm list features` |
+| 5 | 120k 次 PBKDF2 在目标 SoC 上的真实耗时（影响是否敢继续提高迭代数） | **实测 136 ms**（SM8750 真机，120k 迭代）；200k = 226 ms、600k = 687 ms；宿主 x86 为 46 ms ⇒ **迭代数有充足余量可提高**，远未逼近 `BackupRepository.kt:193` 的 `withTimeout(120_000)` | 一次性 Java 基准 dex：`javac --release 17` → `d8.bat --lib <android.jar> --min-api 31` → push → `dalvikvm -cp /data/local/tmp/x/classes.dex <Main>`（⚠️ 用 `dalvikvm`，`app_process` 会崩） |
+| 6 | `webdav_config` 历史明文凭据的迁移是否曾对真实用户跑过（缺文件） | **迁移代码存在但零测试覆盖**：`BackupRepository.kt:62-81` 从旧键 `url`/`user`/`pass` 迁移（**仅 https 才迁移**，随后删旧键）；全仓无任何测试触及该分支；release 包不可调试 ⇒ 真机 prefs 读不到 ⇒ **与报告「缺文件」的判定一致**，属于「有代码、无证据」 | 读 `BackupRepository.kt:62-81`；grep 测试目录无命中；真机 `run-as` 不可用（release） |
+| 7 | 是否存在应用锁 / 生物解锁（代码中未找到） | **不存在**：全仓 grep `BiometricPrompt` / `KeyguardManager` / `setUserAuthenticationRequired` **零命中**；`SecureWindow.kt` 只用 `FLAG_SECURE` 禁截屏，**那是防泄露不是身份认证** ⇒ 报告判定成立 | 全仓 grep |
+
+**未完成的两条尾巴**（设备侧链路断，非代码问题）：
+
+1. **第 3 条的 Android 侧复核**：宿主实验已证明 `HttpURLConnection` 语义，但「目标 ROM 上是否同样」需在真机跑同一实验；dex 已备好 `E:\ASHKB\.tmp-soC\dex3\classes.dex`，**设备回来后补跑**。
+2. **第 6 条的真机 prefs 取证**：release 包不可调试、设备亦掉线；须用 debug 包 + `run-as` 或 root 才能读到 `webdav_config` 历史键，**设备回来后补跑**。
+
+> 上述 7 条中，1 / 4 / 5 是**真机实测**，2 / 3 / 6 / 7 是**代码 + 宿主实验**。第 3、6 条的真机侧补跑不改变结论方向（宿主实验与代码已足够定性），只影响「目标 ROM 是否与宿主一致」的强度。
+
+---

@@ -13,7 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -84,7 +84,7 @@ fun KbDetailDialog(
                     modifier = Modifier.padding(bottom = Spacing.xxs),
                 )
                 if (editing) {
-                    OutlinedTextField(
+                    AshkbTextField(
                         value = draft,
                         onValueChange = { draft = it },
                         label = { Text(stringResource(R.string.kb_note_title)) },

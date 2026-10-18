@@ -8,8 +8,8 @@ import java.time.temporal.ChronoUnit
 /**
  * B7（v1.0.39）：周期康复计划的**完成度反算**。
  *
- * 进度不另存（避免双份真相）：直接由 `exercise_logs` 中 `status="done"` 的**去重日期**
- * 与计划的周窗口比较得出。
+ * 进度不另存（避免双份真相）：直接由 `exercise_logs` 中**完成状态**（[ExerciseLogStatus.COMPLETED]）的
+ * **去重日期**与计划的周窗口比较得出。
  *
  * 纯函数、无 Android 依赖，可单测。
  */
@@ -36,7 +36,7 @@ object ExercisePlanProgress {
     /**
      * @param plan 计划（`startDate` 为空时视为今天开始）
      * @param spec 已解析的每周结构
-     * @param logs 运动日志（只用 status="done" 的日期）
+     * @param logs 运动日志（只用完成状态 [ExerciseLogStatus.COMPLETED] 的日期）
      * @param today 计算基准日
      */
     fun of(
@@ -55,7 +55,7 @@ object ExercisePlanProgress {
         // 计划窗口内的完成日期（去重）
         val windowEnd = start.plusDays(totalWeeks * 7L - 1)
         val doneDates = logs
-            .filter { it.status == "done" }
+            .filter { ExerciseLogStatus.isDone(it.status) }
             .mapNotNull { runCatching { LocalDate.parse(it.date) }.getOrNull() }
             .filter { !it.isBefore(start) && !it.isAfter(windowEnd) }
             .toSet()

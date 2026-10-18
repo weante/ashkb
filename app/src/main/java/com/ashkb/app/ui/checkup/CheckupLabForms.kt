@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import java.util.Locale
 
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.ImagingRecord
@@ -34,7 +35,7 @@ import com.ashkb.app.ui.theme.Spacing
 
 /** 化验值回填文本：去掉无意义的小数尾零（`25.0` → `25`），否则用户每改一次都要先删掉 `.0`。 */
 private fun editText(v: Double?): String =
-    v?.let { "%.4f".format(it).trimEnd('0').trimEnd('.') } ?: ""
+    v?.let { String.format(Locale.US, "%.4f", it).trimEnd('0').trimEnd('.') } ?: ""
 
 /**
  * 化验结果表单：新增（[existing] 为 null）与修改共用。
@@ -74,16 +75,16 @@ internal fun LabResultFormSheet(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            OutlinedTextField(testName, { testName = it }, label = { Text(stringResource(R.string.lab_indicator_name)) }, singleLine = true)
-            OutlinedTextField(value, { value = it }, label = { Text(stringResource(R.string.lab_value)) }, singleLine = true)
-            OutlinedTextField(valueText, { valueText = it },
+            AshkbTextField(testName, { testName = it }, label = { Text(stringResource(R.string.lab_indicator_name)) }, singleLine = true)
+            AshkbTextField(value, { value = it }, label = { Text(stringResource(R.string.lab_value)) }, singleLine = true)
+            AshkbTextField(valueText, { valueText = it },
                 label = { Text(stringResource(R.string.lab_value_text_field)) }, singleLine = true)
-            OutlinedTextField(unit, { unit = it }, label = { Text(stringResource(R.string.common_unit)) }, singleLine = true)
+            AshkbTextField(unit, { unit = it }, label = { Text(stringResource(R.string.common_unit)) }, singleLine = true)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OutlinedTextField(refLow, { refLow = it },
+                AshkbTextField(refLow, { refLow = it },
                     label = { Text(stringResource(R.string.lab_ref_lower)) }, singleLine = true,
                     modifier = Modifier.weight(1f))
-                OutlinedTextField(refHigh, { refHigh = it },
+                AshkbTextField(refHigh, { refHigh = it },
                     label = { Text(stringResource(R.string.lab_ref_upper)) }, singleLine = true,
                     modifier = Modifier.weight(1f))
             }
@@ -161,15 +162,15 @@ internal fun ImagingFormSheet(
                 selected = modality,
                 onSelect = { modality = it },
             )
-            OutlinedTextField(bodyPart, { bodyPart = it },
+            AshkbTextField(bodyPart, { bodyPart = it },
                 label = { Text(stringResource(R.string.imaging_body_part_field)) }, singleLine = true)
-            OutlinedTextField(hospital, { hospital = it },
+            AshkbTextField(hospital, { hospital = it },
                 label = { Text(stringResource(R.string.imaging_hospital_label)) }, singleLine = true)
-            OutlinedTextField(findings, { findings = it },
+            AshkbTextField(findings, { findings = it },
                 label = { Text(stringResource(R.string.imaging_findings)) })
-            OutlinedTextField(conclusion, { conclusion = it },
+            AshkbTextField(conclusion, { conclusion = it },
                 label = { Text(stringResource(R.string.imaging_conclusion)) })
-            OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes)) })
+            AshkbTextField(notes, { notes = it }, label = { Text(stringResource(R.string.common_notes)) })
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
                 enabled = bodyPart.isNotBlank() && dateOk,

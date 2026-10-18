@@ -48,6 +48,7 @@ import com.ashkb.app.ui.components.StatusChip
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
+import java.util.Locale
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -472,8 +473,8 @@ private fun displayNameOf(context: Context, uri: Uri): String? = runCatching {
 
 /** 附件多在 100KB–5MB 区间：超过 1MB 显示一位小数，否则取整 KB 更易读。 */
 private fun formatBytes(bytes: Long): String =
-    if (bytes >= 1_048_576L) "%.1f MB".format(bytes / 1_048_576.0)
-    else "%.0f KB".format(bytes / 1024.0)
+    if (bytes >= 1_048_576L) String.format(Locale.US, "%.1f MB", bytes / 1_048_576.0)
+    else String.format(Locale.US, "%.0f KB", bytes / 1024.0)
 
 /**
  * v1.0.86（批次 11 / D6）：**失败类**提示的文案集合。

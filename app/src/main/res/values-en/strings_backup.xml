@@ -88,4 +88,6 @@
     <string name="backup_pending_selfcheck_ok">Passed file self-check: %1$s</string>
     <string name="backup_pending_created_at">Backed up on %1$s (schema v%2$d)</string>
     <string name="backup_verify_incomplete">Verification did not fully pass: %1$s</string>
+    <string name="backup_file_too_large">%1$s is about %2$d MB, which exceeds the local processing limit (%3$d MB), so it was rejected — the whole file is never loaded into memory. Please make sure you selected a file exported by this app.</string>
+    <string name="backup_pick_read_failed">Could not read the selected file — please check that it is still accessible (not deleted, not locked by another app), or try a copy in another location.</string>
 </resources>

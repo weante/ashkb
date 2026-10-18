@@ -15,7 +15,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,6 +42,7 @@ import com.ashkb.app.ui.components.DateTextField
 import com.ashkb.app.ui.components.DestructiveAction
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
+import java.util.Locale
 import java.time.LocalDate
 import org.json.JSONArray
 import com.ashkb.app.ui.components.FillRemainingAction
@@ -87,7 +88,7 @@ internal fun FlareStartDialog(
                     }
                 }
                 ScoreRow(stringResource(R.string.symptom_peak_pain), peak) { peak = it }
-                OutlinedTextField(
+                AshkbTextField(
                     value = note, onValueChange = { note = it },
                     label = { Text(stringResource(R.string.common_notes_optional)) }, modifier = Modifier.fillMaxWidth(),
                 )
@@ -146,7 +147,7 @@ internal fun FlareEditSheet(
                 actions = if (checked) actions + a else actions - a
             })
             ScoreRow(stringResource(R.string.symptom_peak_pain), peak) { peak = it }
-            OutlinedTextField(
+            AshkbTextField(
                 value = note, onValueChange = { note = it },
                 label = { Text(stringResource(R.string.common_notes_optional)) }, modifier = Modifier.fillMaxWidth(),
             )
@@ -241,7 +242,7 @@ internal fun FlareResolveDialog(
             Column {
                 Text(stringResource(R.string.symptom_remission_confirm_note), style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(Spacing.sm))
-                OutlinedTextField(
+                AshkbTextField(
                     value = note, onValueChange = { note = it },
                     label = { Text(stringResource(R.string.symptom_relieve_notes_field)) }, modifier = Modifier.fillMaxWidth(),
                 )
@@ -299,7 +300,7 @@ internal fun BasdaiDialog(
                 ScoreRow(stringResource(R.string.basdai_q4_tenderness), q4) { q4 = it }
                 ScoreRow(stringResource(R.string.basdai_q5_stiffness), q5) { q5 = it }
                 ScoreRow(stringResource(R.string.basdai_q6_stiffness), q6) { q6 = it }
-                OutlinedTextField(
+                AshkbTextField(
                     value = note, onValueChange = { note = it },
                     label = { Text(stringResource(R.string.common_notes_optional)) }, modifier = Modifier.fillMaxWidth(),
                 )
@@ -314,7 +315,8 @@ internal fun BasdaiDialog(
                 if (total != null) {
                     Spacer(Modifier.height(Spacing.sm))
                     Text(
-                        stringResource(R.string.ui_basdai_total_prefix, total) +
+                        // v1.2.10 审查 HIGH-2：总分先按 Locale.US 收敛再交给资源（见资源注释）。
+                        stringResource(R.string.ui_basdai_total_prefix, String.format(Locale.US, "%.1f", total)) +
                         if (ClinicalThresholds.basdaiHigh(total)) stringResource(R.string.basdai_high_note_paren) else "",
                         style = MaterialTheme.typography.titleMedium,
                         color = if (ClinicalThresholds.basdaiHigh(total)) MaterialTheme.colorScheme.error

@@ -32,6 +32,7 @@ import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.CheckupDeletion
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.DerivedAlerts
+import com.ashkb.app.domain.ExerciseLogStatus
 import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.LabImport
@@ -39,6 +40,7 @@ import com.ashkb.app.domain.MinimalMode
 import com.ashkb.app.domain.ScreeningSeeds
 import com.ashkb.app.domain.SupplementHistory
 import com.ashkb.app.domain.VaccineSafety
+import java.util.Locale
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import org.json.JSONArray
@@ -159,7 +161,7 @@ class HealthRepository(private val context: Context) {
     private suspend fun evaluateSymptomAlerts(log: SymptomDaily) {
         if (log.feverish && (log.feverTemp ?: 0.0) >= FEVER_THRESHOLD) {
             insertAlertOnce(
-                type = "symptom_abnormal", severity = "high", refDate = log.date,
+                type = DerivedAlerts.SYMPTOM_ABNORMAL, severity = "high", refDate = log.date,
                 message = context.getString(
                     R.string.ui_alert_fever,
                     log.feverTemp.toString(),
@@ -170,14 +172,14 @@ class HealthRepository(private val context: Context) {
         }
         if (log.eyeSymptom) {
             insertAlertOnce(
-                type = "symptom_abnormal", severity = "high", refDate = log.date,
+                type = DerivedAlerts.SYMPTOM_ABNORMAL, severity = "high", refDate = log.date,
                 message = context.getString(R.string.ui_alert_eye),
                 kbRef = "emr-001",
             )
         }
         if (log.neuroRedFlag) {
             insertAlertOnce(
-                type = "neuro_red_flag", severity = "high", refDate = log.date,
+                type = DerivedAlerts.NEURO_RED_FLAG, severity = "high", refDate = log.date,
                 message = context.getString(R.string.ui_alert_neuro),
                 kbRef = "emr-004",
             )
@@ -224,11 +226,11 @@ class HealthRepository(private val context: Context) {
         if (lastTwo.size < 2) return
         if (lastTwo.all { ClinicalThresholds.basdaiHigh(it.total) }) {
             insertAlertOnce(
-                type = "basdai_high", severity = "medium", refDate = record.date,
+                type = DerivedAlerts.BASDAI_HIGH, severity = "medium", refDate = record.date,
                 message = context.getString(
                     R.string.ui_alert_basdai_high,
-                    "%.1f".format(ClinicalThresholds.BASDAI_HIGH),
-                    "%.1f".format(record.total),
+                    String.format(Locale.US, "%.1f", ClinicalThresholds.BASDAI_HIGH),
+                    String.format(Locale.US, "%.1f", record.total),
                 ),
                 kbRef = "edu-th-002",
             )
@@ -285,7 +287,7 @@ class HealthRepository(private val context: Context) {
         val days = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.parse(active.startDate), today)
         if (days >= FLARE_ALERT_DAY) {
             insertAlertOnce(
-                type = "flare_day7", severity = "medium", refDate = today.toString(),
+                type = DerivedAlerts.FLARE_DAY7, severity = "medium", refDate = today.toString(),
                 message = context.getString(R.string.ui_alert_flare_days, days),
                 kbRef = "edu-002",
             )
@@ -377,7 +379,7 @@ class HealthRepository(private val context: Context) {
     }
 
     suspend fun pendingFeedbackLogs(yesterday: String): List<ExerciseLog> =
-        exerciseDao.pendingFeedback(yesterday)
+        exerciseDao.pendingFeedback(yesterday, ExerciseLogStatus.COMPLETED)
 
     /** R27 矩阵输入：当日运动库（红榜 + 黑榜由引擎分层） */
     suspend fun exerciseLibrary(): List<KbEntry> = kbDao.exercises()
@@ -500,7 +502,7 @@ class HealthRepository(private val context: Context) {
         val overdue = kbDao.overdueReview(today)
         overdue.forEach { e ->
             insertAlertOnce(
-                type = "review_due", severity = "low", refDate = e.id,
+                type = DerivedAlerts.REVIEW_DUE, severity = "low", refDate = e.id,
                 message = context.getString(R.string.ui_alert_kb_review_due, e.title, e.reviewDue),
                 kbRef = e.id,
             )

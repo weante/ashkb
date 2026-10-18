@@ -14,7 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -89,7 +89,7 @@ internal fun SymptomFormCard(
             )
             Spacer(Modifier.height(Spacing.xs))
         }
-        OutlinedTextField(
+        AshkbTextField(
             value = stiffnessMin,
             onValueChange = { stiffnessMin = it.filter { c -> c.isDigit() }.take(4) },
             label = { Text(stringResource(R.string.symptom_stiffness_field)) },
@@ -100,7 +100,7 @@ internal fun SymptomFormCard(
 
         SwitchRow(stringResource(R.string.symptom_fever), feverish, stringResource(R.string.emergency_fever_threshold_note)) { feverish = it }
         if (feverish) {
-            OutlinedTextField(
+            AshkbTextField(
                 value = feverTemp,
                 onValueChange = { feverTemp = it.filter { c -> c.isDigit() || c == '.' }.take(5) },
                 label = { Text(stringResource(R.string.symptom_max_fever_field)) },
@@ -116,7 +116,7 @@ internal fun SymptomFormCard(
         ScoreRow(stringResource(R.string.wellness_sleep_quality), sleepScore) { sleepScore = it }
         ScoreRow(stringResource(R.string.symptom_fatigue), fatigue) { fatigue = it }
 
-        OutlinedTextField(
+        AshkbTextField(
             value = notes, onValueChange = { notes = it },
             label = { Text(stringResource(R.string.common_notes_optional)) }, modifier = Modifier.fillMaxWidth(),
         )

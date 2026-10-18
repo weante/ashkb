@@ -22,11 +22,13 @@
     <string name="ui_exercise_hint_cervical">Cervical spine involvement: %1$s</string>
     <string name="ui_exercise_hint_cervical_default">Cervical spine involvement: this movement carries a high cervical risk</string>
     <string name="ui_exercise_hint_alternative">Alternative: %1$s</string>
-    <string name="ui_exercise_feedback_soreness">Pain worsened after exercise, but this fits muscle soreness (delayed onset). Watch it for 1–2 days; you may hold the duration steady next session (exc-010 progression rule).</string>
-    <string name="ui_exercise_feedback_worse">Pain worsened after exercise and does not fit simple muscle soreness. By the 2-hour post-exercise pain rule, reduce the next session: cut the duration by 20% or drop the intensity one level (exc-010). If it worsens twice in a row, consider seeing a rehabilitation specialist.</string>
-    <string name="ui_exercise_feedback_stiffness">Morning stiffness worsened — this may point to inflammatory activity rather than overexertion. Keep intensity low (L1) this week; if it keeps worsening, log your symptom trend and contact your doctor.</string>
-    <string name="ui_exercise_feedback_better">Good feedback. You can progress as planned: duration first (add 5–10 min every 1–2 weeks), then frequency, and intensity last.</string>
-    <string name="ui_exercise_feedback_stable">Steady feedback. Keep the current amount. Progression order: duration → frequency → intensity (exc-010).</string>
+    <!-- v1.2.10（用户 2026-10-13）：与中文侧同批改写——去掉内部规则编号（exc-010）与档位代号（L1），
+         改成"发生了什么 + 接下来怎么做"。规则内容与中文完全一致，未增删任何医学判断。 -->
+    <string name="ui_exercise_feedback_soreness">A bit sore after exercising, but this looks like the usual muscle soreness. Watch it for 1–2 days and keep the next session at the same duration — no need to add more.</string>
+    <string name="ui_exercise_feedback_worse">Pain worsened after exercise, and it does not look like ordinary muscle soreness. Ease off next time: cut the time by about a fifth, or move down to the gentler level. If this happens twice in a row, consider seeing a rehabilitation specialist.</string>
+    <string name="ui_exercise_feedback_stiffness">Morning stiffness was worse the next day. This is more likely inflammation being active rather than overtraining. Stay at the gentlest level for the week; if it keeps worsening, note your symptom trend and contact your doctor.</string>
+    <string name="ui_exercise_feedback_better">That went well. You can build up gradually: duration first (add 5–10 minutes every 1–2 weeks), then how often you go, and difficulty last.</string>
+    <string name="ui_exercise_feedback_stable">About the same as usual. Keep what you are doing now. If you want to build up, do it in this order: duration, then frequency, then difficulty.</string>
     <string name="ui_exercise_blocked_body">L3 · %1$s | %2$s</string>
     <string name="ui_exercise_today_suitable">Good for today: %1$s</string>
 
@@ -37,6 +39,8 @@
 
     <!-- ===== Medication: injection cycle / as needed / empty stomach ===== -->
     <string name="ui_emergency_meds_inj_cycle">" · Every %1$d days"</string>
+    <!-- v1.2.10 (review §6.9): when the frequency cannot be read, print the stored value verbatim — never "daily". -->
+    <string name="ui_emergency_meds_unknown_freq">%1$s (frequency not recognized)</string>
     <string name="ui_med_prn_detail">As needed · %1$s</string>
     <string name="ui_med_prn_backup">Backup</string>
     <string name="ui_schedule_empty_stomach">%1$s · Empty stomach</string>
@@ -54,14 +58,14 @@
     <string name="ui_flare_date_range">%1$s to %2$s</string>
     <string name="ui_flare_peak_suffix">" · peak %1$d/10"</string>
     <string name="ui_symptom_more_alerts">%1$d more unread alerts</string>
-    <string name="ui_symptom_basdai_recorded">%1$s is already recorded (total %2$.1f). You can edit and resubmit to overwrite it.</string>
+    <string name="ui_symptom_basdai_recorded">%1$s is already recorded (total %2$s). You can edit and resubmit to overwrite it.</string>
     <string name="ui_symptom_form_recorded_at">Recorded at %1$s. Saving again will overwrite it.</string>
-    <string name="ui_basdai_total_prefix">Total: %1$.1f</string>
+    <string name="ui_basdai_total_prefix">Total: %1$s</string>
 
     <!-- ===== Checkup / report / knowledge base ===== -->
     <string name="ui_checkup_lab_date_prefix">Date: %1$s</string>
     <string name="ui_vaccine_doctor_confirm">Doctor confirmed: %1$s</string>
-    <string name="ui_report_stiffness_score">%1$.0f min</string>
+    <string name="ui_report_stiffness_score">%1$s min</string>
     <string name="ui_med_kb_remaining">…%1$d more in the knowledge base</string>
 
     <!-- ===== Today / emergency / crash notice ===== -->

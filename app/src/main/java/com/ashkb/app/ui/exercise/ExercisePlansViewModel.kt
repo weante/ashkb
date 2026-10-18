@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
 /**
  * B7（v1.0.39）周期康复计划页状态：计划列表 + 在用计划进度 + 最近一次种子结果。
  *
- * 进度不另存：由 `exercise_logs` 中 `status="done"` 的日期去重后与计划周窗口比较得出
+ * 进度不另存：由 `exercise_logs` 中完成状态（`ExerciseLogStatus.COMPLETED`）的日期去重后与计划周窗口比较得出
  * （纯函数 `domain/ExercisePlanProgress`），此处只负责取数与装配。
  */
 data class ExercisePlansUiState(

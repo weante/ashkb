@@ -60,6 +60,21 @@ interface MedicationDao {
     @Query("SELECT * FROM medications WHERE id = :id")
     suspend fun byId(id: String): Medication?
 
+    /**
+     * v1.2.10（审查第二批 §5-MEDIUM-6）：按通用名键找已存在的药，供档案 JSON 导入复用 id。
+     *
+     * **为什么导入必须复用 id 而不是每次 `Ids.new("med")`**：`medications` 上
+     * `name_key` 只是普通索引、**不是唯一约束**，所以「同一份 JSON 导入两次」原先会在库里
+     * 留下两支同名药。它们会各自排提醒（同一时刻响两次）、各自进依从率分母（分子只算一份，
+     * 依从率凭空掉一半），而用户在药单上看不出哪支是哪支。
+     * 触发条件很平常：换机时导入失败重试一次、或者拿同一份 JSON 在两台设备上都导。
+     *
+     * 只认**在用**（`is_archived = 0`）：已停用的同名药是另一段病史，不该被导入覆盖或复活
+     * ——导入是「建档」，不是「恢复用药」。
+     */
+    @Query("SELECT * FROM medications WHERE name_key = :nameKey AND is_archived = 0 LIMIT 1")
+    suspend fun activeByNameKey(nameKey: String): Medication?
+
     @Upsert
     suspend fun upsert(medication: Medication)
 
@@ -91,28 +106,33 @@ interface MedicationLogDao {
     @Query("SELECT * FROM medication_logs WHERE med_id = :medId AND date = :date AND slot_key = :slotKey")
     suspend fun find(medId: String, date: String, slotKey: String?): MedicationLog?
 
+    /**
+     * v1.2.10（维护者指令：按需用药每天只记一次）：某条药**某天的按需记录**。
+     *
+     * 为什么不能用 [find] 代劳：按需行的 `slot_key` 是 NULL，而 SQL 里 `slot_key = NULL`
+     * 恒为 NULL（不成立），于是 [find] 永远查不到按需行——这正是旧实现「每点一次插一行」
+     * 的成因。这里必须写 `IS NULL`。
+     *
+     * `ORDER BY recorded_at DESC LIMIT 1`：旧版本允许一天落多行，存量数据里可能真有。
+     * 取**最新**那条，让今日卡展示与写入侧更新的是同一条，不会越改越乱。
+     */
+    @Query(
+        "SELECT * FROM medication_logs WHERE med_id = :medId AND date = :date " +
+            "AND slot_key IS NULL ORDER BY recorded_at DESC LIMIT 1",
+    )
+    suspend fun findPrn(medId: String, date: String): MedicationLog?
+
     @Upsert
     suspend fun upsert(log: MedicationLog)
 
-    @Query("SELECT COUNT(*) FROM medication_logs WHERE date BETWEEN :from AND :to")
-    suspend fun countBetween(from: String, to: String): Int
-
-    /**
-     * P4 M9「记录内完成度」（v1.0.76（批次 3a）改名，原「服药依从」）的取数：
-     * 区间内**计划打卡**（`prn_flag = 0`）的指定状态条数。
-     *
-     * 为什么排除 PRN：按需药的打卡次数由疼痛 / 发作决定，既没有计划剂量也没有「漏服」，
-     * 混进分母只会抬高或稀释完成度——它由 [countPrnBetween] 单独报数（原实现两者混算，指标虚高）。
-     */
-    @Query(
-        "SELECT COUNT(*) FROM medication_logs WHERE date BETWEEN :from AND :to " +
-            "AND status = :status AND prn_flag = 0",
-    )
-    suspend fun countScheduledBetweenStatus(from: String, to: String, status: String): Int
-
-    /** v1.0.76（批次 3a）：区间内按需（PRN）打卡条数——单独统计，不参与完成度。 */
-    @Query("SELECT COUNT(*) FROM medication_logs WHERE date BETWEEN :from AND :to AND prn_flag = 1")
-    suspend fun countPrnBetween(from: String, to: String): Int
+    // v1.2.10（审查 §6.10）：原 `countBetween` / `countScheduledBetweenStatus` / `countPrnBetween`
+    // 三条纯计数查询已删除——它们是"同一份语义被四处各写一遍"的一半：分母只认 SQL 里列举的
+    // 那几个字面量状态，而药单页走 `AdherenceCalc.completion(logs)`（认不出的状态也进分母），
+    // 于是同一批记录在两张页面上算出两个完成度。报表改用 `listBetween(...)` 取整行后在
+    // Kotlin 侧算（`AdherenceCalc.completion` / `prnCount`），过滤规则只剩一处。
+    //
+    // 留着它们只会给下一个人一条"看起来能直接用"的错路——与 v1.1.1 删 `countBetweenStatus`
+    // 的理由逐字相同（见本文件 SupplementLogDao 内该处注释）。
 
     /**
      * v1.0.48：某条药的用药记录（区间内倒序），供药单点开查看流水。
@@ -136,8 +156,9 @@ interface MedicationLogDao {
      * v1.0.77（批次 3b）：区间内的全部用药记录（含 PRN）。
      *
      * 为什么需要「整行」而不只是计数：计划剂量口径的完成度要按 `(date, med_id, slot_key)`
-     * 与 `planned_slots` 里的计划槽位**逐条配对**——计数版本（[countScheduledBetweenStatus]）
-     * 只有三态条数，无法知道「哪一剂没记录」，也就分不出「未记录（missed）」。
+     * 与 `planned_slots` 里的计划槽位**逐条配对**，计数无法知道「哪一剂没记录」，
+     * 也就分不出「未记录（missed）」。v1.2.10（审查 §6.10）起「记录内完成度」也走这里——
+     * 报表不再另写一套只认三态字面量的计数 SQL，界面上「共 N 条记录」与完成度的分母因此永远同源。
      */
     @Query("SELECT * FROM medication_logs WHERE date BETWEEN :from AND :to")
     suspend fun listBetween(from: String, to: String): List<MedicationLog>
@@ -395,12 +416,19 @@ interface ExerciseLogDao {
     @Query("SELECT * FROM exercise_logs WHERE date = :date")
     suspend fun byDate(date: String): List<ExerciseLog>
 
-    /** R21：待反馈的昨日运动打卡（fb 为空且已完成） */
+    /**
+     * R21：待反馈的昨日运动打卡（fb 为空且已完成）。
+     *
+     * v1.2.10（审查 §6.5）：状态过滤从**写死的 `status = 'done'`** 改成入参 [statuses]，
+     * 调用方传 [com.ashkb.app.domain.ExerciseLogStatus.COMPLETED]。写法照抄补剂侧
+     * [SupplementLogDao.observeHistoryFor] 的同一处改造（v1.0.87）：过滤值不从 SQL 里再抄一份，
+     * 是为了让「什么算练过了」这套定义全应用只有一处。
+     */
     @Query(
-        "SELECT * FROM exercise_logs WHERE date = :date AND status = 'done' " +
+        "SELECT * FROM exercise_logs WHERE date = :date AND status IN (:statuses) " +
             "AND fb_pain_change IS NULL ORDER BY recorded_at"
     )
-    suspend fun pendingFeedback(date: String): List<ExerciseLog>
+    suspend fun pendingFeedback(date: String, statuses: Collection<String>): List<ExerciseLog>
 
     @Upsert
     suspend fun upsert(log: ExerciseLog)

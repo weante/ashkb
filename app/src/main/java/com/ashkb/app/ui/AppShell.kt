@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Emergency
 import androidx.compose.material.icons.rounded.MedicalInformation
 import androidx.compose.material.icons.rounded.Restaurant
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -46,15 +47,21 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import java.util.Locale
 
 import com.ashkb.app.CrashLogger
 import com.ashkb.app.R
+import com.ashkb.app.data.entity.Vitals
+import com.ashkb.app.data.entity.WeightLog
 import com.ashkb.app.data.repo.DisclaimerStore
+import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.ui.backup.BackupScreen
 import com.ashkb.app.ui.backup.BackupViewModel
 import com.ashkb.app.ui.checkup.CheckupScreen
 import com.ashkb.app.ui.checkup.CheckupViewModel
 import com.ashkb.app.ui.components.NavRow
+import com.ashkb.app.ui.components.SectionCard
+import com.ashkb.app.ui.components.StatTile
 import com.ashkb.app.ui.emergency.EmergencyScreen
 import com.ashkb.app.ui.emergency.EmergencyViewModel
 import com.ashkb.app.ui.exercise.ExercisePlansScreen
@@ -94,6 +101,7 @@ import com.ashkb.app.ui.symptom.SymptomViewModel
 import com.ashkb.app.ui.theme.Motion
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
+import com.ashkb.app.ui.theme.StatusTone
 import com.ashkb.app.ui.today.TodayScreen
 import com.ashkb.app.ui.today.TodayViewModel
 import com.ashkb.app.ui.wellness.RecipesScreen
@@ -166,6 +174,8 @@ fun AppShell() {
 
     // v1.0.40：上次启动若有未捕获异常，本次启动弹一条摘要（便于截图反馈）；读后即清，不重复打扰。
     // 完整堆栈留在 filesDir/last_crash.txt（adb pull 可取）。
+    // v1.2.10（审查第二批 HIGH-5）：takeLast 已改为挂起 + Dispatchers.IO——本处原本在冷启动的
+    // 帧渲染路径上做文件 IO（两个文件各一轮 exists/readText/delete）。
     val appContext = LocalContext.current.applicationContext
     LaunchedEffect(Unit) {
         CrashLogger.takeLast(appContext)?.let { log ->
@@ -303,7 +313,11 @@ fun AppShell() {
                                         .clip(RoundedCornerShape(Size.dockItemCorner))
                                         .background(
                                             if (selected) {
-                                                MaterialTheme.colorScheme.secondaryContainer
+                                                // v1.2.10（UI 2.0 批次 C「换件」）：选中胶囊由
+                                                // secondaryContainer（旧配色下是大地色）改为
+                                                // primaryContainer（= 设计稿 brand-soft），
+                                                // 与全 App 其它选中态统一。
+                                                MaterialTheme.colorScheme.primaryContainer
                                             } else {
                                                 Color.Transparent
                                             },
@@ -324,6 +338,17 @@ fun AppShell() {
                                         imageVector = if (selected) t.selectedIcon else t.icon,
                                         contentDescription = null,   // 装饰性：label 已承载语义
                                         modifier = Modifier.size(Size.iconMd),
+                                        // v1.2.10（UI 2.0 批次 C「换件」3.7③）：未选中图标由默认
+                                        // onSurface 改为 **onSurfaceVariant**（设计稿 §5.11 的 ink-2）。
+                                        // 旧实现不传 tint，图标吃的是 LocalContentColor = onSurface，
+                                        // 与选中态图标同一个明度——「选中」只剩胶囊底色一处编码，
+                                        // 在深色主题下尤其难分。选中态保持 onSurface（胶囊底是
+                                        // primaryContainer，前景由 M3 派生，不动）。
+                                        tint = if (selected) {
+                                            MaterialTheme.colorScheme.onSurface
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
                                     )
                                     Spacer(Modifier.height(Spacing.xxs))
                                     Text(
@@ -511,6 +536,15 @@ private fun HealthHub(
             }
         }
 
+        // 今日体征面板：不点进二级页也能看到核心数值（设计稿 §06 ③「Hub 首屏新增今日体征面板」）
+        item {
+            VitalsPanel(
+                vitals = vitals,
+                weight = weight,
+                onOpen = onOpenWellness,
+            )
+        }
+
         // M2/M3 营养与骨健康
         item {
             NavRow(
@@ -531,16 +565,111 @@ private fun HealthHub(
             )
         }
 
-        // M7 紧急卡
+        // M7 紧急卡：danger-soft 瓦片提示其特殊地位（设计稿 §06 ③）
         item {
             NavRow(
                 icon = Icons.Rounded.Emergency,
                 title = stringResource(R.string.emergency_card_title),
                 subtitle = emergencySub,
+                tone = StatusTone.Danger,
                 onClick = onOpenEmergency,
             )
         }
 
         item { Spacer(Modifier.height(Spacing.xxl)) }
     }
+}
+
+/**
+ * 健康 Hub 首屏的「今日体征」面板（设计稿 §06 ③ 的建议项）。
+ *
+ * 四格数值：体温 / 血压 / 心率 / 体重——前三格来自今日体征记录，体重格来自今日体重记录
+ * （两者是两张表，各自独立记录）。没记的格显示「未记录」而非隐藏：面板的价值是让用户
+ * 一眼看出「哪项今天还没量」，留白反而看不出缺口。
+ *
+ * 判色沿用 `WellnessScreen.kt` 的 [VitalsHero] 同一套 [ClinicalThresholds] 阈值
+ * （体温 ≥38.5 危险 / ≥37.3 提醒；血压 ≥140/90 危险、收缩压 ≤90 提醒；心率越界提醒）。
+ * 方向着色遵医学语义：数值正常给 Success，越界给 Warning/Danger，**没有记录给 Neutral**
+ * （未记录不是"坏消息"，不该染成警示色）。
+ *
+ * 右上角按钮进的是二级页 [WellnessScreen]（体征与体重的录入表单都在那里），
+ * 所以文案用「记录 / 编辑」而不是「查看」。
+ */
+@Composable
+private fun VitalsPanel(vitals: Vitals?, weight: WeightLog?, onOpen: () -> Unit) {
+    val notRecorded = stringResource(R.string.common_not_recorded)
+
+    SectionCard(
+        title = stringResource(R.string.vitals_today_title),
+        action = {
+            FilledTonalButton(onClick = onOpen) {
+                Text(if (vitals != null) stringResource(R.string.common_edit) else stringResource(R.string.common_record))
+            }
+        },
+    ) {
+        // 两列 × 两行（设计稿 §06 ③ 的 `grid-template-columns:1fr 1fr`），
+        // 格子顺序也照设计稿：血压 / 心率 → 体温 / 体重。
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Box(Modifier.weight(1f)) {
+                StatTile(
+                    label = stringResource(R.string.vitals_bp),
+                    value = bloodPressureText(vitals) ?: notRecorded,
+                    tone = bloodPressureTone(vitals?.bpSys, vitals?.bpDia),
+                )
+            }
+            Box(Modifier.weight(1f)) {
+                StatTile(
+                    label = stringResource(R.string.vitals_heart_rate),
+                    value = vitals?.heartRate?.toString() ?: notRecorded,
+                    unit = vitals?.heartRate?.let { stringResource(R.string.vitals_bpm_unit) },
+                    tone = heartRateTone(vitals?.heartRate),
+                )
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Box(Modifier.weight(1f)) {
+                StatTile(
+                    label = stringResource(R.string.vitals_temperature_short),
+                    value = vitals?.temperature?.let { String.format(Locale.US, "%.1f", it) } ?: notRecorded,
+                    unit = vitals?.temperature?.let { "℃" },
+                    tone = temperatureTone(vitals?.temperature),
+                )
+            }
+            Box(Modifier.weight(1f)) {
+                StatTile(
+                    label = stringResource(R.string.vitals_today_weight),
+                    value = weight?.weightKg?.let { String.format(Locale.US, "%.1f", it) } ?: notRecorded,
+                    unit = weight?.let { "kg" },
+                )
+            }
+        }
+    }
+}
+
+/** 血压格显示值：两值都有才显示 `收缩/舒张`，缺一即为 null（调用方回退「未记录」）。 */
+private fun bloodPressureText(vitals: Vitals?): String? =
+    if (vitals?.bpSys != null && vitals.bpDia != null) "${vitals.bpSys}/${vitals.bpDia}" else null
+
+/** 体温判色（与 `WellnessScreen.VitalsHero` 同一口径）。 */
+private fun temperatureTone(temp: Double?): StatusTone = when {
+    temp == null -> StatusTone.Neutral
+    temp >= ClinicalThresholds.FEVER_ALERT -> StatusTone.Danger
+    temp >= ClinicalThresholds.FEVER_LOW -> StatusTone.Warning
+    else -> StatusTone.Success
+}
+
+/** 血压判色（与 `WellnessScreen.VitalsHero` 同一口径）。 */
+private fun bloodPressureTone(sys: Int?, dia: Int?): StatusTone = when {
+    sys == null || dia == null -> StatusTone.Neutral
+    sys >= ClinicalThresholds.BP_HIGH_SYS || dia >= ClinicalThresholds.BP_HIGH_DIA -> StatusTone.Danger
+    sys <= ClinicalThresholds.BP_LOW_SYS -> StatusTone.Warning
+    else -> StatusTone.Success
+}
+
+/** 心率判色（与 `WellnessScreen.VitalsHero` 同一口径）。 */
+private fun heartRateTone(hr: Int?): StatusTone = when {
+    hr == null -> StatusTone.Neutral
+    hr > ClinicalThresholds.HR_HIGH || hr < ClinicalThresholds.HR_LOW -> StatusTone.Warning
+    else -> StatusTone.Success
 }

@@ -23,11 +23,14 @@
     <string name="ui_exercise_hint_cervical">颈椎受累提示：%1$s</string>
     <string name="ui_exercise_hint_cervical_default">颈椎受累提示：该类动作颈椎风险高</string>
     <string name="ui_exercise_hint_alternative">替代方案：%1$s</string>
-    <string name="ui_exercise_feedback_soreness">运动后疼痛加重，但表现符合肌肉酸痛（延迟性酸痛）。观察 1–2 天；下次时长可暂不加量（exc-010 进展原则）。</string>
-    <string name="ui_exercise_feedback_worse">运动后疼痛加重且不符合单纯肌肉酸痛——按「运动后 2 小时疼痛规则」建议下次减量：时长 −20% 或强度降一档（exc-010）。连续 2 次加重建议咨询康复科。</string>
-    <string name="ui_exercise_feedback_stiffness">晨僵加重——可能提示炎症活动而非运动过量。建议当周维持低强度（L1），若持续加重请记录症状趋势并联系医生。</string>
-    <string name="ui_exercise_feedback_better">反馈良好。可按进展原则加量：先时长（每 1–2 周 +5–10 min），再频率，最后强度。</string>
-    <string name="ui_exercise_feedback_stable">反馈平稳。维持当前量，加量顺序：时长 → 频率 → 强度（exc-010）。</string>
+    <!-- v1.2.10（用户 2026-10-13）：这五条原本直接印内部规则编号（exc-010）与矩阵档位代号（L1），
+         读起来像给医生看的判读依据而不是给患者的话。规则本身不变，只改成"发生了什么 +
+         接下来怎么做"的顺序，并去掉编号与代号——用户看不懂 exc-010，也不知道 L1 对应哪一档。 -->
+    <string name="ui_exercise_feedback_soreness">运动后有点疼，但这更像平时那种运动后的肌肉酸痛。先观察 1–2 天，下次先按原来的时长练，不用加量。</string>
+    <string name="ui_exercise_feedback_worse">运动后疼痛加重，而且不太像普通的肌肉酸痛。下次练的时候把量收一收：时间减掉两成，或者换更轻的那一档。连续两次这样加重，建议找康复科医生看看。</string>
+    <string name="ui_exercise_feedback_stiffness">第二天早上的僵硬加重了。这更可能是炎症在活动，不一定是练多了。这一周就保持最轻的那一档；如果还在加重，记下症状变化并联系医生。</string>
+    <string name="ui_exercise_feedback_better">这次感觉不错。可以慢慢往上加：先加时间（每 1–2 周加 5–10 分钟），再加次数，最后才加难度。</string>
+    <string name="ui_exercise_feedback_stable">和平时差不多。保持现在的量就好。要加量的话按这个顺序来：先时间，再次数，最后难度。</string>
     <string name="ui_exercise_blocked_body">L3 · %1$s｜%2$s</string>
     <string name="ui_exercise_today_suitable">今日适合：%1$s</string>
 
@@ -38,6 +41,8 @@
 
     <!-- ===== 用药：注射周期 / 按需 / 空腹 ===== -->
     <string name="ui_emergency_meds_inj_cycle">" · 每 %1$d 天"</string>
+    <!-- v1.2.10（审查 §6.9）：急救卡上频次读不出来时，原样印存库值——绝不能印「每日」。 -->
+    <string name="ui_emergency_meds_unknown_freq">%1$s（频次无法识别）</string>
     <string name="ui_med_prn_detail">按需 · %1$s</string>
     <string name="ui_med_prn_backup">备用</string>
     <string name="ui_schedule_empty_stomach">%1$s · 晨起空腹</string>
@@ -55,14 +60,14 @@
     <string name="ui_flare_date_range">%1$s 至 %2$s</string>
     <string name="ui_flare_peak_suffix">" · 峰值 %1$d/10"</string>
     <string name="ui_symptom_more_alerts">还有 %1$d 条未读警报</string>
-    <string name="ui_symptom_basdai_recorded">%1$s 已记录（总分 %2$.1f），可修改后重新提交，覆盖原记录。</string>
+    <string name="ui_symptom_basdai_recorded">%1$s 已记录（总分 %2$s），可修改后重新提交，覆盖原记录。</string>
     <string name="ui_symptom_form_recorded_at">已记录于 %1$s，再次保存将覆盖</string>
-    <string name="ui_basdai_total_prefix">总分：%1$.1f</string>
+    <string name="ui_basdai_total_prefix">总分：%1$s</string>
 
     <!-- ===== 检查 / 报告 / 知识库 ===== -->
     <string name="ui_checkup_lab_date_prefix">日期：%1$s</string>
     <string name="ui_vaccine_doctor_confirm">医生确认：%1$s</string>
-    <string name="ui_report_stiffness_score">%1$.0f 分</string>
+    <string name="ui_report_stiffness_score">%1$s 分</string>
     <string name="ui_med_kb_remaining">…其余 %1$d 条可在知识库查看</string>
 
     <!-- ===== 今日 / 急诊 / 崩溃提示 ===== -->

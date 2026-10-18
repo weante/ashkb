@@ -22,7 +22,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import java.util.Locale
 
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.DoseState
@@ -145,17 +146,17 @@ internal fun MedBasicsSection(
     nameKey: MutableState<String>,
     medClass: MutableState<MedClass>,
 ) {
-    OutlinedTextField(
+    AshkbTextField(
         name.value, { name.value = it },
         label = { Text(stringResource(R.string.med_name_field)) },
         modifier = Modifier.fillMaxWidth(),
     )
-    OutlinedTextField(
+    AshkbTextField(
         brand.value, { brand.value = it },
         label = { Text(stringResource(R.string.med_brand_field)) },
         modifier = Modifier.fillMaxWidth(),
     )
-    OutlinedTextField(
+    AshkbTextField(
         nameKey.value, { nameKey.value = it },
         label = { Text(stringResource(R.string.med_generic_key_field)) },
         modifier = Modifier.fillMaxWidth(),
@@ -242,7 +243,7 @@ internal fun MedRouteDoseSection(
             label = { Text(stringResource(R.string.med_route_injection)) },
         )
     }
-    OutlinedTextField(
+    AshkbTextField(
         dose.value, { dose.value = it },
         label = { Text(stringResource(R.string.med_dose_field)) },
         modifier = Modifier.fillMaxWidth(),
@@ -356,7 +357,7 @@ internal fun MedScheduleSection(
             )
         }
     } else {
-        OutlinedTextField(
+        AshkbTextField(
             prnReason.value, { prnReason.value = it },
             label = { Text(stringResource(R.string.med_prn_reason_field)) },
             modifier = Modifier.fillMaxWidth(),
@@ -383,7 +384,7 @@ internal fun MedCycleSection(
     isMonthly: Boolean,
 ) {
     if (!isMonthly) {
-        OutlinedTextField(
+        AshkbTextField(
             cycleDays.value, { cycleDays.value = it.filter { c -> c.isDigit() }.take(3) },
             label = {
                 Text(
@@ -391,6 +392,16 @@ internal fun MedCycleSection(
                         if (isInjection) R.string.med_inj_cycle_field else R.string.med_oral_cycle_field,
                     ),
                 )
+            },
+            singleLine = true,
+            // v1.2.10（审查 M1）：天数下界 1。填 0 时立刻说明后果而不是只让保存按钮置灰——
+            // `0` 会被 `ScheduleCalc.isInjectionDay` 判成"永远不是周期日"，这支药随后从
+            // 今日卡与所有提醒里静默消失；用户需要知道"这个数字不能是 0"以及为什么。
+            isError = !cycleDaysOk(cycleDays.value),
+            supportingText = {
+                if (!cycleDaysOk(cycleDays.value)) {
+                    Text(stringResource(R.string.med_cycle_days_min_error))
+                }
             },
             modifier = Modifier.fillMaxWidth(),
         )
@@ -407,6 +418,19 @@ internal fun MedCycleSection(
         ),
         modifier = Modifier.fillMaxWidth(),
     )
+}
+
+/**
+ * v1.2.10（审查 M1）：周期天数输入是否可用。
+ *
+ * 与 `buildMed` 的落库判定**同一份口径**（非空、且 ≥ `ScheduleCalc.MIN_CYCLE_DAYS`）：
+ * 空串不算错（用户还在删改，`buildMed` 会回落 14），`0` 与超大值算错。
+ * 上界交给 `clampCycleDays` 静默压回（用户敲 `9999` 时不必报错，按 999 生效即可），
+ * 这里只拦"会让药消失"的那个值。
+ */
+internal fun cycleDaysOk(raw: String): Boolean {
+    val n = raw.toIntOrNull() ?: return raw.isBlank()
+    return n >= ScheduleCalc.MIN_CYCLE_DAYS
 }
 
 // ===== 第一步：固定星期 =====
@@ -489,7 +513,7 @@ internal fun MedMealSection(
 /** 存放说明（备注类字段，独立 section：在它里面敲键不碰其它区块）。 */
 @Composable
 internal fun MedStorageSection(storage: MutableState<String>) {
-    OutlinedTextField(
+    AshkbTextField(
         storage.value, { storage.value = it },
         label = { Text(stringResource(R.string.med_storage_hint)) },
         modifier = Modifier.fillMaxWidth(),
@@ -510,7 +534,7 @@ internal fun MedDoseStateSection(
         }
     }
     if (doseState.value == DoseState.TAPERING) {
-        OutlinedTextField(
+        AshkbTextField(
             taperNote.value, { taperNote.value = it },
             label = { Text(stringResource(R.string.med_taper_note_label)) },
             placeholder = { Text(stringResource(R.string.med_taper_note_hint)) },
@@ -706,7 +730,7 @@ private fun TimePickerDialog(
         title = { Text(stringResource(R.string.med_time_picker_title)) },
         text = { TimePicker(state = state) },
         confirmButton = {
-            TextButton(onClick = { onConfirm("%02d:%02d".format(state.hour, state.minute)) }) {
+            TextButton(onClick = { onConfirm(String.format(Locale.US, "%02d:%02d", state.hour, state.minute)) }) {
                 Text(stringResource(R.string.common_save))
             }
         },

@@ -17,7 +17,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,6 +34,7 @@ import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.Labels
 import com.ashkb.app.domain.Lifestyle
+import com.ashkb.app.domain.ProfileLists
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
@@ -54,13 +55,9 @@ fun ProfileEditScreen(
     var diagnosis by remember { mutableStateOf(initial?.diagnosis ?: defaultDiagnosis) }
     var year by remember { mutableStateOf(initial?.diagnoseYear?.toString() ?: "") }
     var hla by remember { mutableStateOf(initial?.hlaB27 ?: "unknown") }
-    var allergies by remember {
-        mutableStateOf(initial?.allergies?.removeSurrounding("[", "]")?.replace("\"", "") ?: "")
-    }
+    var allergies by remember { mutableStateOf(jsonToCsv(initial?.allergies)) }
     var bloodType by remember { mutableStateOf(initial?.emergencyBloodType ?: "") }
-    var comorbid by remember {
-        mutableStateOf(initial?.comorbidities?.removeSurrounding("[", "]")?.replace("\"", "") ?: "")
-    }
+    var comorbid by remember { mutableStateOf(jsonToCsv(initial?.comorbidities)) }
     // R27 矩阵两输入：分期维 + 颈椎受累维（驱动 M4 运动过滤 / M5 预警灵敏度）
     var stage by remember { mutableStateOf(initial?.diseaseStage ?: "unknown") }
     var spine by remember { mutableStateOf(initial?.spineMobility ?: "none") }
@@ -146,17 +143,17 @@ fun ProfileEditScreen(
                 .padding(horizontal = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            OutlinedTextField(
+            AshkbTextField(
                 name, { name = it },
                 label = { Text(stringResource(R.string.profile_display_name_required)) },
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            AshkbTextField(
                 diagnosis, { diagnosis = it },
                 label = { Text(stringResource(R.string.profile_diag_required)) },
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            AshkbTextField(
                 year, { year = it.filter { c -> c.isDigit() }.take(4) },
                 label = { Text(stringResource(R.string.profile_diagnosis_year)) },
                 modifier = Modifier.fillMaxWidth(),
@@ -192,7 +189,7 @@ fun ProfileEditScreen(
                     FilterChip(selected = spine == k, onClick = { spine = k }, label = { Text(l) })
                 }
             }
-            OutlinedTextField(
+            AshkbTextField(
                 allergies, { allergies = it },
                 label = { Text(stringResource(R.string.profile_allergy_field)) },
                 modifier = Modifier.fillMaxWidth(),
@@ -227,12 +224,12 @@ fun ProfileEditScreen(
                     )
                 }
             }
-            OutlinedTextField(
+            AshkbTextField(
                 bloodType, { bloodType = it },
                 label = { Text(stringResource(R.string.profile_blood_field)) },
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            AshkbTextField(
                 comorbid, { comorbid = it },
                 label = { Text(stringResource(R.string.profile_comorbidity_field)) },
                 modifier = Modifier.fillMaxWidth(),
@@ -240,13 +237,13 @@ fun ProfileEditScreen(
             // v10（C9）体重目标区间：两列并排，可留空
             Text(stringResource(R.string.weight_target_title), style = MaterialTheme.typography.labelMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OutlinedTextField(
+                AshkbTextField(
                     wLow, { wLow = it.filter { c -> c.isDigit() || c == '.' } },
                     label = { Text(stringResource(R.string.weight_target_low)) },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                 )
-                OutlinedTextField(
+                AshkbTextField(
                     wHigh, { wHigh = it.filter { c -> c.isDigit() || c == '.' } },
                     label = { Text(stringResource(R.string.weight_target_high)) },
                     modifier = Modifier.weight(1f),
@@ -288,13 +285,13 @@ fun ProfileEditScreen(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OutlinedTextField(
+                AshkbTextField(
                     sedentary, { sedentary = it.filter { c -> c.isDigit() }.take(2) },
                     label = { Text(stringResource(R.string.profile_sedentary_field)) },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                 )
-                OutlinedTextField(
+                AshkbTextField(
                     sleepH, { sleepH = it.filter { c -> c.isDigit() }.take(2) },
                     label = { Text(stringResource(R.string.profile_sleep_field)) },
                     modifier = Modifier.weight(1f),
@@ -312,8 +309,15 @@ fun ProfileEditScreen(
     }
 }
 
-private fun csvToJson(csv: String): String? {
-    val items = csv.split("，", ",").map { it.trim() }.filter { it.isNotBlank() }
-    if (items.isEmpty()) return null
-    return "[" + items.joinToString(",") { "\"$it\"" } + "]"
-}
+/**
+ * 逗号分隔的用户输入 → JSON 数组字符串（`null` = 空）。
+ *
+ * v1.2.10（审查 §5-MEDIUM-5）：实现已搬到 [ProfileLists.toJson]（domain 层），
+ * 好与读侧放进同一个往返测试——留这两个薄壳只为不改调用点。
+ */
+private fun csvToJson(csv: String): String? = ProfileLists.toJson(csv)
+
+/**
+ * JSON 数组字符串 → 逗号分隔的可编辑文本（[csvToJson] 的逆，见 [ProfileLists.fromJson]）。
+ */
+private fun jsonToCsv(raw: String?): String = ProfileLists.fromJson(raw)

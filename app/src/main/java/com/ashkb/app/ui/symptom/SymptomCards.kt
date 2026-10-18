@@ -14,6 +14,7 @@ import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.Vaccines
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -24,11 +25,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import java.util.Locale
 
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.Alert
 import com.ashkb.app.data.entity.BasdaiRecord
+import com.ashkb.app.domain.DerivedAlerts
 import com.ashkb.app.data.entity.FlareAction
 import com.ashkb.app.data.entity.FlareEvent
 import com.ashkb.app.data.entity.FlareTrigger
@@ -46,22 +49,35 @@ import androidx.compose.ui.Alignment
 // 警报 / 发作 / BASDAI 卡
 // ---------------------------------------------------------------------------
 
+/**
+ * 警报类型 → 卡片上的短标题。
+ *
+ * v1.2.10（审查 §6.6）：此前只覆盖 5 型，`vaccine_live_pending` 落 `else` 显示成通用的「提醒」。
+ * 严重度色调本来就是对的（`alertTone("high") = Danger`），所以这不是降级事故，但用户在症状页
+ * 顶部看到一条红卡片只写「提醒」，得点进去才知道是活疫苗的事——而活疫苗 × 免疫抑制是
+ * **需要立刻联系医生**的那一类（见 `domain/VaccineSafety`）。
+ *
+ * 类型常量以 [DerivedAlerts] 为准；`review_due` 不在其中（它是裸字符串，见 `HealthRepository`）。
+ * 新增写入侧类型时这里必须同步，`SymptomAlertLabelTest` 会拿写入侧的类型逐个比对。
+ */
 @Composable
 private fun alertLabel(alertType: String): String = when (alertType) {
-    "symptom_abnormal" -> stringResource(R.string.symptom_alert_section)
-    "basdai_high" -> stringResource(R.string.basdai_self_high)
-    "flare_day7" -> stringResource(R.string.report_flare_tracking)
-    "review_due" -> stringResource(R.string.backup_content_review)
-    "neuro_red_flag" -> stringResource(R.string.emergency_neuro_flag)
+    DerivedAlerts.SYMPTOM_ABNORMAL -> stringResource(R.string.symptom_alert_section)
+    DerivedAlerts.BASDAI_HIGH -> stringResource(R.string.basdai_self_high)
+    DerivedAlerts.FLARE_DAY7 -> stringResource(R.string.report_flare_tracking)
+    DerivedAlerts.VACCINE_LIVE_PENDING -> stringResource(R.string.vaccine_live_pending_alert)
+    DerivedAlerts.REVIEW_DUE -> stringResource(R.string.backup_content_review)
+    DerivedAlerts.NEURO_RED_FLAG -> stringResource(R.string.emergency_neuro_flag)
     else -> stringResource(R.string.reminder_nav)
 }
 
 private fun alertIcon(alertType: String) = when (alertType) {
-    "symptom_abnormal" -> Icons.Rounded.MonitorHeart
-    "basdai_high" -> Icons.Rounded.Insights
-    "flare_day7" -> Icons.Rounded.TrendingUp
-    "review_due" -> Icons.Rounded.Schedule
-    "neuro_red_flag" -> Icons.Rounded.WarningAmber
+    DerivedAlerts.SYMPTOM_ABNORMAL -> Icons.Rounded.MonitorHeart
+    DerivedAlerts.BASDAI_HIGH -> Icons.Rounded.Insights
+    DerivedAlerts.FLARE_DAY7 -> Icons.Rounded.TrendingUp
+    DerivedAlerts.VACCINE_LIVE_PENDING -> Icons.Rounded.Vaccines
+    DerivedAlerts.REVIEW_DUE -> Icons.Rounded.Schedule
+    DerivedAlerts.NEURO_RED_FLAG -> Icons.Rounded.WarningAmber
     else -> Icons.Rounded.ErrorOutline
 }
 
@@ -246,14 +262,14 @@ internal fun BasdaiList(records: List<BasdaiRecord>, onDelete: (BasdaiRecord) ->
             verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
         ) {
             Text(
-                "%.1f".format(r.total),
+                String.format(Locale.US, "%.1f", r.total),
                 style = MaterialTheme.typography.titleMedium,
                 color = if (ClinicalThresholds.basdaiHigh(r.total)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
             )
             DestructiveAction(
                 label = stringResource(R.string.common_delete),
                 confirmTitle = stringResource(R.string.basdai_delete_confirm, r.date),
-                confirmBody = stringResource(R.string.basdai_delete_note, "%.1f".format(r.total)) + "\n" +
+                confirmBody = stringResource(R.string.basdai_delete_note, String.format(Locale.US, "%.1f", r.total)) + "\n" +
                     stringResource(R.string.common_delete_irreversible),
                 onConfirm = { onDelete(r) },
             )

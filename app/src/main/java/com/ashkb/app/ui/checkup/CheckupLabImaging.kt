@@ -36,7 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,6 +53,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.util.Locale
 
 
 import com.ashkb.app.data.entity.CheckupRecord
@@ -85,7 +86,7 @@ private fun LabValue(valueText: String, unit: String?, abnormal: String?, onClic
     }
 }
 
-private fun fmtDouble(v: Double): String = "%.2f".format(v).trimEnd('0').trimEnd('.')
+private fun fmtDouble(v: Double): String = String.format(Locale.US, "%.2f", v).trimEnd('0').trimEnd('.')
 
 private fun labValueText(lab: LabResult): String =
     lab.value?.let { fmtDouble(it) } ?: lab.valueText ?: "-"
@@ -755,7 +756,7 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
             }
 
             Text(stringResource(R.string.ai_import_step2), style = MaterialTheme.typography.bodyMedium)
-            OutlinedTextField(
+            AshkbTextField(
                 value = pasted,
                 onValueChange = { pasted = it },
                 label = { Text(stringResource(R.string.common_paste_ai_reply)) },

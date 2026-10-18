@@ -8,7 +8,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -57,7 +57,7 @@ internal fun ExerciseLogEditSheet(
                 style = MaterialTheme.typography.titleLarge,
             )
             Text(log.excName, style = MaterialTheme.typography.bodyMedium)
-            OutlinedTextField(
+            AshkbTextField(
                 value = duration,
                 onValueChange = { duration = it.filter { c -> c.isDigit() }.take(3) },
                 label = { Text(stringResource(R.string.exercise_duration_field)) },
@@ -83,7 +83,7 @@ internal fun ExerciseLogEditSheet(
                     )
                 }
             }
-            OutlinedTextField(
+            AshkbTextField(
                 value = note, onValueChange = { note = it },
                 label = { Text(stringResource(R.string.common_notes_optional)) },
                 modifier = Modifier.fillMaxWidth(),

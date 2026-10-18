@@ -38,6 +38,8 @@ object EmergencyLockscreenPublisher {
             val meds = EmergencyMeds.summarize(
                 db.medicationDao().listActive(), LocalDate.now().toString(),
                 freqLabel = { context.getString(it.plainRes) },
+                // v1.2.10（审查 §6.9）：读不出来的频次原样印出存库值（锁屏那张卡同样给医生看）
+                unknownFreqLabel = { context.getString(R.string.ui_emergency_meds_unknown_freq, it) },
                 // v1.2.6（i18n）：注射周期文案同样按系统语言解析
                 injCycleLabel = { context.getString(R.string.ui_emergency_meds_inj_cycle, it) },
                 // v1.2.6（i18n）：商品名括号随语言换全角 / 半角

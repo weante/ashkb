@@ -42,6 +42,7 @@ class EmergencyMedsTest {
     ) = EmergencyMeds.summarize(
         meds, today, maxLines = maxLines,
         freqLabel = { ctx.getString(it.plainRes) },
+        unknownFreqLabel = { ctx.getString(R.string.ui_emergency_meds_unknown_freq, it) },
         injCycleLabel = { ctx.getString(R.string.ui_emergency_meds_inj_cycle, it) },
         brandParen = { ctx.getString(R.string.ui_brand_paren, it) },
     )
@@ -195,6 +196,32 @@ class EmergencyMedsTest {
         val detail = summarizeMeds(listOf(m), today).ordered.single().detail
         assertTrue(detail.contains("25 mg"))
         assertTrue(detail.contains("· 每 14 天"))
+    }
+
+    // ======================= 脏频次（v1.2.10 审查 §6.9）=======================
+
+    /**
+     * v1.2.10（审查 §6.9）：读不出来的频次**不能印成「每日」**。
+     *
+     * 这张卡是给医生看的：印「每日」等于替用户把一个读不懂的值断言成一个明确服法，
+     * 而它可能是一支每两周一次的药。修法是原样印存库值 + 一句「频次无法识别」。
+     */
+    @Test
+    fun `频次读不出来时印原始存库值而不是每日`() {
+        val m = med(dose = "25 mg", frequency = "Q7D-unknown")
+        val detail = summarizeMeds(listOf(m), today).ordered.single().detail
+        assertEquals("25 mg · Q7D-unknown（频次无法识别）", detail)
+        assertFalse("不能把读不出的频次印成每日", detail.contains("每日"))
+    }
+
+    @Test
+    fun `脏频次不影响其他字段与免疫抑制置顶`() {
+        val dirty = med(id = "med-d", name = "脏药", medClass = "BIOLOGIC", frequency = "???")
+        val ok = med(id = "med-o", name = "好药", frequency = "DAILY")
+        val s = summarizeMeds(listOf(ok, dirty), today)
+        // 免疫抑制仍然置顶（脏频次不改变 medClass 判定）
+        assertEquals("脏药", s.ordered.first().name)
+        assertTrue(s.ordered.first().detail.contains("???（频次无法识别）"))
     }
 
     // ======================= 空药单 =======================

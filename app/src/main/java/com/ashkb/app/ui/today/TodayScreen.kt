@@ -1,22 +1,29 @@
 package com.ashkb.app.ui.today
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AcUnit
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -54,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -62,6 +70,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
+import com.ashkb.app.ui.components.AshkbTextField
 import com.ashkb.app.R
 import com.ashkb.app.data.entity.InjSite
 import com.ashkb.app.data.entity.Medication
@@ -86,6 +95,9 @@ import com.ashkb.app.ui.theme.DataLarge
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
+import com.ashkb.app.ui.theme.TimeRail
+import com.ashkb.app.ui.theme.accent
+import java.util.Locale
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -977,10 +989,68 @@ private fun MedCheckCard(
             Modifier.padding(Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
+            // ── UI 2.0 批次 D「换图」：DoseCard 时间轨（设计稿 §5.4）──────────────
+            // 左侧「时间轨」= 计划时刻恒宽 52dp 右对齐（tnum）+ 脊柱线 + 状态点
+            // （绿=已服 / 蓝=待服 / 红=漏服）。扫一眼就能定位「今天吃到哪了」。
+            //
+            // 有意保留的偏差：设计稿 demo 是「一张面板里多行」，这里仍是**一行一张卡**。
+            // 每剂自己的 Surface 底色已经承载了状态语义，合成一张大面板反而要把状态色
+            // 挪进行内，卡片之间也失去「各自可点」的边界。
+            //
+            // 脊柱 = `Modifier.height(IntrinsicSize.Min)` + `fillMaxHeight`，与
+            // `ui/components/Status.kt` 里 AlertBanner 左侧 4dp 色条是同一套机制（全仓库
+            // 唯一的先例）。**不引入 `Modifier.shadow`**——v1.1.6 的横带教训。
+            //
+            // ⚠️ 这一行里**不放 FlowRow**：FlowRow 的固有尺寸（intrinsic）在
+            // foundation 1.7.3 上不参与 `minIntrinsicHeight`，会让本行量出 0 高、整张卡
+            // 被 Surface 裁掉。chip 一律放到轨道下面，整宽铺开。
             Row(
-                verticalAlignment = Alignment.CenterVertically,
+                Modifier.height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
+                // 时间轨：计划时刻 + 服法提示。PRN 没有计划时刻，用「按需」占位。
+                Column(
+                    Modifier.width(Size.doseRailWidth),
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+                ) {
+                    Text(
+                        item.slotTime ?: stringResource(R.string.med_prn_short),
+                        style = TimeRail,
+                        color = onContainer,
+                        textAlign = TextAlign.End,
+                    )
+                    Text(
+                        railHint(med),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = onContainer.copy(alpha = 0.72f),
+                        textAlign = TextAlign.End,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
+                // 脊柱线 + 状态点。点的颜色走 `st.tone.accent()`（Success→绿 / Info→品牌蓝 /
+                // Danger→红 / Warning→琥珀 / Neutral→ink-2），与 StatusChip 共用同一套
+                // 语义解析，**不另造颜色**（设计稿红线：医学警示语义只靠三色）。
+                // 点宽 8dp > 脊柱 2dp，左右各溢出 3dp——Box 默认不裁剪子项，正好形成
+                // 设计稿里「圆点骑在脊柱上」的观感。
+                Box(
+                    Modifier
+                        .fillMaxHeight()
+                        .width(Size.doseSpineWidth)
+                        .background(MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Box(
+                        Modifier
+                            .offset(y = Spacing.xs)
+                            .align(Alignment.TopCenter)
+                            .size(Size.doseDot)
+                            .background(st.tone.accent(), CircleShape),
+                    )
+                }
+
+                // 正文列：药名 + 状态文字 + 动作。状态「图标」这一环由脊柱上的点承担。
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Text(
                         "${med.name} ${med.dose}",
@@ -988,69 +1058,81 @@ private fun MedCheckCard(
                         color = onContainer,
                         textDecoration = if (item.skipped) TextDecoration.LineThrough else null,
                     )
-                    // 时段 / 剂型 / 服法 / 储存：4 个 chip，替代原来的字符串拼接一整行
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    ) {
-                        StatusChip(item.slotLabel, st.tone, st.icon)
-                        if (med.route == "injection") StatusChip(stringResource(R.string.med_route_injection), StatusTone.Info)
-                        if (med.route == "oral") {
-                            StatusChip(
-                                when (med.takeWithFood) {
-                                    "empty_stomach" -> stringResource(R.string.med_fasting)
-                                    "with_food" -> stringResource(R.string.med_with_meal)
-                                    else -> stringResource(R.string.common_any)
-                                },
-                                StatusTone.Neutral,
-                            )
+
+                    // 文字一环（三重编码：色 + 图标 + 文字）
+                    Text(st.detail, style = MaterialTheme.typography.bodySmall, color = onContainer)
+
+                    // v10（C7）：漏服时给出通用处理指引入口（口服补服规则 / 注射窗口分级）
+                    if (missed) {
+                        TextButton(
+                            onClick = onMissedGuide,
+                            modifier = Modifier.heightIn(min = Size.touchMin),
+                        ) { Text(stringResource(R.string.missed_dose_title)) }
+                    }
+
+                    if (st.actionable && !item.isPrn) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            Button(onClick = onCheckIn, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                                Text(stringResource(R.string.med_take_action))
+                            }
+                            OutlinedButton(onClick = onSkip, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                                Text(stringResource(R.string.med_skip))
+                            }
+                            if (med.route == "injection") {
+                                OutlinedButton(onClick = onPostpone, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                                    Text(stringResource(R.string.med_postpone))
+                                }
+                            }
                         }
-                        med.storage?.let { StatusChip(it, StatusTone.Warning, Icons.Rounded.AcUnit) }
                     }
-                }
-            }
 
-            // 文字一环（三重编码：色 + 图标 + 文字）
-            Text(st.detail, style = MaterialTheme.typography.bodySmall, color = onContainer)
-
-            // v10（C7）：漏服时给出通用处理指引入口（口服补服规则 / 注射窗口分级）
-            if (missed) {
-                TextButton(
-                    onClick = onMissedGuide,
-                    modifier = Modifier.heightIn(min = Size.touchMin),
-                ) { Text(stringResource(R.string.missed_dose_title)) }
-            }
-
-            if (st.actionable && !item.isPrn) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Button(onClick = onCheckIn, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                        Text(stringResource(R.string.med_take_action))
-                    }
-                    OutlinedButton(onClick = onSkip, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                        Text(stringResource(R.string.med_skip))
-                    }
-                    if (med.route == "injection") {
-                        OutlinedButton(onClick = onPostpone, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                            Text(stringResource(R.string.med_postpone))
+                    if (item.isPrn) {
+                        // v1.2.10（维护者指令）：按需药常驻首页、每天只记一次。
+                        // 记过之后把「不设提醒」的说明换成「今天已记录，明天可再记」——
+                        // 否则卡片显示「已服 21:03」却仍写着「记录实际使用即可」，用户不知道还能不能再点。
+                        Text(
+                            stringResource(if (item.done) R.string.med_prn_done_note else R.string.med_prn_note),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (!item.done) {
+                            Button(onClick = onPrnTaken, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                                Text(stringResource(R.string.med_record_prn_use))
+                            }
                         }
                     }
                 }
             }
 
-            if (item.isPrn) {
-                Text(
-                    stringResource(R.string.med_prn_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (!item.done) {
-                    Button(onClick = onPrnTaken, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                        Text(stringResource(R.string.med_record_prn_use))
-                    }
+            // 状态 / 储存 chip：时段与服法已经被时间轨接管，这里只留状态与储存，
+            // 并与正文列左对齐（缩进 = 轨道宽 + 脊柱宽 + 两段 md 间距）。
+            Row {
+                Spacer(Modifier.width(Size.doseRailWidth + Size.doseSpineWidth + Spacing.md * 2))
+                FlowRow(
+                    Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    StatusChip(st.chip, st.tone, st.icon)
+                    med.storage?.let { StatusChip(it, StatusTone.Warning, Icons.Rounded.AcUnit) }
                 }
             }
         }
     }
+}
+
+/**
+ * 时间轨下面那行提示（设计稿 §5.4 的 `.rail span`）。
+ *
+ * 注射写「注射」，口服写服法——原来这两条是独立的 chip，批次 D 把它们收进轨道：
+ * 同一件事（这一剂怎么吃/打）只在一处编码，chip 行只留状态与储存。
+ */
+@Composable
+private fun railHint(med: Medication): String = when {
+    med.route == "injection" -> stringResource(R.string.med_route_injection)
+    med.takeWithFood == "empty_stomach" -> stringResource(R.string.med_fasting)
+    med.takeWithFood == "with_food" -> stringResource(R.string.med_with_meal)
+    else -> stringResource(R.string.common_any)
 }
 
 @Composable
@@ -1074,7 +1156,7 @@ private fun SkipDialog(
                     }
                 }
                 if (reason == SkipReason.OTHER) {
-                    androidx.compose.material3.OutlinedTextField(
+                    AshkbTextField(
                         value = note, onValueChange = { note = it },
                         label = { Text(stringResource(R.string.common_extra_notes)) }, modifier = Modifier.fillMaxWidth(),
                     )
@@ -1166,7 +1248,7 @@ private fun PostponeDialog(
                         )
                     }
                 }
-                androidx.compose.material3.OutlinedTextField(
+                AshkbTextField(
                     value = custom,
                     onValueChange = { custom = it },
                     label = { Text(stringResource(R.string.med_postpone_manual_date)) },
@@ -1226,7 +1308,7 @@ private fun MissedDoseDialog(item: TodayItem, onDismiss: () -> Unit) {
                         stringResource(
                             R.string.missed_dose_late,
                             if (late < 60) stringResource(R.string.dom_duration_minutes, late)
-                            else stringResource(R.string.dom_duration_hours, "%.1f".format(late / 60.0)),
+                            else stringResource(R.string.dom_duration_hours, String.format(Locale.US, "%.1f", late / 60.0)),
                         ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

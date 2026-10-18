@@ -277,6 +277,19 @@ class BackupViewModel(
     // ======================= 恢复（协议 §6 五步） =======================
 
     fun verifyBackup(fileName: String, bytes: ByteArray, password: String) {
+        // v1.2.10（审查 CRITICAL-2）：**最后一道体积守卫**。文件选择器那条路径已经拿
+        // `OpenableColumns.SIZE` 挡过一次，但 `verifyBackup` 是公开入口（WebDAV 下载、
+        // 将来别的调用方都会走到这里），解密前先在这儿看字节数组本身多大，
+        // 免得把"上游忘了检查"变成一次 OOM。
+        if (bytes.size.toLong() > BackupEngine.PICK_LIMIT_BYTES) {
+            fail(app.getString(
+                R.string.backup_file_too_large,
+                fileName,
+                BackupEngine.sizeMb(bytes.size.toLong()),
+                BackupEngine.sizeMb(BackupEngine.PICK_LIMIT_BYTES),
+            ))
+            return
+        }
         viewModelScope.launch {
             _busy.value = true
             try {
@@ -326,8 +339,36 @@ class BackupViewModel(
                 else info(app.getString(R.string.vm_restore_incomplete, verifyIssues(v)))
             } catch (e: Exception) {
                 fail(app.getString(R.string.vm_restore_failed, errText(e)))
-            } finally { _busy.value = false }
+            } finally {
+                // v1.2.10（审查 HIGH-3）：**两条路径都要丢下明文**。此前只有 `cancelRestore()`
+                // 会清 `_pendingRestore`，于是「解密后的整库明文 String（DecryptedFile.payload）
+                // + 恢复口令 CharArray」在恢复成功之后仍然常驻到 ViewModel 销毁为止——
+                // 恢复完已经是"上一份数据"了，留着它没有任何用途，只有风险。
+                // 失败路径同样清：失败时库已由 `repo.restore()` 的 pre-restore 快照复位，
+                // 重试要重新选文件、重新输口令，这个代价值得。
+                _pendingRestore.value = null
+                _pendingFileName.value = null
+                wipeRestorePassword()
+                _busy.value = false
+            }
         }
+    }
+
+    /**
+     * v1.2.10（审查 HIGH-3）：**兜底**清内存里的敏感载体。
+     *
+     * 正常路径上 `cancelRestore()` 与 `doRestore()` 都已各清一次，这里防的是"用户直接
+     * 返回/退出，一次都没走那两条路径"——比如选了文件、解密成功、看着待恢复块，然后按返回键
+     * 离开。没有这个兜底，明文 payload 与恢复码会一直活到这个 VM 被回收。
+     */
+    override fun onCleared() {
+        _pendingRestore.value = null
+        _pendingFileName.value = null
+        _restoreResult.value = null
+        _davPicked.value = null
+        _recoveryReveal.value = null
+        wipeRestorePassword()
+        super.onCleared()
     }
 
     fun cancelRestore() {

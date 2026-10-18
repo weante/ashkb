@@ -9,6 +9,7 @@ import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.entity.Alert
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.Profile
+import com.ashkb.app.data.entity.Reaction
 import com.ashkb.app.data.entity.Supplement
 import com.ashkb.app.data.entity.SupplementLog
 import com.ashkb.app.data.repo.HealthRepository
@@ -61,6 +62,22 @@ class TodayViewModel(
 
     /** [date] 保持普通 getter（跨零点不重组的调用点用它，与批次 9 同口径）。 */
     private val date: LocalDate get() = dateProvider.today.value
+
+    // ---- v1.0.74：跨零点补记（「昨天还有 N 剂未记录」） ----
+
+    /**
+     * 昨天已到点、却既未「已服」也未「跳过」的剂量；今日页顶部据此显示补记卡。
+     *
+     * ⚠️ 必须声明在 [init] 之前（Kotlin 按声明顺序初始化属性）：`init` 里的
+     * `viewModelScope.launch { refreshYesterdayPending() }` 在 `Dispatchers.Main.immediate`
+     * 上同步内联到第一句 `withContext(Dispatchers.IO)` 便派发 IO 协程并返回；若本字段此刻
+     * 尚未初始化，IO 线程读到 null，会在 `_yesterdayPending.value = …` 处抛 NPE。
+     * 2026-10-18 真机间歇崩溃（`TodayViewModel.kt:255`）即由此而来，v1.2.10 修正声明顺序。
+     */
+    private val _yesterdayPending = MutableStateFlow<List<PendingDoses.Pending>>(emptyList())
+
+    /** 对外只读视图：UI 用它渲染补记卡。 */
+    val yesterdayPending: StateFlow<List<PendingDoses.Pending>> = _yesterdayPending
 
     /**
      * 日期源是**进程级**单例，监听器必须随 VM 一起摘掉，否则被销毁的 VM 会被它一直持有。
@@ -164,9 +181,20 @@ class TodayViewModel(
         viewModelScope.launch { healthRepo.setMinimalMode(false, nowIso()) }
     }
 
-    fun checkIn(item: TodayItem, injSite: String? = null, reaction: String = "none") {
+    /**
+     * 今日页打卡。
+     *
+     * v1.2.10（审查 §6.4）：`reaction` 的默认值由字面量 `"none"` 改为 [Reaction.NONE].name。
+     * 两种拼写都落过库（补记路径 `repo.checkIn(…)` 走的是仓库侧的大写默认值），今天没有读取方
+     * 按它分支，但等接上判读时就会变成两个不同的值。用 `Reaction.NONE.name` 而不是再写字面量，
+     * 保证与仓库侧的默认值同源。
+     */
+    fun checkIn(item: TodayItem, injSite: String? = null, reaction: String = Reaction.NONE.name) {
         viewModelScope.launch {
-            repo.checkIn(item.med, item.slotKey, item.slotTime, reaction, injSite)
+            // v1.2.10（审查 L6 同口径）：把今日页的归属日显式传下去——跨零点时 `LocalDate.now()`
+            // 已是次日，会把日志记到次日，原槽位永远空缺。按需药「每天只记一次」的判定也依赖
+            // 这个日期：页面显示的是哪一天，就应当记在哪一天（`findPrn(med, date)` 按同一天找）。
+            repo.checkIn(item.med, item.slotKey, item.slotTime, reaction, injSite, date = todayDate.value)
             // v1.0.73：应用内打卡后撤掉该槽位已显示的通知——此前只有「通知动作」与「全屏页」
             // 会撤，从今日页打卡会让通知一直挂到下一次升级触发才被清掉。
             NotificationHelper.cancel(app, item.med.id, item.slotKey)
@@ -179,7 +207,9 @@ class TodayViewModel(
 
     fun skip(item: TodayItem, reason: String, note: String?) {
         viewModelScope.launch {
-            repo.skip(item.med, item.slotKey, item.slotTime, reason, note)
+            // v1.2.10（审查 L6）：把今日页的归属日显式传下去（与 checkIn 一样）。
+            // 默认值仍是 LocalDate.now()，但跨零点时 value 里的 date 才是槽位那天。
+            repo.skip(item.med, item.slotKey, item.slotTime, reason, note, date = todayDate.value)
             // 主动跳过＝已结算：撤通知并重排（配合 ReminderReceiver 的 skipped 判定，
             // 不再对用户明确跳过的剂量继续加急）
             NotificationHelper.cancel(app, item.med.id, item.slotKey)
@@ -215,18 +245,17 @@ class TodayViewModel(
         repo.materializePlannedSlots(meds, win.from, win.to)
     }
 
-    // ---- v1.0.74：跨零点补记（「昨天还有 N 剂未记录」） ----
-
-    private val _yesterdayPending = MutableStateFlow<List<PendingDoses.Pending>>(emptyList())
-
-    /** 昨天已到点、却既未「已服」也未「跳过」的剂量；今日页顶部据此显示补记卡。 */
-    val yesterdayPending: StateFlow<List<PendingDoses.Pending>> = _yesterdayPending
+    // ---- v1.0.74：跨零点补记（字段声明见文件上方 init 之前） ----
 
     /**
      * 重算「昨天未记录」。凡是可能改变昨天记录的操作（打卡 / 跳过 / 跨日）后都要调一次。
      *
      * 判定口径走纯函数 [PendingDoses.unsettledOn] + 仓库的**已结算**槽位集合——
-     * done 与 skipped 都算结算，避免用户昨天明确跳过（写了原因）的剂量天天挂卡催补。
+     * **done / partial / skipped 三态都算结算**（`AdherenceCalc.SETTLED_STATUSES`），
+     * 避免用户昨天明确跳过（写了原因）或记了部分完成的剂量天天挂卡催补。
+     *
+     * v1.2.10（审查 L5）：这行此前只写「done 与 skipped」——代码从 v1.0.77 起就含 partial，
+     * 是注释漂移。照旧注释改代码会退回「记了部分完成仍被催补」的老 bug（裁决项 2）。
      */
     suspend fun refreshYesterdayPending() = withContext(Dispatchers.IO) {
         // v1.0.84（批次 9）：用**与 UI 同一个**日期源（ticker 推进的 date），不再各读一次系统时钟——

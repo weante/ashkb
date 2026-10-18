@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.ashkb.app.R
 import com.ashkb.app.ui.components.NavRow
 import com.ashkb.app.ui.components.SectionCard
+import com.ashkb.app.ui.components.shareOrReport
 
 /**
  * v1.2.0：报表「导出 / 备份」页。
@@ -56,8 +57,10 @@ internal fun ExportPage(vm: ReportViewModel, busy: Boolean, context: android.con
                     onClick = {
                         vm.generateReportPdf(
                             onReady = { intent ->
-                                runCatching { context.startActivity(Intent.createChooser(intent, shareTitle)) }
-                                    .onFailure { context.getString(R.string.report_share_fail, it.message) }
+                                // v1.2.10（审查第二批 M5）：失败必须让用户看见。
+                                // 原先 `.onFailure { context.getString(...) }` 求值即丢——没有接收者，
+                                // 分享面板起不来时用户只会觉得「点了没反应」。
+                                shareOrReport(context, intent, shareTitle)
                             },
                             onError = { vm.reportError(it) },
                         )
@@ -79,10 +82,7 @@ internal fun ExportPage(vm: ReportViewModel, busy: Boolean, context: android.con
                 OutlinedButton(
                     onClick = {
                         vm.generateEmergencyCardPdf(
-                            onReady = { intent ->
-                                runCatching { context.startActivity(Intent.createChooser(intent, shareTitle)) }
-                                    .onFailure { context.getString(R.string.report_share_fail, it.message) }
-                            },
+                            onReady = { intent -> shareOrReport(context, intent, shareTitle) },
                             onError = { vm.reportError(it) },
                         )
                     },
@@ -103,3 +103,4 @@ internal fun ExportPage(vm: ReportViewModel, busy: Boolean, context: android.con
         item { Spacer(Modifier.height(20.dp)) }
     }
 }
+

@@ -4,6 +4,7 @@ import android.content.Context
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.entity.PlannedSlot
+import com.ashkb.app.data.entity.StopReason
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -80,6 +81,9 @@ class PostponeInjectionSlotTest {
         assertEquals("顺延必须留一条药品变更审计行（此前是本文件唯一不留痕的变更）", 1, changes.size)
         assertEquals("schedule_change", changes.first().changeType)
         assertEquals(today.plusDays(2).toString(), changes.first().effectiveDate)
+        // v1.2.10（审查 §6.7）：reason 必须落在 StopReason 词汇表里，且与历史行逐字相同（无需迁移）
+        assertEquals(StopReason.POSTPONE.name.lowercase(), changes.first().reason)
+        assertEquals(StopReason.POSTPONE, StopReason.fromKey(changes.first().reason))
     }
 
     @Test

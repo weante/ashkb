@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  深色窗口背景 = `ui/theme/Color.kt` 的 `backgroundDark` (0xFF0C1218)。
+  见 `values/colors.xml` 的说明：窗口背景是页面底色的兜底来源，
+  批次 A 换色把 `backgroundLight/Dark` 改成了瓷白/深墨，但从未真正生效，
+  因为没人画它、也没人把窗口背景钉到它。§06 帧②（深色）把这个缺陷照了出来。
+-->
+<resources>
+    <color name="ashkb_window_background">#FF0C1218</color>
+</resources>

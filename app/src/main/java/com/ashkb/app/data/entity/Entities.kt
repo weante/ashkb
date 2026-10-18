@@ -67,11 +67,51 @@ enum class MedFrequency(@StringRes val labelRes: Int, @StringRes val plainRes: I
     CUSTOM(R.string.enum_med_frequency_custom, R.string.enum_med_frequency_custom_plain);
 
     companion object {
-        fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: DAILY
+        /**
+         * 按存库值取枚举，**无法识别（含 null / 空串）时返回 null**——v1.2.10（审查 §6.9）新增。
+         *
+         * 为什么要有它：原先只有 [fromKey]，而它是 fail-open 的（读不出就退回 [DAILY]）。
+         * 于是「这支药存了个没人认识的频次」与「这支药本来就是每日」在代码里长得一模一样，
+         * 调用方**没有能力**区分。存库值可能因为降级安装、手工改库、或未来版本删掉某个枚举项
+         * 而变成无法识别——那时把「每 8 小时」静默当成「每日」是在替用户改医嘱。
+         *
+         * 纯函数：不碰资源、不记日志，判断权交回调用方。
+         */
+        fun fromKeyOrNull(k: String?): MedFrequency? = entries.firstOrNull { it.name.equals(k, true) }
+
+        /**
+         * 兼容入口：无法识别时退回 [DAILY]（**刻意 fail-open**，见下）。
+         *
+         * 排程侧（[com.ashkb.app.domain.ScheduleCalc.slotsFor]）继续用这个取值，理由是
+         * **两害相权**：退回 DAILY 会让「每周一次」变成天天提醒（多提醒，用户看得见、能改）；
+         * 而 fail-closed（返回空列表）会让这支药**从今日页彻底消失**，用户以为药没了——
+         * 一个看得见的错配比一个看不见的空缺安全。
+         *
+         * 但「看得见」的前提是显示侧不再撒谎：[labelResOrNull] 让界面印出**原始字符串**，
+         * 药单页再挂一枚「频次无法识别」标签，用户才有机会去改。
+         */
+        fun fromKey(k: String?) = fromKeyOrNull(k) ?: DAILY
+
+        /**
+         * 频次文案资源；**无法识别时返回 null**，调用方必须显示原始存库值而不是伪造一个频次
+         * （与 [InjSite.fromKey] 的「宁可显示原始字符串」同口径）。
+         */
+        fun labelResOrNull(k: String?): Int? = fromKeyOrNull(k)?.labelRes
     }
 }
 
-/** 打卡状态（完成 / 部分完成 / 跳过）。v1.2.5（i18n）：文案改为字符串资源 `labelRes`。 */
+/**
+ * 打卡状态（完成 / 部分完成 / 跳过）。v1.2.5（i18n）：文案改为字符串资源 `labelRes`。
+ *
+ * ⚠️ **当前零引用（预留）**——v1.2.10 审查裁决项 6 的结论是**保留不删**，与 v1.2.4 把 BASDAI
+ * 频次档 `MedFrequency.Q8H` 标 `hidden = true` 而不删是同一个口径：这两个枚举描述的是**表的取值域**，
+ * 属于 schema 语义，删掉等于宣称"这三态不存在"。实际落库的是 `entities` 里 `status: String` 的
+ * name 字面量（`"done"` / `"partial"` / `"skipped"`），靠 `AdherenceCalc` 的常量与集合判定；
+ * 这个枚举是给"以后要做打卡状态选择器"时用的**唯一文案来源**。
+ *
+ * 不删的第二个理由：`labelRes` 三条字符串已在两份 `strings.xml` 里，删除枚举会让它们变成
+ * 无主资源，而 `EnglishStringsParityTest` 只保证中英一致、不会告诉你哪条没用了。
+ */
 enum class CheckStatus(@StringRes val labelRes: Int) {
     DONE(R.string.enum_check_status_done),
     PARTIAL(R.string.enum_check_status_partial),
@@ -102,12 +142,26 @@ enum class SkipReason(@StringRes val labelRes: Int) {
     }
 }
 
-/** 注射 / 用药后不良反应程度。v1.2.5（i18n）：文案改为字符串资源 `labelRes`。 */
+/**
+ * 注射 / 用药后不良反应程度。v1.2.5（i18n）：文案改为字符串资源 `labelRes`。
+ *
+ * v1.2.10（审查 §6.4）：补 [fromKey]，并让所有写入点统一用 [NONE].name（大写）。
+ * 缺陷是两种拼写都真实落库过：`TodayViewModel.checkIn` 的形参默认值写的是小写 `"none"`，
+ * 而 `MedicationRepository.checkIn` 的默认值是 `Reaction.NONE.name`（`"NONE"`）——补记路径走后者。
+ * 今天没有任何界面渲染这一列，所以没有用户可见后果；但等哪天要按它分支（例如"有不良反应"提示）
+ * 时，`"none"` 与 `"NONE"` 会被当成两个不同的值。枚举 key 以 name 存库是本项目的数据格式，
+ * 故**不改历史行**：靠 [fromKey] 的大小写不敏感匹配兼底（与 [SkipReason.fromKey] 同款）。
+ */
 enum class Reaction(@StringRes val labelRes: Int) {
     NONE(R.string.enum_reaction_none),
     MILD(R.string.enum_reaction_mild),
     MODERATE(R.string.enum_reaction_moderate),
-    SEVERE(R.string.enum_reaction_severe),
+    SEVERE(R.string.enum_reaction_severe);
+
+    companion object {
+        /** 按存库值取枚举，**未知值返回 null**（不猜一个程度——猜错等于替用户报了不良反应）。 */
+        fun fromKey(k: String?): Reaction? = entries.firstOrNull { it.name.equals(k, true) }
+    }
 }
 
 /**
@@ -314,8 +368,14 @@ data class CheckupAttachment(
  * v1.2.5（i18n）：`label` → `labelRes`、`warning` → `noteRes`（可空的咨询性提示文案）。
  * `noteRes` **保持可空**：「这条原因有没有提示」是业务事实（判读逻辑见 domain/StopWarning），
  * 不能为统一类型塞一个占位资源进去。
+ *
+ * v1.2.10（审查 §6.7）：`reason` 一列按实体注释只应存**本枚举的小写名**，而
+ * `MedicationRepository.postponeInjection` 曾直接写字面量 `"postpone"`——那个 key 不在
+ * 枚举里，`fromKey` 会静默兜底成 `OTHER`（"顺延" 被读成 "其他"）。修法是补一个
+ * [POSTPONE] 成员，与 `MedFrequency.Q8H` 的 `hidden` 同款口径：**枚举项保留、但不可选**。
+ * 落库 key 仍是 `"postpone"`（`name.lowercase()`），与历史行逐字相同，因此不需要数据迁移。
  */
-enum class StopReason(@StringRes val labelRes: Int, @StringRes val noteRes: Int?) {
+enum class StopReason(@StringRes val labelRes: Int, @StringRes val noteRes: Int?, val hidden: Boolean = false) {
     DOCTOR_SCHEDULED(R.string.enum_stop_reason_doctor_scheduled, null),
     DOCTOR_ADJUST(R.string.enum_stop_reason_doctor_adjust, null),
     SELF_STOPPED(R.string.enum_stop_reason_self_stopped, R.string.enum_stop_reason_self_stopped_note),
@@ -325,10 +385,21 @@ enum class StopReason(@StringRes val labelRes: Int, @StringRes val noteRes: Int?
     INFECTION(R.string.enum_stop_reason_infection, R.string.enum_stop_reason_infection_note),
     SURGERY(R.string.enum_stop_reason_surgery, R.string.enum_stop_reason_surgery_note),
     FINANCIAL(R.string.enum_stop_reason_financial, R.string.enum_stop_reason_financial_note),
-    OTHER(R.string.enum_stop_reason_other, null);
+    OTHER(R.string.enum_stop_reason_other, null),
+    // v1.2.10（审查 §6.7）：注射顺延的台账 key。**不可选**（`hidden = true`）——它描述的
+    // 不是「停药原因」，而是 `change_type = 'schedule_change'` 行的类别；若进了停药弹层的
+    // 单选列表，患者能把「顺延」当成停药原因提交（见 ui/me/MedsScreen.kt 的 pickable 过滤）。
+    POSTPONE(R.string.enum_stop_reason_postpone, null, hidden = true);
 
     companion object {
         fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: OTHER
+
+        /**
+         * 供 UI 单选列表使用的子集：`hidden` 成员不出现在列表里，但**枚举项必须保留**
+         * ——历史数据里已落库的 key（`"postpone"`）仍要能解析出正确原因，删掉枚举项会让
+         * `fromKey` 退回 `OTHER`，把「顺延」静默读成「其他」。口径与 `MedFrequency.hidden` 一致。
+         */
+        fun pickable(): List<StopReason> = entries.filter { !it.hidden }
     }
 }
 
@@ -452,7 +523,16 @@ data class FlareEvent(
     @ColumnInfo(name = "notes") val notes: String? = null,
 )
 
-/** M4 运动打卡（exercise_logs）。exc_id 弱引用 kb_entries(exercise)；R21 次日反馈字段组。v1.2.5（i18n）：`label` → `labelRes`。 */
+/**
+ * M4 运动打卡（exercise_logs）。exc_id 弱引用 kb_entries(exercise)；R21 次日反馈字段组。v1.2.5（i18n）：`label` → `labelRes`。
+ *
+ * ⚠️ **当前零引用（预留）**——v1.2.10 审查裁决项 6 的结论是**保留不删**。
+ * 实际落库的是 `ExerciseLog.fbPainChange` / `fbStiffnessChange` 两个 `String?` 列（`"better"` /
+ * `"same"` / `"worse"`）；**今天全仓没有任何读取方按这三态分支**（`exc-010` 的"worse → 建议减量"
+ * 判读还没接上）。这个枚举是那套判读的文案来源，删了它就得在接上的那天重新造一遍。
+ *
+ * 与 [CheckStatus] 同属"取值域枚举、零引用但保留"的一类，理由见那里的 KDoc。
+ */
 enum class FeedbackChange(@StringRes val labelRes: Int) {
     BETTER(R.string.enum_feedback_change_better),
     SAME(R.string.enum_feedback_change_same),
@@ -471,7 +551,8 @@ data class ExerciseLog(
     @ColumnInfo(name = "grade") val grade: String? = null, // L1 / L2 / L3 快照
     @ColumnInfo(name = "duration_min") val durationMin: Int? = null,
     @ColumnInfo(name = "intensity") val intensity: String? = null, // low / moderate / high
-    @ColumnInfo(name = "status") val status: String = "done", // done / partial / skipped
+    // done / partial / skipped；判据见 domain/ExerciseLogStatus（v1.2.10 审查 §6.5 起不再在各处重写）
+    @ColumnInfo(name = "status") val status: String = "done",
     @ColumnInfo(name = "reason") val reason: String? = null, // skipped / partial 必填
     /** R21 次日反馈：运动后疼痛 / 晨僵变化（exc-010 判读：worse → 建议减量） */
     @ColumnInfo(name = "fb_pain_change") val fbPainChange: String? = null, // better / same / worse
@@ -786,7 +867,21 @@ enum class EmergencyScene(@StringRes val labelRes: Int, val kbId: String) {
     FALL_FRACTURE(R.string.enum_emergency_scene_fall_fracture, "emr-003"),
     CAUDA_EQUINA(R.string.enum_emergency_scene_cauda_equina, "emr-004"),
     STEROID_ADRENAL(R.string.enum_emergency_scene_steroid_adrenal, "emr-005");
-    companion object { fun fromKey(k: String?) = entries.firstOrNull { it.name.equals(k, true) } ?: INFECTION_FEVER }
+    companion object {
+        /**
+         * 兼容入口：无法识别时退回 [INFECTION_FEVER]。
+         *
+         * ⚠️ **null 与「无法识别」语义不同**，必须用 [fromKeyOrNull] 区分（v1.2.10 审查 §6.9）：
+         * `null` 的意思是「用户还没选」（新增事件），退回感染发热与新增时的默认档一致，是对的；
+         * 但一个**读不出来的脏值**退回感染发热之后，[com.ashkb.app.ui.emergency.EventDraft.toEvent]
+         * 的 `scene = scene.name` 会把它**就地改写成 "INFECTION_FEVER" 落库**——
+         * 用户只是打开一条旧记录看了看再保存，原始的「卡马西平过敏」之类信息就永久没了，全程零提示。
+         */
+        fun fromKey(k: String?) = fromKeyOrNull(k) ?: INFECTION_FEVER
+
+        /** 无法识别时返回 null（含 null / 空串），调用方据此把脏值区分于「未填」。 */
+        fun fromKeyOrNull(k: String?): EmergencyScene? = entries.firstOrNull { it.name.equals(k, true) }
+    }
 }
 
 @Entity(tableName = "emergency_events", indices = [Index("date"), Index("scene")])

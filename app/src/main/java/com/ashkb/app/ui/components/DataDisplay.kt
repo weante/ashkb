@@ -39,8 +39,22 @@ private val Trend.icon: ImageVector?
     }
 
 /**
- * 指标格：数值 + 单位 + 语义色调 + 趋势箭头。
+ * 指标格：标签 + 数值 + 单位 + 语义色调 + 趋势箭头 + 增量文字。
  * 数值一律等宽（`DataXxx`），避免刷新时字宽跳动。
+ *
+ * ## UI 2.0 批次 D「换图」：增量三件套（设计稿 §5.8）
+ *
+ * 设计稿把指标卡写成 `.lb`（12sp 标签）+ `.vl`（26px 数据 tnum）+ `.dl`（增量行），
+ * 并规定增量方向着色遵循**医学语义**而非涨跌语义——症状均值下降标绿（好转），
+ * 血压升高仍标红。所以 `deltaTone` 由调用方决定，**不**从 `trend` 的方向推导：
+ * 「涨/跌」是数学方向，「好转/恶化」是临床判断，两者经常相反。
+ *
+ * 两点有意保留的偏差：
+ * 1. **不加卡片描边/底色**。设计稿 demo 的 `.stat` 自带 `border 1px + radius 16`，
+ *    但本 App 的指标格一律嵌在 `SectionCard` 面板里（批次 C 3.1 已把 SectionCard
+ *    定为全 App 唯一的卡片形态），再套一层描边就成了「卡中卡」。
+ * 2. `delta` 为 null 时，箭头仍按老行为画在数值右侧；一旦给了 `delta`，
+ *    箭头就下移到增量行——设计稿的箭头本来就在 `.dl` 上，不重复编码。
  */
 @Composable
 fun StatTile(
@@ -49,9 +63,12 @@ fun StatTile(
     unit: String? = null,
     tone: StatusTone = StatusTone.Neutral,
     trend: Trend = Trend.None,
+    delta: String? = null,
+    deltaTone: StatusTone = StatusTone.Neutral,
     onClick: (() -> Unit)? = null,
 ) {
     val valueColor = if (tone == StatusTone.Neutral) MaterialTheme.colorScheme.onSurface else tone.accent()
+    val deltaColor = if (deltaTone == StatusTone.Neutral) MaterialTheme.colorScheme.onSurfaceVariant else deltaTone.accent()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -62,7 +79,7 @@ fun StatTile(
     ) {
         Text(
             label,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
@@ -75,7 +92,8 @@ fun StatTile(
                     modifier = Modifier.padding(bottom = Spacing.xs),
                 )
             }
-            trend.icon?.let {
+            // delta 在场时箭头归增量行，避免同一件事编码两次
+            if (delta == null) trend.icon?.let {
                 Icon(
                     imageVector = it,
                     contentDescription = null,   // 装饰性：数值本身已承载信息
@@ -83,6 +101,23 @@ fun StatTile(
                         .padding(bottom = Spacing.xs)
                         .size(Size.iconSm),
                     tint = valueColor,
+                )
+            }
+        }
+        if (delta != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                trend.icon?.let {
+                    Icon(
+                        imageVector = it,
+                        contentDescription = null,
+                        modifier = Modifier.size(Size.iconSm),
+                        tint = deltaColor,
+                    )
+                }
+                Text(
+                    delta,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = deltaColor,
                 )
             }
         }

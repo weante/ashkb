@@ -1,8 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  v1.2.10（UI 2.0 批次 D 验收发现的缺陷修复）：
+  ① parent 从 `android:Theme.Material.Light.NoActionBar` 改为深色版 ——
+     原先是"深色主题挂浅色 parent"，窗口背景、系统栏图标基准、系统绘制部件
+     全部按浅色走；`windowLightStatusBar=false` 只是打了单个补丁。
+  ② `android:windowBackground` 钉到 `backgroundDark` (0xFF0C1218)。
+  两项必须同时做：只改 parent 不钉 windowBackground，会退回到 Material 深色
+  默认底（#303030 系），与设计稿的深墨 #0C1218 不是一回事。
+  见 values/colors.xml 的完整说明。
+-->
 <resources>
-    <style name="Theme.Ashkb" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.Ashkb" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ashkb_window_background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 </resources>

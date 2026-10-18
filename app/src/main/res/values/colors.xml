@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v1.2.10（UI 2.0 批次 D「换图」验收中发现的缺陷修复）：
+  App 从未真正绘制过页面底色 —— `Scaffold(containerColor = Color.Transparent)`
+  （v1.1.6 为消掉手势区那条横带而定的）之后，页面背景**由窗口背景兜底**，
+  而 `Theme.Ashkb` 的 parent 是 `android:Theme.Material.Light.NoActionBar`，
+  它的 `android:windowBackground` = `background_material_light` = #FAFAFA。
+
+  浅色下 #FAFAFA 与设计稿的冷调瓷白 #F3F6F8 极接近，所以一直没人发现；
+  深色下卡片变深、页面底仍是 #FAFAFA，于是每张卡周围都出现白边（§06 帧②抓到）。
+
+  这里把窗口背景显式钉到设计稿的「bg 瓷白」值，与 `ui/theme/Color.kt` 的
+  `backgroundLight` / `backgroundDark` 一致（值改动必须两处同步，
+  `WindowBackgroundParityTest` 会断言这一点）。
+
+  ⚠️ 为什么改 XML 而不在 Compose 里包一层 Surface：
+  `ui/theme/Theme.kt` 在 UI 2.0 交接文档 §5「明确不改」清单里
+  （`ui/theme/{Tone,Semantics,Theme}.kt`），`ui/AppShell.kt` 又有 L2/L3 的
+  early return、加背景层要动结构；窗口背景是同一效果的零结构改动方案。
+-->
+<resources>
+    <color name="ashkb_window_background">#FFF3F6F8</color>
+</resources>

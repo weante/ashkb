@@ -34,6 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -54,6 +55,15 @@ import com.ashkb.app.ui.theme.colors
  * 原实现把高度钉死在 28dp，而 labelMedium 的行高是 18sp——提示类文案一旦换到第二行
  * （化验页「同一项目有多个单位…」就是），第二行直接被裁掉。改下限后：单行 chip 高度分毫不变
  * （内容 18dp + 上下 [Spacing.xs] 内边距 = 26dp，仍由 28dp 下限决定），多行则按内容长高。
+ *
+ * v1.2.10（UI 2.0 批次 C「换件」）：前导矢量图标改为 **6dp 状态点**（[Size.statusDot]）。
+ *
+ * 为什么换成点：同一屏里胶囊经常连着出现四五个（今日页一张卡就有「已服 / 已漏服 / 部分完成」），
+ * 每个都带一枚 18dp 图标时，"图标"这层编码反而互相打架、把文字挤窄；换成点之后
+ * **三重编码仍然成立**（底色 + 点 + 文字），而点的面积只有图标的 1/9，文字拿到更多宽。
+ *
+ * 兼容：[icon] 形参**保留**（调用点 50 处，其中紧急/化验几处确实需要语义图标），
+ * 传了就仍按图标渲染；不传（绝大多数调用点）走状态点。
  */
 @Composable
 fun StatusChip(
@@ -78,6 +88,14 @@ fun StatusChip(
         ) {
             if (icon != null) {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(Size.iconSm), tint = fg)
+            } else {
+                // 状态点：与胶囊同色系但用前景色，保证"底色浅、点深"的对比
+                Box(
+                    Modifier
+                        .size(Size.statusDot)
+                        .clip(CircleShape)
+                        .background(fg),
+                )
             }
             Text(text, style = MaterialTheme.typography.labelMedium, color = fg)
         }
@@ -136,6 +154,11 @@ fun WeightedTrailingRow(
  * 告警横幅：今日页告警必须成为视觉主角。
  * 左侧 4dp 色条 + 大图标 + 标题/正文 + 可选动作与关闭。
  * 紧急卡等"反向设计"场景用 `titleStyle = titleLarge` 把标题放大。
+ *
+ * ⚠️ 容器永不透明、永不毛玻璃——见 ui/theme/Color.kt 的 `Glass` 注释。
+ * 半透明会让对比度随背后内容浮动，而医学警告不能"看背景运气"；本组件是安全类
+ * 信息的唯一容器，故底色一律取 `tone.colors()` 给出的实心色，任何"顺手调淡一点"
+ * 的改动都不允许。
  */
 @Composable
 fun AlertBanner(

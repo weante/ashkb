@@ -288,37 +288,65 @@ class ExerciseEngineTest {
     }
 
     // ======================= R21 反馈判读（exc-010） =======================
+    //
+    // v1.2.10（用户 2026-10-13）：这五条文案原本把内部规则编号（exc-010）和矩阵档位代号（L1）
+    // 直接印给患者看，判读依据是给医生/维护者看的，患者看不懂也不需要。断言因此改为锁定
+    // **行为含义**（会不会建议减量、按什么顺序加量），不再锁定具体措辞里有没有某个编号。
+    // 编号不得外泄由 [R21 反馈判读文案不向患者印内部规则编号] 单独把关。
 
     @Test
     fun `疼痛加重且符合肌肉酸痛 观察不加量`() {
         val msg = ctx.getString(ExerciseEngine.interpretFeedback("worse", null, true))
-        assertTrue(msg.contains("延迟性酸痛"))
-        assertFalse(msg.contains("减量"))
+        assertTrue(msg.contains("酸痛"))
+        // 肌肉酸痛不该被读成"炎症加重"——这条分支的前提就是不建议减量。
+        assertFalse(msg.contains("减"))
     }
 
     @Test
-    fun `疼痛加重非肌肉酸痛 建议减量 20 percent`() {
+    fun `疼痛加重非肌肉酸痛 建议下次收一收`() {
         val msg = ctx.getString(ExerciseEngine.interpretFeedback("worse", null, false))
-        assertTrue(msg.contains("减量"))
-        assertTrue(msg.contains("20%"))
+        assertTrue(msg.contains("加重"))
+        assertTrue(msg.contains("下次"))
     }
 
     @Test
-    fun `晨僵加重提示炎症活动降 L1`() {
+    fun `晨僵加重提示炎症活动保持最轻一档`() {
         val msg = ctx.getString(ExerciseEngine.interpretFeedback(null, "worse", false))
-        assertTrue(msg.contains("晨僵"))
-        assertTrue(msg.contains("L1"))
+        assertTrue(msg.contains("僵硬"))
+        assertTrue(msg.contains("炎症"))
     }
 
     @Test
-    fun `反馈良好按进展原则加量`() {
+    fun `反馈良好按顺序加量`() {
         val msg = ctx.getString(ExerciseEngine.interpretFeedback("better", null, null))
-        assertTrue(msg.contains("加量"))
+        assertTrue(msg.contains("加"))
+        assertTrue(msg.indexOf("时间") < msg.indexOf("难度"))
     }
 
     @Test
     fun `反馈平稳维持当前量`() {
         val msg = ctx.getString(ExerciseEngine.interpretFeedback(null, null, null))
-        assertTrue(msg.contains("维持"))
+        assertTrue(msg.contains("保持"))
+    }
+
+    /**
+     * 内部规则编号与档位代号属于**判读依据**，不是给患者看的内容。
+     *
+     * 用户 2026-10-13 明确要求把这条改掉——原句「按「运动后 2 小时疼痛规则」建议下次减量：
+     * 时长 −20% 或强度降一档（exc-010）」读起来像从设计文档里抄出来的。这类编号一旦漏回文案，
+     * 患者会以为自己需要知道一条自己查不到、也不该去查的规则。
+     */
+    @Test
+    fun `R21 反馈判读文案不向患者印内部规则编号`() {
+        listOf(
+            Triple("worse", null, true), Triple("worse", null, false),
+            Triple(null, "worse", false), Triple("better", null, null),
+            Triple(null, null, null),
+        ).forEach { (pain, stiffness, soreness) ->
+            val msg = ctx.getString(ExerciseEngine.interpretFeedback(pain, stiffness, soreness))
+            // exc-010 这类条目编号、R21/R27 这类规则编号、以及 L1/L2/L3 档位代号。
+            assertFalse("判读文案泄露了内部编号: $msg", Regex("""(exc-\d+|R\d\d)""").containsMatchIn(msg))
+            assertFalse("判读文案内印了档位代号: $msg", Regex("""\bL[123]\b""").containsMatchIn(msg))
+        }
     }
 }

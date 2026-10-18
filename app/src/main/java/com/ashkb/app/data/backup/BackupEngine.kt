@@ -65,6 +65,73 @@ object BackupEngine {
     fun sha256Hex(data: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(data).joinToString("") { "%02x".format(it) }
 
+    /**
+     * v1.2.10（审查 CRITICAL-2）：**本机恢复文件一次读入的上限**。
+     *
+     * 为什么不是 WebDAV 那个 6 MiB：两个上限服务的对象不同。
+     *  · [WebDavClient.BINARY_RESPONSE_LIMIT]（6 MiB）守的是**服务器响应**——远端那份文件是不是
+     *    本应用写的、有没有被换掉，客户端无从预知，所以只能卡在本应用自己导出的正常量级上；
+     *  · 本常量守的是**用户在本机文件选择器里挑中的那份**，它按构造就是本应用的导出物
+     *    （`ashkb-YYYYMMDD.ashkb`）。维护者已明确否决把 6 MiB 当作本机上限
+     *    （User said：「4的本地备份体积上限不能只是6m，太少了」）。
+     *
+     * 附件**不在**这个数里：`checkup_attachments` 只存 `remote_path` 等元数据，图片本体在
+     * 应用私有目录 / WebDAV 上，全库 JSON 导出不含附件字节。所以这个 64 MiB 是「防病态输入」
+     * 的兜底，而不是给正常数据划的线——正常全库导出在个位数 MB。
+     *
+     * 真要大备份：这是**防止把几百 MB 随手读进内存**的守卫，不是产品策略。数值一句话可调。
+     */
+    /** 1 MiB。与 [WebDavClient.BYTES_PER_MB] 同值同义（两个类各自持有，避免跨对象耦合）。 */
+    private const val BYTES_PER_MIB: Long = 1024L * 1024L
+
+    const val PICK_LIMIT_BYTES: Long = 64L * BYTES_PER_MIB
+
+    /** 选中的文件是否在可读入范围内（纯函数，恰好等于上限视为通过）。 */
+    fun withinPickLimit(sizeBytes: Long): Boolean = sizeBytes <= PICK_LIMIT_BYTES
+
+    /** MiB 取整，只用于文案；与本文件其它地方一样不引入浮点。 */
+    fun sizeMb(bytes: Long): Long = bytes / BYTES_PER_MIB
+
+    private const val READ_BUFFER_BYTES = 8 * 1024
+
+    /**
+     * v1.2.10（审查 CRITICAL-2）：**有上限地**读入一个流，超限整体拒绝、绝不返回半份数据。
+     *
+     * 与 [WebDavClient.readBounded] 的关系：那边守服务器响应、异常类型是 `DavResponseTooLargeException`；
+     * 这里守用户在本机选择器里挑中的文件，异常走 [BackupException] 带 `resId`，于是 UI 侧
+     * 复用既有的 `errText` 就能把上限数字报给用户。两处都刻意"先看声明长度、再逐块累计"：
+     * 前者能在读到第一个字节前就拒绝（省掉一次 64 MiB 的无用搬运），后者兜住
+     * `available()` 撒谎的流（网盘、SAF provider 都可能）。
+     *
+     * 为什么宁可抛异常也不截断：半个备份的 JSON 必然解析失败，还会把"文件坏了"和
+     * "超了上限"两种完全不同的排查方向混在一起——与 [WebDavClient] 那条
+     * 「半个备份比没有备份更危险」同源。
+     *
+     * @param displayName 只用于文案（用户要能认出是哪个文件被拒）
+     */
+    fun readBounded(stream: java.io.InputStream, maxBytes: Long, displayName: String): ByteArray {
+        val oversize = { actual: Long ->
+            BackupException(
+                "文件超过本机读入上限：$displayName $actual > $maxBytes",
+                resId = R.string.backup_file_too_large,
+                resArgs = listOf(displayName, sizeMb(actual), sizeMb(maxBytes)),
+            )
+        }
+        return stream.use { input ->
+            val declared = runCatching { input.available().toLong() }.getOrNull()
+            if (declared != null && declared > maxBytes) throw oversize(declared)
+            val out = java.io.ByteArrayOutputStream()
+            val buf = ByteArray(READ_BUFFER_BYTES)
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                out.write(buf, 0, n)
+                if (out.size() > maxBytes) throw oversize(out.size().toLong())
+            }
+            out.toByteArray()
+        }
+    }
+
     // ======================= 导出 =======================
 
     data class ExportResult(val payload: String, val rowTotal: Int, val tableCount: Int)

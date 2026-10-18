@@ -34,6 +34,7 @@ class EmergencyLockscreenTest {
     private fun summarizeMeds(meds: List<Medication>, today: String) = EmergencyMeds.summarize(
         meds, today,
         freqLabel = { ctx.getString(it.plainRes) },
+        unknownFreqLabel = { ctx.getString(R.string.ui_emergency_meds_unknown_freq, it) },
         injCycleLabel = { ctx.getString(R.string.ui_emergency_meds_inj_cycle, it) },
         brandParen = { ctx.getString(R.string.ui_brand_paren, it) },
     )

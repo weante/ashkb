@@ -4,7 +4,9 @@ import android.content.Context
 import com.ashkb.app.data.entity.MedicationLog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -72,7 +74,67 @@ class AdherenceTest {
         assertEquals(100, AdherenceCalc.ratePct(done = 7, partial = 0, total = 7))
     }
 
-    /** 与收拢前的内联公式逐例对齐（`((done + partial*0.5) / total * 100).toInt()`） */
+    /**
+     * v1.2.10（审查 L1）：**整数式与数学真值逐例一致**，穷举 `d,p ≤ 80 / t ≤ 120`。
+     *
+     * 旧实现 `((d + p*0.5) / t * 100).toInt()` 把式子拖进 double，除不尽的值在二进制里没有精确表示：
+     * `d=4 / p=21 / t=25` 的数学结果是 58，double 算出 `57.99999999999999` → 截断成 **57**。
+     * 本次穷举出 67 组不一致（临床 70/90 两档恰好都没踩到，所以症状只是「偶尔差 1 个百分点」）。
+     *
+     * 真值按**有理数**算：`(d*2 + p) * 100 / (t*2)` 的整数除法即 floor，与数学 floor 同向。
+     */
+    @Test
+    fun `整数式与数学真值穷举一致`() {
+        // 三重循环 + 条件判断会踩 detekt NestedBlockDepth（阈值 3），所以真值比对抽到
+        // 下面的 checkEnumeration 里，把「遍历」与「断言」分开——遍历本身不需要嵌套两层以上。
+        val checked = checkEnumeration()
+        assertTrue("穷举至少要跑几万组", checked > 10000)
+    }
+
+    /**
+     * 穷举 `d,p ≤ 80 / t ≤ 120`，逐例与有理数真值比对，返回比对过的组数。
+     *
+     * 拆成三层普通函数（都不是 test）只为压住嵌套深度：detekt 的 `NestedBlockDepth` 数的是
+     * 「块套块」，三层 `for` 加一次 `if` 就超阈值。本项目的规定是新问题必须在代码里修、
+     * 绝不进基线，所以这里用函数调用代替缩进。
+     */
+    private fun checkEnumeration(): Int {
+        var checked = 0
+        for (t in 1..120) {
+            checked += checkOneTotal(t)
+        }
+        return checked
+    }
+
+    /** 固定分母 `t`，遍历所有 `d/p`。 */
+    private fun checkOneTotal(t: Int): Int {
+        var checked = 0
+        for (d in 0..80) {
+            for (p in 0..80) {
+                checked += checkOneCase(t, d, p)
+            }
+        }
+        return checked
+    }
+
+    /** 单例比对：`d + p > t` 的组合不算一组。 */
+    private fun checkOneCase(t: Int, d: Int, p: Int): Int {
+        if (d + p > t) return 0
+        // 真值：分子 = 2d + p，分母 = 2t，百分比 = 分子*100/分母（向下取整）
+        val expected = (d * 2 + p) * 100 / (t * 2)
+        assertEquals("done=$d partial=$p total=$t", expected, AdherenceCalc.ratePct(d, p, t))
+        return 1
+    }
+
+    /** L1 的点名反例：`4/21/25` 必须是 58，旧浮点式给 57。 */
+    @Test
+    fun `依从率不再因浮点误差少一个百分点`() {
+        assertEquals(58, AdherenceCalc.ratePct(done = 4, partial = 21, total = 25))
+        // 旧实现会给出 57
+        assertNotEquals(57, AdherenceCalc.ratePct(done = 4, partial = 21, total = 25))
+    }
+
+    /** 与收拢前的内联公式在「算得准」的输入上逐个相等（这些例子旧浮点式也未失真）。 */
     @Test
     fun `matches the previous inline formula`() {
         val cases = listOf(

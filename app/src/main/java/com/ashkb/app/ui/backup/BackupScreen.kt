@@ -1,6 +1,6 @@
 package com.ashkb.app.ui.backup
 
-import android.content.Intent
+import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,16 +38,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +63,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 import com.ashkb.app.R
 import com.ashkb.app.data.backup.BackupEngine
@@ -76,6 +81,7 @@ import com.ashkb.app.ui.components.LoadingBlock
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.components.SecureWindow
 import com.ashkb.app.ui.components.SectionCard
+import com.ashkb.app.ui.components.shareOrReport
 import com.ashkb.app.ui.theme.Clinical
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
@@ -100,7 +106,7 @@ private fun SecretField(
     supportingText: (@Composable () -> Unit)? = null,
 ) {
     var revealed by remember { mutableStateOf(false) }
-    OutlinedTextField(
+    AshkbTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
@@ -159,6 +165,9 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
     val davPicked by vm.davPicked.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
+    // v1.2.10（审查 CRITICAL-2）：两个文件选择器的回调都在**主线程**上，而读入是纯 IO。
+    // 挪进这个 scope 后主线程只做状态赋值；上限与超限文案统一由 BackupEngine 提供。
+    val pickScope = rememberCoroutineScope()
 
     // 选好的待恢复备份：本机文件选择与 WebDAV 下载两条来源都写它，恢复区只读
     var pickedBytes by remember { mutableStateOf<ByteArray?>(null) }
@@ -170,12 +179,38 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            runCatching {
-                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            }.getOrNull()?.let { bytes ->
-                pickedBytes = bytes
-                pickedName = queryName(context, uri)
-                vm.cancelRestore()
+            val name = queryName(context, uri) ?: "backup"
+            // 先看清体积：SAF 能报出大小时连读都不读（一份 200 MB 的文件没必要先搬进内存再后悔）。
+            // 报不出大小（provider 不提供该列，返回 -1）时才落到 readBounded 的逐块累计兜底。
+            val declaredSize = querySize(context, uri)
+            if (declaredSize != null && !BackupEngine.withinPickLimit(declaredSize)) {
+                GlobalMessages.post(
+                    context.getString(
+                        R.string.backup_file_too_large,
+                        name,
+                        declaredSize / (1024L * 1024L),
+                        BackupEngine.PICK_LIMIT_BYTES / (1024L * 1024L),
+                    )
+                )
+            } else {
+                pickScope.launch {
+                    val bytes = withContext(Dispatchers.IO) {
+                        runCatching {
+                            context.contentResolver.openInputStream(uri)?.let {
+                                BackupEngine.readBounded(it, BackupEngine.PICK_LIMIT_BYTES, name)
+                            }
+                        }.getOrNull()
+                    }
+                    if (bytes == null) {
+                        // v1.2.10：以前是 `runCatching{}.getOrNull()` 之后静默什么都不做——
+                        // 用户点了文件、界面毫无反应，分不清"没选中"和"读失败"。
+                        GlobalMessages.post(context.getString(R.string.backup_pick_read_failed))
+                    } else {
+                        pickedBytes = bytes
+                        pickedName = name
+                        vm.cancelRestore()
+                    }
+                }
             }
         }
     }
@@ -183,9 +218,33 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            runCatching {
-                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            }.getOrNull()?.let { vm.importProfileJson(it) }
+            val name = queryName(context, uri) ?: "profile.json"
+            val declaredSize = querySize(context, uri)
+            if (declaredSize != null && !BackupEngine.withinPickLimit(declaredSize)) {
+                GlobalMessages.post(
+                    context.getString(
+                        R.string.backup_file_too_large,
+                        name,
+                        declaredSize / (1024L * 1024L),
+                        BackupEngine.PICK_LIMIT_BYTES / (1024L * 1024L),
+                    )
+                )
+            } else {
+                pickScope.launch {
+                    val bytes = withContext(Dispatchers.IO) {
+                        runCatching {
+                            context.contentResolver.openInputStream(uri)?.let {
+                                BackupEngine.readBounded(it, BackupEngine.PICK_LIMIT_BYTES, name)
+                            }
+                        }.getOrNull()
+                    }
+                    if (bytes == null) {
+                        GlobalMessages.post(context.getString(R.string.backup_pick_read_failed))
+                    } else {
+                        vm.importProfileJson(bytes)
+                    }
+                }
+            }
         }
     }
 
@@ -212,6 +271,18 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
     // 留在根级是因为它是**页面进入**这一事件（不是渲染状态）；LaunchedEffect(Unit) 不读状态，
     // 所以放在根部零重组代价。
     LaunchedEffect(Unit) { vm.refreshAttachStats() }
+
+    // v1.2.10（审查 HIGH-3）：**离开本页就把密文丢掉**。此前 `pickedBytes` 是个纯 `remember`，
+    // 全文件没有一处把它置空——它活的是 NavBackStackEntry 的生命周期，而不是"这屏可见"的时间：
+    // 用户选完备份、看一眼、返回主界面，几 MiB 的密文仍挂在内存里，直到该条目被回收。
+    // 密文本身泄露不了内容（VaultCipher 加密），但没有任何理由让它多留一秒。
+    // 副作用是"回到本页要重新选文件"——正确的代价：恢复本来就必须重新输口令。
+    DisposableEffect(Unit) {
+        onDispose {
+            pickedBytes = null
+            pickedName = null
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         ScreenTopBar(title = stringResource(R.string.me_backup_section), onBack = onBack)
@@ -281,11 +352,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     OutlinedButton(
                         onClick = {
-                            vm.exportProfileJson { intent ->
-                                runCatching {
-                                    context.startActivity(Intent.createChooser(intent, shareTitle))
-                                }
-                            }
+                            vm.exportProfileJson { intent -> shareOrReport(context, intent, shareTitle) }
                         },
                         enabled = !busy,
                     ) { Text(stringResource(R.string.backup_export_profile)) }
@@ -474,11 +541,9 @@ private fun LocalBackupSection(vm: BackupViewModel, busy: Boolean) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Button(
                 onClick = {
-                    vm.backupLocal(backupPass) { intent ->
-                        runCatching {
-                            context.startActivity(Intent.createChooser(intent, shareTitle))
-                        }
-                    }
+                    // v1.2.10（审查第二批 M5）：以前这里是 `runCatching { startActivity(…) }` 且
+                    // **没有 onFailure**——分享面板起不来时用户只会觉得"生成了但什么都没发生"。
+                    vm.backupLocal(backupPass) { intent -> shareOrReport(context, intent, shareTitle) }
                 },
                 enabled = !busy && backupPass.length >= 6,
                 modifier = Modifier.heightIn(min = Size.touchMin),
@@ -997,6 +1062,12 @@ private fun DavBackupPickerSheet(vm: BackupViewModel, busy: Boolean, onDismiss: 
         Column(
             Modifier
                 .fillMaxWidth()
+                // v1.2.10（审查第二批 M7）：**这行 `verticalScroll` 是修 bug，不是修饰**。
+                // 服务端列表上限是 `WebDavClient.TEXT_RESPONSE_LIMIT`（1 MiB），条目多起来时
+                // 这个 Column 会长过屏幕；没有滚动容器，`ModalBottomSheet` 只会把溢出部分**裁掉**
+                // ——排在后面的备份不是"需要滚一下"，而是**根本看不到也点不到**。
+                // 与 `ui/checkup/CheckupLabImaging.kt` 的 `SheetColumn` 同一惯例。
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.lg)
                 .padding(bottom = Spacing.xl),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -1088,13 +1159,13 @@ private fun WebDavSheet(vm: BackupViewModel, onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             Text(stringResource(R.string.backup_dav_config_title), style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(
+            AshkbTextField(
                 value = davUrl, onValueChange = { davUrl = it },
                 label = { Text(stringResource(R.string.backup_dav_url_field)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-            OutlinedTextField(
+            AshkbTextField(
                 value = davUser, onValueChange = { davUser = it },
                 label = { Text(stringResource(R.string.backup_dav_username_field)) }, modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -1126,5 +1197,20 @@ private fun queryName(context: android.content.Context, uri: Uri): String? = run
     context.contentResolver.query(uri, null, null, null, null)?.use { c ->
         val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
         if (idx >= 0 && c.moveToFirst()) c.getString(idx) else uri.lastPathSegment
+    }
+}.getOrNull()
+
+/**
+ * v1.2.10（审查 CRITICAL-2）：先问清体积，再决定要不要读。
+ *
+ * 返回 null 表示**问不出来**（provider 不提供 [OpenableColumns.SIZE]，或该列是
+ * `Cursor.getLong` 在空值上给的 0/-1）。这时不能当"零字节"放过，也不能当超限拒绝，
+ * 只能交给 [BackupEngine.readBounded] 的逐块累计兜底——两条路都通，只是后者
+ * 多搬一次数据。
+ */
+private fun querySize(context: Context, uri: Uri): Long? = runCatching {
+    context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+        val idx = c.getColumnIndex(OpenableColumns.SIZE)
+        if (idx >= 0 && c.moveToFirst() && !c.isNull(idx)) c.getLong(idx).takeIf { it > 0 } else null
     }
 }.getOrNull()

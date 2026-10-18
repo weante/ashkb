@@ -101,4 +101,21 @@ class StopWarningTest {
         assertTrue(keys.containsAll(listOf("FORGOT", "OUTING", "RUN_OUT")))
         assertTrue(keys.containsAll(listOf("TOO_BUSY", "UNWELL", "HOSPITALIZED", "SIDE_EFFECT", "OTHER")))
     }
+
+    /**
+     * v1.2.10（审查 §6.7）：`reason` 列里的 `"postpone"` 必须能解析成枚举成员，而不是兜底成
+     * OTHER；同时它**不能**出现在停药弹层的单选列表里（那是「停药原因」，顺延不是）。
+     */
+    @Test
+    fun `postpone key resolves to its own member and stays out of the picker`() {
+        assertEquals(StopReason.POSTPONE, StopReason.fromKey("postpone"))
+        // 历史行是大写混写也认（fromKey 本就大小写不敏感）
+        assertEquals(StopReason.POSTPONE, StopReason.fromKey("POSTPONE"))
+        assertTrue("POSTPONE 是台账 key，不可选", StopReason.POSTPONE.hidden)
+        val pickable = StopReason.pickable()
+        assertFalse("顺延不该出现在停药原因单选里", pickable.contains(StopReason.POSTPONE))
+        assertEquals("只隐藏 POSTPONE 一项", StopReason.entries.size - 1, pickable.size)
+        // 原有兜底语义不能被这次改动带走
+        assertEquals(StopReason.OTHER, StopReason.fromKey("nope"))
+    }
 }
