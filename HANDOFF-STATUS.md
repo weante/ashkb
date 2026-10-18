@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.2.10（versionCode 122）· 2026-10-19 · 审查第二批 / 第三批 + 裁决项 3、6、7 + §6.7 + 按需用药每天一次 + UI 2.0 批次 B–E + §06 双主题验收 + 真机启动崩溃修复**，**已全部落地、门禁全绿；本批提交后推送并发布为 GitHub Latest**（Release id / 资产摘要随后回填；逐批取证见文末「批次 B」「批次 C」「批次 B–E（UI 2.0）」「真机崩溃修复」「健康 Hub「今日体征」面板 + 紧急卡 danger-soft 瓦片」「UI 2.0 §06 ④⑤ 收尾」六节）；本版把此前积压的六批改动一次合并发布，**无库结构变更**（仍 v19），可覆盖安装。上一版 **v1.2.9（versionCode 121）· 2026-10-10 · 裁决项 1、2 + 首页补剂卡**（release id `410782041`），更早 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」**（release id `408053469`）。
+> **时点快照**：截至 **v1.2.10（versionCode 122）· 2026-10-19 · 审查第二批 / 第三批 + 裁决项 3、6、7 + §6.7 + 按需用药每天一次 + UI 2.0 批次 B–E + §06 双主题验收 + 真机启动崩溃修复**，**已全部落地、门禁全绿、已推送并发布为 GitHub Latest**（release id `416558911`，资产 `ashkb-1.2.10-release.apk` 5,213,292 B；逐批取证见文末六节）；本版把此前积压的六批改动一次合并发布，**无库结构变更**（仍 v19），可覆盖安装。上一版 **v1.2.9（versionCode 121）· 2026-10-10 · 裁决项 1、2 + 首页补剂卡**（release id `410782041`），更早 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」**（release id `408053469`）。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号以 `app/build.gradle.kts` 为准（v1.2.9 起**不再把单测条数抄进文档**，见根 `build.gradle.kts` 里 `verifySpecSync` 的注释）。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -11,13 +11,13 @@
 
 | 项 | 结果 |
 |---|---|
-| 工作树 | 已推送：`5ecbf33`（v1.2.9 裁决项 1）、`6285d69`（README 审核）、`86e50df`（裁决项 2 + 首页补剂卡）、`c0ee3b1`（补剂卡「不提醒」文案）均在 `origin/main`（`9d5010d..c0ee3b1`）；附注标签 `v1.2.9` → `c0ee3b1`（远端 `refs/tags/v1.2.9^{}` 已核对）。发布记录回填（本行所在提交）随后推送 |
+| 工作树 | **干净，全部已在 `origin/main`**：v1.2.10 发布提交 `45b0435`（106 files / +7097 / −2044）；此前 `5ecbf33`（v1.2.9 裁决项 1）、`6285d69`、`86e50df`、`c0ee3b1`、`f68350b`、`b1781c8`（裁决项 3）。附注标签 `v1.2.10`（tag 对象 `0649fb2`）→ `45b0435`，`v1.2.9` → `c0ee3b1`（远端 `refs/tags/v1.2.10^{}` / `v1.2.9^{}` 均已核对）。发布记录回填（本行所在提交）随后推送 |
 | 全量单测 | **全绿，0 失败 / 0 错误 / 0 跳过**（约 102 个测试文件；**实际条数以 CI 为准，文档不记数**——v1.2.9 起如此）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
-| APK 版本 | **v1.2.10 已构建**：release 经 `aapt dump badging` 核对为 versionCode 122 / versionName 1.2.10，正式证书 `38ca80a6…d7d`（未回退 debug 签名）。上一版 v1.2.9 为 versionCode 121 / versionName 1.2.9 |
+| APK 版本 | **v1.2.10 已构建并发布**：release 经 `aapt dump badging` 核对为 versionCode 122 / versionName 1.2.10，正式证书 `38ca80a6…d7d`（未回退 debug 签名），5,213,292 B，sha256 `109909E0…0186`。上一版 v1.2.9 为 versionCode 121 / versionName 1.2.9 |
 | 审查裁决进度 | **裁决项 1、2 已落地并发布（v1.2.9）；裁决项 3 已落地（未发布）**。① 对乙酰氨基酚 `MedClass.NSAID` → 新增 `MedClass.ANALGESIC`，`DrugInteractionKeys` 的 `nsaid`/`nsaid_longterm` 摘除 acetaminophen，新增 2 条回归（`MedicationInteractionChainTest`）；②「已结算」统一到 `AdherenceCalc.SETTLED_STATUSES` 唯一口径——删掉 `MedicationRepository.doneSlotRefs`、`ReminderReceiver` 改引 `settledSlotRefs`、`TodayItem` 新增 `partial`/`isSettled`、今日页 partial 不再显示成「漏服」也不计入待办，连带按铁律重写 4 条 detekt 复杂度（不进基线）并清掉 2 条签名过期的基线条目；③ **口服不再提供「每两周」**——新增 `ui/me/MedEditSections.kt` 的 `routeVisible`（chips 按 route 过滤 + 保留当前值逃生口）、`MedEditScreen.onPrimary()` 提交拦截 + `med_route_frequency_error` 红字，**domain 层刻意不动**（`ScheduleCalc.isCycleGatedBy` 只加 KDoc），新增 10 条回归（`MedRouteFrequencyGuardTest`）。其余 5 项待裁决；其中**裁决项 6、7 与审查第二、三批（含 §6.7）已落地、门禁全绿、未发版**（见文末「批次 B」）；另按维护者指令（m00936）落地**按需用药常驻首页 + 每天只记一次**（见文末「批次 C」） |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
-| GitHub 正式版（Latest） | **v1.2.9**（2026-10-12，release id `410782041`，资产 `ashkb-1.2.9-release.apk` 5224936 B，sha256 `413f82b8…`）；上一版 **v1.2.8**（id `408053469`，5220504 B，`ece175f8…`）、**v1.2.7**（id `407916739`，5220504 B，`e09e6990…`）、**v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——五条资产摘要与本地 `Get-FileHash` **逐字节一致** |
+| GitHub 正式版（Latest） | **v1.2.10**（2026-10-19，release id `416558911`，资产 `ashkb-1.2.10-release.apk` 5213292 B，sha256 `109909e0…0186`）；上一版 **v1.2.9**（id `410782041`，5224936 B，`413f82b8…`）、**v1.2.8**（id `408053469`，5220504 B，`ece175f8…`）、**v1.2.7**（id `407916739`，5220504 B，`e09e6990…`）、**v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——六条资产摘要与本地 `Get-FileHash` **逐字节一致** |
 | GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 / v1.2.7 / v1.2.8 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |
 
 > **最关键的一句话**：真机走查（Xiaomi 15 Pro / Android 16，被测制品 = v1.0.70 发布资产，SHA-256 逐字节一致）已完成：
@@ -877,5 +877,27 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 2. **第 6 条的真机 prefs 取证**：release 包不可调试、设备亦掉线；须用 debug 包 + `run-as` 或 root 才能读到 `webdav_config` 历史键，**设备回来后补跑**。
 
 > 上述 7 条中，1 / 4 / 5 是**真机实测**，2 / 3 / 6 / 7 是**代码 + 宿主实验**。第 3、6 条的真机侧补跑不改变结论方向（宿主实验与代码已足够定性），只影响「目标 ROM 是否与宿主一致」的强度。
+
+---
+
+### v1.2.10 发布记录（2026-10-19 · 已发布为 GitHub Latest）
+
+**一次把六批积压改动合并发版**：审查第二/三批 + 裁决项 3、6、7 + §6.7、按需用药每天一次、UI 2.0 批次 B–E、§06 三块收尾（③ 体征面板 + danger-soft 瓦片、④ 稳定期胶囊、⑤ 类别徽章）、真机启动崩溃修复。**上线理由：线上 v1.2.9 带着那个间歇启动崩溃。**
+
+| 项 | 事实 |
+| --- | --- |
+| 发布提交 | `45b0435c617cd946a8eb1cb7e64ec129ee04ba41`「v1.2.10: 合并发布积压的七批改动（含真机启动崩溃修复）」——**106 files / +7097 / −2044**；`f68350b..45b0435` 已推 `origin/main` |
+| 版本 | `app/build.gradle.kts` `versionCode 122` / `versionName "1.2.10"`；`ASHKB_DB_VERSION` 仍 **19**（无库结构变更，可覆盖安装） |
+| 门禁 | `E:\ASHKB\v1210-release-gate1.log` → **BUILD SUCCESSFUL in 2m 54s**；单测 **116 文件 / 993 条**（failures=0 errors=0 skipped=0）；detekt **0**；lint **184 = 0 Error** + 176 Warning + 8 Information；`verifySpecSync` 通过 |
+| APK | `ashkb-1.2.10-release.apk` **5,213,292 B**；`aapt dump badging` = versionCode 122 / versionName 1.2.10；`apksigner verify --print-certs` = `CN=ASHKB, OU=Personal, O=weante, L=Shenzhen, ST=Guangdong, C=CN`，证书 SHA-256 `38ca80a6…d7d`（未回退 debug 签名）；`Get-FileHash -Algorithm SHA256` = `109909E04EE16320B7976E1AFC19D840FD10CD9BD040BDC54B2C18E8F1170186`，仓库根副本与 `app/build/outputs/apk/release/app-release.apk` **逐字节一致** |
+| GitHub Release | release id **`416558911`**，**Latest**，非预发布、非 draft；`target_commitish` = `45b0435`；唯一资产 `ashkb-1.2.10-release.apk`（5,213,292 B，sha256 `109909e0…0186`，`state=uploaded`） |
+| 标签 | 附注标签 `v1.2.10`（tag 对象 `0649fb2`）→ `45b0435`；远端 `refs/tags/v1.2.10` = `0649fb2`、`refs/tags/v1.2.10^{}` = `45b0435`（已核对，与 v1.2.8/v1.2.9 记账形态一致） |
+| Release notes | `E:\ASHKB\release-tooling\release-bodies\v1.2.10.md`（本版正文，五节 + 测试 + 已知范围说明） |
+
+⚠️ **本次踩到并修好的一个坑**：`gh release create --target <sha>` 建的是**轻量标签**（远端 `refs/tags/v1.2.10` 直接指向 commit），而历史版本全是**附注标签**（远端多一条 `^{}`）。已本地 `git tag -a v1.2.10 -m "…" 45b0435` 补建并 `push --force origin refs/tags/v1.2.10` 覆盖。**下次发版：先本地 `git tag -a`、`git push origin <tag>`，再 `gh release create --verify-tag` 或直接不带 `--target`。**
+
+⚠️ **网络**：直连 `github.com` 超时（20s），但 `api.github.com` 直连 200；推送与 Release 全程走系统代理 `http://127.0.0.1:7897` + `--http1.1`。一次 `ls-remote` 报 `TLS connect error: unexpected eof while reading`，**重试即成功** ⇒ 代理链路偶发，失败先重试再判定。
+
+**本版仍未做**（与上一节「UI 2.0 §06 ④⑤ 收尾」的记载一致）：§06 六帧的**真机观感**待维护者本人过目（设备侧无线调试未开）；裁决项 5（`domain/ClinicalThresholds.kt` 在子代理禁改清单）与审查报告 §十 三条澄清仍挂账。
 
 ---

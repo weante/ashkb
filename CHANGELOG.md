@@ -344,6 +344,42 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
 
 ---
 
+### 八、版本、门禁与发布
+
+`versionCode 122` / `versionName 1.2.10`。`ASHKB_DB_VERSION` 仍 **19**（本版**无库结构变更**，
+可直接覆盖安装，无迁移、无数据改写）。
+
+**门禁**（`E:\ASHKB\v1210-release-gate1.log`，沙箱外跑，Gradle 8.7 + JDK 21）
+`cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug verifySpecSync` →
+**BUILD SUCCESSFUL in 2m 54s**（42 tasks: 18 executed, 24 up-to-date）。
+结果口径一律读 XML 而非 HTML 的 mtime：单测 **116 文件 / 993 条 / failures=0 / errors=0 / skipped=0**；
+`app/build/reports/detekt/detekt.xml` issues **0**（该文件本轮为 UP-TO-DATE，仍是 2026-10-18 21:57 的空报告）；
+`app/build/reports/lint-results-debug.xml` total **184** = **0 Error** + 176 Warning + 8 Information；
+`verifySpecSync` 通过（版本号三处断言 + `ASHKB_DB_VERSION` 的 schema json 存在）。
+
+**release APK**（`E:\ASHKB\v1210-release-apk1.log`，`assembleRelease` → 1m 2s）
+`ashkb-1.2.10-release.apk` **5,213,292 B**；`aapt dump badging` = `versionCode='122' versionName='1.2.10'`；
+`apksigner verify --print-certs` = `CN=ASHKB, OU=Personal, O=weante, L=Shenzhen, ST=Guangdong, C=CN`，
+证书 SHA-256 `38ca80a61760208e1f0c9d81c2caf5c7c90da0e3bd759150ccdf641ec9012d7d`（**未回退 debug 签名**）；
+`Get-FileHash -Algorithm SHA256` = `109909E04EE16320B7976E1AFC19D840FD10CD9BD040BDC54B2C18E8F1170186`
+（仓库根同名副本与 `app/build/outputs/apk/release/app-release.apk` 逐字节一致）。
+
+**已发布**：GitHub Release `v1.2.10`（release id **`416558911`**，**Latest**，非预发布），
+资产 `ashkb-1.2.10-release.apk`（**5,213,292 B**，sha256 `109909e04ee16320b7976e1afc19d840fd10cd9bd040bdc54b2c18e8f1170186`，
+与本地 `Get-FileHash` 逐字节一致），`target_commitish` = `45b0435`。
+附注标签 `v1.2.10`（tag 对象 `0649fb2`）指向 `45b0435c617cd946a8eb1cb7e64ec129ee04ba41`
+（已核对远端 `refs/tags/v1.2.10^{}` = 本地 commit）。`origin/main` 已到 `45b0435`
+（`f68350b..45b0435`；本次推送走代理 `--http1.1`，直连 github.com 超时）。
+
+⚠️ **标签记账踩坑**：`gh release create ... --target <sha>` 建的是**轻量标签**（远端 `refs/tags/v1.2.10`
+直接指向 commit `45b0435`），而历史版本（`v1.2.8` / `v1.2.9`）都是**附注标签**（远端多一条
+`refs/tags/vX^{}`）。已本地 `git tag -a` 补建并 `push --force refs/tags/v1.2.10` 覆盖，
+现远端同时有 `refs/tags/v1.2.10` = `0649fb2`（tag 对象）与 `refs/tags/v1.2.10^{}` = `45b0435`（commit），
+与 v1.2.8/v1.2.9 的记账形态一致。**下次发版：先 `git tag -a` 再 `git push origin <tag>`，不要依赖
+`gh release create --target` 建标签。**
+
+---
+
 ## [v1.2.9] — 2026-10-10
 
 **两件事：①审查裁决项 2（「已结算」口径三处打架）统一；②首页补剂卡——补剂提醒/打卡从二级页搬到今日页。** 无库结构变更（枚举与状态都存字符串），可覆盖安装。
