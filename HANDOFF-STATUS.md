@@ -929,7 +929,7 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 
 **发布决定（维护者裁决 m14246）**：**就地重做 v1.2.10** —— 不 bump 版本号，重建 APK 覆盖 GitHub Release 资产与附注标签。理由：这是 v1.2.10 自身带出去的 UI 回归，发布历史保持单条更干净。
 
-**仍未做**：`dark-05-me.png` 是 0 字节损坏文件需重拍；「上次异常」遮罩项需解锁亮屏重跑；裁决项 8 第 3、6 条的真机侧尾巴；裁决项 5；审查报告 §十 三条澄清。**修复已推送，并按维护者裁决就地重做 v1.2.10（覆盖 Release 资产与标签，版本号不变），详见下一节。**
+**仍未做**：`dark-05-me.png` 是 0 字节损坏文件需重拍；「上次异常」遮罩项需解锁亮屏重跑；~~裁决项 8 第 3、6 条的真机侧尾巴~~（**2026-10-22 已补完**，见下一节）；裁决项 5；审查报告 §十 三条澄清。**修复已推送，并按维护者裁决就地重做 v1.2.10（覆盖 Release 资产与标签，版本号不变），详见下一节。**
 
 ---
 
@@ -950,5 +950,16 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 | 真机复验 | **深色**：趋势页标题完整「BASDAI 总分走势」、末值 `1` 独立右置、窄格无胶囊；概览页 BASDAI 宽卡标题行右侧**深绿底 `● 稳定期`**。**浅色**：同位置**浅绿底 `● 稳定期`**、标题「疾病活动度（BASDAI）」完整。两主题 `uiautomator dump` 把标题与胶囊解析为**两个独立节点** ⇒ 胶囊确在宽卡标题行。截图 `E:\ASHKB\ui2-shots\ui20\v1210\fix-*.png` |
 
 **设备侧还原**：`cmd uimode night no`、`settings put global auto_time_zone 1`、时区 `Asia/Hong_Kong`（`service call alarm 3 s16` 修回）。
+
+### 裁决项 8 第 3、6 条：Android 侧真机取证补完（2026-10-22）
+
+设备（Xiaomi 2410DPN6CC / haotian，Android 16）在 v1.2.10 装机状态下补跑了两条尾巴。
+
+| 条目 | 结论 | 证据 |
+| --- | --- | --- |
+| 第 3 条 跨主机重定向不转发 Authorization | **DROPPED 确认（Android 真机实测，非仅本机 JVM）** | `E:\ASHKB\.tmp-soC\dex3\classes.dex`（5,528 B，`RedirectLab`）push 到 `/data/local/tmp/rdlab/` 后 `dalvikvm -cp … RedirectLab` 运行：A(8091) 回 302 → B(8092)。**B 实际收到的头**只有 `GET /target HTTP/1.1` / `User-Agent: ASHKB-RedirectLab/1.0` / `Host: localhost:8092` / `Connection: Keep-Alive` / `Accept-Encoding: gzip` —— **无 Authorization**。`final code = 200`、`final url = http://localhost:8092/target`、`auto-follow = true` ⇒ 跟随成立、凭据被丢弃。这坐实了 `WebDavClient.kt:68-83` 从未设 `setInstanceFollowRedirects` 的风险面：跨主机 302 时凭据不会外泄，但请求会静默打到新地址。 |
+| 第 6 条 明文凭据迁移（prefs）取证 | **无法取证，与审查报告「缺文件」判定一致** | `dumpsys package com.ashkb.app` ⇒ `flags=0x0`、**无 `DEBUGGABLE`**、`versionCode=122 versionName=1.2.10`；`run-as com.ashkb.app` ⇒ `run-as: package not debuggable`；`ls /data/data/com.ashkb.app/shared_prefs/` ⇒ `Permission denied`；`id` ⇒ `uid=2000(shell)` **无 root**。⇒ release 包 prefs 在无 root 设备上不可读，**该条只能靠代码审读 + 单测，不能靠真机取证**。既有结论不变：`BackupRepository.kt:62-81` 的旧键（url/user/pass）→ 仅 https 迁移 → 删旧键逻辑存在，但**零测试覆盖**。 |
+
+**复现方法（可复用）**：`javac --release 17` → `d8.bat --lib <android.jar> --min-api 31 --output <已存在目录>` → `adb push` → **`dalvikvm -cp /data/local/tmp/<dir>/classes.dex <Main>`**（`app_process` 会崩）。⚠️ 运行时会先打印一段 `InvocationTargetException / UnsatisfiedLinkError: android.os.SystemProperties.native_get` 的**无害噪声**（okhttp 静态初始化在 dalvikvm 下取不到系统属性），`System.exit(0)` 前的主逻辑照常执行完毕。
 
 ⚠️ **重做踩坑**：`gh release create --target` 建轻量标签的老坑之外，这次还发现 `gh release upload --clobber` **只换资产不改 `target_commitish`** —— 必须另外 `gh api -X PATCH .../releases/<id> -f target_commitish=<sha>`，否则 Release 页面仍指向旧提交。下次重做记得三条一起做：`git tag -a` 重建 + `push --force`、`upload --clobber`、`api PATCH target_commitish`。
