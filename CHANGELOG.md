@@ -12,9 +12,31 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 **无库结构变更**（`ASHKB_DB_VERSION` 仍 19），可直接覆盖安装；无迁移、无数据改写。
 
-**本版未做**：§06 五帧的**真机观感**仍待维护者本人过目（设备侧无线调试未开，本轮未逐帧装机复核）；裁决项 5（化验临界值显示，`domain/ClinicalThresholds.kt` 在子代理禁改清单）与审查报告 §十 三条澄清仍挂账。
+**本版未做**：§06 六帧的**真机观感**在发布前未逐帧装机复核（设备侧无线调试未开）；**发布后已补做，并因此抓到一个回归**——见下方「### 一」里的「⚠️ 发布后回退」段。裁决项 5（化验临界值显示，`domain/ClinicalThresholds.kt` 在子代理禁改清单）与审查报告 §十 三条澄清仍挂账。
+
+### 〇、发布后回退：BASDAI「稳定期」胶囊从迷你图卡挪到全宽卡
+
+**问题（真机实证，浅深双主题均复现）**：v1.2.10 发布后按 §06 六帧做真机双主题验收，报表「趋势」页的 **BASDAI 走势卡标题被截断成「BASDAI 总…」**，末值 `1` 紧贴「稳定期」胶囊、几乎粘连。根因：`SmallTrendChart` 的标题行是「`weight(1f)` 标题 + 末值 + `trailing` 胶囊」三段，而**两列小多图的单格只有约 170dp**——装不下 7 个字的标题加两段尾部内容，标题列被压到只剩省略号。**这是 §06 ④ 落地时引入的回归**，`Ui2ConclusionBadgesTest` 的 6 条静态断言（只验槽位存在与顺序）**没有覆盖实际渲染宽度**，所以测试全绿而真机可见。
+
+**修法（改挂宿主，不改判据）**：
+- `app/src/main/java/com/ashkb/app/ui/components/SmallTrendChart.kt`：**删除** `trailing` 形参与其 `trailing?.invoke()` 调用，标题行恢复「`weight(1f)` 标题 + 末值」两段；KDoc 补一段 ⚠️ 说明「这里刻意没有结论槽」及原因。
+- `app/src/main/java/com/ashkb/app/ui/report/ReportScreen.kt`：`MiniSeries` **删除** `badge` 字段、`TrendCharts` 删除 `basdaiStable` 与 `badge = …` 传参、`MiniSeriesCell` 删除 `trailing = …`；改为在**概览页那张全宽 `SectionCard`** 上用 `action = if (basdaiStable) { { StatusChip(…) } }` 渲染同一枚胶囊（`SectionCard.action` 是 `@Composable RowScope.() -> Unit`，标题列已 `weight(1f)`、动作区非权重排在之后，正是设计稿 `p-head` 右侧 `st st-ok` 的位置）。
+- 判据不变，仍是 `!ClinicalThresholds.basdaiHigh(o.basdaiLatest.total)` 且要求 `o.basdaiLatest != null`；颜色仍走 `StatusTone.Success`；字符串仍是 `report_basdai_stable`。
+- **`config/detekt/baseline.xml` 同步回退**：`:31`/`:80` 两条既存豁免的签名去掉 `trailing: (@Composable () -> Unit)? = null,`，恢复到 v1.2.10 之前那份 42502 B / 316 行 / 309 条 `<ID>` 的原样（`git diff --numstat` = `2 2`，即正好这两行的往返，**零新增、零净增条目**）。
+
+**回归**：`app/src/test/java/com/ashkb/app/ui/Ui2ConclusionBadgesTest.kt` 改写为 6 条：`稳定期胶囊挂在全宽 BASDAI 卡的标题行右侧`（在 `OverviewPage` 区间内取 BASDAI 卡，断言 `action = if (basdaiStable)`、`R.string.report_basdai_stable`、`!ClinicalThresholds.basdaiHigh(o.basdaiLatest.total)`、`tone = StatusTone.Success`）+ `迷你图卡不再承载结论胶囊`（**反向断言** `trailing` 形参 / `val badge` / `trailing = if (s.badge != null)` 三者均不得回潮，且标题行仍是「权重标题 → `Text(lastLabel`」的顺序）+ 原有 4 条。类 KDoc 补一段「静态断言的边界」：能证明槽位存在、证明不了放得下。
+
+> ⚠️ **负向对照两轮（都是「能编译的违规形状」）**：①把 `action = if (basdaiStable)` 改成 `action = if (false)` ⇒ 6 条里**正好 1 条 FAIL**（「稳定期胶囊挂在全宽 BASDAI 卡的标题行右侧」）；②把 `val badge: String? = null` 加回 `MiniSeries` ⇒ **正好 1 条 FAIL**（「迷你图卡不再承载结论胶囊」）。两轮其余 5 条仍 pass，`NEGATIVE-CONTROL-TEMP` 标记随后核为零命中。
+
+**门禁**：`E:\ASHKB\ui2-fix-basdai-gate1.log` → **BUILD SUCCESSFUL in 3m 18s**（42 tasks: 17 executed, 25 up-to-date）。单测 **993 条 / 116 文件全绿**；detekt **0**；lint **0 error**（184 = 176 Warning + 8 Information）；`verifySpecSync` 通过。release APK 重建：`app/build/outputs/apk/release/app-release.apk` **5,213,292 B @ 2026-10-21 23:37:17**，SHA-256 `9C03C5184B8E540ABB98B66A3408D29D91730583DAC613B1FA7D9E28AE61FF89`（`E:\ASHKB\ui2-fix-basdai-apk1.log`，1m 49s）。
+
+**教训（写进文档以免重犯）**：**静态断言只能证明「槽位存在、顺序正确」，证明不了「放得下」**。凡新增「标题 + 数值 + 徽章」这类三段式布局，必须真机看一眼；窄格（两列网格的单格）尤其危险——把结论类徽章挂在宽卡标题行，而不是塞进迷你图。
+
+**真机复验（2026-10-21，修复后装机）**：`adb install -r` 覆盖安装 ⇒ `versionCode=122 / versionName=1.2.10`，数据保留。**深色**：趋势页 BASDAI 卡标题完整显示「BASDAI 总分走势」、末值 `1` 右侧独立、窄格内无胶囊（`fix-light-03b-report-trend.png`）；概览页 BASDAI 宽卡标题行右侧为**深绿底 `● 稳定期`** 胶囊（`fix-dark-03-report-overview2.png`）。**浅色**：概览页同一位置为**浅绿底 `● 稳定期`** 胶囊、标题「疾病活动度（BASDAI）」完整不截断（`fix-light-03-report-overview.png`）。两主题 `uiautomator dump` 均含 `text="疾病活动度（BASDAI）"` 与 `text="稳定期"` 两个独立节点 ⇒ 胶囊确在宽卡标题行、非窄格内。截图留档 `E:\ASHKB\ui2-shots\ui20\v1210\fix-*.png` + 同名 `.xml`。设备已还原（`uimode night no`、`auto_time_zone 1`、时区 `Asia/Hong_Kong`）。
 
 ### 一、UI 2.0 §06 ④⑤ 收尾：报表「稳定期」结论胶囊 + 知识库类别徽章
+
+> ⚠️ **本节的 ④（结论胶囊）在发布后已回退改挂全宽卡**：下方描述的是发布时的形态（挂在 `SmallTrendChart.trailing`），真机验收发现窄格截断，现改为 `SectionCard.action`。以「### 〇、发布后回退」为准；本节保留发布时的原始记录，便于回溯。
 
 **背景**：§06 双主题验收还剩两块缺口——④ 报表页 BASDAI 走势卡缺设计稿要求的「稳定期」状态胶囊（当时只有 ≥4.0 的高危胶囊），⑤ 知识库条目的类别标签渲染成了卡片内左上角的胶囊，而设计稿要的是**行右侧的软底小徽章**。维护者裁决（m05521）两项都做。**复核后推翻了此前「这两块要先解除 `domain/`+`data/` 禁改」的判断**：所需数据（`KbEntry.category`、`BasdaiRecord.total`）与阈值常量（`ClinicalThresholds.BASDAI_HIGH`/`basdaiHigh`）**在现有模型里全都已经存在**，两块都只改 `ui/` 层。
 
@@ -370,6 +392,12 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
 附注标签 `v1.2.10`（tag 对象 `0649fb2`）指向 `45b0435c617cd946a8eb1cb7e64ec129ee04ba41`
 （已核对远端 `refs/tags/v1.2.10^{}` = 本地 commit）。`origin/main` 已到 `45b0435`
 （`f68350b..45b0435`；本次推送走代理 `--http1.1`，直连 github.com 超时）。
+
+> **就地重做（2026-10-21，维护者裁决 m14246）**：发布后真机验收发现本版带出一个 UI 回归
+> （报表 BASDAI 标题截断，见「### 〇」）。**不 bump 版本号**，改后重建 APK
+> **5,213,292 B @ 2026-10-21 23:37:17**、sha256 `9C03C5184B8E540ABB98B66A3408D29D91730583DAC613B1FA7D9E28AE61FF89`
+> （门禁 `E:\ASHKB\ui2-fix-basdai-gate1.log`，3m 18s，单测 993/116 全绿、detekt 0、lint 0 Error），
+> 覆盖 Release 资产与 `v1.2.10` 附注标签（指向新的修复提交）。**版本号不变，内容以本条为准。**
 
 ⚠️ **标签记账踩坑**：`gh release create ... --target <sha>` 建的是**轻量标签**（远端 `refs/tags/v1.2.10`
 直接指向 commit `45b0435`），而历史版本（`v1.2.8` / `v1.2.9`）都是**附注标签**（远端多一条

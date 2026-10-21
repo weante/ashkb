@@ -901,3 +901,34 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 **本版仍未做**（与上一节「UI 2.0 §06 ④⑤ 收尾」的记载一致）：§06 六帧的**真机观感**待维护者本人过目（设备侧无线调试未开）；裁决项 5（`domain/ClinicalThresholds.kt` 在子代理禁改清单）与审查报告 §十 三条澄清仍挂账。
 
 ---
+
+### v1.2.10 发布后真机验收 + 一处回归的修复（2026-10-21）
+
+**真机环境**：Xiaomi 2410DPN6CC（haotian，Android 16，1440×3200 / density 600），无线调试经 `adb pair`（配对码 945418）连到 `192.168.68.64`；`adb install -r ashkb-1.2.10-release.apk` 覆盖安装 ⇒ `versionCode=122 / versionName=1.2.10`，**数据保留**（印证无库结构变更）。截图留档 `E:\ASHKB\ui2-shots\ui20\v1210\{light,dark}-*.png` + 同名 `.xml`。
+
+**① 崩溃修复的 30 轮屏关冷启动复验（`E:\ASHKB\npe-verify1.log`）**：每轮 `am force-stop` → 关屏 → 冷启动 → 唤醒 → 查 `logcat -d -b crash`。结果 **FATAL EXCEPTION 0 条、crash buffer 全空**；events buffer 反复出现 `am_proc_start … com.ashkb.app/com.ashkb.app.MainActivity` ⇒ 冷启动路径真实执行过。
+
+> ⚠️ **该轮复验有一项无效，须如实记下**：循环期间设备处于**锁屏 + AOD**（`dumpsys trust` → `deviceLocked=1`；`dumpsys window` → `isKeyguardShowing=true`），每轮 `uiautomator dump` 抓到的都是锁屏界面（包名全是 `com.android.systemui` / `com.miui.aod`）⇒ **`mask=False` 不能作为「首页没浮出遮罩」的证据**。MIUI 密码锁无法用 adb 绕过（`locksettings set-disabled true` 回显成功但 `get-disabled` 仍 false；`keyevent 82` 只拉通知栏；`pkill systemui` 无权限），**只能让用户手动解锁**。故「遮罩项」仍待解锁亮屏下重跑。
+
+**② §06 双主题真机观感（结论：③⑤ 通过，④ 有回归）**：
+
+| 帧 | 结论 | 证据 |
+| --- | --- | --- |
+| ③ 健康 Hub「今日体征」面板 | ✅ 通过 | 两列两行、顺序 血压/心率 → 体温/今日体重，四项全「未记录」且**不隐藏**；紧急卡瓦片 **danger-soft**（浅色粉底 + 深红 `*`），另两个入口仍 primaryContainer 蓝底 |
+| ⑤ 知识库类别徽章 | ✅ 通过 | 「教育」徽章在**标题行右侧**、软底小圆角；长标题正常两行；底部 `S2 期刊开放获取全文 · Agca R et al. Heart 2021` 证据等级行**原样保留** |
+| 深色页面底 | ✅ 通过 | 四帧页面底均匀深色、**无白边** ⇒ 批次 A 的 `windowBackground` 修复在 v1.2.10 上仍有效 |
+| ④ 报表「稳定期」胶囊 | ❌ **回归** | 趋势页 BASDAI 卡标题被截断成「BASDAI 总…」、末值 `1` 紧贴胶囊（`light-03b-report-trend.png` / `dark-03-report.png` 双主题同形） |
+
+**③ 回归的修复（已落地并过门禁）**：把胶囊从「两列小多图的单格（约 170dp）」挪到**概览页全宽 `SectionCard` 的 `action` 槽**，`SmallTrendChart` 删除 `trailing` 形参、`MiniSeries` 删除 `badge` 字段、`MiniSeriesCell` 删除传参；判据与颜色不变。`config/detekt/baseline.xml` 的 `:31`/`:80` 两条既存豁免同步去掉 `trailing` 片段，恢复到 42502 B / 316 行 / 309 条 `<ID>` 原样（`git diff --numstat` = `2 2`，零净增）。守卫 `Ui2ConclusionBadgesTest` 改写为 6 条（含 3 条**反向断言**钉住 `trailing` / `badge` / 传参不得回潮），两轮负向对照各只 1 条 FAIL 且正是目标断言。
+
+**门禁**：`E:\ASHKB\ui2-fix-basdai-gate1.log` → **BUILD SUCCESSFUL in 3m 18s**；单测 **993 / 116** 全绿；detekt **0**；lint **184 = 0 Error**；`verifySpecSync` 通过。APK 重建 **5,213,292 B @ 2026-10-21 23:37:17**，sha256 `9C03C5184B8E540ABB98B66A3408D29D91730583DAC613B1FA7D9E28AE61FF89`。
+
+> ⚠️ **教训（写进文档）**：**静态断言只能证明「槽位存在、顺序正确」，证明不了「放得下」**。§06 ④ 的初版 6 条断言全绿，真机上标题却已截断 —— 结论类徽章应挂在**宽卡标题行**，不要塞进两列网格的迷你格。
+
+**④ 修复后的真机复验（2026-10-21，通过）**：`adb install -r` ⇒ `versionCode=122 / versionName=1.2.10`，数据保留。**深色**趋势页标题完整「BASDAI 总分走势」、末值 `1` 独立右置、窄格无胶囊（`fix-light-03b-report-trend.png`）；**深色/浅色**概览页 BASDAI 宽卡标题行右侧分别是**深绿底 / 浅绿底 `● 稳定期`** 胶囊，标题「疾病活动度（BASDAI）」完整（`fix-dark-03-report-overview2.png` / `fix-light-03-report-overview.png`）。两主题 `uiautomator dump` 均把「疾病活动度（BASDAI）」与「稳定期」解析为**两个独立节点** ⇒ 胶囊确在宽卡标题行。设备已还原（`uimode night no` / `auto_time_zone 1` / `Asia/Hong_Kong`）。
+
+**发布决定（维护者裁决 m14246）**：**就地重做 v1.2.10** —— 不 bump 版本号，重建 APK 覆盖 GitHub Release 资产与附注标签。理由：这是 v1.2.10 自身带出去的 UI 回归，发布历史保持单条更干净。
+
+**仍未做**：`dark-05-me.png` 是 0 字节损坏文件需重拍；「上次异常」遮罩项需解锁亮屏重跑；裁决项 8 第 3、6 条的真机侧尾巴；裁决项 5；审查报告 §十 三条澄清。**修复尚未推送、未发新 Release**（未经维护者明确指示）。
+
+---

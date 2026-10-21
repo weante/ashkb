@@ -55,7 +55,11 @@ import kotlin.math.roundToInt
  *   被排除的数据必须说出来，否则「图上看不见」会被误读成「没测过」。
  * @param emptyText 无数据时的占位文案。**必须由调用方给对**——v1.0.55 之前这里写死成
  *   「暂无化验数据」，于是收缩压 / 心率这些**非化验**指标的空格子也在说「暂无化验数据」（用户实测发现）。
- * @param trailing 标题行右侧的结论槽（UI 2.0 §06 ④：BASDAI 格的「稳定期」胶囊）。空数据时不渲染。
+ * ⚠️ **这里刻意没有「结论槽」**（v1.2.10 发布后回退）：§06 ④ 曾在此加 `trailing` 形参挂
+ * BASDAI 的「稳定期」胶囊，真机实测**两列小多图的单格只有约 170dp**，标题 + 末值 + 胶囊
+ * 三段挤不下，标题被压成「BASDAI 总…」、末值与胶囊还贴在一起。结论胶囊已改挂到
+ * **全宽 BASDAI 卡**（`ReportScreen` 概览页 `SectionCard(action = …)`），那里空间充足。
+ * 教训：静态断言只能证明「槽位存在」，证明不了「放得下」——窄格里的三段式必须真机看。
  */
 @Composable
 fun SmallTrendChart(
@@ -70,7 +74,6 @@ fun SmallTrendChart(
     accent: Color = MaterialTheme.colorScheme.primary,
     caveat: String? = null,
     onClick: (() -> Unit)? = null,
-    trailing: (@Composable () -> Unit)? = null,
 ) {
     val cs = MaterialTheme.colorScheme
     // v1.2.10（UI 2.0 批次 D「换图」）：阈值线改用 **danger**，与 [TrendChart] 同口径。
@@ -126,7 +129,6 @@ fun SmallTrendChart(
             if (lastLabel != null) {
                 Text(lastLabel, style = valueStyle, maxLines = 1)
             }
-            trailing?.invoke()
         }
 
         if (points.isEmpty()) {

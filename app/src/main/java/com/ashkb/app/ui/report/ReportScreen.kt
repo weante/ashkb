@@ -302,7 +302,26 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
         }
 
         item {
-            SectionCard(title = stringResource(R.string.report_basdai_section)) {
+            // UI 2.0 §06 ④：BASDAI 的「稳定期」结论胶囊挂在**全宽卡**标题行右侧。
+            // ⚠️ 它曾经挂在「趋势」页两列小多图的 BASDAI 格上（`SmallTrendChart.trailing`），
+            // 真机实测单格只有约 170dp，标题 + 末值 + 胶囊三段挤不下，标题被压成
+            // 「BASDAI 总…」、末值与胶囊粘连 ⇒ 发布后回退到此处（全宽标题行空间充足）。
+            // 判据与下方高危胶囊互补：< 阈值说「稳定期」，≥ 阈值说「需要讨论」，不会同时出现。
+            val basdaiStable = o.basdaiLatest != null &&
+                !ClinicalThresholds.basdaiHigh(o.basdaiLatest.total)
+            SectionCard(
+                title = stringResource(R.string.report_basdai_section),
+                action = if (basdaiStable) {
+                    {
+                        StatusChip(
+                            text = stringResource(R.string.report_basdai_stable),
+                            tone = StatusTone.Success,
+                        )
+                    }
+                } else {
+                    null
+                },
+            ) {
                 if (o.basdaiLatest == null) {
                     Text(stringResource(R.string.report_no_basdai), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
@@ -459,10 +478,6 @@ private fun TrendCharts(t: ReportRepository.Trends) {
     val noDataText = stringResource(R.string.common_no_data)
     val noLabText = stringResource(R.string.report_no_lab_data)
 
-    // UI 2.0 §06 ④：BASDAI 走势图标题行右侧的「稳定期」结论胶囊。判据与下方高危胶囊
-    // 互补——高危胶囊说「≥ 4.0 需要讨论」，这里说「< 4.0 处在稳定期」，两者不会同时出现。
-    val basdaiStable = t.basdai.lastOrNull()?.let { !ClinicalThresholds.basdaiHigh(it.total) } == true
-
     val vitalsSeries = listOf(
         MiniSeries(
             key = "basdai",
@@ -472,7 +487,6 @@ private fun TrendCharts(t: ReportRepository.Trends) {
             threshold = ClinicalThresholds.BASDAI_HIGH,
             accent = cs.primary,
             emptyText = noDataText,
-            badge = if (basdaiStable) stringResource(R.string.report_basdai_stable) else null,
         ),
         MiniSeries("pain", stringResource(R.string.symptom_pain_score), stringResource(R.string.exercise_minute_suffix), painPoints, null, cs.secondary, noDataText),
         MiniSeries("stiff", stringResource(R.string.symptom_morning_stiffness), stringResource(R.string.exercise_minute_space_suffix), stiffPoints, null, cs.secondary, noDataText),
@@ -597,13 +611,6 @@ private data class MiniSeries(
     val caveat: String? = null,
     /** 展开成大图时的标题（格子窄，这里可以带英文缩写）。默认与格子标题相同。 */
     val sheetTitle: String = title,
-    /**
-     * 标题行右侧的结论胶囊文案（UI 2.0 §06 ④：BASDAI 格的「稳定期」）。
-     *
-     * 存**文案**而不是资源 id，是为了守住本类「资源在组合期解析」的约定；
-     * `null` 表示本格没有结论胶囊（其余 11 格都是这样）。
-     */
-    val badge: String? = null,
 )
 
 /** 单格：包一层浅容器（小多图靠边界彼此区分），点开进入大图。 */
@@ -630,14 +637,6 @@ private fun MiniSeriesCell(
             caveat = s.caveat,
             onClick = onExpand,
             modifier = Modifier.padding(Spacing.sm),
-            // UI 2.0 §06 ④：带结论的格子（BASDAI「稳定期」）在标题行右侧挂 Success 胶囊。
-            // 走 [StatusChip] 而不是自绘：设计稿 `.st-ok` 就是「软底 + 6dp 状态点 + 文字」
-            // 三重编码，与 StatusChip 的既有形态逐项对应（圆角/内边距由组件统一给）。
-            trailing = if (s.badge != null) {
-                { StatusChip(text = s.badge, tone = StatusTone.Success) }
-            } else {
-                null
-            },
         )
     }
 }

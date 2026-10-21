@@ -7,13 +7,19 @@ import org.junit.Test
 /**
  * UI 2.0 §06 ④⑤ 的两处「结论徽章」要求：
  *
- * - ④ 报表 BASDAI 走势图**标题行右侧**的「稳定期」结论胶囊（设计稿 `.st-ok`）；
+ * - ④ 报表 BASDAI 的「稳定期」结论胶囊（设计稿 `.st-ok`）。**它挂在全宽 BASDAI 概览卡
+ *   的标题行右侧，不在两列小多图的格子里**——后者单格只有约 170dp，标题 + 末值 + 胶囊
+ *   三段挤不下（v1.2.10 发布后真机实测「BASDAI 总…」截断，随即回退）；
  * - ⑤ 知识库条目**行右侧**的类别徽章（设计稿 `.tier`），底部「S1 · 来源名」证据等级行保留。
  *
  * 为什么用源码静态断言而不是 Compose 测试：本仓没有 Compose UI 测试基础设施，
  * 而这两条要求是**结构性**的（槽位在不在、胶囊挂在哪一格、类别胶囊有没有从左上挪走），
  * 静态扫描足以钉住——与 `ui/HealthHubVitalsPanelTest.kt`、`ui/ViewModelInitOrderGuardTest.kt`
  * 同一套做法。这些是**防漂移**断言，不是行为断言。
+ *
+ * ⚠️ **静态断言的边界**（v1.2.10 的教训）：它能证明「槽位存在、顺序正确」，**证明不了
+ * 「放得下」**——④ 最初挂在窄格里的版本 6 条断言全绿，真机上标题却已截断。凡是新增
+ * 「标题 + 数值 + 徽章」三段式布局，必须真机看一眼，别把绿灯当验收。
  */
 class Ui2ConclusionBadgesTest {
 
@@ -53,11 +59,46 @@ class Ui2ConclusionBadgesTest {
     // ---------------------------------------------------------------- ④ 报表
 
     @Test
-    fun `SmallTrendChart 标题行保留了右侧结论槽`() {
+    fun `稳定期胶囊挂在全宽 BASDAI 卡的标题行右侧`() {
+        // 胶囊的宿主必须是**概览页那张全宽卡**的 action 槽，而不是趋势页的迷你格。
+        val overview = slice(reportSource, "private fun OverviewPage(", "private fun PeriodicPage(")
+        assertTrue("OverviewPage 区间必须能定位到", overview.isNotEmpty())
+        val basdaiCard = slice(
+            overview,
+            "SectionCard(",
+            "if (ClinicalThresholds.basdaiHigh(o.basdaiLatest.total))",
+        )
+        assertTrue("BASDAI 概览卡区间必须能定位到", basdaiCard.isNotEmpty())
         assertTrue(
-            "设计稿 §06 ④ 的「稳定期」胶囊挂在走势图卡标题行右侧；" +
-                "SmallTrendChart 必须保留一个带默认值的 trailing 槽，既有 11 格不受影响",
+            "「稳定期」胶囊必须挂在这张全宽卡的 action 槽上（标题行右侧）",
+            basdaiCard.contains("action = if (basdaiStable)") &&
+                basdaiCard.contains("R.string.report_basdai_stable"),
+        )
+        assertTrue(
+            "判据必须走 ClinicalThresholds.basdaiHigh（Double 重载，避免各自 toInt() 截断），" +
+                "稳定期 = 最新一次 BASDAI 低于高活动度阈值",
+            basdaiCard.contains("!ClinicalThresholds.basdaiHigh(o.basdaiLatest.total)"),
+        )
+        assertTrue(
+            "结论胶囊走 Success 色调，对应设计稿 `.st-ok`（软底 + 状态点 + 文字）",
+            basdaiCard.contains("tone = StatusTone.Success"),
+        )
+    }
+
+    @Test
+    fun `迷你图卡不再承载结论胶囊`() {
+        assertFalse(
+            "SmallTrendChart 曾有的 trailing 槽已在 v1.2.10 发布后回退——" +
+                "两列小多图的单格约 170dp，标题 + 末值 + 胶囊三段挤不下（真机截断实证）",
             chartSource.contains("trailing: (@Composable () -> Unit)? = null"),
+        )
+        assertFalse(
+            "MiniSeries 不再有 badge 字段（胶囊已改挂全宽卡）",
+            reportSource.contains("val badge: String? = null"),
+        )
+        assertFalse(
+            "MiniSeriesCell 不得再往 SmallTrendChart 传结论槽",
+            reportSource.contains("trailing = if (s.badge != null)"),
         )
         val titleRow = slice(
             chartSource,
@@ -66,31 +107,8 @@ class Ui2ConclusionBadgesTest {
         )
         assertTrue("标题行区间必须能定位到（SmallTrendChart 结构变了？）", titleRow.isNotEmpty())
         assertTrue(
-            "trailing 必须真的渲染在标题行内（否则加了形参也没用）",
-            titleRow.contains("trailing?.invoke()"),
-        )
-        assertTrue(
-            "标题列仍需 weight(1f) 收紧，尾部再挂非权重子项——顺序反了会把徽章压成零宽（v1.0.90 教训）",
-            titleRow.indexOf("Modifier.weight(1f)") in 1 until titleRow.indexOf("trailing?.invoke()"),
-        )
-    }
-
-    @Test
-    fun `稳定期胶囊只在 BASDAI 低于阈值时挂上`() {
-        assertTrue(
-            "判据必须走 ClinicalThresholds.basdaiHigh（Double 重载，避免各自 toInt() 截断），" +
-                "稳定期 = 最新一次 BASDAI 低于高活动度阈值",
-            reportSource.contains("!ClinicalThresholds.basdaiHigh(it.total)"),
-        )
-        assertTrue(
-            "只有 BASDAI 那一格能拿到结论胶囊，其余 11 格 badge 必须为 null",
-            reportSource.contains(
-                "badge = if (basdaiStable) stringResource(R.string.report_basdai_stable) else null",
-            ),
-        )
-        assertTrue(
-            "结论胶囊走 Success 色调，对应设计稿 `.st-ok`（软底 + 状态点 + 文字）",
-            reportSource.contains("StatusChip(text = s.badge, tone = StatusTone.Success)"),
+            "标题列仍需 weight(1f) 收紧，末值作为非权重子项排在之后——顺序反了会把末值压成零宽（v1.0.90 教训）",
+            titleRow.indexOf("Modifier.weight(1f)") in 1 until titleRow.indexOf("Text(lastLabel"),
         )
     }
 
