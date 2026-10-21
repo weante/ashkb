@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.2.10（versionCode 122）· 2026-10-19 · 审查第二批 / 第三批 + 裁决项 3、6、7 + §6.7 + 按需用药每天一次 + UI 2.0 批次 B–E + §06 双主题验收 + 真机启动崩溃修复**，**已全部落地、门禁全绿、已推送并发布为 GitHub Latest**（release id `416558911`，资产 `ashkb-1.2.10-release.apk` 5,213,292 B；逐批取证见文末六节）；本版把此前积压的六批改动一次合并发布，**无库结构变更**（仍 v19），可覆盖安装。上一版 **v1.2.9（versionCode 121）· 2026-10-10 · 裁决项 1、2 + 首页补剂卡**（release id `410782041`），更早 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」**（release id `408053469`）。
+> **时点快照**：截至 **v1.2.10（versionCode 122）· 2026-10-19 · 审查第二批 / 第三批 + 裁决项 3、6、7 + §6.7 + 按需用药每天一次 + UI 2.0 批次 B–E + §06 双主题验收 + 真机启动崩溃修复**，**已全部落地、门禁全绿、已推送并发布为 GitHub Latest**（release id `416558911`，资产 `ashkb-1.2.10-release.apk` 5,213,292 B，sha256 `9C03C518…FF89`，**2026-10-21 就地重做过一次**；逐批取证见文末七节）；本版把此前积压的六批改动一次合并发布，**无库结构变更**（仍 v19），可覆盖安装。上一版 **v1.2.9（versionCode 121）· 2026-10-10 · 裁决项 1、2 + 首页补剂卡**（release id `410782041`），更早 **v1.2.8（versionCode 120）· 2026-10-09 · UI 2.0 批次 A「整份换色」**（release id `408053469`）。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号以 `app/build.gradle.kts` 为准（v1.2.9 起**不再把单测条数抄进文档**，见根 `build.gradle.kts` 里 `verifySpecSync` 的注释）。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -929,6 +929,26 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 
 **发布决定（维护者裁决 m14246）**：**就地重做 v1.2.10** —— 不 bump 版本号，重建 APK 覆盖 GitHub Release 资产与附注标签。理由：这是 v1.2.10 自身带出去的 UI 回归，发布历史保持单条更干净。
 
-**仍未做**：`dark-05-me.png` 是 0 字节损坏文件需重拍；「上次异常」遮罩项需解锁亮屏重跑；裁决项 8 第 3、6 条的真机侧尾巴；裁决项 5；审查报告 §十 三条澄清。**修复尚未推送、未发新 Release**（未经维护者明确指示）。
+**仍未做**：`dark-05-me.png` 是 0 字节损坏文件需重拍；「上次异常」遮罩项需解锁亮屏重跑；裁决项 8 第 3、6 条的真机侧尾巴；裁决项 5；审查报告 §十 三条澄清。**修复已推送，并按维护者裁决就地重做 v1.2.10（覆盖 Release 资产与标签，版本号不变），详见下一节。**
 
 ---
+
+### v1.2.10 就地重做（2026-10-21 · 版本号不变，覆盖 Release 资产与标签）
+
+**维护者裁决（m14246）**：**就地重做 v1.2.10**，不 bump 版本号——这是 v1.2.10 自身带出去的 UI 回归，发布历史保持单条更干净；并且**先真机验证再发**。
+
+| 项 | 事实 |
+| --- | --- |
+| 修复提交 | `0c33bf43810b111f36c6bcc2b417e3233e0ada52`「v1.2.10 修正：BASDAI「稳定期」胶囊改挂全宽卡（修发布后真机发现的标题截断）」——**6 files / +132 / −54**；`5c1e4cd..0c33bf4` 已推 `origin/main` |
+| 版本 | **不变**：`versionCode 122` / `versionName "1.2.10"`；`ASHKB_DB_VERSION` 仍 **19** |
+| 门禁 | `E:\ASHKB\ui2-fix-basdai-gate1.log` → **BUILD SUCCESSFUL in 3m 18s**；单测 **993 / 116** 全绿；detekt **0**；lint **184 = 0 Error** + 176 Warning + 8 Information；`verifySpecSync` 通过 |
+| 新 APK | `ashkb-1.2.10-release.apk` **5,213,292 B @ 2026-10-21 23:37:17**，sha256 `9C03C5184B8E540ABB98B66A3408D29D91730583DAC613B1FA7D9E28AE61FF89`；正式证书 `38ca80a6…d7d`（未回退 debug 签名）；仓库根副本与 build 产物逐字节一致 |
+| Release 资产 | `gh release upload v1.2.10 --clobber` ⇒ `state=uploaded`、`digest=sha256:9c03c518…ff89`、size 5,213,292（旧 `109909e0…0186` 已被替换） |
+| 标签 | 附注标签重建：tag 对象 **`acaedcf`** → `0c33bf4`（`+ 0649fb2...acaedcf (forced update)`）；远端 `refs/tags/v1.2.10` = `acaedcf`、`refs/tags/v1.2.10^{}` = `0c33bf4`（已 `ls-remote` 核对） |
+| Release 元数据 | `target_commitish` 由 `45b0435` 改为 `0c33bf4`（`gh api -X PATCH`）；id `416558911`、**Latest**、非 draft / 非 prerelease 不变 |
+| Release notes | `E:\ASHKB\release-tooling\release-bodies\v1.2.10.md`（185 行 / 11,141 B），新增「本资产于 2026-10-21 就地重做过一次」提示与「就地重做记账」表；已 `gh release edit --notes-file` 同步，远端 body 6,651 字符 / 186 行 |
+| 真机复验 | **深色**：趋势页标题完整「BASDAI 总分走势」、末值 `1` 独立右置、窄格无胶囊；概览页 BASDAI 宽卡标题行右侧**深绿底 `● 稳定期`**。**浅色**：同位置**浅绿底 `● 稳定期`**、标题「疾病活动度（BASDAI）」完整。两主题 `uiautomator dump` 把标题与胶囊解析为**两个独立节点** ⇒ 胶囊确在宽卡标题行。截图 `E:\ASHKB\ui2-shots\ui20\v1210\fix-*.png` |
+
+**设备侧还原**：`cmd uimode night no`、`settings put global auto_time_zone 1`、时区 `Asia/Hong_Kong`（`service call alarm 3 s16` 修回）。
+
+⚠️ **重做踩坑**：`gh release create --target` 建轻量标签的老坑之外，这次还发现 `gh release upload --clobber` **只换资产不改 `target_commitish`** —— 必须另外 `gh api -X PATCH .../releases/<id> -f target_commitish=<sha>`，否则 Release 页面仍指向旧提交。下次重做记得三条一起做：`git tag -a` 重建 + `push --force`、`upload --clobber`、`api PATCH target_commitish`。
