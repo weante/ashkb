@@ -1,4 +1,21 @@
-# 下次接手从这里开始（写于 v1.1.0 发布后）
+# 下次接手从这里开始（v1.2.10 发布后 · 2026-10-23 更新）
+
+> **本文件是仓库内唯一权威的接手文档**，随仓库一起分发。
+> `E:\ASHKB\NEXT-SESSION.md`（仓库根之外、**不被 git 跟踪**）是会话工作日志，记的是过程细节与踩坑现场；两者内容会有出入，**以本文件为准**。
+> 上一版本文件停在 `v1.1.0 / versionCode 102 / 单测 736 条`，落后 10 个版本，已于 2026-10-23 全面重写。
+
+---
+
+**当前状态**：`v1.2.10`（versionCode **122**）已发布为 GitHub **Latest**，已装维护者真机。
+
+- 发布提交 `45b0435` → 修复 `0c33bf4` → 记账 `3302ebb` → 取证 `faaf538`；`origin/main` = `faaf538`，**工作树干净、ahead/behind 0/0**。
+- Release `v1.2.10`：id `416558911`，`target_commitish` = `0c33bf4`，资产 `ashkb-1.2.10-release.apk` **5,213,292 B**，sha256 `9C03C518…FF89`；附注标签 `acaedcf` → `0c33bf4`（已核对远端 `^{}` 剥壳）。
+- 单测 **993 条 / 116 个文件全绿**；detekt **0**；lint **184 条 = 0 error**（176 Warning + 8 Information）；`verifySpecSync` 通过。门禁日志 `E:\ASHKB\ui2-fix-basdai-gate1.log`（3m 18s）。
+- `ASHKB_DB_VERSION` = **19**（无迁移，可覆盖安装）。
+- CI（GitHub Actions `ci.yml`）：最近 5 次 run 全部 `success`。
+- ⚠️ v1.2.10 首发版带出一个 UI 回归（报表「趋势」页 BASDAI 卡标题被截断成「BASDAI 总…」，因「稳定期」胶囊被塞进约 170dp 的两列迷你格），**已修**：胶囊改挂概览页全宽 `SectionCard(action = …)`，`SmallTrendChart.trailing` / `MiniSeries.badge` 全部删除，detekt 基线两条签名同步回退（`2 2` 行往返、零净增）。真机双主题复验通过后**就地重做**了 Release（版本号不变）。
+
+---
 
 ## 零、OPEN-RISK（已知未修的高危——每轮开工先看这一节）
 
@@ -8,28 +25,55 @@
 | # | 风险 | 现状 |
 |---|---|---|
 | R1 | **大字号 + 窄屏（2.0× / 320dp）时急救卡「当前用药」的剂量说明会被挤到 0 宽** | v1.1.1 修好的是**胶囊**（安全标记恒可见，旧版恰恰是它消失）；三元素在算术上无法共存，**待维护者裁决**：(a) 胶囊换行 (b) 缩短文案 (c) 维持现状 |
-| R2 | **`postponeInjection` 的旧幽灵槽位不会自动消失** | 只防新增；清理属**删用户数据**，需维护者明确同意 |
-| R3 | **周报「下次复诊日」恒空** | 窗口写错（`[今天, +120]` 查就诊日），**2 行可修**，未修 |
-| R4 | **备份文件名只过滤前后缀就拿去做破坏性 DELETE** | `AttachmentPath.SEGMENT_PATTERN` 已解决同一问题、没传播过去 |
-| R5 | **`verifyBackup` 半提交 + 原始异常文本直接给用户看** | 未修 |
-| R6 | **`GlobalMessages` 一次性事件无订阅者即丢** | 未修（replay=0） |
-| R7 | **附件级联删除在事务外销毁字节** | 有成文取舍；失败模式选的是**最不可恢复**的那个 |
-| R8 | **`KbDetailDialog` 的第四个时钟源** | 改签名会撞 detekt 基线；已在代码里写明"明说的残留" |
+| R2 | **`postponeInjection` 的旧幽灵槽位不会自动消失** | 只防新增：`MedicationRepository.kt:621` 是 `slotDao.deleteOfMedFrom(med.id, today)`，**只删「今天起」**，历史计划行按设计保留。清理旧幽灵属**删用户数据**，需维护者明确同意 |
 
-**尚未真机验证的高危**（改完没上机，属"未验证"而非"已知坏"）：CRITICAL 那条的运行时宽度（需 320/360dp × 1.0×/2.0× 四张截图）· 恢复备份的重入保护（需真机双击）· WebDAV 真实网络下 20MB 附件下载。
+### 已修销账（原 R3–R8，全部在 v1.2.7 批次 14 修掉，勿再重复提）
+
+| 原编号 | 风险 | 修法落点 |
+|---|---|---|
+| R3 | 周报「下次复诊日」恒空 | 改为**按下次复诊日**取数，不再按就诊日（`Daos.kt:756` / `ReportRepository.kt:261` 有完整 KDoc） |
+| R4 | 备份文件名只过滤前后缀就拿去做破坏性 DELETE | 新增 `WebDavClient.isSafeBackupName` + `BACKUP_NAME_PATTERN = Regex("ashkb-backup-[0-9A-Za-z._-]+\\.ashkb")`（整串匹配，排除 `%` `/` `\` `?` `#`），`parseBackupFileNames` 出口过滤 |
+| R5 | `verifyBackup` 半提交 + 原始异常文本直接给用户看 | **半提交已修**：采纳 vault key 从「校验」挪进 `restore`，且必须在 pre-restore 快照之前（`BackupRepository.kt:273-330`）。**异常原文未修**：`BackupEngine.kt:288` 仍 `"恢复写入失败：${e.message}"`，见小尾巴 1 |
+| R6 | `GlobalMessages` 一次性事件无订阅者即丢 | `MutableSharedFlow(replay = 0)` 改为 `Channel`（`GlobalMessages.kt:15-27`） |
+| R7 | 附件级联删除在事务外销毁字节 | 改为「事务内只动行 → 提交后才删字节」；成文取舍：崩溃只会落在「什么都没变」或「孤儿字节占空间」，都比「行在、文件没了」好（`HealthRepository.kt:805-847`） |
+| R8 | `KbDetailDialog` 的第四个时钟源 | 改为注入 `today: String`，不再读系统时钟（`KbDetailDialog.kt:42-60`）；基线签名字串已同步（既存豁免，未新增） |
 
 ---
-**当前状态**：`v1.1.0`（versionCode **102**）已发布为 GitHub Latest、已装维护者真机；单测 **736 条全绿**；CI 连续 `success`；CHANGELOG / HANDOFF / HANDOFF-STATUS / README **四份已同步**；工作区无未提交改动。
 
----
+## 一、第一优先级：真机复验与维护者决策
 
-## 一、第一优先级：收维护者的真机问题（攒够一批再改）
+**1. 三笔真机复验（我做不了，需维护者解锁手机 / 重开无线调试）**
 
-维护者从 2026-10-02 起用几天攒问题。**回来时不要再一版一版追**——v1.0.90 → v1.0.96 连出 7 个版本，其中 5 个是观感微调，每次都要他重新装机重看，效率低。
+| # | 事项 | 现状 |
+|---|---|---|
+| 1 | `dark-05-me.png` 是 **0 字节损坏文件** | 重拍时设备掉线；AOD 锁屏下 `screencap` 产出全黑或 0 字节。MIUI 密码锁**无法 adb 绕过**（`locksettings set-disabled true` 对 MIUI 无效、`input keyevent 82` 只会拉下通知栏） |
+| 2 | 「上次异常」遮罩项**证据无效** | 30 轮屏关冷启动复验期间设备处于**锁屏 + AOD**，`uiautomator dump` 抓到的全是 `com.android.systemui` / `com.miui.aod`，`mask=False` **不能证明首页没浮遮罩**。有效证据只有 `logcat -d -b crash` 零 FATAL + events buffer 里反复的 `am_proc_start … MainActivity`。需**解锁亮屏**后重跑 |
+| 3 | 批次 C ⑥「存量同日多行不被改写」 | 设备上没有旧版遗留的多行数据，只有单测 `PrnDailyCapTest` 用例 4 覆盖 |
 
-**做法**：把所有问题写成一个批次任务书（`release-tooling/batchN-brief.md`）→ 派**一个**子代理 → 复核 → 构建 → 发布 **1.1.1**。
+**2. 三项只属于维护者本人**（在「子代理禁改清单」里）
 
-**问清三点**（这几轮证明这三点最省时间）：哪个界面/哪个元素（**截图最好**）· 期望 vs 实际 · 属于哪类（排版 / 数字 / 找不到记录 / 闪退）。
+- **裁决项 5「临界」显示**：`domain/ClinicalThresholds.kt:35` 的 `const val LAB_NEAR_BOUNDARY_RATIO = 0.05f` **全仓零使用点**（只声明、无引用），化验判读只有 `high` / `low` / `normal` 三态，**没有 near-boundary 分支**。该文件禁改，须维护者本人动手或明确授权。
+- **审查报告 §十 的澄清问题 —— 实为 5 条**（文档此前一直误记为 3 条）。原件 `C:\Users\weant\Documents\Qoder\2026-09-28\a6159f90\ASHKB-代码审查报告.md:260-266`：
+  ①审查目的的权重（自用可靠性 / 上架前安全审计 / 交接新维护者 / 改进 AI 协作流程）
+  ②医疗规则处置权（只报不改 / 允许把安全默认值改保守 / 先把散落阈值外移并加校验）
+  ③备份威胁模型（仅防设备丢失 / 不信任 WebDAV 服务商 / 需考虑恶意备份文件 / 完全不用 WebDAV）—— 决定 S-1/S-2/S-3 是 P0 还是 P2
+  ④锁屏急救卡（S-5 隐私换可用是刻意取舍，保留还是改成需解锁查看详情）
+  ⑤改造预算（愿为「测试安全网」投入多少，第 2 批约 1 天，直接决定第 3 批医学规则敢不敢动手）
+- **批次 C 的发版**：按需药「每天只记一次」已过门禁、已装机验证 ①②③④，**已随 v1.2.10 发布**（release id `416558911`）。
+
+**3. UI 2.0 §06 六帧验收 —— 代码侧缺口已全部清零**
+
+③ 健康 Hub「今日体征」面板（两列两行，顺序 血压/心率 → 体温/体重，未记录不隐藏）+ 紧急卡 **danger-soft** 瓦片：**真机通过**。
+⑤ 知识库类别徽章（「教育」在标题行右侧、软底小圆角，底部证据等级行原样保留）：**真机通过**。
+④ 报表「稳定期」胶囊：**首版有窄格截断回归，已修复并真机复验通过**（现挂概览页全宽卡标题行右侧，深色深绿底 / 浅色浅绿底 `● 稳定期`）。
+深色页面底四帧均匀、**无白边**（批次 A 的 `windowBackground` 缺陷修复仍有效）。
+截图留档 `E:\ASHKB\ui2-shots\ui20\v1210\`（`light-*` / `dark-*` / `fix-*`）。
+
+**4. 裁决项 8（审查报告 §九 七条）—— 已结项，两条真机尾巴已补完**
+
+第 3 条**跨主机重定向不转发 `Authorization` 已由 Android 真机实测确认**（`RedirectLab` dex 走 `dalvikvm`，B 端实收头里无 Authorization，`final url` 已跳到 `localhost:8092`、`auto-follow=true`）。
+第 6 条**无法取证**（`flags=0x0` 非 debuggable、`run-as` 被拒、`shared_prefs` Permission denied、shell 无 root）⇒ 与审查报告「缺文件」判定一致，只能靠代码审读 + 单测。
+其余五条（MIUI appops / CI 签名 / Keystore 背书 / PBKDF2 耗时 / 应用锁）均已取证并回填 `HANDOFF-STATUS.md` 的「裁决项 8 结项」一节。
 
 ---
 
@@ -41,42 +85,59 @@
 | 2 | **Wellness 下半屏**（饮食画像 / 忌口 / 时间线） | 自动滚动误触拨号盘两次，我不再用盲手势 | 健康 → 营养与骨健康 → 往下滚（**补剂区维护者已确认正常** ✅） |
 | 3 | **`KeyValueRow` 新对齐**（v1.0.95/96） | 同上 | 健康档案 / 身体指标 / 饮食画像应**靠右**；周月报长值**从固定位置折行**；急救卡剂量说明**不再 6 行** |
 
+**尚未真机验证的高危**（改完没上机，属"未验证"而非"已知坏"）：R1 那条的运行时宽度（需 320/360dp × 1.0×/2.0× 四张截图）· 恢复备份的重入保护（`restoreMutex` 已就位，需真机双击）· WebDAV 真实网络下 20MB 附件下载（`AttachmentDownloadLimitTest` 已覆盖上限逻辑）。
+
+**批次 B 新增、同样未装机的真机看点**：本地备份选文件的 64 MiB 上限提示、档案导出/导入新增 7 个字段（含 `spine_mobility`）往返、用药史弹层 90 天窗 / 最多 60 行截断、急诊事件草稿各字段都有输入格、运动判读反馈文案已去掉 `exc-010` / `L1` 代号、**停药弹层里不应出现「顺延」**（已真机确认 ✅）、顺延注射后台账 `reason` 存的是 `postpone`。
+
 ---
 
 ## 三、A 组剩余（性能拆分）
 
-| 屏幕 | 现状 |
-|---|---|
-| `ReportScreen`（**803 行**） | 报告页三个 tab 的 Flow 仍在根级 |
-| `EmergencyScreen`（**822 行**） | 同上；**事件卡的同形挤压风险已在 v1.0.92 修掉** |
+> 行数与读点数已于 2026-10-23 逐文件实测，**不要沿用旧数字**。
 
-**照已完成的四个先例做**（`MedsScreen` 标杆 / `BackupScreen` 19→3 / `TodayScreen` 8→3 / `WellnessScreen` 10→0 / `MedEditScreen` 根级读点 24→0）。
+| 屏幕 | 实测现状 | 是否还欠 |
+|---|---|---|
+| `ReportScreen` | **835 行**，`collectAsState` **×8**（全在根函数 `:85-91`：`overview` / `trends` / `trendDays` / `periodic` / `periodDays` / `busy` / `message`） | ✅ 欠：三个 tab 的 Flow 仍在根级 |
+| `EmergencyScreen` | **772 行**，`collectAsState` **×6**（全在根函数 `:109-113`：`contacts` / `events` / `profile` / `meds` / `date`） | ✅ 欠；事件卡的同形挤压风险已在 v1.0.92 修掉 |
+| `BackupScreen` | **1216 行**，`collectAsState` **×26** —— 但**已按节拆分**（`LocalBackupSection` / `WebDavSection` / `AttachSyncSection` / `RestoreSection` / `LedgerSection` / `DavBackupPickerSheet` / `WebDavSheet` 各收自己的 Flow），根函数 `:163-165` 只留 `busy` / `message` / `davPicked` **3 个** | ❌ **不欠**（旧记法「19→3」要按这个现状理解：根级已达标，26 是**全文件**计数） |
+
+**照已完成的先例做**：`MedsScreen` 标杆 / `TodayScreen` 8→3 / `WellnessScreen` 10→0 / `MedEditScreen` 根级读点 24→0 / `BackupScreen` 根级 3。
+
+> 附带一项：`BackupScreen.kt` 有两处底部弹层仍是 `DividerList`（**非惰性**）—— `:989`（台账行）与 `:1097`（DAV 备份选择弹层）。M7 只修了「滚动 / 尾部可达」，**虚拟化没做**，可按 `MedHistory` 的截断先例收掉。
 
 ---
 
 ## 四、小尾巴（可一次性收掉）
 
-1. **补剂「部分完成」写入路径**：数据层已就位（`SupplementLogStatus` 覆盖 partial、依从率已按三态算），只差 UI（卡片只给「打卡 / 跳过」，与药品一致）
-2. **3 条孤儿字符串**（batch 3b 报告：`report_adherence_breakdown` 等），当时为避免动范围外内容未删
-3. **`HealthRepository` 一句注释**仍写"随库 v19 落地"（现已落地）
-4. **`DateProvider` 广播注册**无自动化测试（需真机跨零点或改时钟）
-5. **级联删除的附件分支**未真机验（行 + 磁盘文件；**19 条 Robolectric 测试**覆盖）
-6. **v1.0.85 的体感收益未验**（附件同步时输密码不再被打断）——设备上**没有附件**，那 3 条 Flow 不发射
+1. **`BackupEngine.kt:288` 仍把原始异常文本透给用户** —— R5 只修了半提交那一半，这半没修。修法：只展示 `resId` 文案，原文进台账/日志。
+2. **补剂「部分完成」写入路径**：数据层与判据已就位（`SupplementLogStatus` 覆盖 partial、依从率已按三态算、`WellnessViewModel.checkInSupplement(supp, status, reason, notes)` 本就收任意 status），**只差 UI** —— `TodayScreen.kt:626-627` 只有 `AdherenceCalc.DONE` / `SKIPPED` 两个入口，加第三个即可。
+3. **16 条孤儿字符串**（2026-10-23 复核，**全部仍为孤儿**，中英各 1 条完全成对）：`attach_count` / `attach_of_record` / `attach_state_remote_only` / `attach_sync_running` / `basdai_total_score` / `common_score_range` / `forms_tap_to_answer` / `forms_tap_to_answer_severe` / `kb_note_saved` / `meds_archived_empty` / `reminder_sedentary_window_label` / `report_adherence_breakdown` / `report_completion_breakdown` / `report_completion_empty_note` / `report_threshold_note2` / `weight_target_not_set`。**删的时候中英必须成对删**（`EnglishStringsParityTest` 会因条目数不等而红）。
+4. **`DateProvider` 的广播注册无测试**（精确表述）：纯 JVM 部分已有 `DateProviderTest.kt` **5 条**（同日不通知 / 变更只通知一次 / 注销后不通知 / 共享同一 flow / 日期回退也传播）；**没测的是 `start/stop` 的广播注册**，需真机跨零点或改时钟。
+5. **级联删除的附件分支未真机验**（行 + 磁盘文件）：`app/src/test` 下 cascade/级联 相关断言实测 **28 处**（旧记法「19 条 Robolectric」已过时）。
+6. **v1.0.85 的体感收益未验**（附件同步时输密码不再被打断）—— 设备上**没有附件**，那 3 条 Flow 不发射。
+
+> ~~`HealthRepository` 一句注释仍写"随库 v19 落地"~~ —— **已销账**：全仓 grep 零命中，该注释早已不存在（现 `:877` 是 v1.0.78 的另一段说明）。
 
 ---
 
 ## 五、必须记住的硬约束（踩过的坑）
 
-- ⚠️ **一次只跑一个 Gradle 构建** —— ⚠️ **注意：本机内存不是瓶颈**（31.7 GB 总 / 常驻 8 GB+ 可用 ✅）。2026-10-04 两次子代理"被杀"**并非内存爆掉，而是 API 额度耗尽**（维护者确认 ✅）。此前我误判为"并发构建内存爆掉"并写进本文件，**该归因已更正** ✅。仍建议串行构建的理由是**构建日志与结果归属清晰**、避免多个任务抢同一份 `build/` 产物 ✅，**不是**因为会崩机器 ✅
-- **`strings.xml` 是混合换行（CRLF+LF）**：必须字节安全改写（UTF8 无 BOM 读入 → 逐条唯一匹配断言 → Replace → 同编码写回），**禁止整文件重排**
-- **改版本号必须同时同步四份文档**，否则 `verifySpecSync` 会 FAILED（它**正确拦住过**一次）
-- **子代理不得改**：版本号 / 四份文档 / lint+detekt 基线 / `ExerciseEngine.kt` / `DateInput.kt` / `ClinicalThresholds.kt` / `AdherenceCalc.kt`
-- **`lintDebug` 0 error 是红线**；中途报出的 detekt 新问题**一律改代码、不进基线**
-- **detekt 基线按「文件 + 完整签名」记账**（连 `private` 都写死）→ 被登记过的函数不能换文件、不能改形参表
-- **发布流程**：`gh api -X POST repos/weante/ashkb/releases --input rel-*.json`（中文走 JSON 文件）→ `curl.exe --http1.1` 上传资产 → **核对摘要**（本地 `Get-FileHash` vs 远端 `digest`）→ 给上一版挂取代横幅（**PATCH 用 release id**）
-- **GitHub 必须 HTTP/1.1**：`git -c http.version=HTTP/1.1 push origin main`
-- **崩溃恢复**：`Could not read workspace metadata from ...transforms-4\...\metadata.bin` = Gradle 转换缓存被写坏 → **停守护进程 + 整个删掉 `transforms-4`** 再重建（只删单个条目无效）
-- **真机读屏**：`uiautomator dump` + `adb pull`；点击要打**最近的可点击祖先**（文本节点常不可点）；⚠️ **别在含电话号码的页面上盲滑动**（已误触拨号盘两次）
+- ⚠️ **本机内存不是瓶颈**（31.7 GB 总 / 常驻 8 GB+ 可用 ✅）。2026-10-04 两次子代理"被杀"**并非内存爆掉，而是 API 额度耗尽**（维护者确认 ✅）。此前误判为"并发构建内存爆掉"并写进本文件，**该归因已更正** ✅。仍建议**串行**构建的理由是**日志与结果归属清晰**、避免多个任务抢同一份 `build/` 产物 ✅，**不是**因为会崩机器。
+- **`strings.xml` 是混合换行（CRLF+LF）**：必须字节安全改写（UTF8 无 BOM 读入 → 逐条唯一匹配断言 → Replace → 同编码写回），**禁止整文件重排**。⚠️ `ReportScreen.kt` 是**纯 CRLF**，用 `[System.IO.File]` 改写时锚点必须带 `` `r`n ``。
+- ⚠️ **`[System.IO.File]` 一律写绝对路径**：`.NET` 的当前目录是**进程启动时的目录**，不随 PowerShell `cd` 变。用相对路径 `ReadAllText` 会抛 "Could not find file"，随后 `WriteAllText` 会在**错误的位置建一个 0 字节同名文件**（本项目已踩两次）。
+- **改版本号必须同时同步四份文档**，否则 `verifySpecSync` 会 FAILED（它**正确拦住过**一次）。机器门的确切要求（`build.gradle.kts:34-86`）：`README.md` 必须含 `` 当前 `v$versionName`（versionCode $versionCode） ``；`HANDOFF-STATUS.md` 必须含 `截至 **v$versionName（versionCode $versionCode）` **且** `versionCode $versionCode / versionName $versionName`；`HANDOFF.md` **不再**被版本门检查；`ASHKB_DB_VERSION` 对应的 `app/schemas/…/$dbVersion.json` 必须存在。
+- **子代理不得改**：版本号 / 四份文档 / lint+detekt 基线 / `ExerciseEngine.kt` / `DateInput.kt` / `ClinicalThresholds.kt` / `AdherenceCalc.kt`。
+- **`lintDebug` 0 error 是红线**；中途报出的 detekt 新问题**一律改代码、不进基线**。
+- **detekt 基线按「文件 + 完整签名」记账**（连 `private` 都写死）→ 被登记过的函数不能换文件、不能改形参表。**但「不得新增基线条目」≠「不得同步既存条目的签名」**：按 `release-bodies/v1.2.7.md:86-92` 先例**同步那一条 ID 的签名字串**即可，改动前备份、改后 `Compare-Object` 确认 diff 恰为目标几行。⚠️ **KDoc/注释不要写进形参列表** —— 形参内嵌注释会**逐字进入基线 ID**。
+- **静态断言 ≠ 验收**（2026-10-21 真机教训）：源码静态守卫只能证明「槽位存在、顺序正确」，**证明不了「放得下」**。§06 ④ 的胶囊初版挂在约 170dp 的迷你格，6 条断言全绿，真机上标题已被压成「BASDAI 总…」。**凡新增「标题 + 数值 + 徽章」三段式布局，必须真机看一眼**；结论类徽章挂**宽卡标题行**，不要塞进迷你格。
+- **发布流程（v1.2.10 实测版，替代旧写法）**：①本地 `git tag -a vX.Y.Z -m "…" <commit>` + `git push origin refs/tags/vX.Y.Z` → ②`gh release create vX.Y.Z --repo weante/ashkb --title … --notes-file … --latest`（**不要再带 `--target`**：`--target` 建的是**轻量标签**，v1.2.10 因此被迫 `--force` 重推附注标签）→ ③`gh release upload vX.Y.Z <apk> --clobber` → ④`gh api -X PATCH repos/weante/ashkb/releases/<id> -f target_commitish=<sha>`（**`upload --clobber` 只换资产、不改 target**）→ ⑤`gh api repos/weante/ashkb/releases/tags/vX.Y.Z` 核对 id / 资产大小 / `state=uploaded`，并查 `releases/latest` 是否已接管 → ⑥`git ls-remote --tags origin` 确认 `refs/tags/vX.Y.Z` 是 tag 对象、`refs/tags/vX.Y.Z^{}` 是 commit（v1.2.2 曾因代理静默失败把 tag 指到旧提交）。全链路需 `HTTP_PROXY`/`HTTPS_PROXY` = `http://127.0.0.1:7897`；`git ls-remote` 偶发 `TLS connect error … unexpected eof`，重试 2–3 次即可。
+- **GitHub 必须 HTTP/1.1**：`git -c http.version=HTTP/1.1 push origin main`。
+- **pwsh 两个坑**：`git rev-parse v1.2.10^{}` 的 `^{}` 会被吃掉 → **必须加引号** `'v1.2.10^{}'`；`gh api --jq .body` 含换行时会被拆成字符串数组 → **必须 `-join "`n"`**。
+- **崩溃恢复**：`Could not read workspace metadata from ...transforms-4\...\metadata.bin` = Gradle 转换缓存被写坏 → **停守护进程 + 整个删掉 `transforms-4`** 再重建（只删单个条目无效）。
+- **构建必须在沙箱外**：workspace-write 下 Gradle 无法初始化 native services（`Failed to load native library 'native-platform.dll'`）。命令：`. E:\ASHKB\build-env\env.ps1; & "E:\ASHKB\build-env\gradle-8.7\bin\gradle.bat" -p E:\ASHKB\patient-health-app <tasks> --console=plain`，且**不要覆盖 `GRADLE_USER_HOME`**。`apksigner` 前必须先 `. env.ps1` 设 `JAVA_HOME`。
+- **门禁结果看 XML，不看 HTML mtime**：`app/build/reports/lint-results-debug.html` 常 UP-TO-DATE 未重写；以 `lint-results-debug.xml`（total/Error）与 `detekt.xml`（issues）为准。凡 `--tests` 过滤运行，结论**必须读 `TEST-*.xml`（含 mtime）**，不能只看 exit code。
+- **真机读屏**：`uiautomator dump` + `adb pull`；点击要打**最近的可点击祖先**（文本节点常不可点）；⚠️ **别在含电话号码的页面上盲滑动**（已误触拨号盘两次）。
+- **无线调试**：IP 与端口每轮都变（本轮见过 `.180` → `.64`，端口 44507/40961/38435/40329/43043/44767）。`adb kill-server` → `start-server` → `adb mdns services` 取 `_adb-tls-connect._tcp` 的 `IP:port`；若只有 `_adb-tls-pairing` 则需 `adb pair <IP>:<port> <配对码>`。**手机侧 VPN 地址（如 `172.19.0.1`）宿主不可达**，用 mdns 广播的 LAN 地址。设备掉线 = 无线调试被关，**宿主侧不可修复**。
 
 ---
 
