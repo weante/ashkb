@@ -80,7 +80,7 @@
     <string name="backup_err_engine_schema_newer">备份来自更高版本（schema %1$d &gt; 当前 %2$d），请先升级 APP</string>
     <string name="backup_err_engine_bad_format">备份格式不正确：%1$s</string>
     <string name="backup_err_engine_unknown_tables">备份包含当前数据库不存在的表，已整体拒绝：%1$s</string>
-    <string name="backup_err_engine_write_failed">恢复写入失败：%1$s</string>
+    <string name="backup_err_engine_write_failed">恢复写入失败，数据库已回滚到恢复前的状态，原有数据未受影响。可重试，或用恢复前的自动快照回退。</string>
     <string name="backup_err_engine_bad_type">备份数据类型不符：%1$s.%2$s 期望数值，实际为 %3$s</string>
     <string name="backup_err_engine_unknown_column">备份含未知列：%1$s.%2$s</string>
     <string name="backup_verify_rows_mismatch">%1$s: 期望 %2$d 实际 %3$d</string>

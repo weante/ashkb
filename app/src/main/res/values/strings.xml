@@ -19,6 +19,7 @@
     <string name="backup_dav_pick_note">服务器 /ashkb/backup/ 下的备份（保留日 7 / 周 4 / 月 6 份）。点击下载到本机，随后走旁路解密五步恢复。</string>
     <string name="backup_dav_pick_refresh">刷新列表</string>
     <string name="backup_dav_pick_title">从 WebDAV 选择备份</string>
+    <string name="backup_dav_pick_truncated">仅列出最近 %1$d 份，更早的备份未显示——可在服务器侧清理后刷新列表</string>
     <string name="backup_dav_probe_note">三步探针：目录可写 → 写入探针回读一致 → 清理。上传后自动回读比对 SHA-256，</string>
     <string name="backup_dav_retention_note">保留日 7 / 周 4 / 月 6 份，路径 /ashkb/backup/。</string>
     <string name="backup_dav_section_title">WebDAV 远程备份（可选）</string>
@@ -78,7 +79,6 @@
     <string name="basdai_q6_stiffness">Q6 晨僵时长（0=无，10=全天）</string>
     <string name="basdai_self_high">自评偏高</string>
     <string name="basdai_title">BASDAI 疾病活动度自评</string>
-    <string name="basdai_total_score">BASDAI 总分</string>
     <string name="basdai_weekly_note">回顾最近一周的感受作答（0=无，10=最重）。6 题全部作答后才会计算总分。</string>
     <string name="basdai_incomplete_note">已作答 %1$d/6 题——6 题全部作答才会计算总分（BASDAI 需完整施测，缺题不计分）</string>
     <string name="checkup_add_item">添加项目</string>
@@ -159,7 +159,6 @@
     <string name="common_refresh">刷新</string>
     <string name="common_required">必填</string>
     <string name="common_save">保存</string>
-    <string name="common_score_range">0–10 分</string>
     <string name="common_submit">提交</string>
     <string name="common_success">成功</string>
     <string name="common_today">今天</string>
@@ -519,7 +518,6 @@
     <string name="report_tab">报表</string>
     <string name="report_threshold">阈值</string>
     <string name="report_threshold_note">阈值说明</string>
-    <string name="report_threshold_note2">阈值以上为高活动度</string>
     <string name="report_total_duration">累计时长</string>
     <string name="report_trend_wait_note">记录满 2 天后这里会出现趋势</string>
     <string name="report_trends_tab">趋势</string>
@@ -735,7 +733,6 @@
     <string name="me_med_disable">停用 %1$s</string>
     <string name="me_meds_count">在用药品（%1$s）</string>
     <string name="meds_archived_section">已停用药品（%1$d）</string>
-    <string name="meds_archived_empty">暂无已停用药品</string>
     <string name="meds_archived_hint">点开可查看停用原因与该药的用药记录</string>
     <string name="meds_stop_line">停用于 %1$s</string>
     <string name="meds_stop_reason_line">原因：%1$s</string>
@@ -779,12 +776,9 @@
     <string name="med_plus_days">+%1$s 天</string>
     <string name="med_postpone_title">顺延 %1$s 注射</string>
     <string name="med_skip_title">跳过 %1$s</string>
-    <string name="report_adherence_breakdown">完成 %1$s · 部分 %2$s · 跳过 %3$s</string>
     <string name="report_adherence_days">记录内完成度（%1$s 天）</string>
     <string name="report_adherence_total">共 %1$s 条记录 · 部分完成按 0.5 计</string>
     <string name="report_completion_empty">—（暂无记录）</string>
-    <string name="report_completion_empty_note">没有已记录的用药打卡，暂无法计算完成度</string>
-    <string name="report_completion_breakdown">完成 %1$d · 部分 %2$d · 跳过 %3$d（共 %4$d 条记录）</string>
     <string name="report_completion_prn_note">另有按需用药记录 %1$d 次，不计入完成度</string>
     <!-- v1.0.77（批次 3b）：计划剂量口径的用药完成度。与「记录内完成度」并列展示——
          两者分母不同（计划剂量数 vs 已记录条数），界面必须把差别写清楚，否则用户会以为数字在打架。 -->
@@ -825,8 +819,6 @@
     <string name="wellness_weight_manage_title">体重记录管理</string>
     <string name="wellness_weight_entry">%1$s　%2$s kg</string>
     <string name="wellness_clear_diet_profile">清除饮食画像</string>
-    <string name="forms_tap_to_answer">点此：%1$s</string>
-    <string name="forms_tap_to_answer_severe">点此：%1$s</string>
     <string name="forms_slider_a11y">%1$s 当前 %2$s 分，满分 %3$s</string>
     <string name="lab_parse_result">解析结果：%1$s 项</string>
     <string name="lab_parse_result_abnormal">解析结果：%1$s 项 · %2$s 项异常</string>
@@ -1030,7 +1022,6 @@
     <string name="kb_note_empty">还没有备注</string>
     <string name="kb_note_edit">写备注</string>
     <string name="kb_note_edit_action">修改备注</string>
-    <string name="kb_note_saved">备注已保存</string>
     <string name="kb_note_clear">清除备注</string>
     <string name="kb_note_has_tag">有备注</string>
     <string name="kb_note_count">%1$d 条有我的备注</string>
@@ -1050,7 +1041,6 @@
     <string name="weight_target_below">低于目标 %1$s kg</string>
     <string name="weight_target_above">高于目标 %1$s kg</string>
     <string name="weight_target_incomplete">请补全目标区间（上下限都需填写）</string>
-    <string name="weight_target_not_set">未设目标区间</string>
     <string name="weight_target_range_label">目标 %1$s – %2$s kg</string>
 
     <!-- ===== v10（v1.0.33）：B10 复诊附件归档 ===== -->
@@ -1067,7 +1057,6 @@
     <string name="attach_delete_confirm">删除该附件？文件将从本机移除。</string>
     <string name="attach_open_failed">无法打开该附件</string>
     <string name="attach_view">查看</string>
-    <string name="attach_count">%1$d 个附件</string>
     <string name="attach_photo_name">照片</string>
     <string name="attach_total_size">占用 %1$s</string>
 
@@ -1083,14 +1072,12 @@
     <string name="attach_link_empty_records">还没有复诊记录。先在「记录」页建一条复诊记录，再回来归属。</string>
     <string name="lab_link_action">归属复诊记录</string>
     <string name="imaging_link_action">归属复诊记录</string>
-    <string name="attach_of_record">该复诊的附件</string>
 
     <!-- ===== v12（v1.0.35）：附件 WebDAV 同步 ===== -->
     <string name="attach_sync_section">附件同步</string>
     <string name="attach_sync_switch">同步附件到 WebDAV</string>
     <string name="attach_sync_switch_note">开启后，附件（化验单 / 影像报告）会加密后逐个上传到服务器，换机时可随用随取。附件内容加密后上传，服务器上不可读；附件不并入备份文件。</string>
     <string name="attach_sync_button">同步附件</string>
-    <string name="attach_sync_running">正在同步附件…</string>
     <string name="attach_sync_summary">本地 %1$d 个 · 已同步 %2$d · 待传 %3$d · 待清理 %4$d</string>
     <string name="attach_sync_size">本地占用 %1$s</string>
     <string name="attach_sync_need_webdav">请先配置 WebDAV 服务器</string>
@@ -1190,7 +1177,6 @@
     <string name="plans_stage_flare">发作期</string>
     <string name="attach_state_synced">已同步</string>
     <string name="attach_state_pending">未同步</string>
-    <string name="attach_state_remote_only">仅云端</string>
     <string name="attach_downloading">正在从云端取回…</string>
     <string name="attach_download_failed">云端未找到该附件，或网络异常</string>
     <!-- v1.0.86（批次 11 / D6）：附件超过 WebDAV 读取上限（%1$d MB）。 -->
@@ -1329,7 +1315,6 @@
     <string name="reminder_sedentary_interval_label">提醒间隔</string>
     <string name="reminder_sedentary_interval_30">每 30 分钟</string>
     <string name="reminder_sedentary_interval_45">每 45 分钟</string>
-    <string name="reminder_sedentary_window_label">活动时段</string>
     <string name="reminder_sedentary_window_value">%1$d:00 – %2$d:00</string>
     <!-- v1.0.69 C8b：晨僵驱动的起床热身序列 -->
     <string name="exercise_warmup_title">起床热身序列</string>

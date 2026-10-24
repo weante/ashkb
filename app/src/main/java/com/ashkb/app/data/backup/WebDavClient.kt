@@ -517,6 +517,36 @@ class WebDavClient(
         }
 
         /**
+         * 远程备份列表最多列出多少份（v1.2.10 审查第二批 M7 附带项）。
+         *
+         * **为什么要有上限**：这个列表挂在 `ModalBottomSheet` 里，宿主是 `Column + verticalScroll`
+         * （**没有虚拟化**，所有行都会被组合出来）——和 `MedHistory` / `SupplementHistory` 同一种
+         * 结构，也就同一种毛病。服务器侧轮换保留「日 7 / 周 4 / 月 6」共 17 份基准，但**同一天
+         * 可以有多份时间戳备份**，而 [parseDavBackups] 本身不限条数（PROPFIND 响应上限 1 MiB，
+         * 按每项约 200 字节算理论上能到数百条）。一次组合数百行 `DavBackupRow` 会让 sheet 明显卡顿。
+         *
+         * 40 的依据：17 份基准之上留两倍余量，够覆盖「同一天连做几次备份」的真实情况；
+         * 而一屏约 20 行，40 行是两屏——翻两屏仍找不到想要的备份时，更该做的是
+         * 「刷新列表」或去服务器侧清理，而不是继续往下滚。
+         *
+         * **上限只影响列出多少行**：`listBackupFiles` 仍返回全量（下载走显式点击，不受此限），
+         * 被截断时另给一行说明（[backupsTruncated]）——不能让用户以为「服务器上只有 40 份」。
+         */
+        const val MAX_BACKUP_FILES = 40
+
+        /**
+         * 列表实际渲染的备份。
+         *
+         * 入参已由 [parseDavBackups] 按备份时间倒序（最新在前），这里**只截断、不重排**——
+         * 再排一次会让「最近」出现第二份定义，两份迟早不一致。
+         */
+        fun visibleBackups(files: List<DavBackupFile>): List<DavBackupFile> =
+            files.take(MAX_BACKUP_FILES)
+
+        /** 列表是否多到列不下（判据是**真实份数**，不是截断后的行数）。 */
+        fun backupsTruncated(total: Int): Boolean = total > MAX_BACKUP_FILES
+
+        /**
          * v1.0.36：解析 PROPFIND 多状态响应为 (名字, 是否目录)。
          *
          * 集合判定同时看 href 尾斜杠与 `<resourcetype><collection/>`——部分服务器只给其一；

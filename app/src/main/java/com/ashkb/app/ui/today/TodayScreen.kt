@@ -623,9 +623,12 @@ private fun TodaySupplementCard(vm: TodayViewModel, onOpenWellness: () -> Unit) 
                     dose = sup.dose,
                     times = SupplementReminderScheduler.parseTimes(sup.times),
                     status = SupplementLogStatus.loggedToday(logs, sup.id),
-                    onCheckIn = { vm.checkInSupplement(sup, AdherenceCalc.DONE) },
-                    onSkip = { vm.checkInSupplement(sup, AdherenceCalc.SKIPPED) },
-                    onUndo = { vm.undoSupplementCheckIn(sup) },
+                    actions = SupplementCheckInActions(
+                        onCheckIn = { vm.checkInSupplement(sup, AdherenceCalc.DONE) },
+                        onPartial = { vm.checkInSupplement(sup, AdherenceCalc.PARTIAL) },
+                        onSkip = { vm.checkInSupplement(sup, AdherenceCalc.SKIPPED) },
+                        onUndo = { vm.undoSupplementCheckIn(sup) },
+                    ),
                 )
             }
         }
@@ -633,44 +636,83 @@ private fun TodaySupplementCard(vm: TodayViewModel, onOpenWellness: () -> Unit) 
 }
 
 /**
+ * 首页补剂行的三个打卡动作。
+ *
+ * 与营养页的 `SupplementRowActions` 同构：**回调收进一个 data class**，让
+ * `TodaySupplementRow` 的参数个数留在 detekt 的 `LongParameterList` 阈值（8）以内。
+ * 加「部分」之前是 7 个参数（name / dose / times / status / onCheckIn / onSkip / onUndo），
+ * 再补一个 onPartial 就正好踩线——收拢比放宽阈值好：阈值一放宽，下一个函数还会踩。
+ */
+private data class SupplementCheckInActions(
+    val onCheckIn: () -> Unit,
+    val onPartial: () -> Unit,
+    val onSkip: () -> Unit,
+    val onUndo: () -> Unit,
+)
+
+/**
  * 补剂卡里的一行：名称 + 剂量 + 提醒时刻 + 今日状态 / 打卡按钮。
  *
  * 时刻文案直接显示 [SupplementReminderScheduler.parseTimes] 的结果（JSON 数组口径，与提醒
  * 排程同一份解析）——用户设的提醒时刻必须在首页看得见，否则「设了没反应」的困惑依旧存在。
  * 未设时刻时显式显示「不提醒」而不是留空，让「到底设没设」一眼可辨。
+ *
+ * v1.2.11：未记录时给出 **三个** 入口（跳过 / 部分 / 已服），补齐数据层早已支持的 `partial` 态；
+ * 三个按钮走 FlowRow 独占名称下方一行，避免把名称列压成零宽。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TodaySupplementRow(
     name: String,
     dose: String,
     times: List<String>,
     status: String?,
-    onCheckIn: () -> Unit,
-    onSkip: () -> Unit,
-    onUndo: () -> Unit,
+    actions: SupplementCheckInActions,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchComfort),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = name, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                text = supplementSubtitle(dose = dose, times = times),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    // v1.2.11：根改成 Column，把「名称行」与「动作行」分开。原因是补剂打卡补齐了三态
+    // （已服 / 部分 / 跳过），三个按钮挤在名称右侧的 Row 里会把名称列压成零宽——这与
+    // 营养页 `SupplementCardRow` 早已踩过的是同一个坑（见其 KDoc 的宽度推算）。
+    Column(Modifier.fillMaxWidth().heightIn(min = Size.touchComfort)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = name, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = supplementSubtitle(dose = dose, times = times),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (status != null) {
+                StatusChip(
+                    text = stringResource(SupplementLogStatus.labelRes(status)),
+                    tone = SupplementLogStatus.tone(status),
+                )
+                TextButton(onClick = actions.onUndo) {
+                    Text(stringResource(R.string.today_supplement_undo))
+                }
+            }
         }
         if (status == null) {
-            TextButton(onClick = onSkip) { Text(stringResource(R.string.today_supplement_skip)) }
-            Button(onClick = onCheckIn) { Text(stringResource(R.string.today_supplement_check_in)) }
-        } else {
-            StatusChip(
-                text = stringResource(SupplementLogStatus.labelRes(status)),
-                tone = SupplementLogStatus.tone(status),
-            )
-            TextButton(onClick = onUndo) { Text(stringResource(R.string.today_supplement_undo)) }
+            // FlowRow 而不是 Row：窄屏 / 大字号下三个按钮整体折行，而不是把末尾那个挤出屏幕。
+            // 文案复用 `med_history_status_partial`（「部分」），与药品历史、补剂详情弹层同源。
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                TextButton(onClick = actions.onSkip) {
+                    Text(stringResource(R.string.today_supplement_skip))
+                }
+                TextButton(onClick = actions.onPartial) {
+                    Text(stringResource(R.string.med_history_status_partial))
+                }
+                Button(onClick = actions.onCheckIn) {
+                    Text(stringResource(R.string.today_supplement_check_in))
+                }
+            }
         }
     }
 }

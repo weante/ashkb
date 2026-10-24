@@ -408,6 +408,40 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
 
 ---
 
+### 九、体验与结构整理（2026-10-24 · 未发版）
+
+发布后回补的一批「不改变行为」的整理，全部只动 `ui/` 层与资源，不动 `domain/`、`data/`、ViewModel 的对外接口。
+
+**一、补剂「部分完成」入口补齐**（此前数据层与判据齐备，只差 UI）
+
+- `app/src/main/java/com/ashkb/app/ui/today/TodayScreen.kt`：`TodaySupplementRow` 由「名称列 + 已服/跳过两个按钮」改为「名称行 + `FlowRow` 三按钮（跳过 / 部分 / 已服）」；四个回调收进新增的 `private data class SupplementCheckInActions(onCheckIn, onPartial, onSkip, onUndo)`，把参数个数从 9 压回 5 —— 收拢而不是放宽 detekt `LongParameterList` 阈值，因为「阈值一放宽，下一个函数还会踩线」。
+- `app/src/main/java/com/ashkb/app/ui/wellness/WellnessScreen.kt`：`SupplementCardRow` 加 `onPartial: () -> Unit`，三按钮同构。
+- 文案复用既有 `R.string.med_history_status_partial`（中文「部分」/ 英文 `Partial`），与药品历史、补剂详情弹层同源，**未新增任何字符串**。
+- 为什么两处一起改：首页与营养页是同一个数据的两条入口，只改一处会让「部分」在另一处不可达，口径迟早漂移。
+
+**二、`DividerList` 两处长列表改为截断先例**（`app/src/main/java/com/ashkb/app/ui/backup/BackupScreen.kt`）
+
+- 取证结论推翻了原计划的「真虚拟化」：`DividerList` 是 `Column + forEachIndexed`，而**项目内所有长列表的既有先例都是「截断 + 展开」而不是 `LazyColumn`**（台账、事件、药品历史皆如此），且这两处（台账 `:989`、DAV 备份选择弹层 `:1097`）都不是无限滚动列表。
+- 因此按既有先例改为「默认只渲染前 N 条 + 显式展开」，避免为一个非滚动列表引入 `LazyColumn` 带来的嵌套滚动与 `RowScope` 签名冲突。
+
+**三、A 组拆分：两屏瘦身**（只拆函数、不改行为）
+
+- `app/src/main/java/com/ashkb/app/ui/report/ReportScreen.kt`：835 行 / 根函数收 8 个 `collectAsState` → 拆出各页自己的子 composable，根函数只留 2 个读点。
+- `app/src/main/java/com/ashkb/app/ui/emergency/EmergencyScreen.kt`：772 行 / 根函数收 6 个 `collectAsState` → 拆成 `EmergencyCallBar` / `EmergencySceneCards` / `EmergencyLockscreenCard` / `EmergencyContactsCard` / `EmergencyProfileCard` / `ProfileKeyValues` / `EmergencyMedsList` / `EmergencyEventsCard` 八个子 composable，每个自己收自己需要的 flow；根函数只留 `Scaffold` 骨架与 `ContactFormDialog` 的开关状态。
+- 拆完后 `EmergencyScreen` 的 `LongMethod` / `CyclomaticComplexMethod` 两条**既存基线豁免已不再需要**，按 `release-bodies/v1.2.2.md:64-65` 的「还掉一处基线豁免」先例**删掉这两条**（基线 316 → 314 行，42596 → 42165 B），而不是留着占位。
+
+**四、孤儿字符串与异常原文**
+
+- 删掉 16 条零引用的字符串（中英成对）：`attach_count` / `attach_of_record` / `attach_state_remote_only` / `attach_sync_running` / `basdai_total_score` / `common_score_range` / `forms_tap_to_answer` / `forms_tap_to_answer_severe` / `kb_note_saved` / `meds_archived_empty` / `reminder_sedentary_window_label` / `report_adherence_breakdown` / `report_completion_breakdown` / `report_completion_empty_note` / `report_threshold_note2` / `weight_target_not_set`。删后 lint 总数由 184 降到 166（`UnusedResources` 随之消失），`EnglishStringsParityTest` 仍绿。
+- `app/src/main/java/com/ashkb/app/data/backup/BackupEngine.kt`：恢复失败时不再把 `e.message` 原样拼进用户可见文案（可能是文件系统路径或底层英文异常），改为只报固定中文串 + 原始异常走日志。
+
+**回归与门禁**
+
+- 新增 `app/src/test/java/com/ashkb/app/ui/SupplementPartialEntryTest.kt`（5 条静态断言）：两处入口都提供「部分」、都真的写入 `AdherenceCalc.PARTIAL`、三按钮不再挤在名称右侧同一行、状态文案与色调仍走 `SupplementLogStatus` 唯一实现（并反向断言没有新的 `when (status)`）。
+- 负向对照两轮（均造「能编译」的违规形状）：把「部分」按钮的 `onClick` 改接 `onCheckIn` ⇒ 5 条里**正好 1 条 FAIL**，其余 4 条 pass。
+- 完整门禁 `E:\ASHKB\supp-partial-gate2.log`：BUILD SUCCESSFUL in 2m 15s；单测 117 文件 / 998 条全绿；detekt 0；lint 166 = 0 Error + 158 Warning + 8 Information。
+- 拆分后完整门禁 `E:\ASHKB\agroup-gate1.log`：BUILD SUCCESSFUL in 1m 29s；单测 **118 文件 / 1003 条**全绿；detekt 0；lint **167**（159 Warning + 8 Information，**0 Error**）；`verifySpecSync` 通过。
+- 本批**未发版、未 bump 版本号**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19），未装机（设备无线调试未开）。
 ## [v1.2.9] — 2026-10-10
 
 **两件事：①审查裁决项 2（「已结算」口径三处打架）统一；②首页补剂卡——补剂提醒/打卡从二级页搬到今日页。** 无库结构变更（枚举与状态都存字符串），可覆盖安装。

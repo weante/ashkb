@@ -103,62 +103,19 @@ private fun Context.dial(phone: String) {
  * 紧急卡（方案 §10.8 反向设计）：疼痛中、慌乱中、单手操作——
  * 字要大、按钮要大、信息要少。120 快拨固定在底部，不随内容滚动。
  */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
-    val contacts by vm.contacts.collectAsStateWithLifecycle()
-    val events by vm.events.collectAsStateWithLifecycle()
-    val profile by vm.profile.collectAsStateWithLifecycle()
-    val meds by vm.meds.collectAsStateWithLifecycle()
-    val today by vm.date.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-
-    var cards by remember { mutableStateOf<List<KbEntry>>(emptyList()) }
-    var selectedCard by remember { mutableStateOf<KbEntry?>(null) }
-    var showContactForm by remember { mutableStateOf(false) }
-    var showEventForm by remember { mutableStateOf(false) }
-    // v1.0.80（批次 6）：编辑目标（null = 未打开）。删除入口在行内，编辑走同一张表单回填原值。
-    var editContact by remember { mutableStateOf<EmergencyContact?>(null) }
-    var editEvent by remember { mutableStateOf<EmergencyEvent?>(null) }
-    var showAllEvents by remember { mutableStateOf(false) }
-    var exporting by remember { mutableStateOf(false) }
-    // v1.0.66 B6a：锁屏紧急信息开关
-    var lockscreenEnabled by remember { mutableStateOf(EmergencyLockscreenStore.enabled(context)) }
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(Unit) { cards = vm.emergencyCards() }
-
-    // 开关开启时，页面内数据一变就同步锁屏卡（用户正在编辑联系人 / 档案 / 药单）
-    LaunchedEffect(lockscreenEnabled, contacts, profile, meds) {
-        if (lockscreenEnabled) EmergencyLockscreenPublisher.refresh(context)
-    }
-
+    // v1.2.10（A 组剩余 / 审查报告第 30 条）：本函数**不再收任何数据流**。
+    // 原先 contacts / events / profile / meds / today 五条流都收在这里，于是任何一条发射
+    // 都会整页重组（含 5 张场景卡、联系人列表、档案与用药汇总）。现在每条流由真正
+    // 用到它的那一个组合件自己收，重组面收敛到该卡本身。
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         // 外层 AppShell 的 Scaffold 已吃掉系统栏内边距，这里置 0 防止双倍空白
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            Button(
-                onClick = { context.dial("120") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
-                    .height(Size.emergencyCallHeight),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                ),
-                shape = MaterialTheme.shapes.large,
-            ) {
-                Icon(
-                    Icons.Rounded.Call,
-                    contentDescription = null,   // 文字已承载语义
-                    modifier = Modifier.size(Size.iconLg),
-                )
-                Spacer(Modifier.width(Spacing.sm))
-                Text(stringResource(R.string.emergency_call_120), style = MaterialTheme.typography.headlineSmall)
-            }
-        },
+        bottomBar = { EmergencyCallBar() },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             ScreenTopBar(title = stringResource(R.string.emergency_card_title), onBack = onBack)
@@ -171,299 +128,72 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
                 ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
-                // ---- 五应急场景卡（不可折叠，最先看到）----
-                items(cards, key = { it.id }) { card ->
-                    AlertBanner(
-                        tone = StatusTone.Danger,
-                        icon = Icons.Rounded.WarningAmber,
-                        title = card.title,
-                        body = card.summary,
-                        actionLabel = stringResource(R.string.common_view_details),
-                        onAction = { selectedCard = card },
-                        titleStyle = MaterialTheme.typography.titleLarge,
-                    )
-                }
-
-                // ---- v1.0.66 B6a：锁屏紧急信息开关 ----
-                item {
-                    SectionCard(
-                        title = stringResource(R.string.emergency_lockscreen_title),
-                        subtitle = stringResource(R.string.emergency_lockscreen_body),
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                        ) {
-                            Text(
-                                stringResource(R.string.emergency_lockscreen_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Switch(
-                                checked = lockscreenEnabled,
-                                onCheckedChange = { v ->
-                                    lockscreenEnabled = v
-                                    scope.launch {
-                                        if (v) {
-                                            EmergencyLockscreenStore.setEnabled(context, true)
-                                            EmergencyLockscreenPublisher.refresh(context)
-                                        } else {
-                                            EmergencyLockscreenPublisher.disable(context)
-                                        }
-                                    }
-                                },
-                            )
-                        }
-                        Text(
-                            stringResource(R.string.emergency_lockscreen_privacy),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(top = Spacing.xs),
-                        )
-                        // v1.0.72：小米 / HyperOS 专属提示。官方《适配常见问题》§9：MIUI **默认不允许
-                        // 应用在锁屏上显示内容/Activity**，需用户主动授予「锁屏显示」；§10：该权限
-                        // **没有查询接口** → 只能给文字 + 跳转按钮，不做状态行。
-                        if (XiaomiCompat.isXiaomi(Build.BRAND, Build.MANUFACTURER)) {
-                            Text(
-                                stringResource(R.string.emergency_lockscreen_miui_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = Spacing.sm),
-                            )
-                            OutlinedButton(
-                                onClick = {
-                                    if (!SystemSetupGuides.openMiuiPermissionEditor(context)) {
-                                        GlobalMessages.post(context.getString(R.string.settings_open_failed))
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
-                            ) { Text(stringResource(R.string.reminder_miui_open)) }
-                        }
-                    }
-                }
-
-                // ---- 紧急联系人 ----
-                item {
-                    SectionCard(
-                        title = stringResource(R.string.emergency_contact_title),
-                        subtitle = stringResource(R.string.emergency_call_a11y),
-                        action = {
-                            TextButton(onClick = { showContactForm = true }) { Text(stringResource(R.string.common_add)) }
-                        },
-                    ) {
-                        if (contacts.isEmpty()) {
-                            Text(
-                                stringResource(R.string.emergency_no_contacts),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else {
-                            // v1.0.90（批次 15）：单条联系人的排版抽成 ContactRow——
-                            // 本函数已到 detekt 的 LongMethod / CyclomaticComplexMethod 阈值
-                            // （基线只兜住**原始签名**，加一个 @OptIn 就不再匹配），
-                            // 而「名称 / 关系 / 改删 / 拨号」本身是独立可读的一件事。
-                            DividerList(contacts, key = { it.id }) { c ->
-                                ContactRow(
-                                    contact = c,
-                                    onDial = { context.dial(c.phone) },
-                                    onEdit = { editContact = c },
-                                    onDelete = { vm.deleteContact(c.id) },
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // ---- 个人信息（供急救人员参考）----
-                item {
-                    SectionCard(
-                        title = stringResource(R.string.me_my_info),
-                        subtitle = stringResource(R.string.emergency_for_paramedics),
-                        action = {
-                            val shareTitle = stringResource(R.string.emergency_share_card)
-                            TextButton(
-                                onClick = {
-                                    if (!exporting) {
-                                        exporting = true
-                                        vm.exportCardPdf(
-                                            onReady = { intent ->
-                                                runCatching {
-                                                    context.startActivity(
-                                                        Intent.createChooser(intent, shareTitle)
-                                                    )
-                                                }
-                                                exporting = false
-                                            },
-                                            onError = {
-                                                GlobalMessages.post(it)
-                                                exporting = false
-                                            },
-                                        )
-                                    }
-                                },
-                                enabled = !exporting,
-                            ) {
-                                Icon(
-                                    Icons.Rounded.PictureAsPdf,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(Size.iconSm),
-                                )
-                                Spacer(Modifier.width(Spacing.xs))
-                                Text(if (exporting) stringResource(R.string.backup_generating) else stringResource(R.string.emergency_export_print))
-                            }
-                        },
-                    ) {
-                        profile?.let { p ->
-                            KeyValueRow(stringResource(R.string.profile_name), p.displayName)
-                            KeyValueRow(stringResource(R.string.profile_diagnosis), p.diagnosis)
-                            KeyValueRow("HLA-B27", stringResource(Labels.hlaB27(p.hlaB27)))
-                            p.allergies?.let {
-                                KeyValueRow(stringResource(R.string.profile_allergy_history), it, valueTone = StatusTone.Danger)
-                            }
-                            p.emergencyBloodType?.let { KeyValueRow(stringResource(R.string.profile_blood_type), it) }
-                        } ?: Text(
-                            stringResource(R.string.profile_not_built),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-
-                        // 当前用药：自动从药单汇总（不依赖用户手工维护），免疫抑制类置顶并标注。
-                        // 刻意放在档案之外——用药与健康档案相互独立，未建档时也必须显示（急救场景尤甚）
-                        val medsSummary = remember(meds, today, context) {
-                            // v1.2.5（i18n）：remember 的 lambda 不是 @Composable，取不到 stringResource，
-                            // 故注入 context::getString（急救卡按 KDoc 用 plainRes）
-                            EmergencyMeds.summarize(
-                                meds, today.toString(),
-                                freqLabel = { context.getString(it.plainRes) },
-                                // v1.2.10（审查 §6.9）：读不出来的频次原样印出存库值（不印「每日」）
-                                unknownFreqLabel = { context.getString(R.string.ui_emergency_meds_unknown_freq, it) },
-                                // v1.2.6（i18n）：注射周期文案同样按系统语言解析
-                                injCycleLabel = { context.getString(R.string.ui_emergency_meds_inj_cycle, it) },
-                                // v1.2.6（i18n）：商品名括号随语言换全角 / 半角
-                                brandParen = { context.getString(R.string.ui_brand_paren, it) },
-                            )
-                        }
-                        Spacer(Modifier.height(Spacing.xs))
-                        Text(
-                            stringResource(R.string.emergency_meds_section),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (medsSummary.isEmpty) {
-                            Text(
-                                stringResource(R.string.emergency_meds_empty),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else {
-                            medsSummary.ordered.forEach { e ->
-                                // ⚠️ v1.2.2：这里**不能**用带 `trailing` 的 [KeyValueRow]。
-                                //
-                                // 实测（维护者截图）：药名「依那西普（恩利）」+ 剂量
-                                // 「25mg · 每周两次 · 每 14 天」+ 胶囊「免疫抑制」三者同排时，
-                                // 剂量列被压到**每行只剩 4–5 个字**（竖排成柱状），右侧却空着一大片。
-                                // `KeyValueRow` 的 KDoc 把「胶囊优先、极端情况下数值列可能被很长
-                                // 的标签吃到 0 宽」写成**有意的取舍**（v1.1.1），但那条是为
-                                // **320dp 窄屏 + 2.0× 字号**写的；这里在**正常字号**下就已不可读，
-                                // 说明它不是那个极端情形，而是这一行的**固有矛盾**：
-                                // 三个无界文本（药名 / 剂量 / 标记）塞不进一行。
-                                //
-                                // 改法：胶囊与**药名同行**（两者都短且有界），
-                                // 剂量**独占整行**并在必要时折行 —— 剂量是急救时真正要读的
-                                // 数字，它不该为布局让步。
-                                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                                    ) {
-                                        Text(
-                                            e.name,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                        if (e.immunosuppressant) {
-                                            StatusChip(
-                                                stringResource(R.string.emergency_meds_tag_immunosuppressant),
-                                                StatusTone.Warning,
-                                                Icons.Rounded.WarningAmber,
-                                            )
-                                        }
-                                    }
-                                    Text(
-                                        e.detail,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                }
-                            }
-                            if (medsSummary.hiddenCount > 0) {
-                                Text(
-                                    stringResource(R.string.emergency_meds_more, medsSummary.hiddenCount),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            if (medsSummary.hasImmunosuppressant) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.WarningAmber,
-                                        contentDescription = null,   // 装饰性：正文已承载语义
-                                        tint = StatusTone.Warning.accent(),
-                                        modifier = Modifier.size(Size.iconSm),
-                                    )
-                                    Text(
-                                        stringResource(R.string.emergency_meds_note),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = StatusTone.Warning.accent(),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ---- 紧急事件记录 ----
-                item {
-                    SectionCard(
-                        title = stringResource(R.string.emergency_events_title),
-                        action = {
-                            TextButton(onClick = { showEventForm = true }) { Text(stringResource(R.string.common_record)) }
-                        },
-                    ) {
-                        if (events.isEmpty()) {
-                            EmptyState(
-                                icon = Icons.Rounded.Schedule,
-                                title = stringResource(R.string.emergency_events_empty),
-                                body = stringResource(R.string.symptom_events_empty_hint),
-                            )
-                        } else {
-                            val shown = if (showAllEvents) events else events.take(3)
-                            // v1.0.92（批次 17）：单条事件抽成 EventRow——理由与 v1.0.90 的 ContactRow 相同：
-                            // 本函数已在 detekt 基线里（`LongMethod` / `CyclomaticComplexMethod`，按
-                            // 「文件 + 完整签名」记账），而 FlowRow 需要的 `@OptIn(ExperimentalLayoutApi::class)`
-                            // 一旦加到本函数上，签名就不再匹配基线。
-                            DividerList(shown) { e ->
-                                EventRow(
-                                    event = e,
-                                    onEdit = { editEvent = e },
-                                    onDelete = { vm.deleteEmergencyEvent(e.id) },
-                                )
-                            }
-                            if (events.size > 3 && !showAllEvents) {
-                                TextButton(
-                                    onClick = { showAllEvents = true },
-                                    modifier = Modifier.padding(top = Spacing.xs),
-                                ) { Text(stringResource(R.string.ui_emergency_view_all_events, events.size)) }
-                            }
-                        }
-                    }
-                }
+                item { EmergencySceneCards(vm) }
+                item { EmergencyLockscreenCard() }
+                item { EmergencyContactsCard(vm) }
+                item { EmergencyProfileCard(vm) }
+                item { EmergencyEventsCard(vm) }
             }
+        }
+    }
+}
+
+/**
+ * 底部固定的 120 快拨。
+ *
+ * 刻意留在根函数之外：它不依赖任何数据流，抽出来让 [EmergencyScreen] 只剩版式骨架，
+ * 也避免以后往根函数里加东西时把这块一起卷进重组。
+ */
+@Composable
+private fun EmergencyCallBar() {
+    val context = LocalContext.current
+    Button(
+        onClick = { context.dial("120") },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+            .height(Size.emergencyCallHeight),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.error,
+            contentColor = MaterialTheme.colorScheme.onError,
+        ),
+        shape = MaterialTheme.shapes.large,
+    ) {
+        Icon(
+            Icons.Rounded.Call,
+            contentDescription = null,   // 文字已承载语义
+            modifier = Modifier.size(Size.iconLg),
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        Text(stringResource(R.string.emergency_call_120), style = MaterialTheme.typography.headlineSmall)
+    }
+}
+
+/**
+ * 五张应急场景卡（不可折叠，最先看到）。
+ *
+ * 自持 `cards` 与「点开哪张」两个状态：场景卡只在进入页面时取一次数，
+ * 把它留在根函数会让根函数为了一个一次性加载持有 `LaunchedEffect`。
+ */
+@Composable
+private fun EmergencySceneCards(vm: EmergencyViewModel) {
+    var cards by remember { mutableStateOf<List<KbEntry>>(emptyList()) }
+    var selectedCard by remember { mutableStateOf<KbEntry?>(null) }
+    val today by vm.date.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) { cards = vm.emergencyCards() }
+
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        cards.forEach { card ->
+            AlertBanner(
+                tone = StatusTone.Danger,
+                icon = Icons.Rounded.WarningAmber,
+                title = card.title,
+                body = card.summary,
+                actionLabel = stringResource(R.string.common_view_details),
+                onAction = { selectedCard = card },
+                titleStyle = MaterialTheme.typography.titleLarge,
+            )
         }
     }
 
@@ -475,32 +205,388 @@ fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -> Unit) {
             onDismiss = { selectedCard = null },
         )
     }
+}
 
-    if (showContactForm) ContactFormDialog(
-        onSave = { vm.saveContact(it); showContactForm = false },
-        onDismiss = { showContactForm = false },
+/**
+ * 锁屏紧急信息开关（v1.0.66 B6a）。
+ *
+ * 开关状态是本页唯一一份「与数据无关的本地状态」，故自持；
+ * 数据侧的同步（联系人 / 档案 / 药单变了就刷新锁屏卡）由各卡片自己触发，
+ * 见 [EmergencyContactsCard] / [EmergencyProfileCard]。
+ */
+@Composable
+private fun EmergencyLockscreenCard() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var enabled by remember { mutableStateOf(EmergencyLockscreenStore.enabled(context)) }
+
+    SectionCard(
+        title = stringResource(R.string.emergency_lockscreen_title),
+        subtitle = stringResource(R.string.emergency_lockscreen_body),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Text(
+                stringResource(R.string.emergency_lockscreen_desc),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+            Switch(
+                checked = enabled,
+                onCheckedChange = { v ->
+                    enabled = v
+                    scope.launch {
+                        if (v) {
+                            EmergencyLockscreenStore.setEnabled(context, true)
+                            EmergencyLockscreenPublisher.refresh(context)
+                        } else {
+                            EmergencyLockscreenPublisher.disable(context)
+                        }
+                    }
+                },
+            )
+        }
+        Text(
+            stringResource(R.string.emergency_lockscreen_privacy),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(top = Spacing.xs),
+        )
+        // v1.0.72：小米 / HyperOS 专属提示。官方《适配常见问题》§9：MIUI **默认不允许
+        // 应用在锁屏上显示内容/Activity**，需用户主动授予「锁屏显示」；§10：该权限
+        // **没有查询接口** → 只能给文字 + 跳转按钮，不做状态行。
+        if (XiaomiCompat.isXiaomi(Build.BRAND, Build.MANUFACTURER)) {
+            Text(
+                stringResource(R.string.emergency_lockscreen_miui_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Spacing.sm),
+            )
+            OutlinedButton(
+                onClick = {
+                    if (!SystemSetupGuides.openMiuiPermissionEditor(context)) {
+                        GlobalMessages.post(context.getString(R.string.settings_open_failed))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
+            ) { Text(stringResource(R.string.reminder_miui_open)) }
+        }
+    }
+}
+
+/**
+ * 紧急联系人卡。
+ *
+ * 自持「新增 / 编辑」两个表单状态——原先它们连同四个对话框都挂在根函数上，
+ * 每次联系人数据变化都会带着整页一起重组。
+ *
+ * v1.0.90（批次 15）：单条联系人的排版抽成 [ContactRow]——原函数已到 detekt 的
+ * LongMethod / CyclomaticComplexMethod 阈值（基线只兜住**原始签名**，加一个 @OptIn
+ * 就不再匹配），而「名称 / 关系 / 改删 / 拨号」本身是独立可读的一件事。
+ */
+@Composable
+private fun EmergencyContactsCard(vm: EmergencyViewModel) {
+    val contacts by vm.contacts.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<EmergencyContact?>(null) }
+
+    // 联系人变了就同步锁屏卡（开关关闭时 refresh 自身是空操作，但这里先判一次省一次 IO）
+    LaunchedEffect(contacts) {
+        if (EmergencyLockscreenStore.enabled(context)) EmergencyLockscreenPublisher.refresh(context)
+    }
+
+    SectionCard(
+        title = stringResource(R.string.emergency_contact_title),
+        subtitle = stringResource(R.string.emergency_call_a11y),
+        action = {
+            TextButton(onClick = { showForm = true }) { Text(stringResource(R.string.common_add)) }
+        },
+    ) {
+        if (contacts.isEmpty()) {
+            Text(
+                stringResource(R.string.emergency_no_contacts),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            DividerList(contacts, key = { it.id }) { c ->
+                ContactRow(
+                    contact = c,
+                    onDial = { context.dial(c.phone) },
+                    onEdit = { editing = c },
+                    onDelete = { vm.deleteContact(c.id) },
+                )
+            }
+        }
+    }
+
+    if (showForm) ContactFormDialog(
+        onSave = { vm.saveContact(it); showForm = false },
+        onDismiss = { showForm = false },
     )
 
-    // v1.0.80（批次 6）：编辑已存在的联系人与事件（回填原值、沿用主键）
-    editContact?.let { c ->
+    // v1.0.80（批次 6）：编辑已存在的联系人（回填原值、沿用主键）
+    editing?.let { c ->
         ContactFormDialog(
             existing = c,
-            onSave = { vm.saveContact(it); editContact = null },
-            onDismiss = { editContact = null },
+            onSave = { vm.saveContact(it); editing = null },
+            onDismiss = { editing = null },
         )
     }
-    editEvent?.let { e ->
-        EmergencyEventSheet(
-            existing = e,
-            onSave = { vm.saveEmergencyEvent(it); editEvent = null },
-            onDismiss = { editEvent = null },
+}
+
+/**
+ * 个人信息卡（供急救人员参考）+ 当前用药汇总。
+ *
+ * 自持 `profile` / `meds` / `today` 三条流与导出状态。用药汇总**刻意放在档案之外**：
+ * 用药与健康档案相互独立，未建档时也必须显示（急救场景尤甚）。
+ */
+@Composable
+private fun EmergencyProfileCard(vm: EmergencyViewModel) {
+    val profile by vm.profile.collectAsStateWithLifecycle()
+    val meds by vm.meds.collectAsStateWithLifecycle()
+    val today by vm.date.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var exporting by remember { mutableStateOf(false) }
+
+    // 档案 / 药单变了就同步锁屏卡
+    LaunchedEffect(profile, meds) {
+        if (EmergencyLockscreenStore.enabled(context)) EmergencyLockscreenPublisher.refresh(context)
+    }
+
+    val medsSummary = remember(meds, today, context) {
+        // v1.2.5（i18n）：remember 的 lambda 不是 @Composable，取不到 stringResource，
+        // 故注入 context::getString（急救卡按 KDoc 用 plainRes）
+        EmergencyMeds.summarize(
+            meds, today.toString(),
+            freqLabel = { context.getString(it.plainRes) },
+            // v1.2.10（审查 §6.9）：读不出来的频次原样印出存库值（不印「每日」）
+            unknownFreqLabel = { context.getString(R.string.ui_emergency_meds_unknown_freq, it) },
+            // v1.2.6（i18n）：注射周期文案同样按系统语言解析
+            injCycleLabel = { context.getString(R.string.ui_emergency_meds_inj_cycle, it) },
+            // v1.2.6（i18n）：商品名括号随语言换全角 / 半角
+            brandParen = { context.getString(R.string.ui_brand_paren, it) },
         )
     }
 
-    if (showEventForm) EmergencyEventSheet(
-        onSave = { vm.saveEmergencyEvent(it); showEventForm = false },
-        onDismiss = { showEventForm = false },
+    SectionCard(
+        title = stringResource(R.string.me_my_info),
+        subtitle = stringResource(R.string.emergency_for_paramedics),
+        action = {
+            val shareTitle = stringResource(R.string.emergency_share_card)
+            TextButton(
+                onClick = {
+                    if (!exporting) {
+                        exporting = true
+                        vm.exportCardPdf(
+                            onReady = { intent ->
+                                runCatching {
+                                    context.startActivity(
+                                        Intent.createChooser(intent, shareTitle)
+                                    )
+                                }
+                                exporting = false
+                            },
+                            onError = {
+                                GlobalMessages.post(it)
+                                exporting = false
+                            },
+                        )
+                    }
+                },
+                enabled = !exporting,
+            ) {
+                Icon(
+                    Icons.Rounded.PictureAsPdf,
+                    contentDescription = null,
+                    modifier = Modifier.size(Size.iconSm),
+                )
+                Spacer(Modifier.width(Spacing.xs))
+                Text(if (exporting) stringResource(R.string.backup_generating) else stringResource(R.string.emergency_export_print))
+            }
+        },
+    ) {
+        ProfileKeyValues(profile)
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            stringResource(R.string.emergency_meds_section),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        EmergencyMedsList(medsSummary)
+    }
+}
+
+/** 档案四行（姓名 / 诊断 / HLA-B27 / 过敏史 / 血型），未建档时给一句说明。 */
+@Composable
+private fun ProfileKeyValues(p: com.ashkb.app.data.entity.Profile?) {
+    p?.let { profile ->
+        KeyValueRow(stringResource(R.string.profile_name), profile.displayName)
+        KeyValueRow(stringResource(R.string.profile_diagnosis), profile.diagnosis)
+        KeyValueRow("HLA-B27", stringResource(Labels.hlaB27(profile.hlaB27)))
+        profile.allergies?.let {
+            KeyValueRow(stringResource(R.string.profile_allergy_history), it, valueTone = StatusTone.Danger)
+        }
+        profile.emergencyBloodType?.let {
+            KeyValueRow(stringResource(R.string.profile_blood_type), it)
+        }
+    } ?: Text(
+        stringResource(R.string.profile_not_built),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+/**
+ * 当前用药汇总的渲染（免疫抑制类置顶 + 尾部警示）。
+ *
+ * 从 [EmergencyProfileCard] 抽出：那段「空态 / 列表 / 隐藏计数 / 免疫抑制提示」四分支
+ * 合起来已超出 LongMethod 阈值，而它本身就是独立可读的一件事。
+ */
+@Composable
+private fun EmergencyMedsList(s: EmergencyMeds.Summary) {
+    if (s.isEmpty) {
+        Text(
+            stringResource(R.string.emergency_meds_empty),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+
+    s.ordered.forEach { e ->
+        // ⚠️ v1.2.2：这里**不能**用带 `trailing` 的 [KeyValueRow]。
+        //
+        // 实测（维护者截图）：药名「依那西普（恩利）」+ 剂量
+        // 「25mg · 每周两次 · 每 14 天」+ 胶囊「免疫抑制」三者同排时，
+        // 剂量列被压到**每行只剩 4–5 个字**（竖排成柱状），右侧却空着一大片。
+        // `KeyValueRow` 的 KDoc 把「胶囊优先、极端情况下数值列可能被很长
+        // 的标签吃到 0 宽」写成**有意的取舍**（v1.1.1），但那条是为
+        // **320dp 窄屏 + 2.0× 字号**写的；这里在**正常字号**下就已不可读，
+        // 说明它不是那个极端情形，而是这一行的**固有矛盾**：
+        // 三个无界文本（药名 / 剂量 / 标记）塞不进一行。
+        //
+        // 改法：胶囊与**药名同行**（两者都短且有界），
+        // 剂量**独占整行**并在必要时折行 —— 剂量是急救时真正要读的
+        // 数字，它不该为布局让步。
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Text(
+                    e.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                if (e.immunosuppressant) {
+                    StatusChip(
+                        stringResource(R.string.emergency_meds_tag_immunosuppressant),
+                        StatusTone.Warning,
+                        Icons.Rounded.WarningAmber,
+                    )
+                }
+            }
+            Text(
+                e.detail,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+
+    if (s.hiddenCount > 0) {
+        Text(
+            stringResource(R.string.emergency_meds_more, s.hiddenCount),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    if (s.hasImmunosuppressant) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            Icon(
+                Icons.Rounded.WarningAmber,
+                contentDescription = null,   // 装饰性：正文已承载语义
+                tint = StatusTone.Warning.accent(),
+                modifier = Modifier.size(Size.iconSm),
+            )
+            Text(
+                stringResource(R.string.emergency_meds_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = StatusTone.Warning.accent(),
+            )
+        }
+    }
+}
+
+/**
+ * 紧急事件记录卡（默认只展开 3 条）。
+ *
+ * 自持「新增 / 编辑 / 展开全部」三个状态。
+ *
+ * v1.0.92（批次 17）：单条事件抽成 [EventRow]——理由与 v1.0.90 的 [ContactRow] 相同：
+ * 原函数已在 detekt 基线里（`LongMethod` / `CyclomaticComplexMethod`，按
+ * 「文件 + 完整签名」记账），而 FlowRow 需要的 `@OptIn(ExperimentalLayoutApi::class)`
+ * 一旦加到那个函数上，签名就不再匹配基线。
+ */
+@Composable
+private fun EmergencyEventsCard(vm: EmergencyViewModel) {
+    val events by vm.events.collectAsStateWithLifecycle()
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<EmergencyEvent?>(null) }
+    var showAll by remember { mutableStateOf(false) }
+
+    SectionCard(
+        title = stringResource(R.string.emergency_events_title),
+        action = {
+            TextButton(onClick = { showForm = true }) { Text(stringResource(R.string.common_record)) }
+        },
+    ) {
+        if (events.isEmpty()) {
+            EmptyState(
+                icon = Icons.Rounded.Schedule,
+                title = stringResource(R.string.emergency_events_empty),
+                body = stringResource(R.string.symptom_events_empty_hint),
+            )
+        } else {
+            val shown = if (showAll) events else events.take(3)
+            DividerList(shown) { e ->
+                EventRow(
+                    event = e,
+                    onEdit = { editing = e },
+                    onDelete = { vm.deleteEmergencyEvent(e.id) },
+                )
+            }
+            if (events.size > 3 && !showAll) {
+                TextButton(
+                    onClick = { showAll = true },
+                    modifier = Modifier.padding(top = Spacing.xs),
+                ) { Text(stringResource(R.string.ui_emergency_view_all_events, events.size)) }
+            }
+        }
+    }
+
+    if (showForm) EmergencyEventSheet(
+        onSave = { vm.saveEmergencyEvent(it); showForm = false },
+        onDismiss = { showForm = false },
+    )
+
+    // v1.0.80（批次 6）：编辑已存在的事件（回填原值、沿用主键）
+    editing?.let { e ->
+        EmergencyEventSheet(
+            existing = e,
+            onSave = { vm.saveEmergencyEvent(it); editing = null },
+            onDismiss = { editing = null },
+        )
+    }
 }
 
 /**

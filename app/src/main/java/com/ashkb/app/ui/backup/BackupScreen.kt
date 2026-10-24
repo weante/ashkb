@@ -1094,8 +1094,20 @@ private fun DavBackupPickerSheet(vm: BackupViewModel, busy: Boolean, onDismiss: 
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else if (backups.isNotEmpty()) {
-                DividerList(items = backups, key = { it.name }) { f ->
+                // v1.2.10（审查第二批 M7 附带项）：只把截断后的行交给 DividerList——
+                // 宿主是 Column + verticalScroll（没有虚拟化），全量组合数百行会让 sheet 卡顿。
+                // 与 MedsScreen / SupplementDetailSheet 的截断先例同一思路；头部「真实份数」
+                // 由下面的截断说明承担，不能让用户以为服务器上只有这么多份。
+                val shownBackups = remember(backups) { WebDavClient.visibleBackups(backups) }
+                DividerList(items = shownBackups, key = { it.name }) { f ->
                     DavBackupRow(f) { vm.downloadDavBackup(f.name) }
+                }
+                if (WebDavClient.backupsTruncated(backups.size)) {
+                    Text(
+                        stringResource(R.string.backup_dav_pick_truncated, shownBackups.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

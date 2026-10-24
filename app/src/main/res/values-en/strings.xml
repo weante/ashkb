@@ -24,6 +24,7 @@
     <string name="backup_dav_pick_note">Backups under /ashkb/backup/ on the server (7 daily / 4 weekly / 6 monthly kept). Tap to download to this device, then run the five-step bypass decryption restore.</string>
     <string name="backup_dav_pick_refresh">Refresh list</string>
     <string name="backup_dav_pick_title">Choose a backup from WebDAV</string>
+    <string name="backup_dav_pick_truncated">Only the %1$d most recent backups are listed; older ones are hidden — clean up on the server, then refresh the list</string>
     <string name="backup_dav_probe_note">Three-step probe: directory writable → probe write reads back identical → clean up. After upload, SHA-256 is read back and compared automatically,</string>
     <string name="backup_dav_retention_note">Keeps 7 daily / 4 weekly / 6 monthly backups at /ashkb/backup/.</string>
     <string name="backup_dav_section_title">WebDAV remote backup (optional)</string>
@@ -83,7 +84,6 @@
     <string name="basdai_q6_stiffness">Q6 Morning stiffness duration (0=none, 10=all day)</string>
     <string name="basdai_self_high">Self-assessment high</string>
     <string name="basdai_title">BASDAI disease activity self-assessment</string>
-    <string name="basdai_total_score">BASDAI total score</string>
     <string name="basdai_weekly_note">Answer based on how you felt over the past week (0=none, 10=worst). The total score is calculated only after all 6 questions are answered.</string>
     <string name="basdai_incomplete_note">Answered %1$d/6—the total score is calculated only after all 6 questions are answered (BASDAI must be completed in full; missing answers score nothing)</string>
     <string name="checkup_add_item">Add item</string>
@@ -164,7 +164,6 @@
     <string name="common_refresh">Refresh</string>
     <string name="common_required">Required</string>
     <string name="common_save">Save</string>
-    <string name="common_score_range">0–10 points</string>
     <string name="common_submit">Submit</string>
     <string name="common_success">Success</string>
     <string name="common_today">Today</string>
@@ -524,7 +523,6 @@
     <string name="report_tab">Reports</string>
     <string name="report_threshold">Threshold</string>
     <string name="report_threshold_note">About thresholds</string>
-    <string name="report_threshold_note2">Above the threshold means high disease activity</string>
     <string name="report_total_duration">Total duration</string>
     <string name="report_trend_wait_note">Trends will appear here after 2 days of records</string>
     <string name="report_trends_tab">Trends</string>
@@ -740,7 +738,6 @@
     <string name="me_med_disable">Stop %1$s</string>
     <string name="me_meds_count">Current medications (%1$s)</string>
     <string name="meds_archived_section">Stopped medications (%1$d)</string>
-    <string name="meds_archived_empty">No stopped medications</string>
     <string name="meds_archived_hint">Tap to see why it was stopped and this medication\'s records</string>
     <string name="meds_stop_line">Stopped on %1$s</string>
     <string name="meds_stop_reason_line">Reason: %1$s</string>
@@ -777,12 +774,9 @@
     <string name="med_plus_days">+%1$s days</string>
     <string name="med_postpone_title">Postpone %1$s injection</string>
     <string name="med_skip_title">Skip %1$s</string>
-    <string name="report_adherence_breakdown">Done %1$s · Partial %2$s · Skipped %3$s</string>
     <string name="report_adherence_days">Completion within records (%1$s days)</string>
     <string name="report_adherence_total">%1$s records total · partial counts as 0.5</string>
     <string name="report_completion_empty">— (no records)</string>
-    <string name="report_completion_empty_note">No medication check-ins recorded yet, so completion can\'t be calculated</string>
-    <string name="report_completion_breakdown">Done %1$d · Partial %2$d · Skipped %3$d (%4$d records total)</string>
     <string name="report_completion_prn_note">Plus %1$d as-needed doses, not counted in completion</string>
     <string name="dose_completion_plan_title">Medication completion (planned-dose basis · past %1$s days)</string>
     <string name="dose_completion_no_plan">— (no plan snapshot)</string>
@@ -820,8 +814,6 @@
     <string name="wellness_weight_manage_title">Manage weight records</string>
     <string name="wellness_weight_entry">%1$s %2$s kg</string>
     <string name="wellness_clear_diet_profile">Clear diet profile</string>
-    <string name="forms_tap_to_answer">Tap here: %1$s</string>
-    <string name="forms_tap_to_answer_severe">Tap here: %1$s</string>
     <string name="forms_slider_a11y">%1$s is currently %2$s out of %3$s</string>
     <string name="lab_parse_result">Parsed: %1$s items</string>
     <string name="lab_parse_result_abnormal">Parsed: %1$s items · %2$s abnormal</string>
@@ -994,7 +986,6 @@
     <string name="kb_note_empty">No notes yet</string>
     <string name="kb_note_edit">Write a note</string>
     <string name="kb_note_edit_action">Edit note</string>
-    <string name="kb_note_saved">Note saved</string>
     <string name="kb_note_clear">Clear note</string>
     <string name="kb_note_has_tag">Has a note</string>
     <string name="kb_note_count">%1$d with my notes</string>
@@ -1010,7 +1001,6 @@
     <string name="weight_target_below">Below target by %1$s kg</string>
     <string name="weight_target_above">Above target by %1$s kg</string>
     <string name="weight_target_incomplete">Please complete the target range (both limits are required)</string>
-    <string name="weight_target_not_set">No target range set</string>
     <string name="weight_target_range_label">Target %1$s – %2$s kg</string>
     <string name="attach_title">Attachment archive</string>
     <string name="attach_add">Add attachment</string>
@@ -1025,7 +1015,6 @@
     <string name="attach_delete_confirm">Delete this attachment? The file will be removed from this device.</string>
     <string name="attach_open_failed">Could not open this attachment</string>
     <string name="attach_view">View</string>
-    <string name="attach_count">%1$d attachments</string>
     <string name="attach_photo_name">Photo</string>
     <string name="attach_total_size">Uses %1$s</string>
     <string name="attach_link_title">Link to follow-up visit</string>
@@ -1039,12 +1028,10 @@
     <string name="attach_link_empty_records">No follow-up visits yet. Create one on the Records page first, then come back to link it.</string>
     <string name="lab_link_action">Link to follow-up visit</string>
     <string name="imaging_link_action">Link to follow-up visit</string>
-    <string name="attach_of_record">Attachments for this visit</string>
     <string name="attach_sync_section">Attachment sync</string>
     <string name="attach_sync_switch">Sync attachments to WebDAV</string>
     <string name="attach_sync_switch_note">When on, attachments (lab reports and imaging reports) are encrypted and uploaded one by one to the server, so you can retrieve them as needed on a new device. Attachment contents are uploaded encrypted and cannot be read on the server; attachments are not included in backup files.</string>
     <string name="attach_sync_button">Sync attachments</string>
-    <string name="attach_sync_running">Syncing attachments…</string>
     <string name="attach_sync_summary">Local %1$d · Synced %2$d · To upload %3$d · To clean up %4$d</string>
     <string name="attach_sync_size">Local usage %1$s</string>
     <string name="attach_sync_need_webdav">Please configure a WebDAV server first</string>
@@ -1144,7 +1131,6 @@
     <string name="plans_stage_flare">Flare</string>
     <string name="attach_state_synced">Synced</string>
     <string name="attach_state_pending">Not synced</string>
-    <string name="attach_state_remote_only">Cloud only</string>
     <string name="attach_downloading">Retrieving from the cloud…</string>
     <string name="attach_download_failed">The attachment was not found in the cloud, or the network failed</string>
     <string name="attach_download_too_large">The cloud attachment exceeds the read limit (%1$d MB); retrieval was stopped</string>
@@ -1260,7 +1246,6 @@
     <string name="reminder_sedentary_interval_label">Reminder interval</string>
     <string name="reminder_sedentary_interval_30">Every 30 minutes</string>
     <string name="reminder_sedentary_interval_45">Every 45 minutes</string>
-    <string name="reminder_sedentary_window_label">Active hours</string>
     <string name="reminder_sedentary_window_value">%1$d:00 – %2$d:00</string>
     <string name="exercise_warmup_title">Morning warm-up sequence</string>
     <string name="exercise_warmup_no_l1">Today\'s prescription has no L1 gentle items, so you can start with the lightest daily activity (getting up slowly, walking slowly indoors), as long as the pain does not worsen.</string>

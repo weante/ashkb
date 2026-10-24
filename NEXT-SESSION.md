@@ -91,33 +91,37 @@
 
 ---
 
-## 三、A 组剩余（性能拆分）
+## 三、A 组剩余（性能拆分）—— **已全部收掉（2026-10-24）**
 
-> 行数与读点数已于 2026-10-23 逐文件实测，**不要沿用旧数字**。
+> 三屏根级读点数已于 2026-10-24 逐文件实测复核。**本节已结项**，保留是为了记住「为什么这么拆」。
 
-| 屏幕 | 实测现状 | 是否还欠 |
+| 屏幕 | 2026-10-23 实测 | 2026-10-24 现态 |
 |---|---|---|
-| `ReportScreen` | **835 行**，`collectAsState` **×8**（全在根函数 `:85-91`：`overview` / `trends` / `trendDays` / `periodic` / `periodDays` / `busy` / `message`） | ✅ 欠：三个 tab 的 Flow 仍在根级 |
-| `EmergencyScreen` | **772 行**，`collectAsState` **×6**（全在根函数 `:109-113`：`contacts` / `events` / `profile` / `meds` / `date`） | ✅ 欠；事件卡的同形挤压风险已在 v1.0.92 修掉 |
-| `BackupScreen` | **1216 行**，`collectAsState` **×26** —— 但**已按节拆分**（`LocalBackupSection` / `WebDavSection` / `AttachSyncSection` / `RestoreSection` / `LedgerSection` / `DavBackupPickerSheet` / `WebDavSheet` 各收自己的 Flow），根函数 `:163-165` 只留 `busy` / `message` / `davPicked` **3 个** | ❌ **不欠**（旧记法「19→3」要按这个现状理解：根级已达标，26 是**全文件**计数） |
+| `ReportScreen` | 835 行，根函数收 8 个 `collectAsState` | ✅ **已拆**：各页子 composable 自收 flow，根函数只留 2 个读点 |
+| `EmergencyScreen` | 772 行，根函数收 6 个 `collectAsState` | ✅ **已拆**：拆成 `EmergencyCallBar` / `EmergencySceneCards` / `EmergencyLockscreenCard` / `EmergencyContactsCard` / `EmergencyProfileCard` / `ProfileKeyValues` / `EmergencyMedsList` / `EmergencyEventsCard` 八个子 composable，每个自收所需 flow；根函数只留 `Scaffold` 骨架 + `ContactFormDialog` 开关 |
+| `BackupScreen` | 1216 行，全文件 ×26 但根级只剩 3 个 | ❌ **不欠**（旧记法「19→3」按此理解：根级已达标，26 是**全文件**计数） |
 
-**照已完成的先例做**：`MedsScreen` 标杆 / `TodayScreen` 8→3 / `WellnessScreen` 10→0 / `MedEditScreen` 根级读点 24→0 / `BackupScreen` 根级 3。
+**附带项已收**：`BackupScreen.kt` 两处 `DividerList`（台账 `:989`、DAV 备份弹层 `:1097`）**没有做真虚拟化** —— 取证后确认项目内所有长列表的既有先例都是「默认截断 + 显式展开」而非 `LazyColumn`（`MedHistory` / 事件列表 / 药品历史皆如此），且这两处都不是无限滚动列表。已按既有先例改截断，**避免为一个非滚动列表引入 `LazyColumn` 带来的嵌套滚动与 `RowScope` 签名冲突**。
 
-> 附带一项：`BackupScreen.kt` 有两处底部弹层仍是 `DividerList`（**非惰性**）—— `:989`（台账行）与 `:1097`（DAV 备份选择弹层）。M7 只修了「滚动 / 尾部可达」，**虚拟化没做**，可按 `MedHistory` 的截断先例收掉。
+**拆完后还掉的基线豁免**：`EmergencyScreen` 的 `LongMethod` 与 `CyclomaticComplexMethod` 两条既存豁免已不再需要，按 `release-bodies/v1.2.2.md:64-65` 先例**删掉**（基线 316 → 314 行，42596 → 42165 B），而不是留着占位。
+
+**照已完成的先例做**：`MedsScreen` 标杆 / `TodayScreen` 8→3 / `WellnessScreen` 10→0 / `MedEditScreen` 根级读点 24→0 / `BackupScreen` 根级 3 / 本轮 `ReportScreen` 8→2、`EmergencyScreen` 6→0。
 
 ---
 
-## 四、小尾巴（可一次性收掉）
+## 四、小尾巴（2026-10-24 已收 3 条，剩 3 条）
 
-1. **`BackupEngine.kt:288` 仍把原始异常文本透给用户** —— R5 只修了半提交那一半，这半没修。修法：只展示 `resId` 文案，原文进台账/日志。
-2. **补剂「部分完成」写入路径**：数据层与判据已就位（`SupplementLogStatus` 覆盖 partial、依从率已按三态算、`WellnessViewModel.checkInSupplement(supp, status, reason, notes)` 本就收任意 status），**只差 UI** —— `TodayScreen.kt:626-627` 只有 `AdherenceCalc.DONE` / `SKIPPED` 两个入口，加第三个即可。
-3. **16 条孤儿字符串**（2026-10-23 复核，**全部仍为孤儿**，中英各 1 条完全成对）：`attach_count` / `attach_of_record` / `attach_state_remote_only` / `attach_sync_running` / `basdai_total_score` / `common_score_range` / `forms_tap_to_answer` / `forms_tap_to_answer_severe` / `kb_note_saved` / `meds_archived_empty` / `reminder_sedentary_window_label` / `report_adherence_breakdown` / `report_completion_breakdown` / `report_completion_empty_note` / `report_threshold_note2` / `weight_target_not_set`。**删的时候中英必须成对删**（`EnglishStringsParityTest` 会因条目数不等而红）。
+**已收（勿再重复提）**
+
+1. ~~`BackupEngine.kt:288` 把原始异常文本透给用户~~ —— **已修**：恢复失败改为只报固定中文串，原始异常走日志。
+2. ~~补剂「部分完成」写入路径只差 UI~~ —— **已修**：首页 `TodayScreen.kt` 与营养页 `WellnessScreen.kt` 两处各加「部分」按钮，均写入 `AdherenceCalc.PARTIAL`；文案复用既有 `R.string.med_history_status_partial`。首页四个回调收进 `SupplementCheckInActions`，参数由 9 压回 5（收拢而不是放宽 detekt `LongParameterList` 阈值）。守卫 `SupplementPartialEntryTest` 5 条。
+3. ~~16 条孤儿字符串~~ —— **已删**（中英成对，`EnglishStringsParityTest` 仍绿）；删后 lint 总数由 184 降到 166（`UnusedResources` 随之消失）。
+
+**仍欠（都需要真机或维护者输入）**
+
 4. **`DateProvider` 的广播注册无测试**（精确表述）：纯 JVM 部分已有 `DateProviderTest.kt` **5 条**（同日不通知 / 变更只通知一次 / 注销后不通知 / 共享同一 flow / 日期回退也传播）；**没测的是 `start/stop` 的广播注册**，需真机跨零点或改时钟。
 5. **级联删除的附件分支未真机验**（行 + 磁盘文件）：`app/src/test` 下 cascade/级联 相关断言实测 **28 处**（旧记法「19 条 Robolectric」已过时）。
 6. **v1.0.85 的体感收益未验**（附件同步时输密码不再被打断）—— 设备上**没有附件**，那 3 条 Flow 不发射。
-
-> ~~`HealthRepository` 一句注释仍写"随库 v19 落地"~~ —— **已销账**：全仓 grep 零命中，该注释早已不存在（现 `:877` 是 v1.0.78 的另一段说明）。
-
 ---
 
 ## 五、必须记住的硬约束（踩过的坑）
@@ -144,3 +148,4 @@
 ## 六、已裁决"不做"（避免重复提）
 
 复诊项目**物理删除**（保持"只停用"）· 化验行内胶囊 28dp 触达区（不动）· Strong Skipping 配置（2.0.20 已默认开启）· skippable 计数 CI 门（脆弱门比没有门更糟）· 迁移起点 **1/2/3 永久不可覆盖**（伪造会让测试虚假通过）· `gradlew`（官方分发 URL 本机不可达）
+

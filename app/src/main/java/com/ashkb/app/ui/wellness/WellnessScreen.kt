@@ -460,6 +460,7 @@ private fun SupplementArchiveCard(
                         onDelete = { onDelete(sup) },
                     ),
                     onCheckIn = { vm.checkInSupplement(sup, AdherenceCalc.DONE, null, null) },
+                    onPartial = { vm.checkInSupplement(sup, AdherenceCalc.PARTIAL, null, null) },
                     onSkip = { vm.checkInSupplement(sup, AdherenceCalc.SKIPPED, null, null) },
                     onUndo = { vm.undoSupplementCheckIn(sup) },
                 )
@@ -690,6 +691,7 @@ private fun SupplementCardRow(
     todayStatus: String?,
     actions: SupplementRowActions,
     onCheckIn: () -> Unit,
+    onPartial: () -> Unit,
     onSkip: () -> Unit,
     onUndo: () -> Unit,
 ) {
@@ -749,9 +751,14 @@ private fun SupplementCardRow(
                 )
                 // v1.0.89（批次 14）：两个按钮直接作为 FlowRow 的项（不再套一层 Row），
                 // 窄屏上可以各自折行，而不是被当成一个整体一起挤出去。
+                // v1.2.11：补齐「部分」——数据层 `AdherenceCalc.SETTLED_STATUSES` 与
+                // `SupplementLogStatus` 一直认三态，此前 UI 只给 done/skipped 两个入口。
                 null -> {
                     TextButton(onClick = onCheckIn, modifier = Modifier.heightIn(min = Size.touchMin)) {
                         Text(stringResource(R.string.exercise_checkin_short))
+                    }
+                    TextButton(onClick = onPartial, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                        Text(stringResource(R.string.med_history_status_partial))
                     }
                     TextButton(onClick = onSkip, modifier = Modifier.heightIn(min = Size.touchMin)) {
                         Text(stringResource(R.string.med_skip))

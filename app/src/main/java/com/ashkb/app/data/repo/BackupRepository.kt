@@ -2,6 +2,7 @@ package com.ashkb.app.data.repo
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.ashkb.app.CrashLogger
 import com.ashkb.app.R
 import com.ashkb.app.data.backup.BackupEngine
 import com.ashkb.app.data.backup.KeystoreCipher
@@ -353,6 +354,11 @@ class BackupRepository(private val context: Context) {
                 verify
             } catch (e: Exception) {
                 log(LedgerType.RESTORE, false, "restore", snapFile.name, null, false, e.message)
+                // v1.2.11（R5 残留）：用户文案里已不再出现原始异常文本（见 `BackupEngine` 的
+                // `backup_err_engine_write_failed`），排查信息必须另找地方落地，否则真出问题时
+                // 只剩一句「已回滚」，连堆栈都没有。这里在**抛给 UI 之前**留一份完整堆栈：
+                // 台账只存 `e.message` 一行，且台账是给用户看的，不适合放堆栈。
+                CrashLogger.recordNonFatal(context, "恢复写入失败", e)
                 throw e
             }
         }

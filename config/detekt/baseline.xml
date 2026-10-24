@@ -15,7 +15,6 @@
     <ID>CyclomaticComplexMethod:BackupScreen.kt$@Composable fun BackupScreen(vm: BackupViewModel, onBack: () -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:CheckupLabImaging.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: () -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:CheckupScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CheckupScreen(vm: CheckupViewModel, onBack: () -&gt; Unit)</ID>
-    <ID>CyclomaticComplexMethod:EmergencyScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:ExerciseEngine.kt$ExerciseEngine$fun evaluate( entry: KbEntry, diseaseStage: String?, spineMobility: String?, ): ExerciseCard</ID>
     <ID>CyclomaticComplexMethod:ExerciseScreen.kt$@Composable private fun PrescriptionHero( ui: com.ashkb.app.ui.exercise.ExerciseUiState, yesterday: com.ashkb.app.data.entity.SymptomDaily?, warmup: com.ashkb.app.domain.MorningWarmup.Sequence?, )</ID>
     <ID>CyclomaticComplexMethod:LabTrend.kt$LabTrends$fun buildOne( indicator: LabIndicator, rows: List&lt;LabResult&gt;, from: String? = null, to: String? = null, ): LabTrend</ID>
@@ -57,7 +56,6 @@
     <ID>LongMethod:CheckupLabImaging.kt$@Composable internal fun LabsList( labs: List&lt;LabResult&gt;, canLoadMore: Boolean, onLoadMore: () -&gt; Unit, onImport: () -&gt; Unit, onAttachDate: (String) -&gt; Unit, onLinkDate: (String) -&gt; Unit, )</ID>
     <ID>LongMethod:CheckupLabImaging.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: () -&gt; Unit)</ID>
     <ID>LongMethod:CheckupScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CheckupScreen(vm: CheckupViewModel, onBack: () -&gt; Unit)</ID>
-    <ID>LongMethod:EmergencyScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun EmergencyScreen(vm: EmergencyViewModel, onBack: () -&gt; Unit)</ID>
     
     <ID>LongMethod:ExercisePlansScreen.kt$@Composable private fun PlanCard( plan: ExercisePlan, progress: ExercisePlanProgress.Progress?, expanded: Boolean, onToggle: () -&gt; Unit, onActivate: () -&gt; Unit, onDeactivate: () -&gt; Unit, )</ID>
     <ID>LongMethod:ExerciseScreen.kt$@Composable private fun PrescriptionHero( ui: com.ashkb.app.ui.exercise.ExerciseUiState, yesterday: com.ashkb.app.data.entity.SymptomDaily?, warmup: com.ashkb.app.domain.MorningWarmup.Sequence?, )</ID>

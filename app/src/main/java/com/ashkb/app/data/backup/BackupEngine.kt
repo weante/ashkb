@@ -284,9 +284,17 @@ object BackupEngine {
             }
             return result
         } catch (e: Exception) {
+            // v1.2.11（R5 残留）：**不再把 `e.message` 拼进用户文案**。
+            // 此前 `resArgs = listOf(e.message.orEmpty())` 让这条自带 resId 的异常绕过了
+            // `BackupViewModel.errText` 的降级处理（resId != 0 时直接 `text(resId, args)`），
+            // 于是 `java.io.FileNotFoundException: /data/user/0/...` 这类原始文本原样糊到提示条上：
+            // 英文类名 + 绝对私有路径，对用户零信息量，还像是应用坏了。
+            // 现在用户看到的是「失败 + 已回滚」这句真正要紧的信息（事务未 setSuccessful ⇒ 整体回滚，
+            // 另有 pre-restore 快照兜底），原始异常与完整堆栈经 `cause` 交给
+            // `BackupRepository.restore` 的 `CrashLogger.recordNonFatal` 落盘供排查。
             throw BackupException(
                 "恢复写入失败：${e.message}", e,
-                resId = R.string.backup_err_engine_write_failed, resArgs = listOf(e.message.orEmpty()))
+                resId = R.string.backup_err_engine_write_failed)
         } finally {
             db.endTransaction()
         }

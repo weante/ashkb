@@ -80,7 +80,7 @@
     <string name="backup_err_engine_schema_newer">The backup comes from a newer version (schema %1$d &gt; current %2$d); update the app first</string>
     <string name="backup_err_engine_bad_format">The backup format is invalid: %1$s</string>
     <string name="backup_err_engine_unknown_tables">The backup contains tables that do not exist in the current database; rejected entirely: %1$s</string>
-    <string name="backup_err_engine_write_failed">Restore write failed: %1$s</string>
+    <string name="backup_err_engine_write_failed">Restore write failed. The database was rolled back to its state before the restore, so your existing data is unaffected. You can retry, or fall back to the automatic pre-restore snapshot.</string>
     <string name="backup_err_engine_bad_type">Backup data type mismatch: %1$s.%2$s should be a number but is %3$s</string>
     <string name="backup_err_engine_unknown_column">The backup contains an unknown column: %1$s.%2$s</string>
     <string name="backup_verify_rows_mismatch">%1$s: expected %2$d, found %3$d</string>

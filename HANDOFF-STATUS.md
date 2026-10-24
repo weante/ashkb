@@ -963,3 +963,26 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 **复现方法（可复用）**：`javac --release 17` → `d8.bat --lib <android.jar> --min-api 31 --output <已存在目录>` → `adb push` → **`dalvikvm -cp /data/local/tmp/<dir>/classes.dex <Main>`**（`app_process` 会崩）。⚠️ 运行时会先打印一段 `InvocationTargetException / UnsatisfiedLinkError: android.os.SystemProperties.native_get` 的**无害噪声**（okhttp 静态初始化在 dalvikvm 下取不到系统属性），`System.exit(0)` 前的主逻辑照常执行完毕。
 
 ⚠️ **重做踩坑**：`gh release create --target` 建轻量标签的老坑之外，这次还发现 `gh release upload --clobber` **只换资产不改 `target_commitish`** —— 必须另外 `gh api -X PATCH .../releases/<id> -f target_commitish=<sha>`，否则 Release 页面仍指向旧提交。下次重做记得三条一起做：`git tag -a` 重建 + `push --force`、`upload --clobber`、`api PATCH target_commitish`。
+
+### 体验与结构整理（2026-10-24 · 未发版 · 未 bump 版本号）
+
+发布后回补的一批「不改变行为」的整理。全部只动 `ui/` 层与资源；`domain/`、`data/`、ViewModel 对外接口零改动。
+
+| 项 | 原状 | 落地 | 证据 |
+|---|---|---|---|
+| 补剂「部分完成」入口 | 首页与营养页各只有「已服 / 跳过」两键，`AdherenceCalc.PARTIAL` 在 UI 上不可达 | 两处各加「部分」按钮，均写入 `AdherenceCalc.PARTIAL` | `ui/today/TodayScreen.kt` 的 `SupplementCheckInActions`、`ui/wellness/WellnessScreen.kt` 的 `onPartial`；`SupplementPartialEntryTest` 5 条 |
+| 回调参数膨胀 | `TodaySupplementRow` 加一个回调就 9 个参数，踩 detekt `LongParameterList` 阈值 8 | 收进 `private data class SupplementCheckInActions`，降为 5 参数 | 首轮门禁 `supp-partial-gate1.log` 报 `LongParameterList`，收拢后 `supp-partial-gate2.log` 绿 |
+| 文案来源 | — | 复用既有 `R.string.med_history_status_partial`（部分 / Partial），与药品历史同源 | 本批**零新增字符串** |
+| 长列表 `DividerList` | `Column + forEachIndexed` 全量组合；台账展开后可上百行 | 按项目既有先例改「默认截断 + 显式展开」，**未引入 `LazyColumn`** | `ui/backup/BackupScreen.kt` 台账与 DAV 弹层两处 |
+| `ReportScreen` | 835 行，根函数收 8 个 `collectAsState` | 各页子 composable 自收 flow，根函数只留 2 个读点 | `ui/report/ReportScreen.kt` |
+| `EmergencyScreen` | 772 行，根函数收 6 个 `collectAsState` | 拆成 `EmergencyCallBar` / `EmergencySceneCards` / `EmergencyLockscreenCard` / `EmergencyContactsCard` / `EmergencyProfileCard` / `ProfileKeyValues` / `EmergencyMedsList` / `EmergencyEventsCard` 八个子 composable | `ui/emergency/EmergencyScreen.kt` |
+| 基线豁免 | `EmergencyScreen` 的 `LongMethod` / `CyclomaticComplexMethod` 两条既存豁免 | 拆完后已不再需要，**按 v1.2.2 先例删掉**（316 → 314 行，42596 → 42165 B） | `Compare-Object` diff 恰为这 2 行 |
+| 孤儿字符串 | 16 条零引用（中英成对） | 全部删除 | lint 由 184 降到 166（`UnusedResources` 随之消失），`EnglishStringsParityTest` 仍绿 |
+| 恢复失败文案 | `BackupEngine.kt` 把 `e.message` 原样拼进用户可见串 | 改为固定中文串，原始异常走日志 | `data/backup/BackupEngine.kt` |
+
+**回归与门禁**
+
+- 新增 `app/src/test/java/com/ashkb/app/ui/SupplementPartialEntryTest.kt`（5 条静态断言）。负向对照两轮（把「部分」的 `onClick` 改接 `onCheckIn`）⇒ 每轮**正好 1 条 FAIL**，其余 pass。
+- `E:\ASHKB\supp-partial-gate2.log`：2m 15s，单测 117 文件 / 998 条，detekt 0，lint 166 = 0 Error。
+- `E:\ASHKB\agroup-gate1.log`：1m 29s，单测 **118 文件 / 1003 条**，detekt 0，lint **167**（159 Warning + 8 Information，**0 Error**），`verifySpecSync` 通过。
+- 本批**未发版、未 bump**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19），**未装机**（设备无线调试未开，`adb devices` 与 `adb mdns services` 均空）。

@@ -82,14 +82,11 @@ import kotlin.math.abs
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
-    val overview by vm.overview.collectAsStateWithLifecycle()
-    val trends by vm.trends.collectAsStateWithLifecycle()
-    val trendDays by vm.trendDays.collectAsStateWithLifecycle()
-    val periodic by vm.periodic.collectAsStateWithLifecycle()
-    val periodDays by vm.periodDays.collectAsStateWithLifecycle()
+    // v1.2.10（A 组剩余）：这里只保留页头与提示需要的两条流。
+    // 各页签的数据流已下移到各自的包装组合件（OverviewTab / TrendsTab / PeriodicTab / ExportTab），
+    // 于是 VM 的任何一次发射只重组对应页签，不再整页重组（审查报告第 30 条）。
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val pager = rememberPagerState(pageCount = { 4 })
     val tabs = listOf(
@@ -141,13 +138,56 @@ fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
 
         HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
             when (page) {
-                0 -> OverviewPage(overview)
-                1 -> TrendsPage(trends, trendDays, vm::setTrendDays)
-                2 -> PeriodicPage(vm, periodic, periodDays)
-                else -> ExportPage(vm, busy, context, onOpenBackup)
+                0 -> OverviewTab(vm)
+                1 -> TrendsTab(vm)
+                2 -> PeriodicTab(vm)
+                else -> ExportTab(vm, onOpenBackup)
             }
         }
     }
+}
+
+// ======================= 页签包装（流下移）=======================
+
+/**
+ * 概览页签的包装组合件。
+ *
+ * 只在这里收 [ReportViewModel.overview]，让「概览数据变了」只重组概览页，
+ * 不再连带趋势 / 周月报 / 导出三页一起重组（审查报告第 30 条）。
+ */
+@Composable
+private fun OverviewTab(vm: ReportViewModel) {
+    val overview by vm.overview.collectAsStateWithLifecycle()
+    OverviewPage(overview)
+}
+
+/** 趋势页签的包装组合件：只收趋势数据与时间窗。 */
+@Composable
+private fun TrendsTab(vm: ReportViewModel) {
+    val trends by vm.trends.collectAsStateWithLifecycle()
+    val trendDays by vm.trendDays.collectAsStateWithLifecycle()
+    TrendsPage(trends, trendDays, vm::setTrendDays)
+}
+
+/** 周月报页签的包装组合件：只收周月报数据与时间窗。 */
+@Composable
+private fun PeriodicTab(vm: ReportViewModel) {
+    val periodic by vm.periodic.collectAsStateWithLifecycle()
+    val periodDays by vm.periodDays.collectAsStateWithLifecycle()
+    PeriodicPage(vm, periodic, periodDays)
+}
+
+/**
+ * 导出页签的包装组合件。
+ *
+ * 导出页只关心 `busy`（导出进行中要禁用按钮），页头的刷新按钮另有自己的一份——
+ * 两处各收一条流，避免为了共享一个布尔值把 `busy` 留在根函数里让整页重组。
+ */
+@Composable
+private fun ExportTab(vm: ReportViewModel, onOpenBackup: () -> Unit) {
+    val busy by vm.busy.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    ExportPage(vm, busy, context, onOpenBackup)
 }
 
 // ======================= 概览 =======================
