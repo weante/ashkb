@@ -910,6 +910,10 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 
 > ⚠️ **该轮复验有一项无效，须如实记下**：循环期间设备处于**锁屏 + AOD**（`dumpsys trust` → `deviceLocked=1`；`dumpsys window` → `isKeyguardShowing=true`），每轮 `uiautomator dump` 抓到的都是锁屏界面（包名全是 `com.android.systemui` / `com.miui.aod`）⇒ **`mask=False` 不能作为「首页没浮出遮罩」的证据**。MIUI 密码锁无法用 adb 绕过（`locksettings set-disabled true` 回显成功但 `get-disabled` 仍 false；`keyevent 82` 只拉通知栏；`pkill systemui` 无权限），**只能让用户手动解锁**。故「遮罩项」仍待解锁亮屏下重跑。
 
+> ✅ **遮罩项已于 2026-10-24 在解锁亮屏下重跑通过（`E:\ASHKB\npe-mask-verify2.log`）**：维护者解锁后，改用**不碰电源键**的方式制造复现条件——每轮 `am force-stop` → `dumpsys deviceidle force-idle`（强制进 deep idle，等价于屏幕关闭/Doze 的进程压力）→ 冷启动 → `dumpsys deviceidle unforce`，**全程不发 `input keyevent 26`**，因此设备不再上锁。30 轮结果：**validDumps=30 / invalidDumps=0 / maskYes=0 / maskNo=30 / lockedRounds=0 / crashBufferLines=0 / fatalCount=0**，每轮 `uiautomator dump` 的包名都是 `com.ashkb.app`（真实抓到首页，不是锁屏）。⇒ **「上次异常」遮罩 30 轮零复现，崩溃修复的真机验证完成**。
+>
+> ⚠️ **上一轮失败的根因是我的方法错了，不是设备的问题**：我拿 `input keyevent 26`（电源键）关屏，这在有密码的设备上**必然重新上锁**，之后任何 `swipe`/`keyevent 82` 都无法真正解锁（`keyevent 82` 只会拉下通知栏）。`deviceLocked=0` 偶尔出现只是设备恰好处于未锁定窗口的巧合。**教训：在带密码锁的设备上做「屏幕关闭态」复验，应该用 `dumpsys deviceidle force-idle` 而不是电源键**；这样既不锁屏、又能压出 Doze 下的冷启动条件。
+
 **② §06 双主题真机观感（结论：③⑤ 通过，④ 有回归）**：
 
 | 帧 | 结论 | 证据 |
@@ -929,7 +933,7 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 
 **发布决定（维护者裁决 m14246）**：**就地重做 v1.2.10** —— 不 bump 版本号，重建 APK 覆盖 GitHub Release 资产与附注标签。理由：这是 v1.2.10 自身带出去的 UI 回归，发布历史保持单条更干净。
 
-**仍未做**：`dark-05-me.png` 是 0 字节损坏文件需重拍；「上次异常」遮罩项需解锁亮屏重跑；~~裁决项 8 第 3、6 条的真机侧尾巴~~（**2026-10-22 已补完**，见下一节）；裁决项 5；审查报告 §十 三条澄清。**修复已推送，并按维护者裁决就地重做 v1.2.10（覆盖 Release 资产与标签，版本号不变），详见下一节。**
+**仍未做**：~~`dark-05-me.png` 是 0 字节损坏文件需重拍~~（**2026-10-24 已重拍，246,280 B，深色「我的」页正常**）；~~「上次异常」遮罩项需解锁亮屏重跑~~（**2026-10-24 已通过，30 轮零复现，见上**）；~~裁决项 8 第 3、6 条的真机侧尾巴~~（**2026-10-22 已补完**，见下一节）；裁决项 5；审查报告 §十 三条澄清。**修复已推送，并按维护者裁决就地重做 v1.2.10（覆盖 Release 资产与标签，版本号不变），详见下一节。**
 
 ---
 

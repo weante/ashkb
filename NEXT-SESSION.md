@@ -42,13 +42,15 @@
 
 ## 一、第一优先级：真机复验与维护者决策
 
-**1. 三笔真机复验（我做不了，需维护者解锁手机 / 重开无线调试）**
+**1. 真机复验（2026-10-24：前两笔已完成，只剩第三笔）**
 
 | # | 事项 | 现状 |
 |---|---|---|
-| 1 | `dark-05-me.png` 是 **0 字节损坏文件** | 重拍时设备掉线；AOD 锁屏下 `screencap` 产出全黑或 0 字节。MIUI 密码锁**无法 adb 绕过**（`locksettings set-disabled true` 对 MIUI 无效、`input keyevent 82` 只会拉下通知栏） |
-| 2 | 「上次异常」遮罩项**证据无效** | 30 轮屏关冷启动复验期间设备处于**锁屏 + AOD**，`uiautomator dump` 抓到的全是 `com.android.systemui` / `com.miui.aod`，`mask=False` **不能证明首页没浮遮罩**。有效证据只有 `logcat -d -b crash` 零 FATAL + events buffer 里反复的 `am_proc_start … MainActivity`。需**解锁亮屏**后重跑 |
+| 1 | ~~`dark-05-me.png` 是 **0 字节损坏文件**~~ | ✅ **2026-10-24 已重拍**（246,280 B，深色「我的」页正常：健康档案 KeyValueRow + 药单管理 NavRow + Dock 选中态）。`E:\ASHKB\ui2-shots\ui20\v1210\dark-05-me.png` |
+| 2 | ~~「上次异常」遮罩项**证据无效**~~ | ✅ **2026-10-24 解锁亮屏下重跑通过**（`E:\ASHKB\npe-mask-verify2.log`）：30 轮 `validDumps=30 / invalidDumps=0 / maskYes=0 / maskNo=30 / lockedRounds=0 / fatalCount=0`，每轮 dump 包名均为 `com.ashkb.app` ⇒ **遮罩 30 轮零复现**。复现条件改用 `dumpsys deviceidle force-idle`（**不碰电源键**，故不上锁），代替原先按电源键关屏的错误做法 |
 | 3 | 批次 C ⑥「存量同日多行不被改写」 | 设备上没有旧版遗留的多行数据，只有单测 `PrnDailyCapTest` 用例 4 覆盖 |
+
+> ⚠️ **教训**：在**带密码锁**的设备上做「屏幕关闭态」复验，**不要用 `input keyevent 26` 关屏** —— 那必然重新上锁，之后 `swipe` / `keyevent 82` 都无法真正解锁（`82` 只拉通知栏），`deviceLocked=0` 偶尔出现只是巧合。正确做法是 `dumpsys deviceidle force-idle` 压出 Doze 条件，全程保持解锁亮屏。
 
 **2. 三项只属于维护者本人**（在「子代理禁改清单」里）
 
