@@ -24,8 +24,8 @@
 
 | # | 风险 | 现状 |
 |---|---|---|
-| R1 | **大字号 + 窄屏（2.0× / 320dp）时急救卡「当前用药」的剂量说明会被挤到 0 宽** | v1.1.1 修好的是**胶囊**（安全标记恒可见，旧版恰恰是它消失）；三元素在算术上无法共存，**待维护者裁决**：(a) 胶囊换行 (b) 缩短文案 (c) 维持现状 |
-| R2 | **`postponeInjection` 的旧幽灵槽位不会自动消失** | 只防新增：`MedicationRepository.kt:621` 是 `slotDao.deleteOfMedFrom(med.id, today)`，**只删「今天起」**，历史计划行按设计保留。清理旧幽灵属**删用户数据**，需维护者明确同意 |
+| ~~R1~~ | ~~大字号 + 窄屏（2.0× / 320dp）时急救卡「当前用药」的剂量说明会被挤到 0 宽~~ | **已修（2026-10-24）**：维护者裁决「胶囊换行」⇒ 药名行由 `Row` 改 `FlowRow`（`ui/emergency/EmergencyScreen.kt:490` 起），放不下时胶囊折到下一行，药名按固有宽测量不再被挤压。代价：药名短时胶囊不再右对齐——急救场景下「读得到药名」优先。**仍未真机复验**（320dp × 2.0× 四张截图） |
+| ~~R2~~ | ~~`postponeInjection` 的旧幽灵槽位不会自动消失~~ | **已修（2026-10-24，维护者 m15462 明确同意）**：v1.1.1 之前顺延只改锚点不清行，那些行日期如今都在过去、`deleteOfMedFrom(today)` 永远碰不到，会被报表永久计为漏服。新增 `domain/PostponeGhostSlots.kt` 判 `[顺延当天, 生效日)` 半开区间 + `PlannedSlotDao.deleteOfMedInRange` + `MedicationRepository.purgePostponeGhostSlots()`，由 `AshkbApplication` 启动期物化**之前**跑一次（`app_prefs` 的 `ghost_slot_purged_v1` 闸门）。判据见该文件类注释；为什么不按「当前锚点重算对不上」判也写在那里 |
 
 ### 已修销账（原 R3–R8，全部在 v1.2.7 批次 14 修掉，勿再重复提）
 

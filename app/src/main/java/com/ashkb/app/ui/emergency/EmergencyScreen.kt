@@ -448,6 +448,7 @@ private fun ProfileKeyValues(p: com.ashkb.app.data.entity.Profile?) {
  * 合起来已超出 LongMethod 阈值，而它本身就是独立可读的一件事。
  */
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun EmergencyMedsList(s: EmergencyMeds.Summary) {
     if (s.isEmpty) {
         Text(
@@ -474,15 +475,26 @@ private fun EmergencyMedsList(s: EmergencyMeds.Summary) {
         // 剂量**独占整行**并在必要时折行 —— 剂量是急救时真正要读的
         // 数字，它不该为布局让步。
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            // v1.2.11：药名行由 Row 改 FlowRow（R1 收尾）。
+            //
+            // v1.2.2 已把剂量拆到独占行，但剩下的「药名 + 胶囊」仍是
+            // Row + weight(1f)：胶囊按固有宽先占位，药名只能吃剩下的。
+            // 维护者在 320dp 窄屏 + 2.0× 字号下看到药名被压成竖排——
+            // 这正是 KeyValueRow KDoc 里写的那个极端情形，只是这次
+            // 撞在**急救卡**上：急救时读不到药名等于这张卡失效。
+            //
+            // FlowRow 里药名不再被挤压：它按自己的固有宽测量（过长时
+            // 在自己那一行内折行），胶囊放不下就整颗折到下一行。
+            // 代价是药名较短时胶囊不再被推到行尾（左对齐紧跟药名），
+            // 急救场景下这反而更好读。
+            FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
             ) {
                 Text(
                     e.name,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
                 )
                 if (e.immunosuppressant) {
                     StatusChip(

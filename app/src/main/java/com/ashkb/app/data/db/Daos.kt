@@ -194,6 +194,21 @@ interface MedicationChangeDao {
     @Query("SELECT * FROM medication_changes WHERE change_type = 'stop' ORDER BY recorded_at DESC")
     fun observeStops(): Flow<List<MedicationChange>>
 
+    /**
+     * 全部顺延变更（R2 存量幽灵槽位清理的输入）。
+     *
+     * 为什么按 `reason` 而不是按 `change_type` 筛：`schedule_change` 这个词表还涵盖
+     * 「改时刻」「改频次」等其它改法，而只有顺延（`reason = postpone`）会产生
+     * 「旧锚点物化了、新锚点不该有」的幽灵区间。拿 `change_type` 一刀切会把正常改时刻
+     * 的历史也卷进来。
+     *
+     * 按 `recorded_at` 升序：清理时逐条按 `[recordedAt 当天, effectiveDate)` 删，
+     * 多次顺延的区间**互不重叠**（后一次的 R 一定晚于前一次的 D，否则就是同一笔），
+     * 顺序执行即可，不需要合并区间。
+     */
+    @Query("SELECT * FROM medication_changes WHERE change_type = 'schedule_change' AND reason = 'postpone' ORDER BY recorded_at ASC")
+    suspend fun listPostpones(): List<MedicationChange>
+
     /** v1.0.71：随药档一并删除该药的变更记录，避免留下指向已删药档的孤儿行。 */
     @Query("DELETE FROM medication_changes WHERE med_id = :medId")
     suspend fun deleteOfMed(medId: String)
@@ -1190,4 +1205,18 @@ interface PlannedSlotDao {
      */
     @Query("DELETE FROM planned_slots WHERE med_id = :medId AND date >= :fromDate")
     suspend fun deleteOfMedFrom(medId: String, fromDate: String)
+
+    /**
+     * 删除某药在 `[fromDate, toDate)` 半开区间内的计划快照——顺延存量清理专用（R2）。
+     *
+     * 为什么是半开区间而不是 `>= from`：顺延的语义是「这一剂从 [effectiveDate] 才开始」，
+     * 生效日当天属于**新**锚点的领地（`isInjectionDay` 以新锚点算 `days >= 0`），
+     * 把它一起删掉会连新锚点刚物化的那一行也抹掉。上界开、下界闭，正好只覆盖
+     * 「用户已决定顺延掉、但旧锚点仍物化过」的那些日期。
+     *
+     * 返回值是实际删除行数（Room 对 `DELETE` 支持返回 `Int`）：清理是一次性静默动作，
+     * 没有日志就没法回答「它到底删了什么」，行数至少让它可观测。
+     */
+    @Query("DELETE FROM planned_slots WHERE med_id = :medId AND date >= :fromDate AND date < :toDate")
+    suspend fun deleteOfMedInRange(medId: String, fromDate: String, toDate: String): Int
 }

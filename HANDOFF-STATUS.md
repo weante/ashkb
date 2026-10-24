@@ -990,3 +990,22 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 - `E:\ASHKB\supp-partial-gate2.log`：2m 15s，单测 117 文件 / 998 条，detekt 0，lint 166 = 0 Error。
 - `E:\ASHKB\agroup-gate1.log`：1m 29s，单测 **118 文件 / 1003 条**，detekt 0，lint **167**（159 Warning + 8 Information，**0 Error**），`verifySpecSync` 通过。
 - 本批**未发版、未 bump**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19），**未装机**（设备无线调试未开，`adb devices` 与 `adb mdns services` 均空）。
+
+### R1 + R2：急救卡药名行改换行、清理存量顺延幽灵槽位（2026-10-24 · 未发版 · 未 bump 版本号）
+
+维护者裁决（m15462）：「R1胶囊换行 / R2 同意」。**R2 此前多轮裁决都是「不做」**（清理属删用户数据），本次明确同意后才落地。
+
+| 项 | 原状 | 落地 | 证据 |
+|---|---|---|---|
+| R1 急救卡药名被压竖排 | 药名与「免疫抑制」胶囊是 `Row` + 药名 `weight(1f)`：胶囊按固有宽先占位，药名只吃剩下的；320dp × 2.0× 字号下药名被压成竖排 | 药名行改 `FlowRow`：放不下就把胶囊折到下一行，药名按固有宽测量 | `ui/emergency/EmergencyScreen.kt:490` 起；代价是药名短时胶囊不再右对齐（急救场景「读得到药名」优先） |
+| R2 存量顺延幽灵槽位 | v1.1.1 之前顺延只改 `startDate` 不清行，旧锚点物化的行永久残留 → 被 `AdherenceCalc.doseCompletion` 计为永久漏服、`MissedDoses.unsettled` 天天提示 | 按每条顺延审计行删 `[recordedAt 日期, effectiveDate)` 半开区间内的 `planned_slots` 行 | 纯函数 `domain/PostponeGhostSlots.kt`；DAO `PlannedSlotDao.deleteOfMedInRange` / `MedicationChangeDao.listPostpones`；执行点 `MedicationRepository.purgePostponeGhostSlots()` |
+| 一次性闸门 | 无 | `AshkbApplication` 在启动期**物化之前**调用一次，`app_prefs` 的 `ghost_slot_purged_v1` 布尔闸门 | 闸门在**成功返回后**才写：抛异常留给下次启动重试（与 `importKbSeedIfNeeded` 同口径） |
+
+**为什么判据是 `[R, D)` 而不是「按当前锚点重算对不上」**：后者会连正常改时刻 / 改频次留下的历史行一起误杀——它们与当前锚点同样对不上，但都是当时真实发生过的计划。`date < R` 是顺延前真实历史（保留）、`date >= D` 是新锚点领地（物化会写），只有 `[R, D)` 是「用户明确决定往后推、按新锚点本就不该有槽位」的幽灵。典型「今天→明天」时区间只有 `R` 当天。
+
+**回归与门禁**
+
+- 新增 `app/src/test/java/com/ashkb/app/domain/PostponeGhostSlotsTest.kt`（6 条）：今天→明天只删今天、今天→两周后覆盖整段但**不含生效日**、顺延到当天/更早时区间为空、带小数秒的 `recordedAt` 仍能取日期、脏串不动。
+- 负向对照（造「能编译」的违规形状）：把 `range` 的 `to` 改成 `to.plusDays(1)` 破坏半开区间 ⇒ 6 条里**正好 3 条 FAIL**，失败信息即区间边界；恢复后 6/6 全绿。
+- `E:\ASHKB\r1r2-gate1.log`：2m 51s，单测 **119 文件 / 1009 条**，detekt **0**，lint **167**（159 Warning + 8 Information，**0 Error**，且无一条落在本轮改动的文件上），`verifySpecSync` 通过。
+- 本批**未发版、未 bump**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19），**未装机**。

@@ -442,6 +442,34 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
 - 完整门禁 `E:\ASHKB\supp-partial-gate2.log`：BUILD SUCCESSFUL in 2m 15s；单测 117 文件 / 998 条全绿；detekt 0；lint 166 = 0 Error + 158 Warning + 8 Information。
 - 拆分后完整门禁 `E:\ASHKB\agroup-gate1.log`：BUILD SUCCESSFUL in 1m 29s；单测 **118 文件 / 1003 条**全绿；detekt 0；lint **167**（159 Warning + 8 Information，**0 Error**）；`verifySpecSync` 通过。
 - 本批**未发版、未 bump 版本号**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19），未装机（设备无线调试未开）。
+
+### 十、R1 + R2：急救卡药名行改换行、清理存量顺延幽灵槽位（2026-10-24 · 未发版）
+
+维护者裁决（m15462）：「R1胶囊换行 / R2 同意」——**R2 此前多轮裁决都是「不做」**（清理属删用户数据），本次明确同意，故落地。
+
+**一、R1：急救卡「当前用药」的药名行由 `Row` 改 `FlowRow`**
+
+- `app/src/main/java/com/ashkb/app/ui/emergency/EmergencyScreen.kt:490` 起：药名与「免疫抑制」胶囊原本是 `Row` + 药名 `weight(1f)`——胶囊按固有宽先占位，药名只能吃剩下的。维护者在 **320dp 窄屏 + 2.0× 字号**下看到药名被压成竖排。v1.2.2 已把剂量说明拆到独占行，剩下「药名 + 胶囊」仍是这个结构。
+- 改成 `FlowRow`：放不下就把胶囊折到下一行，药名按自己的固有宽测量、不再被挤压。代价是药名较短时胶囊不再被推到行尾（左对齐紧跟药名）——在急救卡上「读得到药名」远比「右对齐好看」重要。
+- 该函数加 `@OptIn(ExperimentalLayoutApi::class)`（`FlowRow` 需要），**不在 detekt 基线里**，故无签名漂移。
+
+**二、R2：清理 v1.1.1 之前顺延留下的存量幽灵计划槽位**
+
+- **问题**：`postponeInjection` 把注射锚点从「今天」挪到新日期，旧锚点在物化窗口（今天-1..今天+7）里已经写过行，而物化是 `INSERT OR IGNORE`（只加不删）。v1.1.1 之前顺延只改 `startDate`、不清行 → 那些行永久残留：新锚点算不出它们，它们也不会被覆盖，却被 `AdherenceCalc.doseCompletion` 配上永远不会存在的日志 → **该剂量在其落入的每个报表窗口里都被永久计为漏服**，`MissedDoses.unsettled` 还会每天提示。
+- v1.1.1 补的 `deleteOfMedFrom(medId, today)` 只防**新增**；升级前已顺延过的用户，那些行日期如今都在过去，`deleteOfMedFrom` 永远碰不到。
+- **判据**：对每条顺延审计行（`change_type='schedule_change' AND reason='postpone'`），取操作发生日 `R = recordedAt 的日期`、生效日 `D = effectiveDate`，删除 `planned_slots` 中该药 **`[R, D)` 半开区间**内的行。`date < R` 是顺延前的真实历史（保留）、`date >= D` 是新锚点领地（物化会写）、只有 `[R, D)` 是「用户明确决定往后推、按新锚点本就不该有槽位」的幽灵。典型情形「今天→明天」时区间只有 `R` 当天，窗口极窄。
+- **为什么不按「当前锚点重算对不上」判**：那会连正常改时刻 / 改频次留下的历史行一起误杀——它们与当前锚点同样对不上，但都是当时真实发生过的计划。
+- 新增纯函数 `app/src/main/java/com/ashkb/app/domain/PostponeGhostSlots.kt`（`range(recordedAt, effectiveDate): Pair<String, String>?` + `dateOf`），无 Android 依赖、可直接单测。日期取 `iso.take(10)` 而不是解析完整时刻：`nowIso()` 用 `ISO_LOCAL_DATE_TIME`，**纳秒非零时会追加小数秒**，但 ISO 8601 的日期永远在前 10 个字符。
+- 新增 DAO：`PlannedSlotDao.deleteOfMedInRange(medId, fromDate, toDate): Int`（半开区间，返回实际删除行数——一次性静默动作若连行数都不留，事后无法回答「它到底删了什么」）；`MedicationChangeDao.listPostpones()`（按 `reason` 而非 `change_type` 筛：后者还涵盖改时刻/改频次，一刀切会把正常改动的历史卷进来）。
+- 执行点 `MedicationRepository.purgePostponeGhostSlots()`，由 `AshkbApplication` 在启动期**物化之前**调用一次，`app_prefs` 的 `ghost_slot_purged_v1` 布尔闸门保证只跑一次（先删、再由物化按当前锚点补回该有的行）。**闸门在成功返回后才写**：抛异常时留给下次启动重试，否则一次瞬时失败会让清理永久不跑且无从察觉（与 `importKbSeedIfNeeded` 同口径）。
+
+**回归与门禁**
+
+- 新增 `app/src/test/java/com/ashkb/app/domain/PostponeGhostSlotsTest.kt`（6 条）：今天→明天只删今天、今天→两周后覆盖整段但**不含生效日**、顺延到当天/更早时区间为空（不删）、带小数秒的 `recordedAt` 仍能取日期、脏串不动。
+- 负向对照（造「能编译」的违规形状）：把 `range` 的 `to` 改成 `to.plusDays(1)`（破坏半开区间）⇒ 6 条里**正好 3 条 FAIL**，失败信息即区间边界 `expected:<(2026-10-15, 2026-10-16)> but was:<(2026-10-15, 2026-10-17)>`；恢复后 6/6 全绿。
+- 完整门禁 `E:\ASHKB\r1r2-gate1.log`：BUILD SUCCESSFUL in 2m 51s；单测 **119 文件 / 1009 条**全绿；detekt **0**；lint **167**（159 Warning + 8 Information，**0 Error**，且无一条落在本轮改动的文件上）；`verifySpecSync` 通过。
+- 本批**未发版、未 bump 版本号**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19），未装机。
+
 ## [v1.2.9] — 2026-10-10
 
 **两件事：①审查裁决项 2（「已结算」口径三处打架）统一；②首页补剂卡——补剂提醒/打卡从二级页搬到今日页。** 无库结构变更（枚举与状态都存字符串），可覆盖安装。

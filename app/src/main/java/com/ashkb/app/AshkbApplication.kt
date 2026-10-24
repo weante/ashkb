@@ -99,6 +99,13 @@ class AshkbApplication : Application() {
                 // 而窗口与提醒一致，是为了让「有提醒可发」与「有计划可评判」永远同时成立。
                 // 单独 runCatching：物化失败不该连带下面的提醒链与补发通知一起停摆。
                 runCatching {
+                    // v1.2.11（R2）：**存量**顺延幽灵槽位清理——必须排在物化之前。
+                    // v1.1.1 之前的顺延只改锚点、不清旧行，那些行如今日期都在过去，
+                    // `deleteOfMedFrom(today)` 永远碰不到，会被报表永久计为漏服。
+                    // 先删（按 `[顺延当天, 生效日)` 区间，判据见 domain/PostponeGhostSlots），
+                    // 再由下面的物化按当前锚点补回该有的行。
+                    // 闸门：一次性，跑过就写 prefs——这是删历史数据，不该每次冷启动都重扫全表。
+                    purgePostponeGhostSlotsOnce()
                     val win = medicationRepository.plannedSlotWindow(today)
                     medicationRepository.materializePlannedSlots(meds, win.from, win.to)
                     // 昨天有未记录的剂量 → 一条汇总通知（每天最多一条，判定与去重见 MissedDoseReminder）
@@ -173,6 +180,30 @@ class AshkbApplication : Application() {
     override fun onTerminate() {
         dateProvider.stop(this)
         super.onTerminate()
+    }
+
+    /**
+     * R2（v1.2.11）：一次性清理存量顺延幽灵计划槽位。
+     *
+     * 为什么是「一次性 + prefs 闸门」而不是每次启动都跑：
+     * 1. 这是**删历史数据**的动作，重复执行没有任何收益（幂等，但白扫全表）；
+     * 2. 幽灵只在 v1.1.1 之前顺延过的库里存在，一次清完就不会再生
+     *    （`postponeInjection` 自 v1.1.1 起已 `deleteOfMedFrom(today)`）；
+     * 3. 与 [importKbSeedIfNeeded] 的 `KEY_SEED_VERSION` 闸门同款形态——本文件的先例。
+     *
+     * **不写闸门的情形**：`purgePostponeGhostSlots()` 抛异常时由调用方的 `runCatching` 兜住，
+     * 但闸门是在**成功返回后**才写，所以失败会留给下次启动重试——否则一次瞬时失败
+     * （例如启动期数据库还没打开完）会让清理永久不跑，且无从察觉。同 [importKbSeedIfNeeded]
+     * 「解析整体失败时不写闸门」的口径。
+     */
+    private suspend fun purgePostponeGhostSlotsOnce() {
+        val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_GHOST_SLOT_PURGED, false)) return
+        val removed = medicationRepository.purgePostponeGhostSlots()
+        if (removed > 0) {
+            Log.i("ASHKB", "purged $removed ghost planned slots from pre-v1.1.1 postpones")
+        }
+        prefs.edit().putBoolean(KEY_GHOST_SLOT_PURGED, true).apply()
     }
 
     /**
@@ -283,6 +314,14 @@ class AshkbApplication : Application() {
 
         private const val PREFS = "app_prefs"
         private const val KEY_SEED_VERSION = "kb_seed_version"
+
+        /**
+         * R2（v1.2.11）：存量顺延幽灵槽位是否已清理过一次。
+         *
+         * 与 [KEY_SEED_VERSION] 不同，这里只存一个布尔：清理没有「版本」概念——
+         * 它针对的是 v1.1.1 之前的顺延残留，而那种残留不会随版本再产生。
+         */
+        private const val KEY_GHOST_SLOT_PURGED = "ghost_slot_purged_v1"
 
         /**
          * 上次导入种子时所使用的应用语言（v1.2.5）。

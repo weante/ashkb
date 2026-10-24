@@ -19,6 +19,7 @@ import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.DrugInteractionKeys
 import com.ashkb.app.domain.MedDeletion
 import com.ashkb.app.domain.MedLogEdit
+import com.ashkb.app.domain.PostponeGhostSlots
 import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.reminder.ReminderScheduler
 import java.time.LocalDate
@@ -636,6 +637,33 @@ class MedicationRepository(private val context: Context) {
                 source = "self",
             )
         )
+    }
+
+    /**
+     * R2：清理**存量**顺延幽灵计划槽位（v1.2.11）。
+     *
+     * [postponeInjection] 从 v1.1.1 起就会 `deleteOfMedFrom(medId, today)`，所以**新发生**的
+     * 顺延不会留下幽灵。但 v1.1.1 之前顺延过的用户，旧锚点物化的行日期如今都已过去，
+     * `deleteOfMedFrom` 永远碰不到——它们会被报表永久计为漏服、并被漏服提示天天点名。
+     *
+     * 判据与为什么是 `[R, D)` 半开区间，见 [com.ashkb.app.domain.PostponeGhostSlots] 的类注释
+     * （那里是纯函数、有单测；这里只负责执行）。
+     *
+     * **为什么需要维护者明确同意**：这是删用户历史表里的行。虽然被判为「用户已明确决定顺延掉
+     * 的日期、按新锚点本就不该有槽位」，但它确实在动历史数据，所以此前多轮裁决都是「不做」；
+     * v1.2.11 由维护者明确同意后才落地（见 NEXT-SESSION.md 的 R2 条）。
+     *
+     * 幂等：对已清理过的库再跑一次，删除行数为 0（区间里的行已经不在了）。
+     * 返回实际删除的行数——一次性静默动作若连行数都不留，事后无法回答「它到底删了什么」。
+     */
+    suspend fun purgePostponeGhostSlots(): Int = db.withTransaction {
+        val slotDao = db.plannedSlotDao()
+        db.medicationChangeDao().listPostpones().sumOf { change ->
+            val (from, to) = PostponeGhostSlots.range(change.recordedAt, change.effectiveDate)
+                ?: return@sumOf 0
+            val medId = change.medId ?: return@sumOf 0
+            slotDao.deleteOfMedInRange(medId, from, to)
+        }
     }
 
     // ---- 通知动作写入（ReminderReceiver / CheckInActionReceiver 共用） ----
