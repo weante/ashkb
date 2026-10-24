@@ -1008,4 +1008,6 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 - 新增 `app/src/test/java/com/ashkb/app/domain/PostponeGhostSlotsTest.kt`（6 条）：今天→明天只删今天、今天→两周后覆盖整段但**不含生效日**、顺延到当天/更早时区间为空、带小数秒的 `recordedAt` 仍能取日期、脏串不动。
 - 负向对照（造「能编译」的违规形状）：把 `range` 的 `to` 改成 `to.plusDays(1)` 破坏半开区间 ⇒ 6 条里**正好 3 条 FAIL**，失败信息即区间边界；恢复后 6/6 全绿。
 - `E:\ASHKB\r1r2-gate1.log`：2m 51s，单测 **119 文件 / 1009 条**，detekt **0**，lint **167**（159 Warning + 8 Information，**0 Error**，且无一条落在本轮改动的文件上），`verifySpecSync` 通过。
-- 本批**未发版、未 bump**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19），**未装机**。
+- 本批**未发版、未 bump**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19）。
+- **R1 真机复验通过（2026-10-24）**：`wm density 720`（320dp 等效宽）+ `settings put system font_scale 2.0` 后，急救卡「当前用药」药名完整显示为两行 `Etanercept（Enbrel）`，「免疫抑制」胶囊折到下一行。uiautomator dump 里药名节点 `[144,2087][1296,2477]`、胶囊节点 `[279,2504][742,2660]`，y 区间不重叠 ⇒ 确实分行、药名不再被压成竖排。证据 `E:\ASHKB\ui2-shots\r1\r1-320dp-2x-emergency-meds.png` + 同名 `.xml`。验完已还原 density（600）/ font_scale（1.0）/ IME，并删除测试药。
+- **R2 未构造历史幽灵数据验证**：清理只在启动时跑一次，本次装机启动已执行（`app_prefs` 闸门 `ghost_slot_purged_v1` 已置真）；判据正确性由 `PostponeGhostSlotsTest` 的 6 条覆盖。

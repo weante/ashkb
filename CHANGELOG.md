@@ -452,6 +452,7 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
 - `app/src/main/java/com/ashkb/app/ui/emergency/EmergencyScreen.kt:490` 起：药名与「免疫抑制」胶囊原本是 `Row` + 药名 `weight(1f)`——胶囊按固有宽先占位，药名只能吃剩下的。维护者在 **320dp 窄屏 + 2.0× 字号**下看到药名被压成竖排。v1.2.2 已把剂量说明拆到独占行，剩下「药名 + 胶囊」仍是这个结构。
 - 改成 `FlowRow`：放不下就把胶囊折到下一行，药名按自己的固有宽测量、不再被挤压。代价是药名较短时胶囊不再被推到行尾（左对齐紧跟药名）——在急救卡上「读得到药名」远比「右对齐好看」重要。
 - 该函数加 `@OptIn(ExperimentalLayoutApi::class)`（`FlowRow` 需要），**不在 detekt 基线里**，故无签名漂移。
+- **真机复验通过（2026-10-24）**：`wm density 720`（320dp 等效宽）+ `font_scale 2.0` 后，急救卡「当前用药」里药名完整显示为两行 `Etanercept（Enbrel）`，「免疫抑制」胶囊折到下一行、不再把药名压成竖排。证据 `E:\ASHKB\ui2-shots\r1\r1-320dp-2x-emergency-meds.png` + 同名 `.xml`（uiautomator dump 里药名节点 `[144,2087][1296,2477]`、胶囊节点 `[279,2504][742,2660]`，两者 y 区间不重叠 ⇒ 确实分行）。验完已还原 density / font_scale / IME，并删除测试药。
 
 **二、R2：清理 v1.1.1 之前顺延留下的存量幽灵计划槽位**
 
@@ -468,7 +469,7 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
 - 新增 `app/src/test/java/com/ashkb/app/domain/PostponeGhostSlotsTest.kt`（6 条）：今天→明天只删今天、今天→两周后覆盖整段但**不含生效日**、顺延到当天/更早时区间为空（不删）、带小数秒的 `recordedAt` 仍能取日期、脏串不动。
 - 负向对照（造「能编译」的违规形状）：把 `range` 的 `to` 改成 `to.plusDays(1)`（破坏半开区间）⇒ 6 条里**正好 3 条 FAIL**，失败信息即区间边界 `expected:<(2026-10-15, 2026-10-16)> but was:<(2026-10-15, 2026-10-17)>`；恢复后 6/6 全绿。
 - 完整门禁 `E:\ASHKB\r1r2-gate1.log`：BUILD SUCCESSFUL in 2m 51s；单测 **119 文件 / 1009 条**全绿；detekt **0**；lint **167**（159 Warning + 8 Information，**0 Error**，且无一条落在本轮改动的文件上）；`verifySpecSync` 通过。
-- 本批**未发版、未 bump 版本号**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19），未装机。
+- 本批**未发版、未 bump 版本号**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19）。R1 已装机真机复验（见上）；R2 的清理只在启动时跑一次，本次装机启动已执行（`app_prefs` 闸门 `ghost_slot_purged_v1` 已置真），未单独构造历史幽灵数据验证。
 
 ## [v1.2.9] — 2026-10-10
 
