@@ -279,6 +279,9 @@
     <string name="lab_parse_empty">未解析出化验数据——请粘贴 AI 按模板输出的完整文本（含「日期」「医院」和各行数据）</string>
     <string name="lab_ref_lower">参考下限</string>
     <string name="lab_ref_upper">参考上限</string>
+    <!-- v1.2.11（缺陷工单 A07）：表单校验。此前非法数字静默变 null 落库、反向区间能存进去并生成伪异常。 -->
+    <string name="lab_field_number_invalid">请输入数字（留空表示未填）</string>
+    <string name="lab_ref_range_reversed">参考下限不能大于参考上限</string>
     <string name="lab_value">数值</string>
     <string name="me_backup_section">备份与数据</string>
     <string name="me_about_title">关于</string>
@@ -866,8 +869,8 @@
     <string name="notif_action_taken">已服用</string>
 
     <!-- ViewModel · 备份与数据（BackupViewModel） -->
-    <string name="vm_backup_password_min">备份口令至少 6 位</string>
-    <string name="vm_backup_password_min_note">备份口令至少 6 位——恢复时唯一解密依据，请牢记</string>
+    <string name="vm_backup_password_min">备份口令至少 12 位（备份文件泄露后可被离线爆破）</string>
+    <string name="vm_backup_password_min_note">备份口令至少 12 位——它是恢复时唯一的解密依据，请牢记。备份文件一旦泄露，口令是唯一的防线：短口令可被离线穷举，长口令不能。</string>
     <string name="vm_backup_local_done">本机备份完成：%1$s（%2$d 表 %3$d 行，SHA-256 %4$s…）。文件已存 app 私有目录，可通过分享另存。</string>
     <string name="vm_backup_failed">备份失败：%1$s</string>
     <string name="vm_dav_need_url_user">请填写 WebDAV 服务器地址与用户名</string>

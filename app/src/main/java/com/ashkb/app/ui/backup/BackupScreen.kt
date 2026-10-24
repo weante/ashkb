@@ -75,6 +75,7 @@ import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.entity.LedgerStatus
 import com.ashkb.app.data.entity.LedgerType
 import com.ashkb.app.data.repo.BackupRepository
+import com.ashkb.app.domain.BackupPasswordRules
 import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.ui.components.DividerList
 import com.ashkb.app.ui.components.LoadingBlock
@@ -545,12 +546,12 @@ private fun LocalBackupSection(vm: BackupViewModel, busy: Boolean) {
                     // **没有 onFailure**——分享面板起不来时用户只会觉得"生成了但什么都没发生"。
                     vm.backupLocal(backupPass) { intent -> shareOrReport(context, intent, shareTitle) }
                 },
-                enabled = !busy && backupPass.length >= 6,
+                enabled = !busy && BackupPasswordRules.newBackupOk(backupPass),
                 modifier = Modifier.heightIn(min = Size.touchMin),
             ) { Text(stringResource(R.string.backup_local_generate)) }
             OutlinedButton(
                 onClick = { vm.backupWebdav(backupPass) },
-                enabled = !busy && backupPass.length >= 6,
+                enabled = !busy && BackupPasswordRules.newBackupOk(backupPass),
                 modifier = Modifier.heightIn(min = Size.touchMin),
             ) { Text(stringResource(R.string.backup_to_dav)) }
         }

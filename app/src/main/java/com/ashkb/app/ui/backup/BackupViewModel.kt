@@ -15,6 +15,7 @@ import com.ashkb.app.data.backup.WebDavClient
 import com.ashkb.app.data.db.AttachmentSyncCounts
 import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.repo.BackupRepository
+import com.ashkb.app.domain.BackupPasswordRules
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -155,7 +156,7 @@ class BackupViewModel(
     // ======================= 本机备份 =======================
 
     fun backupLocal(password: String, onShare: (Intent) -> Unit) {
-        if (password.length < 6) { fail(app.getString(R.string.vm_backup_password_min_note)); return }
+        if (!BackupPasswordRules.newBackupOk(password)) { fail(app.getString(R.string.vm_backup_password_min_note)); return }
         viewModelScope.launch {
             _busy.value = true
             try {
@@ -191,7 +192,7 @@ class BackupViewModel(
 
     fun backupWebdav(password: String) {
         if (!repo.webdavConfigured()) { fail(app.getString(R.string.vm_dav_not_configured)); return }
-        if (password.length < 6) { fail(app.getString(R.string.vm_backup_password_min)); return }
+        if (!BackupPasswordRules.newBackupOk(password)) { fail(app.getString(R.string.vm_backup_password_min)); return }
         viewModelScope.launch {
             _busy.value = true
             try {

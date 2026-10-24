@@ -15,11 +15,13 @@ import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.reminder.ReminderScheduler
 import java.time.LocalDate
 import java.time.LocalDateTime
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
 
@@ -43,19 +45,26 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
      * 与 `stopMedication` 同款做法（那里也是先单独取消该药全部闹钟再重排）。
      */
     fun saveMedication(context: android.content.Context, med: Medication) = viewModelScope.launch {
-        val before = repo.medicationById(med.id)
-        if (before != null) ReminderScheduler.cancelAllFuture(context, listOf(before))
-        repo.saveMedication(med)
-        rescheduleReminders(context)
+        // C05（缺陷工单）：取消 / 重排都是「药 × 槽 × 3 次 binder」量级的 AlarmManager 调用，
+        // 整段放 IO——保存药单是热路径，在主线程上会卡到可感知甚至 ANR。
+        withContext(Dispatchers.IO) {
+            val before = repo.medicationById(med.id)
+            if (before != null) ReminderScheduler.cancelAllFuture(context, listOf(before))
+            repo.saveMedication(med)
+            rescheduleReminders(context)
+        }
     }
 
     fun stopMedication(context: android.content.Context, med: Medication, reason: String, note: String?) =
         viewModelScope.launch {
-            repo.stopMedication(med, reason, note)
-            // R6 治本：归档≠删除，rescheduleAll 只遍历活跃药、取消不到被停药的未来闹钟——
-            // 先单独取消该药全部闹钟（slotsFor 不查归档标志，request code 仍可算对），再重排活跃药
-            ReminderScheduler.cancelAllFuture(context, listOf(med))
-            rescheduleReminders(context)
+            // C05（缺陷工单）：同上，取消 + 重排整段放 IO。
+            withContext(Dispatchers.IO) {
+                repo.stopMedication(med, reason, note)
+                // R6 治本：归档≠删除，rescheduleAll 只遍历活跃药、取消不到被停药的未来闹钟——
+                // 先单独取消该药全部闹钟（slotsFor 不查归档标志，request code 仍可算对），再重排活跃药
+                ReminderScheduler.cancelAllFuture(context, listOf(med))
+                rescheduleReminders(context)
+            }
         }
 
     /**
@@ -65,7 +74,7 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
     private suspend fun rescheduleReminders(context: android.content.Context) {
         // v1.0.73（P1-17）：整段移出主线程——重排是「药 × 槽 × 3 次 binder」量级
         // （约 8 天窗口），在保存药物/停药这条热路径上会造成可感知卡顿。
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        withContext(Dispatchers.IO) {
             val list = com.ashkb.app.data.db.AppDatabase.get(context).medicationDao().listActive()
             val today = LocalDate.now()
             // v1.2.9（审查答复裁决项 2 = A）：传**已结算**集合（done / partial / skipped）——

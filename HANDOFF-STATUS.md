@@ -1033,3 +1033,27 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 **门禁**：`E:\ASHKB\near-gate2.log` 2m 50s，单测 **1024 条 / 121 文件**全绿，detekt 0，lint 168 = 0 Error 且无一条落在改动文件上，`verifySpecSync` 通过。
 
 **未做**：真机复验（需要一条距边界 ≤5% 的真实化验值；设备无线调试状态未知）；未发版、未 bump。
+
+### 缺陷工单第 1 批：10 项不需 schema 的修复（2026-10-25 · 未发版 · 未 bump 版本号）
+
+工单《ASHKB 缺陷修复执行工单-724cf39.md》分两批：本批 **10 项不动 Room schema**（A02 / A03 / A05 / A07 / B02 / B03 / B04 / B06 / C01 / C05），
+第 2 批 A01 / A04 / A06 / B01 需要一次 v19→v20 迁移，另开一笔。
+
+| 项 | 原状 | 落地 | 证据 |
+| --- | --- | --- | --- |
+| A02 | 眼部与发热共用 `symptom_abnormal`，`insertAlertOnce` 按 `(type, ref_date)` 去重 ⇒ 同日眼部警报被吞 | 新增 `DerivedAlerts.EYE_RED_FLAG`；`FEVER_ALERT` 保持原值不迁移存量；`SymptomCards` 补 label / icon 分支 | `RecordDeletionCascadeTest` 新增「同日发热与眼部各自成一条警报不被去重吞掉」 |
+| A03 | 把症状 / 体征改回正常后旧红旗仍在（撤销逻辑散落且漏路径） | `HealthRepository.reconcileRedFlags(date)` 成为唯一入口，三通道独立判定 + 撤销；`evaluateSymptomAlerts` / `evaluateVitalsAlerts` / `vitalsStillFever` 整体删除 | 4 条新测（改回正常 / 取消勾选 / 降温 / 删记录各一条撤销） |
+| A05 | 跨 vault 恢复继续用本机密钥，附件必然解密失败且无提示 | `domain/VaultKeyDomain.kt` 三态判定（`ADOPT`/`PROCEED`/`MISMATCH`），`restore` 在 `adoptIfAbsent` **之前**阻断并抛 `backup_err_vault_key_mismatch` | `VaultKeyDomainTest` 6 条 + 负向对照 |
+| A07 | `LabDraft.toRecord` 丢掉 `existing.abnormal`；反向区间能存进去并算出伪异常 | `abnormal = existing?.abnormal` 原样带过；新增 `ui/checkup/LabDraftRules.kt`（非法数字 / 反向区间），红框、说明、保存按钮共用同一组判据 | `LabDraftRulesTest`；表单抽 `LabReferenceRangeRow` 以回到 detekt 80 行内 |
+| B02 | 复诊 PDF 的 upcoming 按 `date` 查，把已过去的就诊日当未来项 | 改按 `next_date` | `CheckupUpcomingPdfTest` |
+| B03 | 停药多步写入非原子（归档 / 清槽位 / 变更记录） | 整段 `db.withTransaction` | 既有停药测试 |
+| B04 | 按需打卡 find-then-upsert 有并发重复窗口 | 查-写包进事务 | `PrnDailyCapTest` |
+| B06 | 关闭安全弹窗会解除父页面 `FLAG_SECURE` | 新增 `ui/components/SecureFlagScope.kt`，每个 effect 只还原本 effect 加过的标志 | `SecureFlagScopeTest` |
+| C01 | 新备份口令最短 6 位 | `domain/BackupPasswordRules.kt`（≥12），VM 两处 + UI 两处接线，中英文案说明理由；**恢复侧刻意不引用该规则** | `BackupPasswordRulesTest` 4 条（含源码断言：`verifyBackup` 区间内不得出现 `BackupPasswordRules`） |
+| C05 | 批量闹钟循环在主 dispatcher | 7 个 ViewModel 移进 `withContext(Dispatchers.IO)`；`ReminderSettingsSheet` 三处本已在 IO，未改 | `AlarmCallsOffMainThreadTest`（补充守卫，含自证判据用例） |
+
+**负向对照三组**（均造「能编译的违规形状」）：注释掉 4 处 `alertDao.deleteUnackedByRef(` ⇒ `RecordDeletionCascadeTest` 28 条里 6 条 FAIL；`localKey == null -> ADOPT` 改 `PROCEED` ⇒ `VaultKeyDomainTest` 6 条里 1 条 FAIL；拆掉 `MeViewModel.saveMedication` 的 IO 包装 ⇒ `AlarmCallsOffMainThreadTest` 精确报 `MeViewModel.kt:52 Scheduler.cancelAllFuture`。
+
+**门禁** `E:\ASHKB\batch1-gate2.log`：BUILD SUCCESSFUL in 2m 50s；单测 **127 文件 / 1061 条** failures=0 errors=0 skipped=0；detekt **0**；lint total **168** = **0 Error** + 160 Warning + 8 Information，**本轮改动文件零命中**；`verifySpecSync` 通过。
+
+**仍未做**：第 2 批 A01 / A04 / A06 / B01（需 v19→v20 一次性迁移）；B05 / B07 / B08 / B09 / C02 / C03 / C04 / C06；本批未装机（设备无线调试未开）。

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Vaccines
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -62,7 +63,8 @@ import androidx.compose.ui.Alignment
  */
 @Composable
 private fun alertLabel(alertType: String): String = when (alertType) {
-    DerivedAlerts.SYMPTOM_ABNORMAL -> stringResource(R.string.symptom_alert_section)
+    DerivedAlerts.FEVER_ALERT -> stringResource(R.string.symptom_alert_section)
+    DerivedAlerts.EYE_RED_FLAG -> stringResource(R.string.ui_alert_eye)
     DerivedAlerts.BASDAI_HIGH -> stringResource(R.string.basdai_self_high)
     DerivedAlerts.FLARE_DAY7 -> stringResource(R.string.report_flare_tracking)
     DerivedAlerts.VACCINE_LIVE_PENDING -> stringResource(R.string.vaccine_live_pending_alert)
@@ -72,7 +74,8 @@ private fun alertLabel(alertType: String): String = when (alertType) {
 }
 
 private fun alertIcon(alertType: String) = when (alertType) {
-    DerivedAlerts.SYMPTOM_ABNORMAL -> Icons.Rounded.MonitorHeart
+    DerivedAlerts.FEVER_ALERT -> Icons.Rounded.MonitorHeart
+    DerivedAlerts.EYE_RED_FLAG -> Icons.Rounded.Visibility
     DerivedAlerts.BASDAI_HIGH -> Icons.Rounded.Insights
     DerivedAlerts.FLARE_DAY7 -> Icons.Rounded.TrendingUp
     DerivedAlerts.VACCINE_LIVE_PENDING -> Icons.Rounded.Vaccines

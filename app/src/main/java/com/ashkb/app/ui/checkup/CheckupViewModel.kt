@@ -20,6 +20,7 @@ import com.ashkb.app.domain.LabImport
 import com.ashkb.app.reminder.CheckupReminderScheduler
 import java.time.LocalDate
 import java.time.LocalDateTime
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class CheckupViewModel(
     private val repo: HealthRepository,
@@ -148,16 +150,19 @@ class CheckupViewModel(
      * 三条路径各写一遍必然漏改一处，而漏改的症状是「提醒与记录不一致」——从界面上看不出来。
      */
     private suspend fun rescheduleCheckupReminders() {
-        val cfg = ReminderConfigRepository(app)
-        val all = com.ashkb.app.data.db.AppDatabase.get(app).checkupRecordDao().listAll()
-        if (cfg.checkupEnabled()) {
-            runCatching {
-                CheckupReminderScheduler.rescheduleAll(
-                    app, all, LocalDate.now(), LocalDateTime.now(),
-                )
+        // C05（缺陷工单）：闹钟重排是 binder 量级调用，整段放 IO。
+        withContext(Dispatchers.IO) {
+            val cfg = ReminderConfigRepository(app)
+            val all = com.ashkb.app.data.db.AppDatabase.get(app).checkupRecordDao().listAll()
+            if (cfg.checkupEnabled()) {
+                runCatching {
+                    CheckupReminderScheduler.rescheduleAll(
+                        app, all, LocalDate.now(), LocalDateTime.now(),
+                    )
+                }
+            } else {
+                CheckupReminderScheduler.cancelAllFuture(app, all)
             }
-        } else {
-            CheckupReminderScheduler.cancelAllFuture(app, all)
         }
     }
 

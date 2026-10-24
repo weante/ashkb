@@ -628,6 +628,10 @@ interface VitalsDao {
     @Query("SELECT * FROM vitals WHERE date BETWEEN :from AND :to ORDER BY date, recorded_at")
     fun observeBetween(from: String, to: String): Flow<List<Vitals>>
 
+    /** v1.2.11（缺陷工单 A03）：按 id 取回被删的那条，删除后要按它的 date 重算红旗警报。 */
+    @Query("SELECT * FROM vitals WHERE id = :id LIMIT 1")
+    suspend fun byId(id: String): Vitals?
+
     /** U4 误录删除 */
     @Query("DELETE FROM vitals WHERE id = :id")
     suspend fun delete(id: String)

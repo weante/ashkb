@@ -15,8 +15,26 @@ import java.time.LocalDate
  */
 object DerivedAlerts {
 
-    /** 发热 / 眼部症状（`HealthRepository.evaluateSymptomAlerts` 的两个分支共用此类型）。 */
-    const val SYMPTOM_ABNORMAL = "symptom_abnormal"
+    /**
+     * 发热红旗。**两个来源合并为一条**：症状自评（勾发热 + 体温 ≥ 阈值）与体征录入（体温 ≥ 阈值）。
+     *
+     * 值沿用历史的 `symptom_abnormal` 不改名——库里存量警报就是这个值，改名等于让它们全部失联
+     * （`insertAlertOnce` 的 `(type, ref_date)` 去重失效，同一天会冒出第二条发热警报）。
+     */
+    const val FEVER_ALERT = "symptom_abnormal"
+
+    /**
+     * 眼部症状红旗（`emr-001` 前葡萄膜炎）。
+     *
+     * v1.2.11（缺陷工单 A02）：**此前与发热共用 `symptom_abnormal`**，而 `insertAlertOnce` 按
+     * `(type, ref_date)` 去重——同一天先写发热再写眼部时，眼部那条直接被去重吞掉：用户勾了
+     * 「眼红眼痛」却只看到一条发热提醒。眼部症状对 AS 患者是**眼科急症级**信号（前葡萄膜炎
+     * 24h 内就诊），被吞等于漏掉安全提示。故拆成独立身份。
+     *
+     * 存量库里的老警报仍记在 `symptom_abnormal` 下，不清洗也不迁移：它们确实是当天真实发生过的
+     * 提醒，用户 ack 过就是留痕；未 ack 的仍会显示（文案由 UI 侧按类型映射，见 `SymptomCards`）。
+     */
+    const val EYE_RED_FLAG = "eye_red_flag"
 
     /** 神经红旗（麻木 / 无力 / 大小便控制变化）。 */
     const val NEURO_RED_FLAG = "neuro_red_flag"
@@ -36,13 +54,20 @@ object DerivedAlerts {
     const val REVIEW_DUE = "review_due"
 
     /**
-     * 症状记录派生的全部警报类型。
+     * 症状 / 体征记录派生的全部警报类型（删除记录时按它们逐个判定）。
      *
-     * v1.1.2（批次 18）起**不再整体照单删除**：发热警报（[SYMPTOM_ABNORMAL]）有第二个来源——
-     * 体征录入（`vitals.temperature`，见第四份审查报告 §六），删症状记录时若体征仍发热，
-     * 那条警报依然成立。见 `HealthRepository.deleteSymptom`。
+     * v1.1.2（批次 18）起**不再整体照单删除**：发热警报（[FEVER_ALERT]）有第二个来源——
+     * 体征录入（`vitals.temperature`），删症状记录时若体征仍发热，那条警报依然成立。
+     *
+     * v1.2.11（工单 A02）：眼部拆出为 [EYE_RED_FLAG]，不再与发热共用去重键。
      */
-    val SYMPTOM_TYPES = listOf(SYMPTOM_ABNORMAL, NEURO_RED_FLAG)
+    val SYMPTOM_TYPES = listOf(FEVER_ALERT, EYE_RED_FLAG, NEURO_RED_FLAG)
+
+    /**
+     * 兼容别名。v1.2.10 及更早的代码与测试用 `SYMPTOM_ABNORMAL` 指代「发热」这一支；
+     * 值相同，保留别名只是为了让存量调用点不必一次性全改（改错方向就会造成去重键漂移）。
+     */
+    const val SYMPTOM_ABNORMAL = FEVER_ALERT
 
     /**
      * 某次发作的日期窗口是否覆盖 [refDate]。

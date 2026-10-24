@@ -22,6 +22,7 @@ import com.ashkb.app.reminder.BasdaiReminderScheduler
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SymptomViewModel(
@@ -154,13 +156,16 @@ class SymptomViewModel(
      * 抽成一处：写入与删除各写一遍必然漏改一处，而漏改的症状是「提醒日期与记录对不上」。
      */
     private suspend fun rescheduleBasdaiReminder() {
-        val cfg = ReminderConfigRepository(app)
-        val db = com.ashkb.app.data.db.AppDatabase.get(app)
-        runCatching {
-            BasdaiReminderScheduler.rescheduleAll(
-                app, db.basdaiDao().latest(), cfg.basdaiCycleDays(),
-                LocalDate.now(), LocalDateTime.now(),
-            )
+        // C05（缺陷工单）：闹钟重排是 binder 量级调用，整段放 IO。
+        withContext(Dispatchers.IO) {
+            val cfg = ReminderConfigRepository(app)
+            val db = com.ashkb.app.data.db.AppDatabase.get(app)
+            runCatching {
+                BasdaiReminderScheduler.rescheduleAll(
+                    app, db.basdaiDao().latest(), cfg.basdaiCycleDays(),
+                    LocalDate.now(), LocalDateTime.now(),
+                )
+            }
         }
     }
 

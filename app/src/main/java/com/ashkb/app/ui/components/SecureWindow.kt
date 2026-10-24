@@ -3,7 +3,6 @@ package com.ashkb.app.ui.components
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalView
@@ -22,6 +21,10 @@ import androidx.compose.ui.window.DialogWindowProvider
  *  - 弹窗 / Sheet 窗口：`LocalView.parent as? DialogWindowProvider`。
  *
  * 用 `DisposableEffect` 在离开组合时清除标志，避免「进过一次口令页，之后全应用都不能截图」。
+ *
+ * v1.2.11（缺陷工单 B06）：清除时**只还原本 effect 拥有的状态**——见 [SecureFlagScope]。
+ * 此前这里无条件 `clearFlags`，于是「备份页（自身已加保护）→ 打开恢复码弹窗 → 关掉弹窗」
+ * 会把父页面的保护一并解掉，用户回到备份页时那页已经可以截屏。
  */
 @Composable
 fun SecureWindow() {
@@ -32,11 +35,10 @@ fun SecureWindow() {
             .firstOrNull()
         val dialogWindow = (view.parent as? DialogWindowProvider)?.window
         val windows = listOfNotNull(activity?.window, dialogWindow).distinct()
-        windows.forEach {
-            it.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
-        }
+        val scope = SecureFlagScope()
+        windows.forEach { scope.acquire(it) }
         onDispose {
-            windows.forEach { it.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+            scope.release()
         }
     }
 }

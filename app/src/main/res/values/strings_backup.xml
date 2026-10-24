@@ -83,6 +83,7 @@
     <string name="backup_err_engine_write_failed">恢复写入失败，数据库已回滚到恢复前的状态，原有数据未受影响。可重试，或用恢复前的自动快照回退。</string>
     <string name="backup_err_engine_bad_type">备份数据类型不符：%1$s.%2$s 期望数值，实际为 %3$s</string>
     <string name="backup_err_engine_unknown_column">备份含未知列：%1$s.%2$s</string>
+    <string name="backup_err_vault_key_mismatch">本机与备份属于不同密钥域（加密密钥不一致）。已阻止恢复，以保护本机已有的附件。</string>
     <string name="backup_verify_rows_mismatch">%1$s: 期望 %2$d 实际 %3$d</string>
     <string name="backup_verify_sha_mismatch">%1$s: SHA-256 不匹配</string>
     <string name="backup_pending_selfcheck_ok">已通过文件自校验：%1$s</string>

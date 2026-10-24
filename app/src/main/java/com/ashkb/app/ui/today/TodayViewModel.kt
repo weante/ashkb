@@ -344,7 +344,10 @@ class TodayViewModel(
             // 撤掉今天该补剂已挂的通知（若有），再整体重排未来 7 天：
             // 补剂打卡按天记，记过当天其余时刻的提醒要立刻撤下，否则用户刚打完卡还会被
             // 后面几个时刻连着提醒（v1.2.4 修过的「打卡了还响」）。
-            SupplementReminderScheduler.cancelAllFuture(app, supplements.value, date)
+            // C05（缺陷工单）：取消也要在 IO——它同样是「补剂 × 时刻」量级的 binder 循环。
+            withContext(Dispatchers.IO) {
+                SupplementReminderScheduler.cancelAllFuture(app, supplements.value, date)
+            }
             rescheduleSupplementReminders()
         }
     }

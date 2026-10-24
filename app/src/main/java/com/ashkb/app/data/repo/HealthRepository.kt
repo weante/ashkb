@@ -129,7 +129,7 @@ class HealthRepository(private val context: Context) {
         val log = if (existing != null) input.copy(id = existing.id)
         else input.copy(id = Ids.new("sym"))
         symptomDao.upsert(log)
-        evaluateSymptomAlerts(log)
+        reconcileRedFlags(log.date)
     }
 
     /**
@@ -144,45 +144,77 @@ class HealthRepository(private val context: Context) {
      * 已被用户确认（ack）的警报保留——那是「他确实看过」的留痕，且不出现在未读列表里。
      *
      * v1.1.2（批次 18）：**发热警报有两个来源**（症状自评的「发热 + 体温」与体征录入的体温），
-     * 共用同一个 `(type='symptom_abnormal', ref_date)` 去重键。故删除症状记录时，
-     * 只有当**体征侧也不再发热**才清这条警报——体征还挂着 38.7 ℃ 时把它删掉，
+     * 故删除症状记录时，只有当**体征侧也不再发热**才清这条警报——体征还挂着 38.7 ℃ 时把它删掉，
      * 等于凭空抹掉一条仍然成立的急症提示。
+     *
+     * v1.2.11（缺陷工单 A03）：改为调 [reconcileRedFlags] 按**当前库内事实**整体重算，
+     * 不再逐条手写「删哪一条」——编辑成正常值（而不只是删除）也必须让旧红旗消失。
      */
     suspend fun deleteSymptom(date: String) = db.withTransaction {
         val row = symptomDao.byDate(date) ?: return@withTransaction
         symptomDao.delete(row.id)
-        alertDao.deleteUnackedByRef(DerivedAlerts.NEURO_RED_FLAG, row.date)
-        if (!vitalsStillFever(row.date)) {
-            alertDao.deleteUnackedByRef(DerivedAlerts.SYMPTOM_ABNORMAL, row.date)
-        }
+        reconcileRedFlags(row.date)
     }
 
-    /** 红旗三通道：发热→emr-002 / 眼→emr-001 / 神经→emr-004（edu-th-001 阈值联动） */
-    private suspend fun evaluateSymptomAlerts(log: SymptomDaily) {
-        if (log.feverish && (log.feverTemp ?: 0.0) >= FEVER_THRESHOLD) {
+    /**
+     * v1.2.11（缺陷工单 A02 + A03）：**按当前库内事实重算某一天的红旗警报**。
+     *
+     * 这是红旗警报的**唯一判定入口**：保存/删除症状、保存/删除体征后都调它。
+     *
+     * 为什么不能只「写时新增」：此前 `saveSymptom` 只调 `evaluateSymptomAlerts`（只增不清），
+     * 于是把 38.7 ℃ 改成 37.0 ℃、或把「眼红眼痛」取消勾选后，那条 high 级警报仍挂在症状页顶部
+     * 指向一件已经不成立的事；`deleteVitals` 更是只删行、完全不碰警报。
+     *
+     * 判据（三条独立通道，互不吞噬）：
+     *  · 发热 = 症状侧（`feverish && temp >= 阈值`）**或** 体征侧（`temperature >= 阈值`）——
+     *    两个来源合并为一条 [DerivedAlerts.FEVER_ALERT]，符合「同一天一条发热警报」的产品口径；
+     *  · 眼部 = 症状侧 `eyeSymptom`，独立身份 [DerivedAlerts.EYE_RED_FLAG]（工单 A02：拆分前
+     *    它与发热共用去重键，同一天两者并存时眼部那条会被去重吞掉）；
+     *  · 神经 = 症状侧 `neuroRedFlag`，独立身份 [DerivedAlerts.NEURO_RED_FLAG]。
+     *
+     * 已 ack 的警报一律不动（用户看过的留痕，且不在未读列表里）。
+     */
+    private suspend fun reconcileRedFlags(date: String) {
+        val symptom = symptomDao.byDate(date)
+        val vitalsTemp = vitalsDao.latestByDate(date)?.temperature
+
+        val fever = (symptom?.feverish == true && (symptom.feverTemp ?: 0.0) >= FEVER_THRESHOLD) ||
+            (vitalsTemp != null && vitalsTemp >= FEVER_THRESHOLD)
+        if (fever) {
+            // 文案取「更能说明事实」的那一个来源：体征侧有值且越界时优先用它（用户刚量了体温）
+            val fromVitals = vitalsTemp != null && vitalsTemp >= FEVER_THRESHOLD
+            val shownTemp = if (fromVitals) vitalsTemp else symptom?.feverTemp
             insertAlertOnce(
-                type = DerivedAlerts.SYMPTOM_ABNORMAL, severity = "high", refDate = log.date,
+                type = DerivedAlerts.FEVER_ALERT, severity = "high", refDate = date,
                 message = context.getString(
-                    R.string.ui_alert_fever,
-                    log.feverTemp.toString(),
+                    if (fromVitals) R.string.ui_alert_vitals_fever else R.string.ui_alert_fever,
+                    shownTemp.toString(),
                     FEVER_THRESHOLD.toString(),
                 ),
                 kbRef = "emr-002",
             )
+        } else {
+            alertDao.deleteUnackedByRef(DerivedAlerts.FEVER_ALERT, date)
         }
-        if (log.eyeSymptom) {
+
+        if (symptom?.eyeSymptom == true) {
             insertAlertOnce(
-                type = DerivedAlerts.SYMPTOM_ABNORMAL, severity = "high", refDate = log.date,
+                type = DerivedAlerts.EYE_RED_FLAG, severity = "high", refDate = date,
                 message = context.getString(R.string.ui_alert_eye),
                 kbRef = "emr-001",
             )
+        } else {
+            alertDao.deleteUnackedByRef(DerivedAlerts.EYE_RED_FLAG, date)
         }
-        if (log.neuroRedFlag) {
+
+        if (symptom?.neuroRedFlag == true) {
             insertAlertOnce(
-                type = DerivedAlerts.NEURO_RED_FLAG, severity = "high", refDate = log.date,
+                type = DerivedAlerts.NEURO_RED_FLAG, severity = "high", refDate = date,
                 message = context.getString(R.string.ui_alert_neuro),
                 kbRef = "emr-004",
             )
+        } else {
+            alertDao.deleteUnackedByRef(DerivedAlerts.NEURO_RED_FLAG, date)
         }
     }
 
@@ -610,7 +642,7 @@ class HealthRepository(private val context: Context) {
         val log = if (existing != null) input.copy(id = existing.id)
         else input.copy(id = Ids.new("vit"))
         vitalsDao.upsert(log)
-        evaluateVitalsAlerts(log)
+        reconcileRedFlags(log.date)
     }
 
     /**
@@ -623,27 +655,16 @@ class HealthRepository(private val context: Context) {
      * 对免疫抑制（生物制剂 / JAK / 激素）的患者，发热是急症级信号：
      * 触发源必须是**体温本身被记下来**，而不是「今天顺手做了症状自评并且勾对了框」。
      *
-     * 与症状侧同用 `symptom_abnormal` 类型 + `insertAlertOnce` 的 `(type, refDate)` 去重：
-     * 两条来源同一天只会留下一条警报，不刷屏。
+     * v1.2.11（缺陷工单 A02/A03）：合并进 [reconcileRedFlags]——体征侧与症状侧同属
+     * [DerivedAlerts.FEVER_ALERT] 一条，且**降温后要能撤掉**（此前只增不清）。
      */
-    private suspend fun evaluateVitalsAlerts(log: Vitals) {
-        val t = log.temperature ?: return
-        if (t < FEVER_THRESHOLD) return
-        insertAlertOnce(
-            type = "symptom_abnormal", severity = "high", refDate = log.date,
-            message = context.getString(R.string.ui_alert_vitals_fever, t.toString(), FEVER_THRESHOLD.toString()),
-            kbRef = "emr-002",
-        )
-    }
 
-    /** 当天体征是否仍构成发热红旗——发热警报有**两个来源**，删除时按它决定留不留。 */
-    private suspend fun vitalsStillFever(date: String): Boolean {
-        val t = vitalsDao.latestByDate(date)?.temperature ?: return false
-        return t >= FEVER_THRESHOLD
+    /** U4 误录删除。v1.2.11（工单 A03）：删后按当前事实重算，否则降不下来的发热警报会留成幽灵。 */
+    suspend fun deleteVitals(id: String) = db.withTransaction {
+        val row = vitalsDao.byId(id) ?: return@withTransaction
+        vitalsDao.delete(id)
+        reconcileRedFlags(row.date)
     }
-
-    /** U4 误录删除 */
-    suspend fun deleteVitals(id: String) = vitalsDao.delete(id)
 
     // ---- M3 体重 ----
     fun observeWeightRecent(limit: Int = 30): Flow<List<WeightLog>> = weightDao.observeRecent(limit)

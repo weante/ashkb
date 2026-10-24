@@ -513,6 +513,82 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
 
 - **未真机复验**：需要一条参考范围内、距边界 ≤5% 的真实化验值才看得出效果；设备当前无线调试状态未知。
 - 未发版、未 bump 版本号。
+### 十二、缺陷工单第 1 批（10 项不需 schema 的修复）· 2026-10-25 · 未发版
+
+工单《ASHKB 缺陷修复执行工单-724cf39.md》第 1 批：**不动 Room schema** 的 10 项。
+第 2 批（A01 / A04 / A06 / B01）需要一次 v19→v20 迁移，另开一笔。
+
+每项都留了会在撤销修复后失败的行为测试；纯静态守卫只作为补充，不当行为证据。
+
+#### A02 发热与眼部红旗共用去重键 → 拆开
+`DerivedAlerts` 新增 `EYE_RED_FLAG = "eye_red_flag"`。此前眼部与发热共用 `symptom_abnormal`，
+而 `insertAlertOnce` 按 `(type, ref_date)` 去重 ⇒ **同一天既有发热又有眼部症状时，眼部那条被吞掉**。
+`FEVER_ALERT` 保持原值 `"symptom_abnormal"`（存量警报不迁移），另加 `SYMPTOM_ABNORMAL` 兼容别名。
+`SymptomCards` 的 `alertLabel` / `alertIcon` 各补 `EYE_RED_FLAG` 分支（`ui_alert_eye` + `Visibility`）。
+
+#### A03 编辑症状 / 体征为正常后旧红旗仍保留 → 唯一重算入口
+`HealthRepository` 新增 `reconcileRedFlags(date)`：一次读当日症状 + 体征，三通道独立判定，
+**撤销也在这里**（不成立就 `deleteUnackedByRef`，已 ack 的不动）。
+四个写入口（`saveSymptom` / `deleteSymptom` / `saveVitals` / `deleteVitals`）全部改走它；
+原先三个函数 `evaluateSymptomAlerts` / `evaluateVitalsAlerts` / `vitalsStillFever` 整体删除。
+`VitalsDao` 新增 `byId(id)`，`deleteVitals` 需要它拿到日期。
+
+#### A05 跨 vault 恢复继续用本机密钥 → 恢复前阻断
+新增 `domain/VaultKeyDomain.kt`（纯函数）：`ADOPT` / `PROCEED` / `MISMATCH` 三态，
+用 `MessageDigest.isEqual` 比密钥。`BackupRepository.restore` 在 `adoptIfAbsent` **之前**判定，
+`MISMATCH` 直接抛 `BackupException` 并提示 `backup_err_vault_key_mismatch`（中英各一条）。
+此前换过密钥的机器恢复旧备份，附件必然解密失败且用户看不到原因。
+
+#### A07 编辑无参考范围的化验记录会清掉异常兜底
+两处：`LabDraft.toRecord` 的 `abnormal = existing?.abnormal`（原来直接丢掉）、
+新增 `ui/checkup/LabDraftRules.kt` 校验非法数字与反向区间。
+反向区间此前能存进去，`saveLabResult` 会拿反向边界算出「凭空偏高」的伪异常。
+表单红框、下方说明、保存按钮启用条件**共用同一组判据**（否则会出现「框红了却还能存」）。
+「单位与参考范围不一致」刻意不判——单位是自由文本，本地没有权威映射能区分「写错」与「罕见」。
+
+#### B02 复诊 PDF 的 upcoming 查询按错日期列
+`ReportRepository` 的 upcoming 改按 `next_date`（原按 `date`，把「已过去的就诊日」当成未来项）。
+
+#### B03 停药与导入的多步写入不是原子操作
+`stopMedication` 整段进 `db.withTransaction`（归档 + 清槽位 + 写变更记录一次提交）。
+中途崩溃此前会留下「已归档但没有变更记录」或「有变更记录但槽位还在」的半成品。
+
+#### B04 按需打卡 find-then-upsert 存在并发重复窗口
+`checkIn` 的查-写两步包进事务。
+
+#### B06 关闭安全弹窗会解除父页面的 FLAG_SECURE
+新增 `ui/components/SecureFlagScope.kt`：每个 `SecureWindow()` effect 只记录**自己加过的**标志，
+`onDispose` 只还原本 effect 拥有的部分。此前无条件 `clearFlags`，
+「备份页（自身有保护）→ 开恢复码弹窗 → 关弹窗」会把父页面保护一并解掉。
+
+#### C01 新备份口令最短长度不足 → 6 位提到 12 位
+新增 `domain/BackupPasswordRules.kt`（`newBackupOk` = 长度 ≥ 12）。
+`BackupViewModel` 两处、`BackupScreen` 两处启用条件全部改走它，中英文案同步说明理由。
+**恢复侧刻意完全不引用这条规则**——旧 6 位口令建的备份必须还能解开；
+这条边界由 `BackupPasswordRulesTest` 的源码断言钉住（`verifyBackup` 区间内不得出现 `BackupPasswordRules`）。
+
+#### C05 大规模闹钟循环仍在主 dispatcher 执行
+7 个 ViewModel 的批量闹钟调用全部移进 `withContext(Dispatchers.IO)`：
+`MeViewModel`（保存药单 / 停药）、`WellnessViewModel`、`SymptomViewModel`、`CheckupViewModel`、
+`ExerciseViewModel`、`ExercisePlansViewModel`、`TodayViewModel`（补剂打卡的取消）。
+`ReminderSettingsSheet` 三处**本来就已经**在 IO 块内，未改。
+新增 `ui/AlarmCallsOffMainThreadTest` 作为补充守卫（含一条自证判据能区分块内 / 块外的用例）。
+
+#### 回归与门禁
+
+- 新增测试 6 个文件：`VaultKeyDomainTest`(6) / `BackupPasswordRulesTest`(4) /
+  `LabDraftRulesTest` / `SecureFlagScopeTest` / `CheckupUpcomingPdfTest` /
+  `AlarmCallsOffMainThreadTest`(2)；`RecordDeletionCascadeTest` 增 6 条（现 28 条）。
+- **负向对照三组**（都造「能编译的违规形状」，确认守卫真的会红）：
+  1. 注释掉 4 处 `alertDao.deleteUnackedByRef(` ⇒ `RecordDeletionCascadeTest` 28 条里 6 条 FAIL；
+  2. `VaultKeyDomain.decide` 的 `localKey == null -> ADOPT` 改 `PROCEED` ⇒ 6 条里 1 条 FAIL；
+  3. `MeViewModel.saveMedication` 拆掉 IO 包装 ⇒ `AlarmCallsOffMainThreadTest` 精确报
+     `MeViewModel.kt:52 Scheduler.cancelAllFuture`。
+- 全门禁 `E:\ASHKB\batch1-gate2.log`：**BUILD SUCCESSFUL in 2m 50s**；
+  单测 **127 文件 / 1061 条** failures=0 errors=0 skipped=0；
+  detekt **0**；lint total **168** = **0 Error** + 160 Warning + 8 Information，
+  **本轮改动文件零命中**；`verifySpecSync` 通过。
+- 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版。
 ## [v1.2.9] — 2026-10-10
 
 **两件事：①审查裁决项 2（「已结算」口径三处打架）统一；②首页补剂卡——补剂提醒/打卡从二级页搬到今日页。** 无库结构变更（枚举与状态都存字符串），可覆盖安装。

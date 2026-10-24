@@ -329,9 +329,15 @@ class ReportRepository(private val context: Context) {
             vaccines = vaccinesAll(),
             overview = overview(),
             basdaiHistory = db.basdaiDao().between(from90, to.toString()).sortedBy { it.date },
-            nextCheckups = db.checkupRecordDao().between(from180, to.plusDays(90).toString())
-                .filter { !it.nextDate.isNullOrBlank() && it.nextDate!! >= to.toString() }
-                .sortedBy { it.nextDate },
+            // v1.2.11（缺陷工单 B02）：**按 `next_date` 查，不按就诊日查**。
+            //
+            // 旧写法 `between(from180, to + 90 天)` 过滤的是 `date`（就诊日），再 `.filter { nextDate >= 今天 }`。
+            // 于是「半年前那次就诊、约在两个月后复查」的记录——就诊日落在 180 天窗口之外——
+            // 直接被 SQL 排除，PDF 的「未来复诊」段恒为空。这与周报 `periodic` 里 R3 修掉的
+            // 是同一个错误（那边已在 v1.2.7 改用 `upcomingByNextDate`），只是 PDF 这条路径被漏了。
+            // 现在与周报共用同一 DAO 口径：`next_date` 非空且落在 [今天, 今天+90 天]，已按该列升序，
+            // 空 `nextDate` 与过去日期都由 SQL 的 `next_date >= :from` 排除，不需要 Kotlin 侧再滤一遍。
+            nextCheckups = db.checkupRecordDao().upcomingByNextDate(to.toString(), to.plusDays(90).toString()),
         )
     }
 

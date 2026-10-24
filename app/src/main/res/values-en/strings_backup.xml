@@ -83,6 +83,7 @@
     <string name="backup_err_engine_write_failed">Restore write failed. The database was rolled back to its state before the restore, so your existing data is unaffected. You can retry, or fall back to the automatic pre-restore snapshot.</string>
     <string name="backup_err_engine_bad_type">Backup data type mismatch: %1$s.%2$s should be a number but is %3$s</string>
     <string name="backup_err_engine_unknown_column">The backup contains an unknown column: %1$s.%2$s</string>
+    <string name="backup_err_vault_key_mismatch">This device and this backup use different encryption keys. Restore was blocked to protect the attachments already on this device.</string>
     <string name="backup_verify_rows_mismatch">%1$s: expected %2$d, found %3$d</string>
     <string name="backup_verify_sha_mismatch">%1$s: SHA-256 mismatch</string>
     <string name="backup_pending_selfcheck_ok">Passed file self-check: %1$s</string>

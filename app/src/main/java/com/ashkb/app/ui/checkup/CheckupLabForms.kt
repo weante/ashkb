@@ -38,6 +38,18 @@ private fun editText(v: Double?): String =
     v?.let { String.format(Locale.US, "%.4f", it).trimEnd('0').trimEnd('.') } ?: ""
 
 /**
+ * v1.2.11（缺陷工单 A07）：数字字段的即时错误说明。
+ *
+ * 只在该字段**确实填错了**时才返回一行（留空合法 = 未填），与 `DateTextField` 的口径一致：
+ * 表单初值都来自库里既有值，只有用户自己改坏才会非法，此时立刻反馈最不容易让人困惑。
+ */
+@Composable
+private fun numberError(raw: String): (@Composable () -> Unit)? =
+    if (LabDraftRules.invalidNumber(raw)) {
+        { Text(stringResource(R.string.lab_field_number_invalid)) }
+    } else null
+
+/**
  * 化验结果表单：新增（[existing] 为 null）与修改共用。
  *
  * @param date 该次化验的日期（新增时取所属复诊记录的日期；修改时取原记录的日期）
@@ -59,6 +71,10 @@ internal fun LabResultFormSheet(
     var unit by remember(existing?.id) { mutableStateOf(existing?.unit ?: "") }
     var refLow by remember(existing?.id) { mutableStateOf(editText(existing?.refLow)) }
     var refHigh by remember(existing?.id) { mutableStateOf(editText(existing?.refHigh)) }
+    // v1.2.11（缺陷工单 A07）：反向区间是「两个字段一起错」，判据抽在 LabDraftRules 里，
+    // 红框、下方说明、保存按钮的启用条件共用同一组判据——否则会出现「框红了却还能存」。
+    val rangeReversed = LabDraftRules.reversedRange(refLow, refHigh)
+    val canSave = LabDraftRules.canSave(testName, value, refLow, refHigh)
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SheetColumn {
@@ -76,18 +92,21 @@ internal fun LabResultFormSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             AshkbTextField(testName, { testName = it }, label = { Text(stringResource(R.string.lab_indicator_name)) }, singleLine = true)
-            AshkbTextField(value, { value = it }, label = { Text(stringResource(R.string.lab_value)) }, singleLine = true)
+            AshkbTextField(
+                value, { value = it }, label = { Text(stringResource(R.string.lab_value)) }, singleLine = true,
+                isError = LabDraftRules.invalidNumber(value),
+                supportingText = numberError(value),
+            )
             AshkbTextField(valueText, { valueText = it },
                 label = { Text(stringResource(R.string.lab_value_text_field)) }, singleLine = true)
             AshkbTextField(unit, { unit = it }, label = { Text(stringResource(R.string.common_unit)) }, singleLine = true)
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                AshkbTextField(refLow, { refLow = it },
-                    label = { Text(stringResource(R.string.lab_ref_lower)) }, singleLine = true,
-                    modifier = Modifier.weight(1f))
-                AshkbTextField(refHigh, { refHigh = it },
-                    label = { Text(stringResource(R.string.lab_ref_upper)) }, singleLine = true,
-                    modifier = Modifier.weight(1f))
-            }
+            LabReferenceRangeRow(
+                refLow = refLow,
+                refHigh = refHigh,
+                onRefLowChange = { refLow = it },
+                onRefHighChange = { refHigh = it },
+                reversed = rangeReversed,
+            )
             // AI 原始标记只读留档：它**不参与**本地判读，编辑数值时也不该被改写
             // （两列并列展示的意义就在这里，见 LabResult.aiAbnormal 与 v1.0.78 的裁决）。
             existing?.aiAbnormal?.let { ai ->
@@ -99,9 +118,9 @@ internal fun LabResultFormSheet(
             }
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
-                enabled = testName.isNotBlank(),
+                enabled = canSave,
                 onClick = {
-                    if (!testName.isNotBlank()) return@SheetSaveButton
+                    if (!canSave) return@SheetSaveButton
                     onSave(
                         LabDraft(testName, value, valueText, unit, refLow, refHigh)
                             .toRecord(existing, date, checkupId)
@@ -125,6 +144,43 @@ internal fun LabResultFormSheet(
                 )
             }
         }
+    }
+}
+
+/**
+ * v1.2.11（缺陷工单 A07）：参考范围两格 + 反向区间提示。
+ *
+ * 抽出来一是为了让 `LabResultFormSheet` 回到 detekt 的 80 行以内（不是放宽阈值），
+ * 二是让「两格共用一个反向判据」这件事在代码里只有一个落点——红框与下方提示
+ * 必须同时出现，分开写迟早漂移。
+ */
+@Composable
+private fun LabReferenceRangeRow(
+    refLow: String,
+    refHigh: String,
+    onRefLowChange: (String) -> Unit,
+    onRefHighChange: (String) -> Unit,
+    reversed: Boolean,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        AshkbTextField(refLow, onRefLowChange,
+            label = { Text(stringResource(R.string.lab_ref_lower)) }, singleLine = true,
+            isError = LabDraftRules.invalidNumber(refLow) || reversed,
+            supportingText = numberError(refLow),
+            modifier = Modifier.weight(1f))
+        AshkbTextField(refHigh, onRefHighChange,
+            label = { Text(stringResource(R.string.lab_ref_upper)) }, singleLine = true,
+            isError = LabDraftRules.invalidNumber(refHigh) || reversed,
+            supportingText = numberError(refHigh),
+            modifier = Modifier.weight(1f))
+    }
+    // 反向区间是「两个字段一起错」，提示放在这一行下方，不挂在某一个框上。
+    if (reversed) {
+        Text(
+            stringResource(R.string.lab_ref_range_reversed),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.error,
+        )
     }
 }
 
@@ -218,11 +274,16 @@ private val MODALITIES = listOf("MRI", "CT", "XRAY")
 /**
  * 化验表单草稿 → 落库行（新增 / 编辑共用）。
  *
- * 两处「刻意为之」必须留在代码里、不能挪进 UI：
+ * 三处「刻意为之」必须留在代码里、不能挪进 UI：
  *  · **编辑沿用原主键**（新 id = 新行，用户会看到「改完多了一条」）；
- *  · **刻意不带 `abnormal`**——交给 `repo.saveLabResult` 按新数值 + 新参考范围重判
- *    （本地判读优先，v1.0.77 裁决）；把旧判读抄回来就会盖掉重判结果。
- *    `aiAbnormal` 则原样带过来：它是只读留档，不参与判读，也不该被编辑抹掉。
+ *  · **`abnormal` 带旧值作兜底**——v1.2.11（缺陷工单 A07）修正：此前这里是「刻意不带」，
+ *    理由是「交给 `repo.saveLabResult` 重判」。但 `saveLabResult` 只在**能算出本地判读**时
+ *    覆盖，而它算不出判读的条件正是「没有参考范围」（用户把范围清空、或这条本来就只有
+ *    AI 标记）。于是编辑一条无范围记录 = 把它的 `abnormal` 静默清成 null，红/黄标记消失，
+ *    趋势图与 PDF 里那项异常也随之不见——用户只是改了个数值，却丢了判读结论。
+ *    现在把旧值原样带过去：有范围时 `saveLabResult` 照常按新范围覆盖（重判仍优先），
+ *    没范围时旧值就是唯一兜底。**这条不再由 UI 决定判读，只是别把已知结论抹掉**；
+ *  · `aiAbnormal` 则原样带过来：它是只读留档，不参与判读，也不该被编辑抹掉。
  */
 private data class LabDraft(
     val testName: String,
@@ -244,6 +305,8 @@ private data class LabDraft(
         unit = unit.ifBlank { null },
         refLow = refLow.trim().toDoubleOrNull(),
         refHigh = refHigh.trim().toDoubleOrNull(),
+        // v1.2.11（缺陷工单 A07）：旧判读原样带过去，别在「本地判不了」时把它抹掉。
+        abnormal = existing?.abnormal,
         aiAbnormal = existing?.aiAbnormal,
         notes = existing?.notes,
     )

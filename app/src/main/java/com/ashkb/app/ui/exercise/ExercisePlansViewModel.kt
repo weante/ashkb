@@ -15,6 +15,7 @@ import com.ashkb.app.domain.ExercisePlanTemplates
 import com.ashkb.app.reminder.ExerciseReminderScheduler
 import java.time.LocalDate
 import java.time.LocalDateTime
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * B7（v1.0.39）周期康复计划页状态：计划列表 + 在用计划进度 + 最近一次种子结果。
@@ -118,24 +120,27 @@ class ExercisePlansViewModel(
             repo.deactivateExercisePlan(id)
             logsRefresh.value += 1
             // v1.0.59 B5：停用后无 active plan → 清掉所有未来运动提醒
-            ExerciseReminderScheduler.cancelAllFuture(app, LocalDate.now())
+            withContext(Dispatchers.IO) { ExerciseReminderScheduler.cancelAllFuture(app, LocalDate.now()) }
         }
     }
 
     /** v1.0.59 B5：重排运动提醒（按当前 active plan + 今日打卡状态） */
     private suspend fun rescheduleExerciseReminders() {
-        val cfg = ReminderConfigRepository(app)
-        val db = com.ashkb.app.data.db.AppDatabase.get(app)
-        if (cfg.exerciseEnabled()) {
-            runCatching {
-                val activePlan = db.exercisePlanDao().active()
-                val hasLogged = db.exerciseLogDao().byDate(LocalDate.now().toString()).isNotEmpty()
-                ExerciseReminderScheduler.rescheduleAll(
-                    app, activePlan, hasLogged, LocalDate.now(), LocalDateTime.now(),
-                )
+        // C05（缺陷工单）：闹钟重排是 binder 量级调用，整段放 IO。
+        withContext(Dispatchers.IO) {
+            val cfg = ReminderConfigRepository(app)
+            val db = com.ashkb.app.data.db.AppDatabase.get(app)
+            if (cfg.exerciseEnabled()) {
+                runCatching {
+                    val activePlan = db.exercisePlanDao().active()
+                    val hasLogged = db.exerciseLogDao().byDate(LocalDate.now().toString()).isNotEmpty()
+                    ExerciseReminderScheduler.rescheduleAll(
+                        app, activePlan, hasLogged, LocalDate.now(), LocalDateTime.now(),
+                    )
+                }
+            } else {
+                withContext(Dispatchers.IO) { ExerciseReminderScheduler.cancelAllFuture(app, LocalDate.now()) }
             }
-        } else {
-            ExerciseReminderScheduler.cancelAllFuture(app, LocalDate.now())
         }
     }
 

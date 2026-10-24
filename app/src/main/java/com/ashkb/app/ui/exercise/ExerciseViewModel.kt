@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** M4 运动模块 UI 状态：当日处方（红榜）+ 黑榜拦截区 + 颈椎受累标志 */
 data class ExerciseUiState(
@@ -137,18 +138,21 @@ class ExerciseViewModel(
 
     /** v1.0.59 B5：重排运动提醒（按当前 active plan + 今日打卡状态） */
     private suspend fun rescheduleExerciseReminders() {
-        val cfg = ReminderConfigRepository(app)
-        val db = com.ashkb.app.data.db.AppDatabase.get(app)
-        if (cfg.exerciseEnabled()) {
-            runCatching {
-                val activePlan = db.exercisePlanDao().active()
-                val hasLogged = db.exerciseLogDao().byDate(LocalDate.now().toString()).isNotEmpty()
-                ExerciseReminderScheduler.rescheduleAll(
-                    app, activePlan, hasLogged, LocalDate.now(), LocalDateTime.now(),
-                )
+        // C05（缺陷工单）：闹钟重排是 binder 量级调用，整段放 IO。
+        withContext(Dispatchers.IO) {
+            val cfg = ReminderConfigRepository(app)
+            val db = com.ashkb.app.data.db.AppDatabase.get(app)
+            if (cfg.exerciseEnabled()) {
+                runCatching {
+                    val activePlan = db.exercisePlanDao().active()
+                    val hasLogged = db.exerciseLogDao().byDate(LocalDate.now().toString()).isNotEmpty()
+                    ExerciseReminderScheduler.rescheduleAll(
+                        app, activePlan, hasLogged, LocalDate.now(), LocalDateTime.now(),
+                    )
+                }
+            } else {
+                ExerciseReminderScheduler.cancelAllFuture(app, LocalDate.now())
             }
-        } else {
-            ExerciseReminderScheduler.cancelAllFuture(app, LocalDate.now())
         }
     }
 

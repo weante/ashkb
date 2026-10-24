@@ -17,6 +17,7 @@ import com.ashkb.app.data.entity.SupplementLog
 import com.ashkb.app.data.entity.SymptomDaily
 import com.ashkb.app.data.entity.VaccineRecord
 import com.ashkb.app.data.entity.VaccineType
+import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.domain.CheckupDeletion
 import com.ashkb.app.domain.DerivedAlerts
 import java.io.File
@@ -467,6 +468,126 @@ class RecordDeletionCascadeTest {
         assertEquals(82.0, rows.first().waistCm ?: 0.0, 0.001)
     }
 
+    // ---- v1.2.11 缺陷工单 A02/A03：红旗警报按「当前事实」重算 ----
+
+    @Test
+    fun `同日发热与眼部各自成一条警报不被去重吞掉`() {
+        val date = "2026-08-11"
+        io {
+            repo.saveSymptom(
+                SymptomDaily(
+                    id = "", date = date, recordedAt = "${date}T20:00:00",
+                    feverish = true, feverTemp = 38.8, eyeSymptom = true,
+                )
+            )
+        }
+        assertEquals(
+            "发热警报缺了",
+            1, io { db.alertDao().countByRef(DerivedAlerts.FEVER_ALERT, date) },
+        )
+        assertEquals(
+            "眼红眼痛对 AS 是眼科急症级信号，与发热共用去重键时会被吞掉（工单 A02）",
+            1, io { db.alertDao().countByRef(DerivedAlerts.EYE_RED_FLAG, date) },
+        )
+    }
+
+    @Test
+    fun `把体温改回正常后发热警报撤销`() {
+        val date = "2026-08-12"
+        io {
+            repo.saveSymptom(
+                SymptomDaily(
+                    id = "", date = date, recordedAt = "${date}T08:00:00",
+                    feverish = true, feverTemp = 38.7,
+                )
+            )
+        }
+        assertEquals(1, io { db.alertDao().countByRef(DerivedAlerts.FEVER_ALERT, date) })
+
+        io {
+            repo.saveSymptom(
+                SymptomDaily(
+                    id = "", date = date, recordedAt = "${date}T20:00:00",
+                    feverish = true, feverTemp = 37.0,
+                )
+            )
+        }
+        assertEquals(
+            "体温已改成 37.0，警报还挂着就是在提示一件不成立的事（工单 A03）",
+            0, io { db.alertDao().countByRef(DerivedAlerts.FEVER_ALERT, date) },
+        )
+    }
+
+    @Test
+    fun `取消眼部勾选后眼部警报撤销`() {
+        val date = "2026-08-13"
+        io {
+            repo.saveSymptom(
+                SymptomDaily(id = "", date = date, recordedAt = "${date}T08:00:00", eyeSymptom = true)
+            )
+        }
+        assertEquals(1, io { db.alertDao().countByRef(DerivedAlerts.EYE_RED_FLAG, date) })
+
+        io {
+            repo.saveSymptom(
+                SymptomDaily(id = "", date = date, recordedAt = "${date}T20:00:00", eyeSymptom = false)
+            )
+        }
+        assertEquals(0, io { db.alertDao().countByRef(DerivedAlerts.EYE_RED_FLAG, date) })
+    }
+
+    @Test
+    fun `体征录的发热降温后警报撤销`() {
+        val date = "2026-08-14"
+        io {
+            repo.saveVitals(Vitals(id = "", date = date, recordedAt = "${date}T08:00:00", temperature = 38.9))
+        }
+        assertEquals(1, io { db.alertDao().countByRef(DerivedAlerts.FEVER_ALERT, date) })
+
+        io {
+            repo.saveVitals(Vitals(id = "", date = date, recordedAt = "${date}T20:00:00", temperature = 36.6))
+        }
+        assertEquals(
+            "体温从 38.9 降到 36.6，发热警报必须撤销",
+            0, io { db.alertDao().countByRef(DerivedAlerts.FEVER_ALERT, date) },
+        )
+    }
+
+    @Test
+    fun `删体征记录后发热警报撤销`() {
+        val date = "2026-08-15"
+        io {
+            repo.saveVitals(Vitals(id = "", date = date, recordedAt = "${date}T08:00:00", temperature = 38.6))
+        }
+        val id = io { db.vitalsDao().latestByDate(date) }!!.id
+        assertEquals(1, io { db.alertDao().countByRef(DerivedAlerts.FEVER_ALERT, date) })
+
+        io { repo.deleteVitals(id) }
+
+        assertNull("体征记录没删掉", io { db.vitalsDao().latestByDate(date) })
+        assertEquals(
+            "删了体温记录却留着发热警报，症状页会一直提示一件不存在的事（工单 A03）",
+            0, io { db.alertDao().countByRef(DerivedAlerts.FEVER_ALERT, date) },
+        )
+    }
+
+    @Test
+    fun `症状侧与体征侧同日发热只留一条警报`() {
+        val date = "2026-08-16"
+        io {
+            repo.saveSymptom(
+                SymptomDaily(
+                    id = "", date = date, recordedAt = "${date}T08:00:00",
+                    feverish = true, feverTemp = 38.9,
+                )
+            )
+            repo.saveVitals(Vitals(id = "", date = date, recordedAt = "${date}T09:00:00", temperature = 38.7))
+        }
+        assertEquals(
+            "两个来源同一天只该有一条发热警报，不刷屏",
+            1, io { db.alertDao().countByRef(DerivedAlerts.FEVER_ALERT, date) },
+        )
+    }
     // ---- 夹具 ----
 
     private fun labById(id: String): LabResult? = io {

@@ -19,6 +19,7 @@ import com.ashkb.app.data.entity.LedgerType
 import com.ashkb.app.domain.AttachmentPath
 import com.ashkb.app.domain.RecoveryCode
 import com.ashkb.app.domain.ScheduleCalc
+import com.ashkb.app.domain.VaultKeyDomain
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
@@ -329,6 +330,24 @@ class BackupRepository(private val context: Context) {
             //  ② 必须在下面第 1 步 pre-restore 快照**之前**——快照是用本机当前密钥加密的
             //     （`VaultCipher.encryptV3(vaultKeyOrThrow(), …)`），换机恢复时本机压根没有密钥，
             //     先跑去加密快照会直接抛异常，用户连"退路快照"这份保险都拿不到。
+            // v1.2.11（缺陷工单 A05）：**采纳之前先验密钥域**。
+            //
+            // 此前 `adoptIfAbsent` 的返回值被丢弃：本机已有可用密钥（= 另一台设备的密钥域）时它
+            // 返回 false，恢复照常往下走，于是备份里用**备份那把 key** 加密的附件在恢复后
+            // 一律解不开——而用户要等到打开某张附件才发现，那时库已被覆盖。
+            // 现在：本机有密钥且与备份不同 ⇒ 在**任何写入之前**抛出可解释的 VaultKeyMismatch，
+            // 库 / 快照 / 密钥 / 网络请求全部保持原样。
+            //
+            // 两种合法情形保持原行为：本机无可用密钥（换机，采纳备份 key）、两侧 key 相同。
+            // 判定本身是纯函数（见 [VaultKeyDomain]），可纯单测；这里只负责把结论翻译成动作。
+            when (VaultKeyDomain.decide(vaultKeys.current(), decrypted.vaultKey)) {
+                VaultKeyDomain.Decision.MISMATCH -> throw BackupEngine.BackupException(
+                    "本机与备份属于不同密钥域，已阻止恢复以保护本机附件",
+                    resId = R.string.backup_err_vault_key_mismatch,
+                )
+                // ADOPT / PROCEED 都继续走下面的 adoptIfAbsent（本机无 key 时它会采纳备份 key）
+                VaultKeyDomain.Decision.ADOPT, VaultKeyDomain.Decision.PROCEED -> Unit
+            }
             decrypted.vaultKey?.let { vaultKeys.adoptIfAbsent(it) }
             // 1. pre-restore 快照（退路）
             val snapshot = BackupEngine.export(supportDb(), nowIso())

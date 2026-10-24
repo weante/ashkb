@@ -113,30 +113,43 @@ class MedicationRepository(private val context: Context) {
 
     suspend fun medicationById(id: String): Medication? = medDao.byId(id)
 
-    /** R17 停药：归档 + medication_changes 登记（裁决 A 快照，self_stopped 供警示联动） */
+    /**
+     * R17 停药：归档 + medication_changes 登记（裁决 A 快照，self_stopped 供警示联动）。
+     *
+     * v1.2.11（缺陷工单 B03）：**三步写入必须在同一事务里**。
+     * 此前 `archive` / `deleteOfMedFrom` / `changeDao.insert` 是三次独立的挂起调用，
+     * 中途被杀（用户切走、系统回收）就会留下半完成状态，而三种半成品都不可接受：
+     *  · 只归档没删计划 → 未来 7 天的槽位还在，此后每天报表把停掉的药算成未记录（假漏服）；
+     *  · 只删计划没归档 → 药还在在用列表里，但计划没了，看起来「今天突然没有药」；
+     *  · 没写 change 行 → 药单变更记录缺一条，用户回溯时找不到停用原因。
+     * 现在整体 `withTransaction`：要么三步全成，要么一步都不留。
+     */
     suspend fun stopMedication(med: Medication, reason: String, note: String?) {
         val now = nowIso()
-        medDao.archive(med.id, now)
-        // v1.0.77（批次 3b）：清掉**今天起**的计划槽位快照（停药生效日 = 今天）。
-        // 物化窗口是滚动的 8 天，此刻未来 7 天的行已经在表里；留着它们，此后每天的报表都会
-        // 把「已经停掉的药」算成未记录——那是用户无法理解的假漏服。
-        // 停药前的历史行**保留**：停药不是删除，那段时间确实有过这些计划剂量。
-        slotDao.deleteOfMedFrom(med.id, LocalDate.now().toString())
-        changeDao.insert(
-            MedicationChange(
-                id = Ids.new("mchg"),
-                recordedAt = now,
-                medId = med.id,
-                medKey = med.nameKey,
-                changeType = "stop",
-                oldSnapshot = medSnapshot(med, archived = false),
-                newSnapshot = medSnapshot(med, archived = true),
-                effectiveDate = LocalDate.now().toString(),
-                reason = reason,
-                reasonNote = note,
-                source = "self",
+        val today = LocalDate.now().toString()
+        db.withTransaction {
+            medDao.archive(med.id, now)
+            // v1.0.77（批次 3b）：清掉**今天起**的计划槽位快照（停药生效日 = 今天）。
+            // 物化窗口是滚动的 8 天，此刻未来 7 天的行已经在表里；留着它们，此后每天的报表都会
+            // 把「已经停掉的药」算成未记录——那是用户无法理解的假漏服。
+            // 停药前的历史行**保留**：停药不是删除，那段时间确实有过这些计划剂量。
+            slotDao.deleteOfMedFrom(med.id, today)
+            changeDao.insert(
+                MedicationChange(
+                    id = Ids.new("mchg"),
+                    recordedAt = now,
+                    medId = med.id,
+                    medKey = med.nameKey,
+                    changeType = "stop",
+                    oldSnapshot = medSnapshot(med, archived = false),
+                    newSnapshot = medSnapshot(med, archived = true),
+                    effectiveDate = today,
+                    reason = reason,
+                    reasonNote = note,
+                    source = "self",
+                )
             )
-        )
+        }
     }
 
     private fun medSnapshot(med: Medication, archived: Boolean): String = org.json.JSONObject()
@@ -291,42 +304,52 @@ class MedicationRepository(private val context: Context) {
         date: LocalDate = LocalDate.now(),
     ) {
         val dateStr = date.toString()
-        // 计划槽位按 (date, med_id, slot_key) 定位；按需行没有槽位键，走 findPrn（`slot_key IS NULL`）。
-        // v1.2.10（维护者指令「按需用药限制只能每天一次」）：找到当天那条就更新它，而不是再插一行——
-        // 存量的旧行（同一天多行）不改写，只是从此不再新增；卡上展示与这里更新的都是 recorded_at 最新那条。
-        val existing = if (slotKey != null) {
-            logDao.find(med.id, dateStr, slotKey)
-        } else {
-            logDao.findPrn(med.id, dateStr)
-        }
-        val now = nowIso()
-        val log = (existing ?: MedicationLog(
-            id = Ids.new("mlog"),
-            date = dateStr,
-            recordedAt = now,
-            backfill = false,
-            medId = med.id,
-            medKey = med.nameKey,
-            medName = med.name,
-            doseSnapshot = med.dose,
-            scheduledTime = slotTime,
-            slotKey = slotKey,
-            status = "done",
-            reason = null,
-            takenAt = now,
-            injSite = injSite,
-            batchNo = null,
-            reaction = reaction,
-            prnFlag = slotKey == null,
-        )).copy(
-            status = "done", takenAt = now, recordedAt = now,
-            reason = null, reaction = reaction, injSite = injSite, notes = note,
-            prnFlag = slotKey == null,
-        )
-        logDao.upsert(log)
-        // 注射部位轮换：记住本次部位（下次打卡提示轮换）
-        if (injSite != null && med.injLastSite != injSite) {
-            medDao.upsert(med.copy(injLastSite = injSite, updatedAt = now))
+        // v1.2.11（缺陷工单 B04）：**查找 → 建/改日志 → 更新注射部位**必须同事务。
+        //
+        // 此前三步各自独立：通知里的「已服」与 UI 上同时点打卡（两个协程、两条 SQL 序列）都会
+        // 先 find 后 upsert，两边都 find 到 null → 各自 INSERT → 两条同日 PRN 行。
+        // 计划槽位有 `(date, med_id, slot_key)` 唯一索引兜底（第二条会被 REPLACE 静默吃掉一条），
+        // 但 PRN 的 `slot_key IS NULL`——唯一索引里 NULL 互不相等，**数据库拦不住**，
+        // 所以「按需药每天只记一次」这条规则此前只靠时序，不是靠原子性。
+        // 包进事务后第二次打卡会看到第一次写入的行（Room 的 suspend 事务是串行的），改而走更新分支。
+        db.withTransaction {
+            // 计划槽位按 (date, med_id, slot_key) 定位；按需行没有槽位键，走 findPrn（`slot_key IS NULL`）。
+            // v1.2.10（维护者指令「按需用药限制只能每天一次」）：找到当天那条就更新它，而不是再插一行——
+            // 存量的旧行（同一天多行）不改写，只是从此不再新增；卡上展示与这里更新的都是 recorded_at 最新那条。
+            val existing = if (slotKey != null) {
+                logDao.find(med.id, dateStr, slotKey)
+            } else {
+                logDao.findPrn(med.id, dateStr)
+            }
+            val now = nowIso()
+            val log = (existing ?: MedicationLog(
+                id = Ids.new("mlog"),
+                date = dateStr,
+                recordedAt = now,
+                backfill = false,
+                medId = med.id,
+                medKey = med.nameKey,
+                medName = med.name,
+                doseSnapshot = med.dose,
+                scheduledTime = slotTime,
+                slotKey = slotKey,
+                status = "done",
+                reason = null,
+                takenAt = now,
+                injSite = injSite,
+                batchNo = null,
+                reaction = reaction,
+                prnFlag = slotKey == null,
+            )).copy(
+                status = "done", takenAt = now, recordedAt = now,
+                reason = null, reaction = reaction, injSite = injSite, notes = note,
+                prnFlag = slotKey == null,
+            )
+            logDao.upsert(log)
+            // 注射部位轮换：记住本次部位（下次打卡提示轮换）
+            if (injSite != null && med.injLastSite != injSite) {
+                medDao.upsert(med.copy(injLastSite = injSite, updatedAt = now))
+            }
         }
     }
 

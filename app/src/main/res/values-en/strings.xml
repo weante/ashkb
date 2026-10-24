@@ -284,6 +284,9 @@
     <string name="lab_parse_empty">No lab data parsed — paste the full text the AI output from the template (including \"Date\", \"Hospital\" and each data row)</string>
     <string name="lab_ref_lower">Reference low</string>
     <string name="lab_ref_upper">Reference high</string>
+    <!-- v1.2.11 (defect ticket A07): form validation. Illegal numbers used to be stored as null silently, and reversed ranges could be saved and then produce a phantom abnormal flag. -->
+    <string name="lab_field_number_invalid">Enter a number (leave empty if not filled)</string>
+    <string name="lab_ref_range_reversed">Reference low cannot be greater than reference high</string>
     <string name="lab_value">Value</string>
     <string name="me_backup_section">Backup and data</string>
     <string name="me_about_title">About</string>
@@ -851,8 +854,8 @@
     <string name="notif_med_escalated_text">The last reminder is still unconfirmed — please check in or note why you skipped it</string>
     <string name="notif_med_text">Tap to view today\'s plan</string>
     <string name="notif_action_taken">Taken</string>
-    <string name="vm_backup_password_min">Backup password must be at least 6 characters</string>
-    <string name="vm_backup_password_min_note">Backup password must be at least 6 characters — it is the only key for decryption when you restore, so keep it safe</string>
+    <string name="vm_backup_password_min">Backup password must be at least 12 characters (a leaked backup file can be brute-forced offline)</string>
+    <string name="vm_backup_password_min_note">Backup password must be at least 12 characters — it is the only key for decryption when you restore, so keep it safe. If the backup file leaks, the password is the only defence: a short one can be brute-forced offline, a long one cannot.</string>
     <string name="vm_backup_local_done">Local backup complete: %1$s (%2$d tables, %3$d rows, SHA-256 %4$s…). The file is saved in the app\'s private directory; you can share it to save a copy elsewhere.</string>
     <string name="vm_backup_failed">Backup failed: %1$s</string>
     <string name="vm_dav_need_url_user">Please enter the WebDAV server address and username</string>
