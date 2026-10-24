@@ -54,7 +54,7 @@
 
 **2. 三项只属于维护者本人**（在「子代理禁改清单」里）
 
-- **裁决项 5「临界」显示**：`domain/ClinicalThresholds.kt:35` 的 `const val LAB_NEAR_BOUNDARY_RATIO = 0.05f` **全仓零使用点**（只声明、无引用），化验判读只有 `high` / `low` / `normal` 三态，**没有 near-boundary 分支**。该文件禁改，须维护者本人动手或明确授权。
+- ~~**裁决项 5「临界」显示**~~：**已修（2026-10-24）**。维护者 m16211 四项裁决（量程 = 参考区间宽 ×5%、独立第四态胶囊 Warning 无箭头、不计入异常单独统计、越界优先）后落地：`ClinicalThresholds.labNearBoundary(value, refLow, refHigh)` 实现判据（拆 `labSpan` / `labBoundaryDistance` 压 detekt 复杂度与 ReturnCount）；`CheckupLabImaging.LabValue` 加 `near ->` 分支（排在 high/low 之后）、`LabRow` 与导入预览均接线、日期分组单独统计临界；`ReportPdfWriter` 新增独立临界分段。中英各 5 条新字符串。回归 15 条（`LabNearBoundaryTest` 10 条纯 JVM + `LabNearBoundaryWiringTest` 5 条静态断言），两轮负向对照各正好 1 条 FAIL。门禁 `near-gate2.log` 1024 条全绿。**未真机复验**（需一条距边界 ≤5% 的真实化验值）。
 - **审查报告 §十 的澄清问题 —— 实为 5 条**（文档此前一直误记为 3 条）。原件 `C:\Users\weant\Documents\Qoder\2026-09-28\a6159f90\ASHKB-代码审查报告.md:260-266`：
   ①审查目的的权重（自用可靠性 / 上架前安全审计 / 交接新维护者 / 改进 AI 协作流程）
   ②医疗规则处置权（只报不改 / 允许把安全默认值改保守 / 先把散落阈值外移并加校验）

@@ -311,6 +311,34 @@ object ReportPdfWriter {
             }
         }
 
+        // v1.2.10 裁决项 5：临界项**单独成段**，不混进上面的异常列表（维护者裁决项 3）。
+        // 判据与界面上完全同源（ClinicalThresholds.labNearBoundary），避免"屏幕上一项、
+        // PDF 里另一项"这类只有对着看才发现的口径分裂。
+        val near = r.labs.filter {
+            val ab = it.abnormal
+            (ab == null || ab == "normal") && ClinicalThresholds.labNearBoundary(it.value, it.refLow, it.refHigh)
+        }
+        if (near.isNotEmpty()) {
+            d.h2(context.getString(R.string.pdf_section_labs_near, near.size))
+            near.take(20).forEach { l ->
+                val v = l.value?.let { String.format(Locale.US, "%.2f", it) } ?: (l.valueText ?: "-")
+                d.line("  ${l.date} ${l.testName}" + context.getString(R.string.ui_value_colon, v) +
+                    (l.unit?.let { " $it" } ?: "") + " " + context.getString(R.string.pdf_lab_flag_near) +
+                    (l.refLow?.let { lo ->
+                        l.refHigh?.let { hi ->
+                            context.getString(
+                                R.string.pdf_lab_ref_range,
+                                String.format(Locale.US, "%.2f", lo),
+                                String.format(Locale.US, "%.2f", hi)
+                            )
+                        }
+                    } ?: ""), false)
+            }
+            if (near.size > 20) {
+                d.line("  " + context.getString(R.string.pdf_labs_more, near.size - 20))
+            }
+        }
+
         d.h2(context.getString(R.string.pdf_section_checkups, r.checkups.size))
         if (r.checkups.isEmpty()) d.line(context.getString(R.string.pdf_no_checkups))
         r.checkups.take(15).forEach { c ->

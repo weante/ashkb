@@ -471,6 +471,48 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
 - 完整门禁 `E:\ASHKB\r1r2-gate1.log`：BUILD SUCCESSFUL in 2m 51s；单测 **119 文件 / 1009 条**全绿；detekt **0**；lint **167**（159 Warning + 8 Information，**0 Error**，且无一条落在本轮改动的文件上）；`verifySpecSync` 通过。
 - 本批**未发版、未 bump 版本号**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19）。R1 已装机真机复验（见上）；R2 的清理只在启动时跑一次，本次装机启动已执行（`app_prefs` 闸门 `ghost_slot_purged_v1` 已置真），未单独构造历史幽灵数据验证。
 
+### 十一、「临界」第四态：化验值距参考边界 ≤5% 量程时单独标注（2026-10-24 · 未发版）
+
+审查裁决项 5 的落地。此前 `ClinicalThresholds.LAB_NEAR_BOUNDARY_RATIO` 是**零引用死常量**——KDoc 写着「距任一参考边界 ≤ 5% 量程视为临界」，但代码里从没用过，化验判读只有偏高 / 偏低 / 正常三态。
+
+维护者裁决（m16211，四项全选推荐项）：
+
+1. **量程基准**：参考区间宽度 × 5%。两侧都有范围时 `(refHigh − refLow) × 5%`；只有上限时 `refHigh × 5%`；只有下限时 `refLow × 5%`。
+2. **呈现形态**：独立第四态胶囊「临界」，与「偏高」「偏低」并列；**Warning** 色调、**不带趋势箭头**（临界不是方向性结论，箭头会把它读成「偏高/偏低的弱化版」）。
+3. **是否算异常**：**不计入**「异常」计数与 PDF 异常标记，单独统计（「N 项临界」）；PDF 用独立标记与独立分段。
+4. **冲突优先级**：**越界优先**——已越界又落在 5% 容差内时仍显示「偏高/偏低」，临界只在参考范围内的正常值上判定。
+
+#### 改动
+
+- `domain/ClinicalThresholds.kt`：实现 `fun labNearBoundary(value: Double?, refLow: Double?, refHigh: Double?): Boolean`。为把圈复杂度留在 detekt 阈值内，量程与距离各拆一个私有函数（`labSpan` / `labBoundaryDistance`），并把两个越界判断合并成一次 `outOfRange`（否则 `ReturnCount` 会超 6）。脏数据（`span <= 0`、`value == null`、无参考范围）一律返回 false。
+- `res/values/strings.xml` + `res/values-en/strings.xml`：新增 `lab_value_near`（`%1$s 临界` / `%1$s borderline`）、`lab_count_near`、`lab_count_abnormal_near`、`pdf_section_labs_near`、`pdf_lab_flag_near`，中英同名同序。
+- `ui/checkup/CheckupLabImaging.kt`：
+  - `LabValue` 新增 `near: Boolean = false` 形参，`when` 里加 `near ->` 分支（**排在 high/low 之后**，落实越界优先），Warning 色调、无 icon。
+  - `LabRow` 传 `near = lab.isNearBoundary()`；`LabResult.isNearBoundary()` 是新增的扩展，内部走 `ClinicalThresholds.labNearBoundary`。
+  - 导入预览行同样标临界，避免「保存前后观感不一致」。
+  - 日期分组副标题新增临界计数：`nearCount = rows.count { it.isNearBoundary() }`，有临界时走 `lab_count_near` / `lab_count_abnormal_near`；`abnormalCount` 仍只数 `isAbnormal()`（**临界不混入异常计数**）。
+- `ui/report/ReportPdfWriter.kt`：新增「临界」独立分段（`pdf_section_labs_near`），过滤条件走 `ClinicalThresholds.labNearBoundary` 且 `ab == null || ab == "normal"`（排除已越界行）；异常段的过滤条件保持不变。
+
+#### 回归（15 条）
+
+- `app/src/test/java/com/ashkb/app/domain/LabNearBoundaryTest.kt`（**10 条**，纯 JVM）：5% 量程两侧 / 单侧上下限、越界优先、`null` 值、无参考范围、`span` 为 0 或负数（下限 ≥ 上限的脏数据）、恰好落在 5% 边界上（含等于，`<=`）。
+- `app/src/test/java/com/ashkb/app/ui/checkup/LabNearBoundaryWiringTest.kt`（**5 条**，静态读源码）：列表行接了 `near = lab.isNearBoundary()`、导入预览走同一判据、`LabValue` 的 `near ->` 分支排在 high/low 之后且用 Warning 且无 icon、临界单独计数不混入异常、PDF 临界段存在且排除已越界行。
+
+#### 负向对照（两轮，均造「能编译的违规形状」）
+
+1. 把 `near = lab.isNearBoundary()` 改成 `near = false` ⇒ 5 条里**正好 1 条 FAIL**（「列表行的数值胶囊接了临界态」），其余 4 条 pass。
+2. 把 `near ->` 分支挪到 `abnormal == "high"` 之前 ⇒ **正好 1 条 FAIL**（「LabValue 的临界分支排在越界分支之后」），其余 4 条 pass。
+
+两轮之后均恢复现场并核过 `NEGATIVE-CONTROL-TEMP` 零残留。
+
+#### 门禁
+
+`E:\ASHKB\near-gate2.log` ⇒ **BUILD SUCCESSFUL in 2m 50s**；单测 **121 文件 / tests=1024 / failures=0 / errors=0 / skipped=0**（1009 → 1024，即新增 15 条）；detekt issues **0**；lint total **168** = 160 Warning + 8 Information + **0 Error**，且无一条落在本轮改动的三个文件上；`verifySpecSync` 通过。
+
+#### 未做
+
+- **未真机复验**：需要一条参考范围内、距边界 ≤5% 的真实化验值才看得出效果；设备当前无线调试状态未知。
+- 未发版、未 bump 版本号。
 ## [v1.2.9] — 2026-10-10
 
 **两件事：①审查裁决项 2（「已结算」口径三处打架）统一；②首页补剂卡——补剂提醒/打卡从二级页搬到今日页。** 无库结构变更（枚举与状态都存字符串），可覆盖安装。

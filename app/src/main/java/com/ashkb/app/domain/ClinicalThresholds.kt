@@ -31,7 +31,13 @@ object ClinicalThresholds {
     const val ADHERENCE_GOOD = 90
     const val ADHERENCE_FAIR = 70
 
-    /** 化验结果距任一参考边界 ≤ 5% 量程视为"临界"。 */
+    /**
+     * 化验结果距任一参考边界 ≤ 5% 量程视为"临界"。
+     *
+     * v1.2.10 审查裁决项 5（维护者 2026-10-24 裁决 A「实现临界显示」）：
+     * 这条 KDoc 从 v1.0.75 起就写着，但常量**零引用**——"临界"态从未实现，等于一张空头支票。
+     * 判据落在 [labNearBoundary]：**越界优先**，只有"在参考范围内"的值才可能被判成临界。
+     */
     const val LAB_NEAR_BOUNDARY_RATIO = 0.05f
 
     /**
@@ -73,6 +79,54 @@ object ClinicalThresholds {
      * 所以这里补一个 Double 重载，让调用点原样传值、不做有损转换。
      */
     fun basdaiHigh(total: Double): Boolean = total >= BASDAI_HIGH
+
+    /**
+     * 化验结果的"临界"判定（v1.2.10 审查裁决项 5，维护者 2026-10-24 裁决）。
+     *
+     * **只在参考范围内的值上判**：越界优先（已越界又落在容差内时仍算偏高/偏低），
+     * 因为「偏高」本身已经比「临界」更值得医生注意，两者叠加只会稀释信号。
+     *
+     * 量程基准（维护者裁决项 1）：两侧都有范围时用区间宽度 `(refHigh - refLow) × 5%`；
+     * 只有上限时用 `refHigh × 5%`。下限单独存在（`refLow` 有、`refHigh` 无）时同样按 `refLow × 5%`。
+     *
+     * 为什么不用固定绝对值：不同化验的量纲差几个数量级（ESR 是 mm/h、CRP 是 mg/L、
+     * 血糖是 mmol/L），一个写死的 `±0.5` 要么把 ESR 判得满屏临界、要么对血糖毫无意义。
+     *
+     * @param value 本次数值；为 null（只有文字结果）时无从判定，返回 false
+     * @param refLow 参考下限，缺失传 null
+     * @param refHigh 参考上限，缺失传 null
+     * @return 值在参考范围内、且距最近边界不超过 5% 量程时为 true
+     */
+    fun labNearBoundary(value: Double?, refLow: Double?, refHigh: Double?): Boolean {
+        if (value == null) return false
+        // 没有任何参考范围：本地判不了，交给 AI 标记兜底（与 saveLabResult 的口径一致）
+        if (refLow == null && refHigh == null) return false
+        // 越界优先：出了范围就不算"临界"
+        val outOfRange = (refHigh != null && value > refHigh) || (refLow != null && value < refLow)
+        if (outOfRange) return false
+        val span = labSpan(refLow, refHigh) ?: return false
+        // 量程为 0 或负数（脏数据：下限≥上限）时不判临界，避免把整段都算成临界
+        if (span <= 0.0) return false
+        return labBoundaryDistance(value, refLow, refHigh) <= span * LAB_NEAR_BOUNDARY_RATIO
+    }
+
+    /**
+     * 「临界」的量程基准（维护者裁决项 1）：两侧都有范围时取区间宽度，只有一侧时取那一侧的值。
+     * 拆成独立函数是为了让 [labNearBoundary] 的圈复杂度留在 detekt 阈值内。
+     */
+    private fun labSpan(refLow: Double?, refHigh: Double?): Double? = when {
+        refLow != null && refHigh != null -> refHigh - refLow
+        refHigh != null -> refHigh
+        refLow != null -> refLow
+        else -> null
+    }
+
+    /** 值距最近参考边界的距离；两侧都在时取更近的那一侧。 */
+    private fun labBoundaryDistance(value: Double, refLow: Double?, refHigh: Double?): Double =
+        listOfNotNull(
+            refHigh?.let { it - value },
+            refLow?.let { value - it },
+        ).min()
 
     /** 疼痛三档标签。 */
     fun painLabel(score: Int): Int = when {

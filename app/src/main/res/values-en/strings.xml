@@ -716,6 +716,8 @@
     <string name="knowledge_title_count">AS knowledge base (%1$s items)</string>
     <string name="lab_count_abnormal">%1$s items · %2$s abnormal</string>
     <string name="lab_count_plain">%1$s items</string>
+    <string name="lab_count_near">%1$s items · %2$s near boundary</string>
+    <string name="lab_count_abnormal_near">%1$s items · %2$s abnormal · %3$s near boundary</string>
     <string name="lab_dialog_title">%1$s lab results</string>
     <string name="lab_expand_normal">Show normal results (%1$s)</string>
     <string name="lab_group_collapse">Collapse</string>
@@ -727,12 +729,14 @@
     <string name="lab_ref_range_missing">No reference range recorded for this measure (not provided at entry or AI import)</string>
     <string name="lab_value_high">%1$s high</string>
     <string name="lab_value_low">%1$s low</string>
+    <string name="lab_value_near">%1$s near boundary</string>
     <string name="lab_mark_note">AI flag: %1$s; local reference-range reading: %2$s</string>
     <string name="lab_mark_high">High</string>
     <string name="lab_mark_low">Low</string>
     <string name="lab_mark_normal">Normal</string>
     <string name="lab_mark_abnormal">Abnormal</string>
     <string name="lab_mark_unknown">Not flagged</string>
+    <string name="lab_mark_near">Near boundary</string>
     <string name="lab_window_hint">%1$d total · showing the most recent %2$d</string>
     <string name="me_in_use_prefix">"Taking %1$s · "</string>
     <string name="me_med_disable">Stop %1$s</string>
@@ -938,6 +942,8 @@
     <string name="pdf_lab_flag_high">↑ High</string>
     <string name="pdf_lab_flag_low">↓ Low</string>
     <string name="pdf_lab_flag_abnormal">⚠ Abnormal</string>
+    <string name="pdf_lab_flag_near">⚠ Near boundary</string>
+    <string name="pdf_section_labs_near">Near-boundary items (within reference range, ≤5%% of the span) (%1$d)</string>
     <string name="pdf_lab_ref_range">(Reference %1$s–%2$s)</string>
     <string name="pdf_labs_more">…%1$d more abnormal items not listed</string>
     <string name="pdf_section_checkups">Follow-up visits in the last 180 days (%1$d)</string>

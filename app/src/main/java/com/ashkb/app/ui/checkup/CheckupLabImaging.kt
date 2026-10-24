@@ -59,6 +59,7 @@ import java.util.Locale
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.data.entity.ImagingRecord
 import com.ashkb.app.data.entity.LabResult
+import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.ImportTemplates
 import com.ashkb.app.domain.LabImport
@@ -77,11 +78,30 @@ import com.ashkb.app.ui.theme.StatusTone
 // ===== 化验值展示：异常不再只用红色——偏高/偏低分方向三重编码 =====
 
 @Composable
-private fun LabValue(valueText: String, unit: String?, abnormal: String?, onClick: (() -> Unit)? = null) {
+private fun LabValue(
+    valueText: String,
+    unit: String?,
+    abnormal: String?,
+    near: Boolean = false,
+    onClick: (() -> Unit)? = null,
+) {
     val text = listOfNotNull(valueText, unit).joinToString(" ")
-    when (abnormal) {
-        "high" -> StatusChip(text = stringResource(R.string.lab_value_high, text), tone = StatusTone.Danger, icon = Icons.Rounded.TrendingUp, onClick = onClick)
-        "low" -> StatusChip(text = stringResource(R.string.lab_value_low, text), tone = StatusTone.Warning, icon = Icons.Rounded.TrendingDown, onClick = onClick)
+    when {
+        abnormal == "high" -> StatusChip(
+            text = stringResource(R.string.lab_value_high, text),
+            tone = StatusTone.Danger,
+            icon = Icons.Rounded.TrendingUp,
+            onClick = onClick,
+        )
+        abnormal == "low" -> StatusChip(
+            text = stringResource(R.string.lab_value_low, text),
+            tone = StatusTone.Warning,
+            icon = Icons.Rounded.TrendingDown,
+            onClick = onClick,
+        )
+        // v1.2.10 裁决项 5：第四态「临界」——**越界优先**，所以这一支排在 high/low 之后。
+        // 刻意不带趋势箭头：临界不是方向性结论，箭头会把它读成"偏高/偏低的弱化版"。
+        near -> StatusChip(text = stringResource(R.string.lab_value_near, text), tone = StatusTone.Warning, onClick = onClick)
         else -> Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
@@ -92,6 +112,19 @@ private fun labValueText(lab: LabResult): String =
     lab.value?.let { fmtDouble(it) } ?: lab.valueText ?: "-"
 
 private fun LabResult.isAbnormal() = abnormal == "high" || abnormal == "low"
+
+/**
+ * v1.2.10 裁决项 5：本行是否属于"临界"（第四态）。
+ *
+ * 判据在 [ClinicalThresholds.labNearBoundary]，**只在参考范围内的值上判**——越界优先，
+ * 所以 `isAbnormal()` 的行这里恒为 false，两态互斥、不会同时出现两枚胶囊。
+ *
+ * 为什么不把"临界"写进库里的 `abnormal` 列：那需要一次库迁移，且会把「本地判读结果」
+ * 这一列的含义从三态改成四态，连带影响 AI 标记并列展示、PDF 计数、以及既有判读测试；
+ * 而 `value` / `refLow` / `refHigh` 三列本来就齐全，实时算即可，历史数据立刻生效。
+ */
+private fun LabResult.isNearBoundary() =
+    !isAbnormal() && ClinicalThresholds.labNearBoundary(value, refLow, refHigh)
 
 /**
  * v1.0.78（批次 4 收尾）：异常标记 key（`high` / `low` / `normal` / …）→ 展示文案。
@@ -142,7 +175,13 @@ private fun RowScope.LabRow(lab: LabResult, onEdit: ((LabResult) -> Unit)?) {
     Column(Modifier.weight(1f)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(lab.testName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-            LabValue(labValueText(lab), lab.unit, lab.abnormal, onClick = if (lab.isAbnormal()) ({ showRef = !showRef }) else null)
+            LabValue(
+                labValueText(lab),
+                lab.unit,
+                lab.abnormal,
+                near = lab.isNearBoundary(),
+                onClick = if (lab.isAbnormal()) ({ showRef = !showRef }) else null,
+            )
         }
         if (showRef) {
             Text(
@@ -405,13 +444,20 @@ private fun LabDateGroup(
     onAttachDate: (String) -> Unit,
 ) {
     val abnormalCount = rows.count { it.isAbnormal() }
+    // v1.2.10 裁决项 5：临界**单独统计**，不进"异常"计数（维护者裁决项 3）——
+    // 临界是"看着还算正常但值得留意"，混进异常计数会把一次正常抽血说成有异常项。
+    val nearCount = rows.count { it.isNearBoundary() }
     // 整组化验共用一条归属：同一天的一次抽血属于同一次复诊，逐项设置只会变成负担
     val linkedId = rows.firstOrNull { it.checkupId != null }?.checkupId
     var expanded by rememberSaveable { mutableStateOf(abnormalCount > 0 || isLatest) }
     SectionCard(
         title = date,
-        subtitle = if (abnormalCount > 0) stringResource(R.string.lab_count_abnormal, rows.size, abnormalCount)
-        else stringResource(R.string.lab_count_plain, rows.size),
+        subtitle = when {
+            abnormalCount > 0 && nearCount > 0 -> stringResource(R.string.lab_count_abnormal_near, rows.size, abnormalCount, nearCount)
+            abnormalCount > 0 -> stringResource(R.string.lab_count_abnormal, rows.size, abnormalCount)
+            nearCount > 0 -> stringResource(R.string.lab_count_near, rows.size, nearCount)
+            else -> stringResource(R.string.lab_count_plain, rows.size)
+        },
         action = {
             TextButton(
                 onClick = { expanded = !expanded },
@@ -808,7 +854,15 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
                     ) {
                         DividerList(items = imp.rows) { r: LabImportRow ->
                             Text(r.testName, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                            LabValue(r.value?.toString() ?: r.valueText, r.unit, r.abnormal)
+                            // v1.2.10 裁决项 5：预览也按同一判据标临界——refLow/refHigh 就在行里，
+                            // 实时算即可；越界优先由 LabValue 的分支顺序保证。
+                            LabValue(
+                                r.value?.toString() ?: r.valueText,
+                                r.unit,
+                                r.abnormal,
+                                near = r.abnormal != "high" && r.abnormal != "low" &&
+                                    ClinicalThresholds.labNearBoundary(r.value, r.refLow, r.refHigh),
+                            )
                         }
                     }
                 }

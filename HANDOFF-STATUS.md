@@ -1011,3 +1011,25 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 - 本批**未发版、未 bump**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19）。
 - **R1 真机复验通过（2026-10-24）**：`wm density 720`（320dp 等效宽）+ `settings put system font_scale 2.0` 后，急救卡「当前用药」药名完整显示为两行 `Etanercept（Enbrel）`，「免疫抑制」胶囊折到下一行。uiautomator dump 里药名节点 `[144,2087][1296,2477]`、胶囊节点 `[279,2504][742,2660]`，y 区间不重叠 ⇒ 确实分行、药名不再被压成竖排。证据 `E:\ASHKB\ui2-shots\r1\r1-320dp-2x-emergency-meds.png` + 同名 `.xml`。验完已还原 density（600）/ font_scale（1.0）/ IME，并删除测试药。
 - **R2 未构造历史幽灵数据验证**：清理只在启动时跑一次，本次装机启动已执行（`app_prefs` 闸门 `ghost_slot_purged_v1` 已置真）；判据正确性由 `PostponeGhostSlotsTest` 的 6 条覆盖。
+### 裁决项 5：「临界」第四态落地（2026-10-24 · 未发版 · 未 bump 版本号）
+
+`ClinicalThresholds.LAB_NEAR_BOUNDARY_RATIO` 此前是**零引用死常量**（KDoc 承诺「距边界 ≤5% 量程视为临界」，代码从未使用）。维护者 m16211 四项裁决后落地：
+
+| 项 | 裁决 | 落地 |
+|---|---|---|
+| 量程基准 | 参考区间宽度 × 5% | `labSpan`：两侧都有 `refHigh-refLow`；单侧取该侧值 |
+| 呈现形态 | 独立第四态胶囊「临界」，Warning、无趋势箭头 | `LabValue(near=…)` 的 `near ->` 分支 |
+| 异常计数 | 不计入异常，单独统计；PDF 独立分段 | `nearCount` + `lab_count_near`/`lab_count_abnormal_near` + `pdf_section_labs_near` |
+| 冲突优先级 | **越界优先** | `near ->` 排在 `high`/`low` 之后；`labNearBoundary` 先判越界 |
+
+**判据**：`value` 非空、至少一侧有参考范围、未越界、`span > 0`、且距最近边界 ≤ `span × 5%`。脏数据（`span <= 0`、下限 ≥ 上限）一律 false。
+
+**落点**：`domain/ClinicalThresholds.kt`（判据 + 两个私有辅助，为压 detekt 圈复杂度/ReturnCount 而拆）；`ui/checkup/CheckupLabImaging.kt`（`LabValue` 第四分支、`LabRow` 接线、导入预览同判据、日期分组临界计数）；`ui/report/ReportPdfWriter.kt`（独立临界分段，排除已越界行）；中英各 5 条新字符串。
+
+**回归 15 条**：`LabNearBoundaryTest.kt`（10 条纯 JVM，覆盖 5% 两侧/单侧、越界优先、null、无范围、span≤0、恰在边界含等于）+ `LabNearBoundaryWiringTest.kt`（5 条静态断言，钉四处接线与分支顺序）。
+
+**负向对照两轮**（造「能编译的违规形状」）：把 `near = lab.isNearBoundary()` 改 `near = false` ⇒ 正好 1 条 FAIL；把 `near ->` 挪到 `high` 之前 ⇒ 正好 1 条 FAIL。恢复后 `NEGATIVE-CONTROL-TEMP` 零残留。
+
+**门禁**：`E:\ASHKB\near-gate2.log` 2m 50s，单测 **1024 条 / 121 文件**全绿，detekt 0，lint 168 = 0 Error 且无一条落在改动文件上，`verifySpecSync` 通过。
+
+**未做**：真机复验（需要一条距边界 ≤5% 的真实化验值；设备无线调试状态未知）；未发版、未 bump。

@@ -711,6 +711,8 @@
     <string name="knowledge_title_count">AS 知识库（%1$s 条）</string>
     <string name="lab_count_abnormal">%1$s 项 · %2$s 项异常</string>
     <string name="lab_count_plain">%1$s 项</string>
+    <string name="lab_count_near">%1$s 项 · %2$s 项临界</string>
+    <string name="lab_count_abnormal_near">%1$s 项 · %2$s 项异常 · %3$s 项临界</string>
     <string name="lab_dialog_title">%1$s 化验结果</string>
     <string name="lab_expand_normal">展开正常项（%1$s）</string>
     <string name="lab_group_collapse">收起</string>
@@ -722,12 +724,14 @@
     <string name="lab_ref_range_missing">该指标未记录参考范围（录入/AI 导入时未提供）</string>
     <string name="lab_value_high">%1$s 偏高</string>
     <string name="lab_value_low">%1$s 偏低</string>
+    <string name="lab_value_near">%1$s 临界</string>
     <string name="lab_mark_note">AI 标记：%1$s；本地参考范围判读：%2$s</string>
     <string name="lab_mark_high">偏高</string>
     <string name="lab_mark_low">偏低</string>
     <string name="lab_mark_normal">正常</string>
     <string name="lab_mark_abnormal">异常</string>
     <string name="lab_mark_unknown">未标注</string>
+    <string name="lab_mark_near">临界</string>
     <string name="lab_window_hint">共 %1$d 项 · 当前显示最近 %2$d 项</string>
     <string name="me_in_use_prefix">"在用 %1$s 种 · "</string>
     <string name="me_med_disable">停用 %1$s</string>
@@ -966,6 +970,8 @@
     <string name="pdf_lab_flag_high">↑ 高</string>
     <string name="pdf_lab_flag_low">↓ 低</string>
     <string name="pdf_lab_flag_abnormal">⚠ 异常</string>
+    <string name="pdf_lab_flag_near">⚠ 临界</string>
+    <string name="pdf_section_labs_near">临界项（参考范围内、距边界 ≤5%%）（%1$d 项）</string>
     <string name="pdf_lab_ref_range">（参考 %1$s–%2$s）</string>
     <string name="pdf_labs_more">…另有 %1$d 项异常未列出</string>
     <string name="pdf_section_checkups">近 180 天复诊记录（%1$d 次）</string>
