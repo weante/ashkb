@@ -94,7 +94,7 @@
 | 第 2 批（要 v20） | A01 补剂改计划后旧时刻闹钟存活 · A04 档案 JSON 全量保真 · A06 化验 `<`/`>` 严格边界 · B01 AI 报告重复导入 | ✅ **已落地并推送**（commit `1f92cdc`；门禁 `batch2-gate2.log` 1088 条全绿 / detekt 0 / lint 0 Error），未发版 |
 | 第 3 批（不动 schema） | C02 恶意备份密钥槽上限 · C03 附件有界复制 + 清理路径 · C06 五处文档与实现对齐 | ✅ **已落地并推送**（commit `a59286e`；门禁 `batch3-gate2.log` 1097 条全绿 / detekt 0 / lint 0 Error），未发版 |
 | 第 4 批 | B09 提醒重排异常被吞 · B08 AI 导入草稿旋转后丢失 | ✅ **已落地并推送**（commit `60d1391`；门禁 `batch4-gate1.log` 1118 条全绿 / detekt 0 / lint 0 Error），未发版 |
-| 第 5 批 | B05 恢复后运行态刷新 · B07 pre-restore 快照的应用内撤销 · C04 CI 强制发布签名 | ✅ **已落地**（门禁 `batch5-gate2.log` 1136 条全绿 / detekt 0 / lint 0 Error），未发版、未提交 |
+| 第 5 批 | B05 恢复后运行态刷新 · B07 pre-restore 快照的应用内撤销 · C04 CI 强制发布签名 | ✅ **已落地并推送**（commit `dedabee` + 文档补记 `4856235`；门禁 `batch5-gate2.log` 1136 条全绿 / detekt 0 / lint 0 Error；C04 已在真 GitHub 流水线用三次探针 tag 闭环验证），未发版 |
 
 > ⚠️ C01 的边界：**恢复侧刻意不引用** `BackupPasswordRules` —— 旧 6 位口令建的备份必须还能解开。
 > 这条由 `BackupPasswordRulesTest` 的源码断言钉住；不要“顺手”在 `verifyBackup` 里加长度检查。
@@ -164,6 +164,15 @@
 - **静态断言 ≠ 验收**（2026-10-21 真机教训）：源码静态守卫只能证明「槽位存在、顺序正确」，**证明不了「放得下」**。§06 ④ 的胶囊初版挂在约 170dp 的迷你格，6 条断言全绿，真机上标题已被压成「BASDAI 总…」。**凡新增「标题 + 数值 + 徽章」三段式布局，必须真机看一眼**；结论类徽章挂**宽卡标题行**，不要塞进迷你格。
 - **发布流程（v1.2.10 实测版，替代旧写法）**：①本地 `git tag -a vX.Y.Z -m "…" <commit>` + `git push origin refs/tags/vX.Y.Z` → ②`gh release create vX.Y.Z --repo weante/ashkb --title … --notes-file … --latest`（**不要再带 `--target`**：`--target` 建的是**轻量标签**，v1.2.10 因此被迫 `--force` 重推附注标签）→ ③`gh release upload vX.Y.Z <apk> --clobber` → ④`gh api -X PATCH repos/weante/ashkb/releases/<id> -f target_commitish=<sha>`（**`upload --clobber` 只换资产、不改 target**）→ ⑤`gh api repos/weante/ashkb/releases/tags/vX.Y.Z` 核对 id / 资产大小 / `state=uploaded`，并查 `releases/latest` 是否已接管 → ⑥`git ls-remote --tags origin` 确认 `refs/tags/vX.Y.Z` 是 tag 对象、`refs/tags/vX.Y.Z^{}` 是 commit（v1.2.2 曾因代理静默失败把 tag 指到旧提交）。全链路需 `HTTP_PROXY`/`HTTPS_PROXY` = `http://127.0.0.1:7897`；`git ls-remote` 偶发 `TLS connect error … unexpected eof`，重试 2–3 次即可。
 - **GitHub 必须 HTTP/1.1**：`git -c http.version=HTTP/1.1 push origin main`。
+- **发布签名的 5 个 GitHub secret 已配好**（2026-10-26，`gh secret set --repo weante/ashkb`）：
+  `ASHKB_KEYSTORE_BASE64`（`ashkb-release.jks` 的 base64，**base64 必须是单行**，用
+  `[Convert]::ToBase64String([IO.File]::ReadAllBytes(...))` 输出后经管道喂给 `gh secret set`）、
+  `ASHKB_STORE_PASSWORD`、`ASHKB_KEY_ALIAS=ashkb`、`ASHKB_KEY_PASSWORD`、
+  `ASHKB_EXPECTED_CERT_SHA256=38ca80a61760208e1f0c9d81c2caf5c7c90da0e3bd759150ccdf641ec9012d7d`
+  （= 本机 `apksigner verify --print-certs` 的证书 SHA-256，与 `CN=ASHKB, OU=Personal, O=weante, L=Shenzhen, ST=Guangdong, C=CN` 对应）。
+  ⚠️ **改 keystore 就必须同步换这两个 secret**（base64 + 摘要），否则 `release` job 会以「签名摘要不匹配」失败。
+  ⚠️ **验证 tag 流水线不要用真版本号**：推一次性探针 tag（如 `v0.0.0-probe`）→ 看结果 → `git push origin :refs/tags/<tag>`
+  + `git tag -d` + `gh run delete <run-id>`，否则工作流历史里会留一堆失败探针。
 - **pwsh 两个坑**：`git rev-parse v1.2.10^{}` 的 `^{}` 会被吃掉 → **必须加引号** `'v1.2.10^{}'`；`gh api --jq .body` 含换行时会被拆成字符串数组 → **必须 `-join "`n"`**。
 - **崩溃恢复**：`Could not read workspace metadata from ...transforms-4\...\metadata.bin` = Gradle 转换缓存被写坏 → **停守护进程 + 整个删掉 `transforms-4`** 再重建（只删单个条目无效）。
 - **构建必须在沙箱外**：workspace-write 下 Gradle 无法初始化 native services（`Failed to load native library 'native-platform.dll'`）。命令：`. E:\ASHKB\build-env\env.ps1; & "E:\ASHKB\build-env\gradle-8.7\bin\gradle.bat" -p E:\ASHKB\patient-health-app <tasks> --console=plain`，且**不要覆盖 `GRADLE_USER_HOME`**。`apksigner` 前必须先 `. env.ps1` 设 `JAVA_HOME`。
