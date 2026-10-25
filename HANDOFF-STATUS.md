@@ -1132,5 +1132,15 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
 首次 `batch5-gate1.log` 因 7 条 `MagicNumber`（`PreRestoreSnapshot.kt:90/91/107/108` 裸 `15`/`16`）失败 ⇒ 抽 `STAMP_LENGTH` 后绿。
 
-**仍未做**：本批**未装机**（设备无线调试未开）；`versionCode` / `versionName` 仍 122 / "1.2.10"；
-C04 的 tag 触发只能在 GitHub 上验——**需维护者先配 5 个 secret**（见 CHANGELOG「十六 / C04」与下一节）。
+**C04 已在真 GitHub 流水线闭环（2026-10-26）**：5 个 secret 已配（`ASHKB_KEYSTORE_BASE64` / `ASHKB_STORE_PASSWORD` /
+`ASHKB_KEY_ALIAS=ashkb` / `ASHKB_KEY_PASSWORD` / `ASHKB_EXPECTED_CERT_SHA256=38ca80a6…d7d`，与本机
+`apksigner verify --print-certs` 的 `CN=ASHKB, OU=Personal, O=weante, L=Shenzhen, ST=Guangdong, C=CN` 摘要逐字一致）。
+三次一次性探针 tag（**验证后已全部删除，远端 `git ls-remote --tags` 零残留，三次 run 已 `gh run delete`**）：
+①正常 tag ⇒ `release` **success** + `build-and-test` **skipped**（路由正确），验签步 `V2 Signer` DN 与正式证书一致，
+末行 `✅ 正式签名身份已验证`；②预期摘要换全零 ⇒ `release` **failure**，
+`签名摘要不匹配：实际 38ca80a6…d7d，预期 ***`；③删掉预期摘要 secret ⇒ `release` **failure**，
+在「Require release signing material」步即失败（**排在 assembleRelease 之前，秒级失败不白烧 4 分钟构建**），
+`未配置 secret ASHKB_EXPECTED_CERT_SHA256——tag 构建必须能证明签名身份，不允许跳过比对`。
+⇒ 工单 C04 验收条件「模拟 tag 时缺 secret / 错误 digest / debug 签名均失败，正确 digest 才通过」**已闭环**。
+
+**仍未做**：本批**未装机**（设备无线调试未开）；`versionCode` / `versionName` 仍 122 / "1.2.10"。

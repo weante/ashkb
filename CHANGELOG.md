@@ -919,6 +919,20 @@ R.string.backup_err_vault_too_many_slots, resArgs = listOf(N, MAX_SLOTS))`。中
     这条 job **刻意不设** `ASHKB_ALLOW_DEBUG_SIGNING`：keystore 一旦缺失/无效，`app/build.gradle.kts` 的
     taskGraph 钩子会直接抛异常，而不是安静产出一个 debug 签名的"正式包"。
 - **README**：C06 时改的「应用内撤销入口尚未实现」随本批改为「备份页可用它撤销上一次恢复，撤销本身也会先留一份新快照」。
+- **真流水线验证（2026-10-26，三次一次性探针 tag，验证后全部删除，远端 `git ls-remote --tags` 确认零残留）**：
+  先按本机 `ashkb-release.jks` 配好 5 个 secret（`ASHKB_KEYSTORE_BASE64` = keystore 的 base64、
+  `ASHKB_STORE_PASSWORD` / `ASHKB_KEY_PASSWORD`、`ASHKB_KEY_ALIAS=ashkb`、
+  `ASHKB_EXPECTED_CERT_SHA256=38ca80a6…d7d`——与本机 `apksigner verify --print-certs` 读出的
+  `CN=ASHKB, OU=Personal, O=weante, L=Shenzhen, ST=Guangdong, C=CN` 证书摘要逐字一致），然后：
+  ① 正常 tag ⇒ `release` job **success**、`build-and-test` **skipped**（路由正确），验签步读到的
+  `V2 Signer` 证书 DN 与正式证书一致，日志末行 `✅ 正式签名身份已验证`；
+  ② 把预期摘要换成全零 ⇒ `release` **failure**，报
+  `签名摘要不匹配：实际 38ca80a6…d7d，预期 ***（debug 签名或错误的 keystore 一律失败）`；
+  ③ 删掉预期摘要 secret ⇒ `release` **failure**，在「Require release signing material」步即失败，
+  报 `未配置 secret ASHKB_EXPECTED_CERT_SHA256——tag 构建必须能证明签名身份，不允许跳过比对`。
+  **缺 secret 是秒级失败、不白烧 4 分钟构建**，因为该步刻意排在 `assembleRelease` 之前。
+  三次 run 已 `gh run delete` 清除，不把失败探针留在工作流历史里。
+  ⇒ C04 验收条件「模拟 tag 时缺 secret / 错误 digest / debug 签名均失败，正确 digest 才通过」**已在真 GitHub 流水线闭环**。
 
 #### 回归与门禁
 
