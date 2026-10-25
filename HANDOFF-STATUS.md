@@ -1057,3 +1057,22 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 **门禁** `E:\ASHKB\batch1-gate2.log`：BUILD SUCCESSFUL in 2m 50s；单测 **127 文件 / 1061 条** failures=0 errors=0 skipped=0；detekt **0**；lint total **168** = **0 Error** + 160 Warning + 8 Information，**本轮改动文件零命中**；`verifySpecSync` 通过。
 
 **仍未做**：第 2 批 A01 / A04 / A06 / B01（需 v19→v20 一次性迁移）；B05 / B07 / B08 / B09 / C02 / C03 / C04 / C06；本批未装机（设备无线调试未开）。
+
+### 缺陷工单第 2 批：四项需 v19→v20 迁移的修复（2026-10-25 · 未发版 · 未 bump 版本号）
+
+工单 `ASHKB-缺陷修复执行工单-724cf39.md` 剩下四项都要落库结构配合，按维护者裁决「先做不需 schema 的 10 项、再单独一笔 v20 做剩 4 项」集中在这一批。**库版本 19 → 20**：`lab_results` 加 `ref_low_inclusive` / `ref_high_inclusive` 两列，新增 `report_import_batches` 表（`fingerprint` 唯一索引）；`MIGRATION_19_20` 已注册进 `ALL_MIGRATIONS`，schema 快照 `app/schemas/com.ashkb.app.data.db.AppDatabase/20.json` 已导出入库。
+
+| 项 | 原状 | 落地 | 证据 |
+|---|---|---|---|
+| A01 补剂改计划后旧时刻闹钟仍会响 | `cancelAllFuture` 只遍历**当前** `times`；接收器不看时刻是否仍合法 | ①持久化已注册槽位键（`SharedPreferences("supplement_alarms")`，键 `supId\|yyyy-MM-dd\|HH:mm`），`cancelAllFuture` 改**两段式**（先按记录取消、再按当前定义扫一遍、最后清空）；②接收器加 `isCurrentSlot(sup, time)` 第四道校验 | `SupplementReminderScheduler.kt` / `SupplementReminderReceiver.kt`；`SupplementReminderSchedulerTest` 新增 3 条 |
+| A04 档案 JSON 非全量保真 + 导入半完成 | 导出漏 12 个药品字段与 `ui_mode`/`minimal_since`；导入不在事务里、不重建槽位 | ①导出补齐 profile 全字段 + 药品全部持久化字段 + `format_version = 2`；②导入整体包 `db.withTransaction`；③导入成功后按新药单 `materializePlannedSlots`（回看 1 天 / 前瞻 7 天）再重排提醒 | `BackupRepository.exportProfileJson` / `importProfileJson`；`BackupViewModel.kt:464`；`BackupProfileJsonTest` 6 条 |
+| A06 `<`/`>` 严格边界被存成包含边界 | `parseRange` 把 `<5` 与 `≤5` 都变 `refHigh=5.0`，判读只用 `>` ⇒ 5 永远不算偏高 | ①加两列 `*_inclusive`（默认 1 = 包含，保存量与旧备份语义）；②解析侧 `^[<＜]`/`^[>＞]` 存 `false`；③判读收敛到 `domain/LabBoundary.kt` 单一实现，`saveLabResult`/`labNearBoundary`/`isNearBoundary`/导入预览/`ReportPdfWriter` 全走它 | `LabBoundaryInclusiveTest` 7 条；`ReportImportParserTest` 新增 `parseLab_strictAndInclusiveBoundariesAreDistinct` |
+| B01 AI 报告重复导入重复写全部记录 | 每次导入新 id、无批次身份 ⇒ 同一份报告拖两次行数翻倍 | ①`ImportFingerprint` 对「类型 + 规范化完整内容」算 SHA-256（字段 `\u001F`、行 `\u001E`，null 与空串同值，`skippedLines` 不参与）；②新增 `report_import_batches` 登记；③查重 + 登记 + 写行**同一事务**，命中返回 `ImportResult.AlreadyImported`；④`insert` 用 `ABORT` 而非 `REPLACE` | `ImportFingerprintTest` 10 条；`CheckupViewModel` 回显「此前已导入」（中英各 4 条新串） |
+
+**顺手做的结构整理**：`HealthRepository` 因本批代码增长被 detekt `LargeClass` 判超阈值——判断不是「有坏味道」，而是「导入一份外部报告」这件事塞进了本来就最大的类。抽出 `data/repo/AiReportImporter.kt`（指纹 + 批次 + 逐行写入，自带事务），`importLabReport` / `importImagingReport` 变一行委托。**没有放宽任何阈值、没有新增基线条目**。
+
+**负向对照四组**（均造「能编译的违规形状」）：去掉 `withTransaction` ⇒ 1 条 FAIL；`inclusive` 写死 `true` ⇒ 2 条 FAIL；去掉指纹查重 ⇒ 1 条 FAIL；去掉 `isCurrentSlot` 校验 ⇒ 1 条 FAIL。恢复后全绿，`NEGATIVE-CONTROL-TEMP` 残留 0。
+
+**门禁** `E:\ASHKB\batch2-gate2.log`：BUILD SUCCESSFUL in 3m 48s；单测 **130 文件 / 1088 条** failures=0 errors=0 skipped=0；detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
+
+**仍未做**：第 2 批之外的 B05 / B07 / B08 / B09 / C02 / C03 / C04 / C06；本批未装机（设备无线调试未开）；`versionCode` / `versionName` 仍 122 / "1.2.10"。

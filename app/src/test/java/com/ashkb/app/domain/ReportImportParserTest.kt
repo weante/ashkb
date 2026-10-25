@@ -172,12 +172,55 @@ class ReportImportParserTest {
         assertEquals(65.0 to 85.0, ReportImportParser.parseRange("65~85"))
         assertEquals(65.0 to 85.0, ReportImportParser.parseRange("65～85"))
         assertEquals(65.0 to 85.0, ReportImportParser.parseRange("65—85"))
+        // v1.2.11（缺陷工单 A06）：`parseRange` 只负责**数值**，`≤` 与 `<` 在这里确实同值——
+        // 两者的语义差别由 `parseLabRow` 落成 `refHighInclusive` 标志（见下一条测试）。
+        // 这行断言曾经是缺陷证据本身：解析器只存了 5，判读又一律按包含边界，
+        // 于是 `<5` 被悄悄放宽成 `≤5`、真实的 5 被标成正常。
         assertEquals(null to 5.0, ReportImportParser.parseRange("≤5"))
         assertEquals(null to 5.0, ReportImportParser.parseRange("<5"))
         assertEquals(null to 40.0, ReportImportParser.parseRange("＜40"))
         assertEquals(3.5 to null, ReportImportParser.parseRange("≥3.5"))
         assertEquals(null to null, ReportImportParser.parseRange("阴性"))
         assertEquals(null to null, ReportImportParser.parseRange(null))
+    }
+
+    /**
+     * v1.2.11（缺陷工单 A06）：`<5` 与 `≤5` 必须落成**不同**的边界语义。
+     *
+     * 化验单上这两种写法是两件事：`<5` 表示 5 本身已经偏高（严格边界，值等于 5 即越界），
+     * `≤5` 表示 5 仍属正常（包含边界）。旧解析器把两者都存成 `refHigh = 5`，判读又一律用
+     * `value > refHigh`，于是 `<5` 被悄悄放宽——真实异常的 5 被标成正常、从趋势图与 PDF 里消失。
+     *
+     * 这一条只验**解析**侧（标志位）；判读侧由 `LabBoundaryInclusiveTest` 覆盖。
+     */
+    @Test
+    fun parseLab_strictAndInclusiveBoundariesAreDistinct() {
+        val text = """
+            日期: 2026-08-02
+            C-反应蛋白(CRP), 5, mg/L, <5, 正常
+            血沉(ESR), 5, mm/h, ≤5, 正常
+            白细胞计数(WBC), 10, 10^9/L, >10, 正常
+            血红蛋白(HGB), 10, g/L, ≥10, 正常
+        """.trimIndent()
+        val rows = ReportImportParser.parseLab(text)!!.rows
+        assertEquals(4, rows.size)
+
+        // `<5`：上界严格，值等于 5 即算偏高
+        assertEquals(5.0, rows[0].refHigh!!, 0.001)
+        assertEquals(false, rows[0].refHighInclusive)
+        assertEquals(true, rows[0].refLowInclusive) // 没写下界 → 默认包含（无关紧要）
+
+        // `≤5`：上界包含，5 仍正常
+        assertEquals(5.0, rows[1].refHigh!!, 0.001)
+        assertEquals(true, rows[1].refHighInclusive)
+
+        // `>10`：下界严格，值等于 10 即算偏低
+        assertEquals(10.0, rows[2].refLow!!, 0.001)
+        assertEquals(false, rows[2].refLowInclusive)
+
+        // `≥10`：下界包含
+        assertEquals(10.0, rows[3].refLow!!, 0.001)
+        assertEquals(true, rows[3].refLowInclusive)
     }
 
     // ---- 影像报告 ----

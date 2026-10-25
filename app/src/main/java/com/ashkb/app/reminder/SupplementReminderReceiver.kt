@@ -51,6 +51,13 @@ class SupplementReminderReceiver : BroadcastReceiver() {
                     NotificationHelper.cancelSupplement(context, supId, dateStr, time)
                     return@launch
                 }
+                // v1.2.11（缺陷工单 A01）：第四道校验——`time` 是否仍是**当前**的合法槽位。
+                // 闹钟取消可能因进程被杀 / prefs 写入失败 / 用户清数据而漏掉；宁可静默不响，
+                // 也不要发出「已经不需要」的提醒（改时刻、删时刻、每日改每周、归档都会造成这种哑闹钟）。
+                if (!SupplementReminderScheduler.isCurrentSlot(sup, time)) {
+                    NotificationHelper.cancelSupplement(context, supId, dateStr, time)
+                    return@launch
+                }
                 val logged = db.supplementLogDao().byDate(dateStr).any { it.supId == supId }
                 if (logged) {
                     NotificationHelper.cancelSupplement(context, supId, dateStr, time)

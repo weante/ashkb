@@ -29,6 +29,7 @@ import com.ashkb.app.data.entity.ExercisePlan
 import com.ashkb.app.data.entity.PlannedSlot
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.entity.Recipe
+import com.ashkb.app.data.entity.ReportImportBatch
 import com.ashkb.app.data.entity.Supplement
 import com.ashkb.app.data.entity.SupplementLog
 import com.ashkb.app.data.entity.SymptomDaily
@@ -44,8 +45,11 @@ import com.ashkb.app.data.entity.WeightLog
  *
  * v1.0.77（批次 3b）：17 → 18，新增 `planned_slots`（计划槽位快照）。
  * v1.0.78（批次 4 收尾）：18 → 19，`lab_results` 新增 `ai_abnormal`（AI 导入的原始异常标记留档）。
+ * v1.2.11（缺陷工单 A06 / B01）：19 → 20，`lab_results` 新增 `ref_low_inclusive` /
+ *   `ref_high_inclusive`（参考边界是否包含，区分 `<5` 与 `≤5`），并新增
+ *   `report_import_batches`（AI 报告导入批次指纹，挡重复导入）。
  */
-internal const val ASHKB_DB_VERSION = 19
+internal const val ASHKB_DB_VERSION = 20
 
 @Database(
     entities = [
@@ -55,6 +59,7 @@ internal const val ASHKB_DB_VERSION = 19
         DietProfile::class, FoodAvoidItem::class, CheckupItem::class, CheckupRecord::class, LabResult::class,
         ImagingRecord::class, VaccineRecord::class, EmergencyEvent::class, EmergencyContact::class, BackupLedger::class,
         CheckupAttachment::class, Recipe::class, ExercisePlan::class, PlannedSlot::class,
+        ReportImportBatch::class,
     ],
     version = ASHKB_DB_VERSION,
     exportSchema = true,
@@ -91,6 +96,9 @@ abstract class AppDatabase : RoomDatabase() {
 
     /** v1.0.77（批次 3b）：计划槽位快照——计划剂量口径的完成度与漏服补发共用 */
     abstract fun plannedSlotDao(): PlannedSlotDao
+
+    /** v1.2.11（缺陷工单 B01）：AI 报告导入批次指纹——挡重复导入 */
+    abstract fun reportImportBatchDao(): ReportImportBatchDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
@@ -516,6 +524,38 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
+         * v1.2.11（缺陷工单 A06 / B01）：19 → 20。
+         *
+         * 两件事：
+         *  ① `lab_results` 增加 `ref_low_inclusive` / `ref_high_inclusive`——参考边界是否包含。
+         *     化验单上 `<5` 与 `≤5` 是两种语义，此前解析器把两者都存成 `refHigh = 5` 并一律
+         *     按包含边界判读，于是 `<5` 被悄悄放宽成 `≤5`（5 这个真实的偏高值被标成正常）。
+         *     **默认值必须是 1（包含）**：存量数据与旧备份的语义本来就是包含边界，写成 0 会把
+         *     库里所有旧记录的含义整体改掉。`NOT NULL DEFAULT 1` 让迁移本身也把旧行落成 1。
+         *  ② 新增 `report_import_batches`（AI 报告导入批次指纹）——同一份报告重复导入不再重复写行。
+         *     建表语句必须与 Room 导出的 `schemas/…/20.json` 逐字一致，否则 `SchemaDriftTest` 会红。
+         */
+        private val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `lab_results` ADD COLUMN `ref_low_inclusive` INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE `lab_results` ADD COLUMN `ref_high_inclusive` INTEGER NOT NULL DEFAULT 1")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `report_import_batches` (" +
+                        "`id` TEXT NOT NULL, " +
+                        "`kind` TEXT NOT NULL, " +
+                        "`fingerprint` TEXT NOT NULL, " +
+                        "`row_count` INTEGER NOT NULL, " +
+                        "`imported_at` TEXT NOT NULL, " +
+                        "PRIMARY KEY(`id`))",
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_report_import_batches_fingerprint` " +
+                        "ON `report_import_batches` (`fingerprint`)",
+                )
+            }
+        }
+
+        /**
          * 批次 2（测试安全网）：**迁移清单的唯一来源**。
          *
          * 由 [get] 与迁移测试共用。此前清单直接内联在 `addMigrations(...)` 里，测试看不到，
@@ -526,7 +566,7 @@ abstract class AppDatabase : RoomDatabase() {
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
             MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
             MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
-            MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
         )
 
         fun get(context: Context): AppDatabase =

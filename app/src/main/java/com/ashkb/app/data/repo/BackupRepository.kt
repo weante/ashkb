@@ -20,6 +20,7 @@ import com.ashkb.app.domain.AttachmentPath
 import com.ashkb.app.domain.RecoveryCode
 import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.domain.VaultKeyDomain
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
@@ -56,6 +57,19 @@ class BackupRepository(private val context: Context) {
      */
     private val restoreMutex = Mutex()
 
+    /**
+     * v1.2.11（缺陷工单 A04）：档案 JSON 的格式版本。
+     *
+     * v1 是历史版本（没有这个键，只导 14 个药品键）。v2 起导出 Medication 的全部持久化字段
+     * 与 Profile 的 ui_mode / minimal_since，并写 format_version。
+     *
+     * 导入侧只把「读到 v1 或不带版本号」当作「旧文件 → 缺键保原值」；读到 v2 时，缺键就是
+     * 真的空值，必须写 null 而不是保留旧值——否则「把某支药的风险标签清空后再导入」
+     * 会把旧标签复活。两者语义不同，靠版本号区分。
+     */
+    private companion object {
+        const val PROFILE_JSON_VERSION = 2
+    }
     private fun nowIso(): String = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
 
     fun observeLedger(): Flow<List<BackupLedger>> = ledgerDao.observeRecent()
@@ -473,6 +487,13 @@ class BackupRepository(private val context: Context) {
     suspend fun exportProfileJson(): String = withContext(Dispatchers.IO) {
         val o = JSONObject()
         o.put("format", "ashkb-profile")
+        // v1.2.11（缺陷工单 A04）：**显式格式版本**。
+        //
+        // 没有版本号的 JSON 只能靠「有没有这个键」猜年代，而「缺键」在语义上是二义的：
+        // 可能是「旧版本导出的、本来就没有这一列」，也可能是「这个字段当时是空的」。
+        // 有了版本号，导入侧才能区分「旧文件 → 缺键保原值」与「新文件 → 缺键就是空」。
+        // 读到不带 `format_version` 的文件一律按 v1 处理（历史文件全部属于这一代）。
+        o.put("format_version", PROFILE_JSON_VERSION)
         o.put("exported_at", nowIso())
         db.profileDao().get()?.let { p ->
             o.put("profile", JSONObject().apply {
@@ -491,6 +512,11 @@ class BackupRepository(private val context: Context) {
                 p.emergencyNote?.let { put("emergency_note", it) }
                 p.weightTargetLow?.let { put("weight_target_low", it) }
                 p.weightTargetHigh?.let { put("weight_target_high", it) }
+                // v1.2.11（缺陷工单 A04）：档案自身的模式字段此前也没导出。
+                // `uiMode` 决定界面是否处于极简模式，`minimalSince` 是它的进入时刻——
+                // 少了它们，「导入一份档案」在极简期用户眼里等于「界面突然变回完整模式」。
+                put("ui_mode", p.uiMode)
+                p.minimalSince?.let { put("minimal_since", it) }
             })
         }
         val meds = db.medicationDao().listActive()
@@ -501,15 +527,33 @@ class BackupRepository(private val context: Context) {
                 m.brandName?.let { put("brand_name", it) }
                 put("name_key", m.nameKey)
                 put("med_class", m.medClass)
+                // v1.2.11（缺陷工单 A04）：导出补齐 Medication 的**全部**持久化字段。
+                //
+                // 此前只导 14 个键，漏掉 `riskTags` / `doseState` / `taperNote` / `prnReason` /
+                // `duration` / 注射部位状态 / `storage` / `takeWithFood` / 核对状态。后果是
+                // 「导出再导入」这个动作**本身会丢数据**：风险标签没了、减量计划没了、
+                // 注射轮换的部位记录被重置、饭前饭后提示消失——而用户以为自己只是备份了一下。
+                m.riskTags?.let { put("risk_tags", it) }
                 put("route", m.route)
                 put("dose", m.dose)
                 put("frequency", m.frequency)
+                m.doseState?.let { put("dose_state", it) }
+                m.taperNote?.let { put("taper_note", it) }
+                m.prnReason?.let { put("prn_reason", it) }
                 m.takeTimes?.let { put("take_times", it) }
                 m.weeklyWeekday?.let { put("weekly_weekday", it) }
                 m.weeklyWeekday2?.let { put("weekly_weekday2", it) }
+                m.duration?.let { put("duration", it) }
                 put("start_date", m.startDate)
                 m.endDate?.let { put("end_date", it) }
                 m.injCycleDays?.let { put("inj_cycle_days", it) }
+                m.injSites?.let { put("inj_sites", it) }
+                m.injLastSite?.let { put("inj_last_site", it) }
+                m.storage?.let { put("storage", it) }
+                m.takeWithFood?.let { put("take_with_food", it) }
+                put("check_doctor_told", m.checkDoctorTold)
+                put("check_leaflet_read", m.checkLeafletRead)
+                m.interactionCheckDate?.let { put("interaction_check_date", it) }
                 m.notes?.let { put("notes", it) }
             })
         }
@@ -533,42 +577,63 @@ class BackupRepository(private val context: Context) {
         val root = JSONObject(json)
         if (root.optString("format") != "ashkb-profile")
             throw BackupEngine.BackupException(context.getString(R.string.backup_err_profile_json_format))
+        // v1.2.11（缺陷工单 A04）：读格式版本。不带这个键的文件一律按 v1（历史文件）。
+        //
+        // v1 与 v2 的差别**只在缺键语义**：v1 的缺键意味着「那一代还没导这个字段」，
+        // 必须保原值；v2 的缺键意味着「这个字段就是空的」，必须写成 null。用同一套兜底
+        // 处理两代文件，二者必错其一。
+        val isV2 = root.optInt("format_version", 1) >= PROFILE_JSON_VERSION
+        // v1 的兜底：缺键保原值；v2 的兜底：缺键即空值。
+        fun keep(old: String?): String? = if (isV2) null else old
         val existing = db.profileDao().get()
         val po = root.optJSONObject("profile")
             ?: throw BackupEngine.BackupException(context.getString(R.string.backup_err_profile_json_section))
+        // v1.2.11（缺陷工单 A04）：**整个导入包一个事务**。
+        //
+        // 缺陷原状：`profileDao().upsert()` 与逐条 `upsertImportedMedication()` 是分离的写，
+        // 中途抛异常（某支药缺 `name`、磁盘满、进程被杀）就留下「档案已换、药单只写了一半」
+        // 的半完成状态，而用户看到的是导入失败——他会再导入一次，于是药单里出现重复。
+        // 工单要求「任一药品非法则全部回滚」，事务是唯一能做到这件事的手段。
         val profile = (existing ?: com.ashkb.app.data.entity.Profile(
             id = 1, displayName = po.getString("display_name"), diagnosis = po.getString("diagnosis"),
             createdAt = nowIso(), updatedAt = nowIso(),
         )).copy(
             displayName = po.getString("display_name"),
             diagnosis = po.getString("diagnosis"),
-            diagnoseYear = if (po.has("diagnose_year")) po.getInt("diagnose_year") else existing?.diagnoseYear,
+            diagnoseYear = pickInt(po, "diagnose_year", isV2, existing?.diagnoseYear),
             hlaB27 = po.optString("hla_b27", existing?.hlaB27 ?: "unknown"),
             // R1：旧档案 JSON 的 active 归一化为 controlled（与迁移 v7→v8 同义；其余未识别值原样透传，引擎按 flare 保守处理）
             diseaseStage = po.optString("disease_stage", existing?.diseaseStage ?: "unknown")
                 .let { if (it == "active") "controlled" else it },
             // v1.2.10（§5-HIGH-4）：颈椎门控的唯一输入，缺键必须保原值——写默认 null 等于
             // 「导入一次旧档案就把颈椎黑榜重新打开」（ExerciseEngine.cervicalInvolved 只认 moderate/severe）
-            spineMobility = po.optString("spine_mobility").ifBlank { existing?.spineMobility },
-            sacroiliitisGrade = po.optString("sacroiliitis_grade").ifBlank { existing?.sacroiliitisGrade },
-            comorbidities = po.optString("comorbidities").ifBlank { existing?.comorbidities },
-            allergies = po.optString("allergies").ifBlank { existing?.allergies },
-            lifestyle = po.optString("lifestyle").ifBlank { existing?.lifestyle },
-            emergencyBloodType = po.optString("emergency_blood_type").ifBlank { existing?.emergencyBloodType },
-            emergencyMedSummary = po.optString("emergency_med_summary").ifBlank { existing?.emergencyMedSummary },
-            emergencyNote = po.optString("emergency_note").ifBlank { existing?.emergencyNote },
+            // v1.2.11（A04）：v2 文件里缺键就是「用户清空了它」，必须写 null。
+            // 旧写法 `ifBlank { existing?.x }` 对 v2 是错的——它会把用户刻意清空的值复活。
+            // 判据收进 [pickText]，每个字段变成一次调用（原来每个 `?:`/`ifBlank` 都算一个分支）。
+            spineMobility = pickText(po, "spine_mobility", isV2, existing?.spineMobility),
+            sacroiliitisGrade = pickText(po, "sacroiliitis_grade", isV2, existing?.sacroiliitisGrade),
+            comorbidities = pickText(po, "comorbidities", isV2, existing?.comorbidities),
+            allergies = pickText(po, "allergies", isV2, existing?.allergies),
+            lifestyle = pickText(po, "lifestyle", isV2, existing?.lifestyle),
+            emergencyBloodType = pickText(po, "emergency_blood_type", isV2, existing?.emergencyBloodType),
+            emergencyMedSummary = pickText(po, "emergency_med_summary", isV2, existing?.emergencyMedSummary),
+            emergencyNote = pickText(po, "emergency_note", isV2, existing?.emergencyNote),
+            uiMode = pickText(po, "ui_mode", isV2, existing?.uiMode) ?: "normal",
+            minimalSince = pickText(po, "minimal_since", isV2, existing?.minimalSince),
             // 体重目标是 Double?：不能用 optString（"72.5" 变字符串再解析会引入第二条解析路径），
             // 用 has() 判存在 + getDouble，语义与上面的 ifBlank 兜底一致
-            weightTargetLow = if (po.has("weight_target_low")) po.getDouble("weight_target_low") else existing?.weightTargetLow,
-            weightTargetHigh = if (po.has("weight_target_high")) po.getDouble("weight_target_high") else existing?.weightTargetHigh,
+            weightTargetLow = pickDouble(po, "weight_target_low", isV2, existing?.weightTargetLow),
+            weightTargetHigh = pickDouble(po, "weight_target_high", isV2, existing?.weightTargetHigh),
         )
-        db.profileDao().upsert(profile)
         var medCount = 0
-        root.optJSONArray("medications")?.let { arr ->
-            val now = nowIso()
-            for (i in 0 until arr.length()) {
-                upsertImportedMedication(arr.getJSONObject(i), now)
-                medCount++
+        db.withTransaction {
+            db.profileDao().upsert(profile)
+            root.optJSONArray("medications")?.let { arr ->
+                val now = nowIso()
+                for (i in 0 until arr.length()) {
+                    upsertImportedMedication(arr.getJSONObject(i), now, isV2)
+                    medCount++
+                }
             }
         }
         log(LedgerType.EXPORT, true, "import-profile", null, medCount, null,
@@ -587,7 +652,37 @@ class BackupRepository(private val context: Context) {
      * 「导入一份档案」会让药单顺序整体重排。`createdAt` 是身份的一部分，跟着 id 走。
      * 其余字段按 JSON 覆盖——导入的语义是「以这份档案为准」，不是「补空白」。
      */
-    private suspend fun upsertImportedMedication(m: JSONObject, now: String) {
+    /**
+     * v1.2.11（缺陷工单 A04）：按**格式版本**取一个可选文本字段。
+     *
+     * 三个分支各自对应一种真实情形，缺一不可：
+     * · 键存在 → 用文件里的值（空串视为「没有值」，与 `ifBlank` 口径一致）；
+     * · 键缺席 + v2 文件 → 用户在新版本里刻意清空，写 null；
+     * · 键缺席 + v1 文件 → 那一代还没导这个字段，**保本机原值**。
+     *
+     * 抽出来的理由不是「好看」，是 detekt：内联写法每个字段要 2–3 个分支，
+     * 十几个字段一叠就把 `importProfileJson` / `upsertImportedMedication` 顶过复杂度阈值 15，
+     * 而这两个函数本身是「字段清单」不是「算法」——复杂度该落在判据函数里，不在清单里。
+     */
+    private fun pickText(o: JSONObject, key: String, isV2: Boolean, old: String?): String? =
+        o.optString(key).ifBlank { if (isV2) null else old }
+
+    /** 同 [pickText]，用于可空浮点（体重目标这类）。 */
+    private fun pickDouble(o: JSONObject, key: String, isV2: Boolean, old: Double?): Double? =
+        if (o.has(key)) o.getDouble(key) else if (isV2) null else old
+    /** 同 [pickText]，用于可空整数（`weekly_weekday` 这类）。 */
+    private fun pickInt(o: JSONObject, key: String, isV2: Boolean, old: Int?): Int? =
+        if (o.has(key)) o.getInt(key) else if (isV2) null else old
+
+    /**
+     * 同 [pickText]，用于**非空** Boolean（`checkDoctorTold` / `checkLeafletRead`）。
+     *
+     * 与其它字段的差别：Boolean 没有「空」这个状态，v1 文件缺键时必须落回本机原值
+     * （否则「导入一次旧档案」会把两条 R03 待办打回未勾选）；v2 文件缺键才是 false。
+     */
+    private fun pickBool(o: JSONObject, key: String, isV2: Boolean, old: Boolean?): Boolean =
+        if (o.has(key)) o.getBoolean(key) else if (isV2) false else old ?: false
+    private suspend fun upsertImportedMedication(m: JSONObject, now: String, isV2: Boolean) {
         val nameKey = m.optString("name_key", m.getString("name").lowercase())
         val existing = db.medicationDao().activeByNameKey(nameKey)
         db.medicationDao().upsert(
@@ -600,11 +695,20 @@ class BackupRepository(private val context: Context) {
                 route = m.optString("route", "oral"),
                 dose = m.optString("dose", ""),
                 frequency = m.optString("frequency", "DAILY"),
-                takeTimes = m.optString("take_times").ifBlank { null },
-                weeklyWeekday = if (m.has("weekly_weekday")) m.getInt("weekly_weekday") else null,
-                weeklyWeekday2 = if (m.has("weekly_weekday2")) m.getInt("weekly_weekday2") else null,
-                startDate = m.optString("start_date", LocalDate.now().toString()),
-                endDate = m.optString("end_date").ifBlank { null },
+                // v1.2.11（A04）：v2 文件里这些键缺席即「空」，v1 文件里缺席是「那一代没有这列」。
+                // 同名字药在 v1 导入时不能因为新字段缺失就把本机已有的风险标签/减量计划清掉。
+                // 判据全部收进 [pickText] / [pickInt]，这里只剩「键名 + 兜底值」两张清单。
+                riskTags = pickText(m, "risk_tags", isV2, existing?.riskTags),
+                doseState = pickText(m, "dose_state", isV2, existing?.doseState),
+                taperNote = pickText(m, "taper_note", isV2, existing?.taperNote),
+                prnReason = pickText(m, "prn_reason", isV2, existing?.prnReason),
+                takeTimes = pickText(m, "take_times", isV2, existing?.takeTimes),
+                weeklyWeekday = pickInt(m, "weekly_weekday", isV2, existing?.weeklyWeekday),
+                weeklyWeekday2 = pickInt(m, "weekly_weekday2", isV2, existing?.weeklyWeekday2),
+                duration = pickText(m, "duration", isV2, existing?.duration),
+                startDate = pickText(m, "start_date", isV2, existing?.startDate)
+                    ?: LocalDate.now().toString(),
+                endDate = pickText(m, "end_date", isV2, existing?.endDate),
                 // v1.2.10（审查 M1）：导入侧也要钳——这份 JSON 可能来自手改、来自更早的版本、
                 // 或来自一台表单不设下界的设备。`0` 落库后这支药会从今日卡与所有提醒里消失。
                 injCycleDays = if (m.has("inj_cycle_days")) {
@@ -612,7 +716,16 @@ class BackupRepository(private val context: Context) {
                 } else {
                     null
                 },
-                notes = m.optString("notes").ifBlank { null },
+                injSites = pickText(m, "inj_sites", isV2, existing?.injSites),
+                injLastSite = pickText(m, "inj_last_site", isV2, existing?.injLastSite),
+                storage = pickText(m, "storage", isV2, existing?.storage),
+                takeWithFood = pickText(m, "take_with_food", isV2, existing?.takeWithFood),
+                // 两个勾选框是 Boolean（非空）：v1 文件没有这两个键，必须保原值，否则
+                // 「导入一次旧档案」会把「已告知医生 / 已读说明书」两条 R03 待办打回未勾选。
+                checkDoctorTold = pickBool(m, "check_doctor_told", isV2, existing?.checkDoctorTold),
+                checkLeafletRead = pickBool(m, "check_leaflet_read", isV2, existing?.checkLeafletRead),
+                interactionCheckDate = pickText(m, "interaction_check_date", isV2, existing?.interactionCheckDate),
+                notes = pickText(m, "notes", isV2, existing?.notes),
                 createdAt = existing?.createdAt ?: now, updatedAt = now,
             )
         )

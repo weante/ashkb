@@ -316,7 +316,14 @@ object ReportPdfWriter {
         // PDF 里另一项"这类只有对着看才发现的口径分裂。
         val near = r.labs.filter {
             val ab = it.abnormal
-            (ab == null || ab == "normal") && ClinicalThresholds.labNearBoundary(it.value, it.refLow, it.refHigh)
+            (ab == null || ab == "normal") &&
+                ClinicalThresholds.labNearBoundary(
+                    it.value,
+                    it.refLow,
+                    it.refHigh,
+                    it.refLowInclusive,
+                    it.refHighInclusive,
+                )
         }
         if (near.isNotEmpty()) {
             d.h2(context.getString(R.string.pdf_section_labs_near, near.size))

@@ -22,6 +22,16 @@ data class LabImportRow(
     val refLow: Double? = null,
     val refHigh: Double? = null,
     /**
+     * v1.2.11（缺陷工单 A06）：参考**下限**是否包含边界。
+     *
+     * 化验单写 `>10` 时 10 本身算偏低；写 `≥10` 时 10 算正常。v1.2.10 之前解析器把两者
+     * 都存成 `refLow = 10`、判读一律 `value < refLow`，于是 `>10` 被悄悄放宽成 `≥10`。
+     * 默认 true（包含）＝旧行为，只有显式 `>` / `<` 才置 false。
+     */
+    val refLowInclusive: Boolean = true,
+    /** v1.2.11（缺陷工单 A06）：参考**上限**是否包含边界（`<5` 为 false、`≤5` 为 true）。 */
+    val refHighInclusive: Boolean = true,
+    /**
      * v1.0.78（批次 4 收尾）：**本地判读结果或兜底值**（high / low / normal）。
      * 解析阶段它取 AI 给的标记，入库时由 `HealthRepository.saveLabResult` 按参考范围**本地判读覆盖**；
      * 只有没有参考范围、本地判不了时才沿用这个 AI 值兜底（本地优先 + AI 兜底）。
@@ -109,6 +119,10 @@ object ReportImportParser {
         val ref = parts.getOrNull(3)?.takeIf { it.isNotBlank() && it != "参考范围" && it != "Reference range" }
         val mark = parts.getOrNull(4)?.takeIf { it.isNotBlank() }
         val (refLow, refHigh) = parseRange(ref)
+        // v1.2.11（缺陷工单 A06）：`<` / `>` 是**严格**边界（值本身算越界），`≤` / `≥` 包含边界。
+        // 只判上界那一侧的前缀：`parseRange` 已经把「有下界无上界」和「有上界无下界」分开了。
+        val strictLow = Regex("^[>＞]").containsMatchIn(ref?.trim().orEmpty())
+        val strictHigh = Regex("^[<＜]").containsMatchIn(ref?.trim().orEmpty())
         // v1.0.78（批次 4 收尾）：AI 标记**同时写两处**——
         // `aiAbnormal` 原样留档（与本地判读并列展示用），`abnormal` 作为「本地判读结果或兜底值」的初值
         // （有参考范围时会被仓库的本地判读覆盖，没有参考范围时它就是最终入库的兜底值）。
@@ -120,6 +134,8 @@ object ReportImportParser {
             unit = unit,
             refLow = refLow,
             refHigh = refHigh,
+            refLowInclusive = !strictLow,
+            refHighInclusive = !strictHigh,
             abnormal = aiMark,
             aiAbnormal = aiMark,
         )

@@ -124,7 +124,8 @@ private fun LabResult.isAbnormal() = abnormal == "high" || abnormal == "low"
  * 而 `value` / `refLow` / `refHigh` 三列本来就齐全，实时算即可，历史数据立刻生效。
  */
 private fun LabResult.isNearBoundary() =
-    !isAbnormal() && ClinicalThresholds.labNearBoundary(value, refLow, refHigh)
+    !isAbnormal() &&
+        ClinicalThresholds.labNearBoundary(value, refLow, refHigh, refLowInclusive, refHighInclusive)
 
 /**
  * v1.0.78（批次 4 收尾）：异常标记 key（`high` / `low` / `normal` / …）→ 展示文案。
@@ -861,7 +862,13 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
                                 r.unit,
                                 r.abnormal,
                                 near = r.abnormal != "high" && r.abnormal != "low" &&
-                                    ClinicalThresholds.labNearBoundary(r.value, r.refLow, r.refHigh),
+                                    ClinicalThresholds.labNearBoundary(
+                                        r.value,
+                                        r.refLow,
+                                        r.refHigh,
+                                        r.refLowInclusive,
+                                        r.refHighInclusive,
+                                    ),
                             )
                         }
                     }

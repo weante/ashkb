@@ -138,7 +138,14 @@ class MigrationTableParityTest {
             val sdb = helper.writableDatabase
             migration.migrate(sdb)
 
-            val entity = entityOf(JSONObject(schemaFile.readText()), LAB_TABLE)
+            // v1.2.11（缺陷工单 A06）：这条用例只验证 **18→19** 那一跳，故列定义取自
+            // 19.json 而不是当前版本的 schema。库版本升到 20 之后，20.json 里多了
+            // `ref_low_inclusive` / `ref_high_inclusive` 两列——它们由 19→20 迁移负责，
+            // 不在本用例的验证范围里；继续拿 20.json 比会得到一条与本用例无关的假失败。
+            val entity = entityOf(
+                JSONObject(File("$SCHEMA_DIR/${migration.endVersion}.json").readText()),
+                LAB_TABLE,
+            )
             assertEquals(
                 "迁移后的列定义与导出 schema 不一致——升级上来的库会与新装的不一样",
                 schemaColumns(entity),

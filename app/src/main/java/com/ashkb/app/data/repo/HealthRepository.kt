@@ -32,8 +32,10 @@ import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.CheckupDeletion
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.DerivedAlerts
+import com.ashkb.app.domain.LabBoundary
 import com.ashkb.app.domain.ExerciseLogStatus
 import com.ashkb.app.domain.ImagingImport
+import com.ashkb.app.domain.ImportResult
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.LabImport
 import com.ashkb.app.domain.MinimalMode
@@ -898,14 +900,20 @@ class HealthRepository(private val context: Context) {
         // v1.0.78（批次 4 收尾）：AI 的原始标记已另存 `ai_abnormal` 一列（库 v19），
         // 故本地判读**只覆盖 `abnormal`**——下面这行刻意不碰 `aiAbnormal`，两列谁也别覆盖谁，
         // 否则「并列展示」就无从谈起（`LabRow` 只在两列不一致时才多显示一行说明）。
-        val localAbnormal = if (result.value != null) {
-            when {
-                result.refHigh != null && result.value > result.refHigh -> "high"
-                result.refLow != null && result.value < result.refLow -> "low"
-                result.refHigh != null || result.refLow != null -> "normal"
-                else -> null // 没有参考范围：本地判不了，保留 AI 标记兜底
-            }
-        } else null
+        // v1.2.11（缺陷工单 A06）：边界是否包含决定用 `>` 还是 `>=`。
+        // 化验单的 `<5` 表示 5 本身已经偏高、`≤5` 表示 5 仍正常；旧代码一律按包含边界判，
+        // 于是 `<5` 被悄悄放宽成 `≤5`（真实异常被标成正常）。严格/包含由导入解析器落库，
+        // 存量数据与旧备份默认包含（迁移里 DEFAULT 1），语义不倒退。
+        // 判据本体在 [LabBoundary]（纯函数、可单测边界），这里只负责「有值才判」。
+        val localAbnormal = result.value?.let {
+            LabBoundary.judge(
+                it,
+                result.refLow,
+                result.refHigh,
+                result.refLowInclusive,
+                result.refHighInclusive,
+            )
+        }
         val withAbnormal = if (localAbnormal != null) result.copy(abnormal = localAbnormal) else result
         val toSave = if (withAbnormal.id.isBlank()) withAbnormal.copy(id = Ids.new("lab")) else withAbnormal
         labResultDao.upsert(toSave)
@@ -932,47 +940,23 @@ class HealthRepository(private val context: Context) {
 
     // ---- M6 AI 导入：ReportImportParser 解析结果 → 实体入库 ----
 
-    /** 化验单导入：逐行写入 lab_results（事务内原子完成；无关联复诊记录，checkupId = null；医院并入备注） */
-    suspend fun importLabReport(import: LabImport) = db.withTransaction {
-        val date = import.date ?: LocalDate.now().toString()
-        val backfill = date != LocalDate.now().toString()
-        val note = listOfNotNull(
-            import.hospital?.let { context.getString(R.string.ui_import_hospital_prefix, it) },
-            import.note,
-        ).joinToString(" · ").ifBlank { null }
-        import.rows.forEach { row ->
-            saveLabResult(
-                LabResult(
-                    id = "", date = date, recordedAt = nowIso(), backfill = backfill,
-                    checkupId = null, testName = row.testName,
-                    value = row.value, valueText = row.valueText,
-                    unit = row.unit, refLow = row.refLow, refHigh = row.refHigh,
-                    // v1.0.78（批次 4 收尾）：两列都写——`aiAbnormal` 留 AI 原值（并列展示），
-                    // `abnormal` 交给 saveLabResult 的本地判读覆盖 / 无参考范围时兜底。
-                    abnormal = row.abnormal, aiAbnormal = row.aiAbnormal, notes = note,
-                )
-            )
-        }
-    }
 
-    /** 影像报告导入：AI 解析结果 → imaging_records，「对比」并入备注 */
-    suspend fun importImagingReport(import: ImagingImport) {
-        val examDate = import.date ?: LocalDate.now().toString()
-        val notesParts = buildList {
-            import.compare?.takeIf { it.isNotBlank() && it != "无" }
-                ?.let { add(context.getString(R.string.ui_import_compare_prefix, it)) }
-        }
-        imagingDao.upsert(
-            ImagingRecord(
-                id = Ids.new("img"), examDate = examDate, recordedAt = nowIso(),
-                backfill = examDate != LocalDate.now().toString(),
-                modality = import.modality, bodyPart = import.bodyPart,
-                hospital = import.hospital, findings = import.findings,
-                conclusion = import.conclusion,
-                notes = notesParts.joinToString("\n").ifBlank { null },
-            )
-        )
-    }
+    /**
+     * v1.2.11（缺陷工单 B01 + 结构整理）：AI 化验报告导入——**同一份报告只写一次**。
+     *
+     * 判重、批次登记与逐行写入都在 [AiReportImporter] 里，且共用一个事务：查重与写入分开做的话，
+     * 进程死在中间会留下「行写了一半、批次没登记」，下次导入又从头写一遍。
+     *
+     * @return `Imported(count)` = 本次新写入行数；`AlreadyImported` = 此前已导入过（本次 0 行）。
+     */
+    suspend fun importLabReport(import: LabImport): ImportResult =
+        AiReportImporter(this, context).lab(import)
+
+    /**
+     * v1.2.11（缺陷工单 B01）：AI 影像报告导入——同一份报告只写一次（判据同 [importLabReport]）。
+     */
+    suspend fun importImagingReport(import: ImagingImport): ImportResult =
+        AiReportImporter(this, context).imaging(import)
 
     // ---- v11：化验 / 影像归属复诊记录（B10 后续增强，手动选择） ----
 

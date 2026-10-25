@@ -97,13 +97,27 @@ object ClinicalThresholds {
      * @param refHigh 参考上限，缺失传 null
      * @return 值在参考范围内、且距最近边界不超过 5% 量程时为 true
      */
-    fun labNearBoundary(value: Double?, refLow: Double?, refHigh: Double?): Boolean {
+    fun labNearBoundary(
+        value: Double?,
+        refLow: Double?,
+        refHigh: Double?,
+        /**
+         * v1.2.11（缺陷工单 A06）：边界是否包含。默认 true＝旧行为，既有调用点不受影响。
+         *
+         * 必须与 [HealthRepository.saveLabResult] 的判读同源：若「越界」按严格边界判、
+         * 「临界」按包含边界判，`<5` 的报告里 5 这个值会同时满足「越界」（5 >= 5）与
+         * 「在范围内」（5 > 5 为假）——两套判据互相打架，界面上会出现自相矛盾的两枚胶囊。
+         */
+        refLowInclusive: Boolean = true,
+        refHighInclusive: Boolean = true,
+    ): Boolean {
         if (value == null) return false
         // 没有任何参考范围：本地判不了，交给 AI 标记兜底（与 saveLabResult 的口径一致）
         if (refLow == null && refHigh == null) return false
-        // 越界优先：出了范围就不算"临界"
-        val outOfRange = (refHigh != null && value > refHigh) || (refLow != null && value < refLow)
-        if (outOfRange) return false
+        // 越界优先：出了范围就不算"临界"。严格边界（`<` / `>`）下值本身即越界。
+        val overHigh = refHigh != null && if (refHighInclusive) value > refHigh else value >= refHigh
+        val underLow = refLow != null && if (refLowInclusive) value < refLow else value <= refLow
+        if (overHigh || underLow) return false
         val span = labSpan(refLow, refHigh) ?: return false
         // 量程为 0 或负数（脏数据：下限≥上限）时不判临界，避免把整段都算成临界
         if (span <= 0.0) return false

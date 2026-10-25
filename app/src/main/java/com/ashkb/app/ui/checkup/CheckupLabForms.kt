@@ -305,6 +305,11 @@ private data class LabDraft(
         unit = unit.ifBlank { null },
         refLow = refLow.trim().toDoubleOrNull(),
         refHigh = refHigh.trim().toDoubleOrNull(),
+        // v1.2.11（缺陷工单 A06）：手工表单的上下界一律**包含边界**（表单里没有 `<`/`≤` 的输入位），
+        // 原样带过 `existing` 的严格标志没有意义——用户在这里改了数值，语义就回到「含边界」。
+        // AI 导入路径（ReportImportParser）才区分 `<5` 与 `≤5`，那条路径不经本函数。
+        refLowInclusive = true,
+        refHighInclusive = true,
         // v1.2.11（缺陷工单 A07）：旧判读原样带过去，别在「本地判不了」时把它抹掉。
         abnormal = existing?.abnormal,
         aiAbnormal = existing?.aiAbnormal,

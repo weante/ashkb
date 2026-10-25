@@ -12,10 +12,13 @@ import com.ashkb.app.R
 import com.ashkb.app.data.backup.BackupEngine
 import com.ashkb.app.data.backup.VaultCipher
 import com.ashkb.app.data.backup.WebDavClient
+import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.db.AttachmentSyncCounts
 import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.repo.BackupRepository
 import com.ashkb.app.domain.BackupPasswordRules
+import com.ashkb.app.reminder.ReminderScheduler
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +26,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.time.LocalDate
 
 /**
  * P4 R20 备份与数据自主 ViewModel。
@@ -420,11 +425,46 @@ class BackupViewModel(
             _busy.value = true
             try {
                 val (name, meds) = repo.importProfileJson(String(bytes, Charsets.UTF_8))
+                // v1.2.11（缺陷工单 A04）：导入成功后**按新药单重建计划槽位并重排提醒**。
+                //
+                // 缺陷原状：导入只写 profile 与 medications 两张表就报「导入完成」。用户回到
+                // 首页看到的仍是导入前的今日用药与提醒——因为 `planned_slots` 是另一张表，
+                // 而 `ReminderScheduler` 的闹钟也是导入前按旧药单排的。用户以为导入失败了。
+                // 工单要求「提示成功前按新药单重建计划槽位并取消/重排提醒」，故放在 info() 之前。
+                rematerializeAfterImport()
                 info(app.getString(R.string.vm_profile_import_done, name, meds))
             } catch (e: Exception) {
                 fail(app.getString(R.string.vm_profile_import_failed, errText(e)))
             } finally { _busy.value = false }
         }
+    }
+
+    /**
+     * v1.2.11（缺陷工单 A04）：导入后重建计划槽位 + 重排提醒。
+     *
+     * 两件事必须一起做，顺序也不能换：
+     * 1. **先物化**——`materializePlannedSlots` 按新药单把「今天-1 .. 今天+7」的槽位写进
+     *    `planned_slots`。今日卡与完成度统计都读这张表，不物化就等于导入没生效。
+     * 2. **再重排**——`ReminderScheduler.rescheduleAll` 内部先 `cancelAllFuture` 再按
+     *    `settledSlotRefs` 排；它读的正是上一步刚写好的槽位，所以顺序不能反。
+     *
+     * 整段在 IO 线程：物化是 N 支药 × 9 天的插入，重排是「药 × 天 × 槽位」量级的
+     * AlarmManager binder 调用，都远超声明的 16ms。失败只记日志、不阻断导入成功提示——
+     * 数据已经进库了，提醒排不上是次要问题，用户重进应用时 `AshkbApplication` 的启动期
+     * 重排会补上。
+     */
+    private suspend fun rematerializeAfterImport() = withContext(Dispatchers.IO) {
+        runCatching {
+            val db = AppDatabase.get(app)
+            val meds = db.medicationDao().listActive()
+            val today = LocalDate.now()
+            // `app` 声明的类型是 Context（构造时传的是 applicationContext），仓库挂在
+            // AshkbApplication 上，故此处要转型——applicationContext 的实例本身就是它。
+            val medRepo = (app as AshkbApplication).medicationRepository
+            medRepo.materializePlannedSlots(meds, today.minusDays(MATERIALIZE_LOOKBACK_DAYS), today.plusDays(MATERIALIZE_LOOKAHEAD_DAYS))
+            ReminderScheduler.rescheduleAll(app, meds, medRepo.settledSlotRefs(today))
+        }
+        Unit
     }
 
     private fun shareFile(file: File, mime: String): Intent {
@@ -519,6 +559,17 @@ class BackupViewModel(
     }
 
     companion object {
+        /**
+         * v1.2.11（缺陷工单 A04）：导入后重建槽位的窗口。
+         *
+         * 与 `AshkbApplication` 启动期物化同一口径：回看 1 天（今天的槽位可能因为导入发生在
+         * 午夜后而缺失）、前瞻 7 天（提醒最长只排 7 天，更远的槽位排了也没人看）。
+         * 提成常量是因为 detekt `MagicNumber` 会把 `minusDays(1)` / `plusDays(7)` 里的字面量
+         * 当魔法数字——而这两个数的含义恰恰值得命名。
+         */
+        const val MATERIALIZE_LOOKBACK_DAYS = 1L
+        const val MATERIALIZE_LOOKAHEAD_DAYS = 7L
+
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication

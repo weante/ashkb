@@ -775,6 +775,22 @@ data class LabResult(
     @ColumnInfo(name = "ref_low") val refLow: Double? = null,
     @ColumnInfo(name = "ref_high") val refHigh: Double? = null,
     /**
+     * v1.2.11（缺陷工单 A06）：参考**下限**是否包含边界。
+     *
+     * 化验单上 `>10` 与 `≥10` 是两种语义：前者 10 本身算偏低，后者 10 算正常。
+     * v1.2.10 之前解析器把两者都存成 `refLow = 10`、判读一律用 `value < refLow`（包含边界），
+     * 于是 `>10` 被悄悄降级成 `≥10`——一个真实的偏低值被标成正常。
+     *
+     * 默认 `true`（包含边界）：旧数据与旧备份里没有这一列，它们的语义本来就是包含边界，
+     * 迁移与恢复都必须落成 true，否则会把**存量**记录的含义整体改掉。
+     */
+    @ColumnInfo(name = "ref_low_inclusive", defaultValue = "1") val refLowInclusive: Boolean = true,
+    /**
+     * v1.2.11（缺陷工单 A06）：参考**上限**是否包含边界（语义同 [refLowInclusive]）。
+     * `<5` 存 false（5 算偏高）、`≤5` 存 true（5 算正常）。
+     */
+    @ColumnInfo(name = "ref_high_inclusive", defaultValue = "1") val refHighInclusive: Boolean = true,
+    /**
      * v1.0.78（批次 4 收尾）：**本地参考范围判读结果**（high / low / normal）；
      * 没有参考范围、本地判不了时沿用 AI 导入的标记兜底（即「本地判读结果或兜底值」）。
      */
@@ -1044,4 +1060,35 @@ data class PlannedSlot(
     /** 计划当时的剂量快照（药档后续改剂量不影响已成行的历史） */
     @ColumnInfo(name = "dose_snapshot") val doseSnapshot: String? = null,
     @ColumnInfo(name = "created_at") val createdAt: String,
+)
+
+// ===========================================================================
+// v1.2.11（缺陷工单 B01）：AI 报告导入批次（report_import_batches）
+// ===========================================================================
+
+/**
+ * v1.2.11（缺陷工单 B01）：**AI 报告导入批次**——同一份报告重复导入不再重复写行。
+ *
+ * 为什么需要一张表而不是一个内存集合：用户把同一张报告粘两次、或把上个月导入过的报告
+ * 再导一次，是常态；每次导入都 `Ids.new("lab")` 生成新 id、没有任何批次身份，于是
+ * 化验单会整份翻倍，「化验 171 项」这类计数与趋势图全被污染，而用户看不出是哪一次重复。
+ *
+ * [fingerprint] 是「报告类型 + 规范化后的完整导入内容」的 SHA-256：同内容必同指纹，
+ * 改一个数值就是另一份报告（**不做**按「日期 + 指标 + 数值」的全局去重——真实报告里
+ * 同一天测两次同一指标是完全正常的事，全局去重会把它们误删）。
+ *
+ * 为什么要落库而不是查重后跳过：查重与写行必须在**同一事务**里。若只在内存里记住
+ * 「这个指纹导过了」，进程一死就丢，而写了一半的行留在库里——批次记录落库才能让
+ * 「批次已存在」与「行已写入」在事务提交这一瞬间同时成立。
+ */
+@Entity(tableName = "report_import_batches", indices = [Index(value = ["fingerprint"], unique = true)])
+data class ReportImportBatch(
+    @PrimaryKey val id: String, // rib-xxxx
+    /** 报告类型：`lab` / `imaging`——同一份文本按两种模板解析出不同结果，不能混用指纹 */
+    @ColumnInfo(name = "kind") val kind: String,
+    /** SHA-256（十六进制小写），唯一索引保证同一份报告只有一条批次 */
+    @ColumnInfo(name = "fingerprint") val fingerprint: String,
+    /** 该批次实际写入的行数（诊断用：0 只可能出现在「重复导入」之外的异常路径） */
+    @ColumnInfo(name = "row_count") val rowCount: Int,
+    @ColumnInfo(name = "imported_at") val importedAt: String,
 )

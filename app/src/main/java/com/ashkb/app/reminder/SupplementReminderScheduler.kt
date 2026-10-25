@@ -42,6 +42,22 @@ object SupplementReminderScheduler {
      */
     const val FREQ_DAILY = "daily"
 
+    /**
+     * v1.2.11（缺陷工单 A01）：**已注册槽位的本地记录**。
+     *
+     * 为什么需要它：[cancelAllFuture] 只能遍历「当前」`sup.times` 去取消，而用户把 08:00 改成
+     * 20:00 之后，08:00 已经不在 `times` 里了——那个闹钟谁也取消不掉，第二天照旧响，
+     * 点进去却找不到任何 08:00 的补剂。系统 `AlarmManager` 没有「列出我排了哪些闹钟」的公开
+     * API（`AlarmManager` 只提供 cancel），所以必须自己记下「我排过哪些」。
+     *
+     * 为什么用 `SharedPreferences` 而不是新表：这是一份**可丢弃的缓存**——记错了最多漏取消
+     * 一个闹钟（接收器还有第二道校验会静默撤下），而加一张表要动 schema、要迁移、要维护。
+     * 键格式 `supId|yyyy-MM-dd|HH:mm`；`supId` 由 `Ids.new` 生成，不含 `|`。
+     */
+    private const val PREFS = "supplement_alarms"
+    private const val KEY_REGISTERED = "registered"
+    private const val KEY_SEP = '|'
+
     data class Slot(val date: LocalDate, val supId: String, val time: String, val fire: LocalDateTime)
 
     /**
@@ -82,6 +98,7 @@ object SupplementReminderScheduler {
     ) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         cancelAllFuture(context, supplements, today)
+        val registered = mutableSetOf<String>()
         for (sup in supplements) {
             for (dayOffset in 0..HORIZON_DAYS) {
                 val date = today.plusDays(dayOffset)
@@ -89,17 +106,31 @@ object SupplementReminderScheduler {
                 val logged = date == today && sup.id in loggedToday
                 for (slot in slotsFor(sup, date, logged, now)) {
                     schedule(context, am, slot)
+                    registered += slotKey(slot.supId, slot.date, slot.time)
                 }
             }
         }
+        writeRegistered(context, registered)
     }
 
+    /**
+     * 取消未来窗口内该批补剂的全部闹钟。
+     *
+     * v1.2.11（缺陷工单 A01）两段式：
+     *  ① 先取消**记录在案**的槽位——与当前 `times` 无关。这是 A01 的修复点：用户把 08:00
+     *     改成 20:00 后 08:00 已不在 `times` 里，只有记录能把它捞出来取消；
+     *  ② 再按当前定义扫一遍，覆盖「本机制上线前就排下」的历史闹钟（它们没被记录过）。
+     *
+     * 不做这一步的后果（A01 原文）：改时刻后旧闹钟照旧响，点进去找不到对应槽位；
+     * 删除时刻 / 每日改每周 / 归档 三条路径同样留下哑闹钟。
+     */
     fun cancelAllFuture(
         context: Context,
         supplements: List<Supplement>,
         today: LocalDate = LocalDate.now(),
     ) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        cancelRegistered(context, am)
         for (sup in supplements) {
             for (dayOffset in 0..HORIZON_DAYS) {
                 val date = today.plusDays(dayOffset)
@@ -108,6 +139,49 @@ object SupplementReminderScheduler {
                 }
             }
         }
+        writeRegistered(context, emptySet())
+    }
+
+    /**
+     * 取消**登记表里记着**的那些闹钟（A01 的第一段）。
+     *
+     * 抽成独立函数有两个理由：
+     * · detekt `LoopWithTooManyJumpStatements`：原地两个 `continue`（键格式坏了 / 日期解析失败）
+     *   会让循环体有两个跳出口，规则要求拆分。拆出来之后「坏键跳过」落在 [registeredKeyOf] 里，
+     *   循环只剩一次调用。
+     * · 语义上这确实是两件事：**取消登记过的** 与 **取消按当前定义算出来的**。
+     *   旧实现只做了后者，所以用户把 08:00 改成 20:00 后，08:00 那个闹钟永远没人取消。
+     */
+    private fun cancelRegistered(context: Context, am: AlarmManager) {
+        for (key in readRegistered(context)) {
+            val slot = registeredKeyOf(key) ?: continue
+            am.cancel(pending(context, slot.first, slot.second, slot.third))
+        }
+    }
+
+    /**
+     * 解析登记键 `supId|date|time`，任一环节不合法就返回 null。
+     *
+     * 登记表是 prefs 里的字符串集合，可能被旧版本、手改或写坏——解析失败必须**静默跳过**，
+     * 不能让一次脏数据把整轮取消失败（那才是「提醒永远不响」的真凶）。
+     */
+    private fun registeredKeyOf(key: String): Triple<String, LocalDate, String>? {
+        val parts = key.split(KEY_SEP)
+        if (parts.size != 3) return null
+        val date = runCatching { LocalDate.parse(parts[1]) }.getOrNull() ?: return null
+        return Triple(parts[0], date, parts[2])
+    }
+    /**
+     * 接收器侧的第二道校验：`time` 是否仍是该补剂**当前**的合法槽位。
+     *
+     * 纯函数（不碰 Context / AlarmManager），供 [SupplementReminderReceiver] 与单测共用。
+     * 为什么接收器也要查一遍：闹钟取消可能因为进程被杀、`SharedPreferences` 写入失败、
+     * 或用户清数据而漏掉；**宁可静默不响，也不要发出「已经不需要」的提醒**。
+     */
+    fun isCurrentSlot(sup: Supplement, time: String): Boolean {
+        if (sup.isArchived) return false
+        if (!sup.frequency.equals(FREQ_DAILY, ignoreCase = true)) return false
+        return time in parseTimes(sup.times)
     }
 
     /**
@@ -142,6 +216,23 @@ object SupplementReminderScheduler {
             context, reqCode(supId, date, time), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+    }
+
+    /** 记录键：`supId|date|time`——与 [reqCode] 的槽位身份一一对应。 */
+    private fun slotKey(supId: String, date: LocalDate, time: String): String =
+        "$supId$KEY_SEP$date$KEY_SEP$time"
+
+    private fun readRegistered(context: Context): Set<String> =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getStringSet(KEY_REGISTERED, emptySet())
+            ?.toSet()
+            .orEmpty()
+
+    private fun writeRegistered(context: Context, keys: Set<String>) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putStringSet(KEY_REGISTERED, keys)
+            .apply()
     }
 
     /**

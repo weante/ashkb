@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import com.ashkb.app.AshkbApplication
+import com.ashkb.app.R
 import com.ashkb.app.data.entity.CheckupItem
 import com.ashkb.app.data.entity.CheckupRecord
 import com.ashkb.app.data.entity.CheckupType
@@ -16,8 +17,10 @@ import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.domain.CheckupDeletion
 import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.domain.ImagingImport
+import com.ashkb.app.domain.ImportResult
 import com.ashkb.app.domain.LabImport
 import com.ashkb.app.reminder.CheckupReminderScheduler
+import com.ashkb.app.ui.GlobalMessages
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
@@ -189,8 +192,24 @@ class CheckupViewModel(
         _labLimit.value += 100
     }
 
+    /**
+     * v1.2.11（缺陷工单 B01）：导入后**必须告诉用户这次到底写没写**。
+     *
+     * 旧实现导入后弹「已导入 N 项」，用户把同一张报告粘两次会看到两条一模一样的成功提示，
+     * 无从判断第二次是否重复；而真实情况是重复写了、数据翻倍。
+     * 现在按 [ImportResult] 分两支回显，重复时明确说「此前已导入」。
+     */
     fun importLabReport(import: LabImport) {
-        viewModelScope.launch { repo.importLabReport(import) }
+        viewModelScope.launch {
+            when (val result = repo.importLabReport(import)) {
+                is ImportResult.Imported -> GlobalMessages.post(
+                    app.getString(R.string.lab_ai_import_done, result.count),
+                )
+                ImportResult.AlreadyImported -> GlobalMessages.post(
+                    app.getString(R.string.lab_ai_import_duplicate),
+                )
+            }
+        }
     }
 
     // ---- 影像记录（v1.0.4 AI 导入） ----
@@ -203,8 +222,18 @@ class CheckupViewModel(
         viewModelScope.launch { repo.deleteImagingRecord(id) }
     }
 
+    /** v1.2.11（缺陷工单 B01）：同 [importLabReport]，影像导入也要把「此前已导入」说清楚。 */
     fun importImagingReport(import: ImagingImport) {
-        viewModelScope.launch { repo.importImagingReport(import) }
+        viewModelScope.launch {
+            when (repo.importImagingReport(import)) {
+                is ImportResult.Imported -> GlobalMessages.post(
+                    app.getString(R.string.imaging_ai_import_done),
+                )
+                ImportResult.AlreadyImported -> GlobalMessages.post(
+                    app.getString(R.string.imaging_ai_import_duplicate),
+                )
+            }
+        }
     }
 
     // ---- 疫苗记录 ----

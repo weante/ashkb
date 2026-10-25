@@ -236,6 +236,8 @@
     <string name="exercise_today_title">今日运动</string>
     <string name="imaging_ai_import_note">把「AI 导入模板」连同 MRI/CT/X线报告照片发给任意 AI 助手，粘贴回复即可入库</string>
     <string name="imaging_ai_import_title">AI 导入影像报告</string>
+    <string name="imaging_ai_import_done">影像报告已导入</string>
+    <string name="imaging_ai_import_duplicate">这份报告此前已导入过，本次没有新增任何记录</string>
     <string name="imaging_conclusion">诊断结论 / 医生意见</string>
     <string name="imaging_empty">暂无影像记录</string>
     <string name="imaging_findings">检查所见</string>
@@ -271,6 +273,8 @@
     <string name="lab_add_indicator_action">添加化验指标</string>
     <string name="lab_ai_import_note">把「AI 导入模板」连同检验报告照片发给任意 AI 助手，AI 按格式整理后粘贴回来即可批量入库</string>
     <string name="lab_ai_import_title">AI 导入化验单</string>
+    <string name="lab_ai_import_done">已导入 %1$d 项化验结果</string>
+    <string name="lab_ai_import_duplicate">这份报告此前已导入过，本次没有新增任何记录</string>
     <string name="lab_collapse_normal">收起正常项</string>
     <string name="lab_detail_title">化验详情</string>
     <string name="lab_indicator_name">指标名称</string>

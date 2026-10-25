@@ -589,6 +589,118 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
   detekt **0**；lint total **168** = **0 Error** + 160 Warning + 8 Information，
   **本轮改动文件零命中**；`verifySpecSync` 通过。
 - 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版。
+### 十三、缺陷工单第 2 批：四项需 v19→v20 迁移的修复 · 2026-10-25 · 未发版
+
+工单 `ASHKB-缺陷修复执行工单-724cf39.md` 里剩下的四项（A01 / A04 / A06 / B01）都需要落库结构配合，
+按维护者裁决「先做不需 schema 的 10 项、再单独一笔 v20 做剩 4 项」放在这一批。**库版本 19 → 20**，
+新增两列一张表，迁移 `MIGRATION_19_20` 已在 `AppDatabase.ALL_MIGRATIONS` 注册；schema 快照
+`app/schemas/com.ashkb.app.data.db.AppDatabase/20.json` 已由构建导出并入库
+（`MigrationCoverageTest` 会检查「当前版本必须有对应 schema 文件」）。
+
+#### A01：补剂改计划后旧时刻的闹钟仍会响
+
+改前 `SupplementReminderScheduler.cancelAllFuture` 只遍历**当前** `sup.times` 里的时刻，
+而闹钟的身份是 `supId|date|time`。把 08:00 改成 20:00 之后，08:00 那条闹钟已经不在
+`times` 里、取消不到，于是**用户改完时间仍会在旧时刻被提醒**；接收器也只看「是不是今天、
+有没有打过卡」，不看「这个时刻还是不是当前计划的一部分」。
+
+改法两层：
+
+1. **持久化已注册的槽位键**（`SharedPreferences("supplement_alarms")` 里的字符串集合，
+   键格式 `supId|yyyy-MM-dd|HH:mm`）。`rescheduleAll` 排程时把每个槽位记进去；
+   `cancelAllFuture` 改**两段式**——先按记录取消（与当前 `times` 无关，这正是能捞回
+   08:00 的原因），再按当前定义扫一遍（覆盖这套机制上线前的历史闹钟），最后清空记录。
+   为什么不用系统闹钟列表反查：`AlarmManager` 没有「按 PendingIntent 前缀枚举」的公开 API，
+   而「记下来再取消」是简单、可迁移、进程重启也不丢的做法。
+2. **接收器加第四道校验**：`SupplementReminderScheduler.isCurrentSlot(sup, time)` ——
+   已归档 / 非每日 / 时刻不在当前 `times` 里，任何一条成立就静默 `return`。
+   闹钟取消可能因进程被杀、prefs 写入失败、用户清数据而漏掉，**宁可静默不响，
+   也不要发出「已经不需要」的提醒**。
+
+两条补剂同刻不会互相覆盖：闹钟 `reqCode` 是 `("sup|$supId|$date|$time").hashCode()`，
+已含 `supId`。
+
+#### A04：档案 JSON 不是全量保真，且导入半完成
+
+改前 `exportProfileJson` 的 profile 块漏 `ui_mode` / `minimal_since`，medications 块只导 14 键
+——`risk_tags` / `dose_state` / `taper_note` / `prn_reason` / `duration` / `inj_sites` /
+`inj_last_site` / `storage` / `take_with_food` / `check_doctor_told` / `check_leaflet_read` /
+`interaction_check_date` 全丢。导入侧 `upsertImportedMedication` 逐条写、**不在事务里**，
+中途失败会留下「档案已改、药品写了一半」的状态；导入成功后也**不重建计划槽位、不重排提醒**，
+新药单要等到下次冷启动才进计划。
+
+改法：
+
+- 导出补齐 profile 全字段（含 `ui_mode` / `minimal_since`）与 medications 全部持久化字段，
+  并加 `format_version`（当前 `2`）。`format_version` 只增不改语义：旧版导出没有这个键，
+  导入时按「缺失键不得清空本机已有值」处理。
+- 导入整体包 `db.withTransaction`：Profile + 全部药品要么全成、要么全不动。
+- 导入成功后 `BackupViewModel` 调 `materializePlannedSlots` 按新药单重建窗口
+  （回看 1 天 / 前瞻 7 天，与 `AshkbApplication` 启动期物化同一口径），再重排提醒。
+- 同名药仍按 `nameKey` 复用 id、保留 `createdAt`，这条语义没变。
+
+#### A06：`<` / `>` 严格边界被存成了包含边界
+
+改前 `ReportImport.parseRange` 把 `<5` 和 `≤5` 都变成 `refHigh = 5.0`，判读又只用 `>`，
+于是「<5 时 5 应当算偏高」这件事**永远判不出来**。
+
+改法（工单明确禁止用 `nextUp/nextDown` 或加减 epsilon 去改用户填的参考值）：
+
+- `lab_results` 加两列 `ref_low_inclusive` / `ref_high_inclusive`（`INTEGER NOT NULL DEFAULT 1`）。
+  默认 `1`（包含）是为了让存量数据与旧备份保持原语义。
+- 解析侧 `parseLabRow` 用 `^[<＜]` / `^[>＞]` 判严格，存 `inclusive = false`；`≤` / `≥` 存 `true`。
+- 判读侧收敛到 `LabBoundary.kt` 的单一实现：`overHigh` 用 `>` 还是 `>=` 由 `refHighInclusive` 决定，
+  `underLow` 同理。`HealthRepository.saveLabResult`、`ClinicalThresholds.labNearBoundary`、
+  `CheckupLabImaging.isNearBoundary`、导入预览、`ReportPdfWriter` 全部走同一处判定。
+- 手工表单（`LabDraft.toRecord`）没有 `<` / `≤` 输入位，改数值即回「包含」语义。
+- `ReportImportParserTest` 原有的 `parseRange_variants` 断言 `parseRange("≤5") == parseRange("<5")`
+  **保留**（在 `parseRange` 这一层它们确实同值），另加一条
+  `parseLab_strictAndInclusiveBoundariesAreDistinct` 钉住「语义差别在 `parseLabRow` 落成标志」。
+
+#### B01：AI 报告重复导入会重复写全部记录
+
+改前每次导入都生成新 id，同一份报告拖两次就有两份行，报表与计数全翻倍。
+
+改法：
+
+- 为「报告类型 + 规范化后的完整内容」算 SHA-256 指纹（`ImportFingerprint`）：字段间用
+  `\u001F`、行间用 `\u001E` 分隔，`null` 与空串视为同一值，各字段 `trim()`。
+  **不按「日期 + 指标 + 数值」全局去重**——真实场景里同一天测两次同一指标很正常，
+  工单明确要求区分「同一份报告」与「同值不同报告」。
+- 新增 `report_import_batches` 表（`fingerprint` 唯一索引）登记已导入批次。
+  查重 + 批次登记 + 数据行写入**同一事务**；命中时整批跳过、返回 `ImportResult.AlreadyImported`。
+- `ReportImportBatchDao.insert` 用 `OnConflictStrategy.ABORT` 而非 `REPLACE`：并发导入撞唯一索引
+  直接抛异常、整事务回滚，`REPLACE` 会让重复防护失效。
+- 影像导入同样包事务（一次一行，但批次登记与那一行必须同时成立）。
+- UI 侧 `CheckupViewModel` 把结果回显：`lab_ai_import_done`（已导入 N 项）/
+  `lab_ai_import_duplicate`（此前已导入，本次没有新增任何记录）/ 影像同形两条，中英各四条。
+- `skippedLines`（解析器诊断信息）**不参与指纹**，否则同一份报告换个解析器版本就被当成新报告。
+
+#### 顺手做的一处结构整理
+
+`HealthRepository` 因 A06/B01 的代码增长被 detekt `LargeClass` 判超阈值。判断：这不是「有坏味道」，
+而是把「导入一份外部报告」这件事塞进了本来就最大的类里——于是把导入逻辑抽成
+`data/repo/AiReportImporter.kt`（指纹 + 批次 + 逐行写入，含自己的事务），
+`HealthRepository.importLabReport` / `importImagingReport` 变成一行委托。
+没有放宽任何 detekt 阈值、没有新增基线条目。
+
+#### 回归与门禁
+
+- 新增 `LabBoundaryInclusiveTest`（7 条，严格/包含 × 上界/下界 + 旧数据默认包含 +
+  临界与越界判据同源不矛盾）、`ImportFingerprintTest`（10 条，同内容同指纹 / 64 位小写十六进制 /
+  改数值·改边界语义·改医院日期·改行序各不同 / null 与空串同 / 空白归一化 / lab 与 imaging 域互不干扰 /
+  `skippedLines` 不参与）、`BackupProfileJsonTest`（6 条，覆盖导出全字段 + 导入事务 + 缺键保原值）。
+- `SupplementReminderSchedulerTest` 新增 3 条：`20:00` 合法而 `08:00` 已不合法 / 归档或非每日任何时刻都不合法 /
+  时刻被删空后任何时刻都不合法。
+- 负向对照（均造「能编译的违规形状」）：A04 去掉 `withTransaction` ⇒ 1 条 FAIL；
+  A06 把 `inclusive` 判断写死为 `true` ⇒ 2 条 FAIL；B01 去掉指纹查重 ⇒ 1 条 FAIL；
+  A01 去掉 `isCurrentSlot` 校验 ⇒ 1 条 FAIL。恢复后全绿，`NEGATIVE-CONTROL-TEMP` 残留 0。
+- 全门禁 `E:\ASHKB\batch2-gate2.log`：**BUILD SUCCESSFUL in 3m 48s**；
+  单测 **130 文件 / 1088 条** failures=0 errors=0 skipped=0；
+  detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
+- 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版。
+
+- 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版。
 ## [v1.2.9] — 2026-10-10
 
 **两件事：①审查裁决项 2（「已结算」口径三处打架）统一；②首页补剂卡——补剂提醒/打卡从二级页搬到今日页。** 无库结构变更（枚举与状态都存字符串），可覆盖安装。

@@ -241,6 +241,8 @@
     <string name="exercise_today_title">Today\'s exercise</string>
     <string name="imaging_ai_import_note">Send the \"AI import template\" along with photos of your MRI/CT/X-ray report to any AI assistant, then paste the reply to import it</string>
     <string name="imaging_ai_import_title">Import imaging report with AI</string>
+    <string name="imaging_ai_import_done">Imaging report imported</string>
+    <string name="imaging_ai_import_duplicate">This report was imported before. Nothing new was added this time.</string>
     <string name="imaging_conclusion">Diagnosis / doctor\'s opinion</string>
     <string name="imaging_empty">No imaging records</string>
     <string name="imaging_findings">Findings</string>
@@ -276,6 +278,8 @@
     <string name="lab_add_indicator_action">Add lab marker</string>
     <string name="lab_ai_import_note">Send the \"AI import template\" along with photos of your lab report to any AI assistant; the AI formats it and you paste it back to import a batch</string>
     <string name="lab_ai_import_title">Import lab report with AI</string>
+    <string name="lab_ai_import_done">Imported %1$d lab results</string>
+    <string name="lab_ai_import_duplicate">This report was imported before. Nothing new was added this time.</string>
     <string name="lab_collapse_normal">Collapse normal results</string>
     <string name="lab_detail_title">Lab details</string>
     <string name="lab_indicator_name">Marker name</string>

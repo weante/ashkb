@@ -37,7 +37,9 @@ class LabNearBoundaryWiringTest {
         )
         assertTrue(
             "预览必须走 ClinicalThresholds.labNearBoundary，不能自己再写一套比较",
-            imaging.contains("ClinicalThresholds.labNearBoundary(r.value, r.refLow, r.refHigh)"),
+            squash(imaging).contains(
+                "ClinicalThresholds.labNearBoundary(r.value,r.refLow,r.refHigh,r.refLowInclusive,r.refHighInclusive",
+            ),
         )
     }
 
@@ -90,7 +92,9 @@ class LabNearBoundaryWiringTest {
         val nearBlock = pdf.substringAfter("val near = r.labs.filter {")
         assertTrue(
             "PDF 的临界判据也要走 ClinicalThresholds.labNearBoundary",
-            nearBlock.contains("ClinicalThresholds.labNearBoundary(it.value, it.refLow, it.refHigh)"),
+            squash(nearBlock).contains(
+                "ClinicalThresholds.labNearBoundary(it.value,it.refLow,it.refHigh,it.refLowInclusive,it.refHighInclusive",
+            ),
         )
         assertTrue(
             "PDF 的临界段必须排除已越界的行",
@@ -118,6 +122,15 @@ class LabNearBoundaryWiringTest {
     }
 
     /** 取某个函数声明起、到下一个顶层声明前的源码片段（够覆盖函数体即可）。 */
+    /**
+     * 把源码压成「无空白」形式再比对。
+     *
+     * 起因：这两条断言原本要求 `labNearBoundary(r.value, r.refLow, ...)` 逐字写在一行里。
+     * 但 A06 让签名多了 `refLowInclusive` / `refHighInclusive` 两个参数后，调用点按 140 字符
+     * 上限被折成多行——**行为没变，断言却红了**。判据守卫应该钉「调用了哪个函数、传了哪几个
+     * 实参」，不该钉「这些实参写在第几行」，故统一先抹掉空白再比对。
+     */
+    private fun squash(source: String): String = source.replace(Regex("\\s+"), "")
     private fun functionBody(source: String, signature: String): String {
         val start = source.indexOf(signature)
         if (start < 0) return ""

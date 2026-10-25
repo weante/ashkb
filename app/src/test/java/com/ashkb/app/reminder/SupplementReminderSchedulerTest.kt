@@ -104,6 +104,45 @@ class SupplementReminderSchedulerTest {
         assertEquals(emptyList<String>(), SupplementReminderScheduler.parseTimes("[]"))
     }
 
+    /**
+     * v1.2.11（缺陷工单 A01）：接收器侧的第二道校验——`time` 是否仍是**当前**合法槽位。
+     *
+     * 缺陷原状：`SupplementReminderReceiver` 只校验日期/归档/已打卡，**从不校验时刻**。
+     * 于是用户把 08:00 改成 20:00 后，那个没人取消的 08:00 闹钟照旧触发，点进去找不到任何
+     * 08:00 的槽位。取消链可能因进程被杀 / prefs 写入失败 / 用户清数据而漏掉，接收器必须自证。
+     */
+    @Test
+    fun `当前时刻仍是合法槽位时才允许提醒`() {
+        val s = sup(times = """["20:00"]""")
+        assertTrue("20:00 是当前槽位", SupplementReminderScheduler.isCurrentSlot(s, "20:00"))
+        assertTrue(
+            "08:00 已被用户改成 20:00，绝不能提醒",
+            !SupplementReminderScheduler.isCurrentSlot(s, "08:00"),
+        )
+    }
+
+    @Test
+    fun `归档或非每日的补剂 任何时刻都不合法`() {
+        assertTrue(
+            "归档后残留闹钟不能响",
+            !SupplementReminderScheduler.isCurrentSlot(sup(isArchived = true), "08:00"),
+        )
+        assertTrue(
+            "每日改每周后残留闹钟不能响",
+            !SupplementReminderScheduler.isCurrentSlot(sup(frequency = "weekly"), "08:00"),
+        )
+    }
+
+    @Test
+    fun `时刻集合被删空后 任何时刻都不合法`() {
+        for (raw in listOf(null, "", "[]")) {
+            assertTrue(
+                "times=$raw 时不该有任何合法槽位",
+                !SupplementReminderScheduler.isCurrentSlot(sup(times = raw), "08:00"),
+            )
+        }
+    }
+
     @Test
     fun `槽位身份含补剂 id 两支同刻补剂不互相覆盖`() {
         val a = SupplementReminderScheduler.reqCode("sup-a", today, "08:00")

@@ -29,6 +29,7 @@ import com.ashkb.app.data.entity.MedicationLog
 import com.ashkb.app.data.entity.PlannedSlot
 import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.entity.Recipe
+import com.ashkb.app.data.entity.ReportImportBatch
 import com.ashkb.app.data.entity.Supplement
 import com.ashkb.app.data.entity.SupplementLog
 import com.ashkb.app.data.entity.SymptomDaily
@@ -1223,4 +1224,27 @@ interface PlannedSlotDao {
      */
     @Query("DELETE FROM planned_slots WHERE med_id = :medId AND date >= :fromDate AND date < :toDate")
     suspend fun deleteOfMedInRange(medId: String, fromDate: String, toDate: String): Int
+}
+/**
+ * v1.2.11（缺陷工单 B01）：AI 报告导入批次（report_import_batches）。
+ *
+ * 只暴露两个动作：查指纹、写批次。**不提供「改批次」** —— 批次是审计痕迹，
+ * 一次导入要么整体成立（批次行 + 数据行在同一事务里一起提交），要么什么都没发生。
+ */
+@Dao
+interface ReportImportBatchDao {
+
+    /** 该指纹是否已经导入过（命中即整批跳过，不写任何行）。 */
+    @Query("SELECT COUNT(*) FROM report_import_batches WHERE fingerprint = :fingerprint")
+    suspend fun countByFingerprint(fingerprint: String): Int
+
+    /**
+     * 登记一个新批次。
+     *
+     * OnConflictStrategy.ABORT 而不是 REPLACE：并发导入同一份报告时，第二条会撞唯一索引
+     * 并**抛异常**，整个事务随之回滚——这正是想要的语义。若用 REPLACE，第二条会覆盖第一条的
+     * 批次行并继续写数据行，重复导入的防护就失效了。
+     */
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(batch: ReportImportBatch)
 }
