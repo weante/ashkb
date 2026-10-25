@@ -34,8 +34,39 @@ class AttachmentRepository(private val context: Context) {
         /** 单文件上限 20 MB——防止用户误选超大视频/文件把内部存储塞满。 */
         const val MAX_BYTES = 20L * 1024 * 1024
 
+        /**
+         * v1.2.11（缺陷工单 C03）：有界复制的读缓冲。
+         *
+         * 8 KiB 是 Android 上 `Streams.copy` / `copyTo` 的默认块大小；保持一致是为了让
+         * 正常文件的复制性能与改动前无异。
+         */
+        private const val COPY_BUFFER_BYTES = 8 * 1024
+
         private const val DIR = "checkup_attachments"
         private const val PREF_SYNC_ENABLED = "attachment_sync_enabled"
+
+        /**
+         * v1.2.11（缺陷工单 C03）：**有界复制**——最多读 `MAX_BYTES + 1` 字节就停手。
+         *
+         * 为什么不能沿用 `input.copyTo(out)`：它会把整个文件**先完整落盘**，之后才检查大小。
+         * 用户误选一个 2 GB 的视频时，这 2 GB 会真真切切写进内部存储，在低端机上可能直接
+         * 写满磁盘、把应用的其他文件挤爆；即便后来删掉，也已经付出了一次全量写的代价。
+         * 多读 1 字节是判据的关键：读到 `MAX_BYTES + 1` 才说明「确实超限」，
+         * 而恰好 `MAX_BYTES` 的合法文件读满即止、不会被误判为超限。
+         *
+         * @return 实际写入字节数；`> MAX_BYTES` 表示超限（调用方负责删文件）。
+         */
+        internal fun copyBounded(input: java.io.InputStream, out: java.io.OutputStream): Long {
+            val buf = ByteArray(COPY_BUFFER_BYTES)
+            var total = 0L
+            while (total <= MAX_BYTES) {
+                val n = input.read(buf)
+                if (n < 0) break
+                out.write(buf, 0, n)
+                total += n
+            }
+            return total
+        }
     }
 
     fun observeAll(): Flow<List<CheckupAttachment>> = dao.observeAll()
@@ -118,9 +149,16 @@ class AttachmentRepository(private val context: Context) {
                 else -> "jpg"
             }
             val target = File(dir(), "catt-${System.currentTimeMillis()}.$ext")
-            val copied = context.contentResolver.openInputStream(uri)?.use { input ->
-                target.outputStream().use { out -> input.copyTo(out) }
-            } ?: return@runCatching null
+            // v1.2.11（缺陷工单 C03）：读取中途失败（URI 失效、存储拔出、写入异常）时，
+            // 目标文件可能已经写了一部分——必须删掉，否则留下一个没有任何 DB 行指向的
+            // 明文残片，既占空间也可能被其他应用/备份看到。
+            // 用 runCatching 而不是 `catch (e: Exception)`：既要覆盖任意失败类型，
+            // 又不能把异常吞掉（detekt TooGenericExceptionCaught 也不允许裸 catch Exception）。
+            val copied = runCatching {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    target.outputStream().use { out -> copyBounded(input, out) }
+                }
+            }.onFailure { target.delete() }.getOrNull() ?: return@runCatching null
 
             if (copied == 0L || copied > MAX_BYTES) {
                 target.delete()
@@ -138,7 +176,12 @@ class AttachmentRepository(private val context: Context) {
                 note = note?.trim()?.ifBlank { null },
                 createdAt = nowIso(),
             )
-            dao.upsert(row)
+            // v1.2.11（缺陷工单 C03）：DAO 写入失败也必须删文件——否则库外留一个孤儿字节，
+            // 界面上看不到、用户也删不掉。
+            runCatching { dao.upsert(row) }.onFailure {
+                target.delete()
+                throw it
+            }
             row
         }.getOrNull()
     }

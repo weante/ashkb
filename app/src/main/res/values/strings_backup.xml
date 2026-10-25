@@ -71,6 +71,7 @@
     <string name="backup_err_vault_bad_pass">解密失败：口令错误或文件已损坏</string>
     <string name="backup_err_vault_slot_missing">文件头缺少密钥槽</string>
     <string name="backup_err_vault_slot_corrupt">密钥槽损坏</string>
+    <string name="backup_err_vault_too_many_slots">文件头损坏：密钥槽数量异常（%1$d &gt; %2$d）</string>
     <string name="backup_err_vault_bad_pass_or_code">解密失败：口令或恢复码错误，或文件已损坏</string>
     <string name="backup_err_vault_auth">解密失败：文件已损坏（密钥槽通过但内容认证失败）</string>
     <string name="backup_err_vault_blob_short">附件密文过短</string>

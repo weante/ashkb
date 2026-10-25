@@ -1076,3 +1076,19 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 **门禁** `E:\ASHKB\batch2-gate2.log`：BUILD SUCCESSFUL in 3m 48s；单测 **130 文件 / 1088 条** failures=0 errors=0 skipped=0；detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
 
 **仍未做**：第 2 批之外的 B05 / B07 / B08 / B09 / C02 / C03 / C04 / C06；本批未装机（设备无线调试未开）；`versionCode` / `versionName` 仍 122 / "1.2.10"。
+
+### 缺陷工单第 3 批：C02 / C03 / C06（2026-10-25 · 未发版 · 未 bump 版本号）
+
+工单 `ASHKB-缺陷修复执行工单-724cf39.md` 里三项**不动库结构**的加固与文档一致性。第 1 批（A02/A03/A05/A07/B02/B03/B04/B06/C01/C05）与第 2 批（A01/A04/A06/B01）见上两节；本批之后工单还剩 **B05 / B07 / B08 / B09 / C04**。
+
+| 项 | 原状 | 落地 | 证据 |
+|---|---|---|---|
+| C02 恶意备份用大量密钥槽放大 KDF | `iter` 有 MIN/MAX 区间，但**槽数量无上限**；解密是「候选秘密 × 槽」双层循环，每槽一次 PBKDF2（120k），恢复码场景候选翻倍 ⇒ 几百槽可把恢复拖到「看起来卡死」 | `VaultCipher` 加 `internal const val MAX_SLOTS = 16`，在**任何 PBKDF2 之前**校验 `slots.length() > MAX_SLOTS` ⇒ `VaultException("密钥槽数量异常：N > 16", resId = R.string.backup_err_vault_too_many_slots, resArgs = listOf(N, MAX_SLOTS))`。中英各 1 条新串 | `VaultSlotLimitTest` 4 条（含**顺序证明**：17 槽且 kdf 全非法 ⇒ 必报数量异常而非「不支持的 KDF」） |
+| C03 附件导入先全量落盘再判大小 | `importFromUri` 用 `input.copyTo(out)` 整段写完才查 `sizeBytes > MAX_BYTES`；误选 2 GB 视频会把 2 GB 真切写进内部存储。且**没有清理路径**：读中途失败 / DAO 写失败都会留下无 DB 行指向的明文残片 | ①新增 `internal fun copyBounded(input, out): Long`，`while (total <= MAX_BYTES)` 最多读 `MAX_BYTES + 1` 即停手（多读 1 字节是判据关键，恰好上限的合法文件不会被误判）；②读取中途异常 ⇒ 删半截文件；③`dao.upsert` 失败 ⇒ 删文件。两处均用 `runCatching{}.onFailure{}` 而非裸 `catch (e: Exception)`（不吞异常 + 不触发 detekt `TooGenericExceptionCaught`） | `AttachmentCopyBoundedTest` 5 条（含「恰好等于上限不被截断」边界） |
+| C06 文档与实现不一致（五处） | ①README 称活疫苗「× 生物制剂**强制**医生确认」；②README 称「恢复前自动快照**可撤销**」；③HANDOFF 称「缺签名**自动回退 debug**（构建不会报错）」；④NEXT-SESSION 写死单测条数 / lint 计数 / `origin/main` 固定 SHA；⑤HANDOFF「超 ~500 行应拆分」被写成已完成事实 | ①改为「活疫苗且医生确认状态为**待确认**时显示安全警报；**当前不读取生物制剂药单、不阻止保存**」（依据 `VaccineSafety.kt:28` + `HealthRepository.kt:984`，实际只 `insertAlertOnce`）；②改为「pre-restore 快照已落盘，**应用内撤销入口尚未实现**」（B07 未做）；③改为「**缺正式签名时 release 构建直接失败**（`GradleException`，v1.0.75 S-13 起），只有显式 `ASHKB_ALLOW_DEBUG_SIGNING=1` 才允许 debug 签名冒烟包」（依据 `app/build.gradle.kts:158-176`）；④改为「以当前源码与 CI 为准」；⑤补「**这是待落实规范，不是已完成事实**」+ 列 11 个超标文件。顺带修 `README` 的 `Room（v19）` 与 `NEXT-SESSION` 的 `ASHKB_DB_VERSION = 19` 两处过期陈述 | 只改文档，未动实现与版本号 |
+
+**负向对照两轮**（均造「能编译的违规形状」）：C02 闸门放宽成 `MAX_SLOTS * 100` ⇒ `槽数量超限时不应先跑 PBKDF2` FAIL；C03 的 `while (total <= MAX_BYTES)` 改成 `while (true)` ⇒ `超限文件在读到上限之后立刻停手` FAIL。恢复后全绿，`NEGATIVE-CONTROL-TEMP` 残留 0。
+
+**门禁** `E:\ASHKB\batch3-gate2.log`：BUILD SUCCESSFUL in 1m；单测 **132 文件 / 1097 条** failures=0 errors=0 skipped=0；detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
+
+**仍未做**：B05 / B07 / B08 / B09 / C04；本批未装机（设备无线调试未开）；`versionCode` / `versionName` 仍 122 / "1.2.10"。

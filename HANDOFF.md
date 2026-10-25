@@ -52,7 +52,7 @@ $env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.7\bin\g
 ## 3. 正式签名（关键！）
 
 - 密钥库：`patient-health-app/ashkb-release.jks`（PKCS12，RSA-2048，alias `ashkb`，有效期 10000 天，`.gitignore` 已排除）
-- 密码：`local.properties` 的 `ashkb.store.password` / `ashkb.key.password`（两者相同）。`app/build.gradle.kts` 从此读取，**缺失时自动回退 debug 签名**（构建不会报错，交付前必须验签！）
+- 密码：`local.properties` 的 `ashkb.store.password` / `ashkb.key.password`（两者相同）。`app/build.gradle.kts` 从此读取。**缺正式签名时 release 构建直接失败**（`GradleException`，v1.0.75 S-13 起）；只有显式设置环境变量 `ASHKB_ALLOW_DEBUG_SIGNING=1` 才允许产出 debug 签名的冒烟包（仅限 CI / 本地冒烟，**不得对外发布**）
 - 证书 SHA-256：`38CA80A61760208E1F0C9D81C2CAF5C7C90DA0E3BD759150CCDF641EC9012D7D`
 - 验签命令：`build-env\android-sdk\build-tools\<ver>\apksigner.bat verify --print-certs <apk>`
 - ⚠️ **keystore + 密码丢失 = 所有用户永远无法覆盖升级**。务必多处离线备份。
@@ -156,7 +156,7 @@ app/src/main/java/com/ashkb/app/
 - 新表单组件优先 ModalBottomSheet 而非 AlertDialog；chip 组用 FlowRow 防窄屏截断
 - 临床阈值（依从 90/70、BASDAI ≥ 4 等）一律进 `ClinicalThresholds`，禁止散落硬编码
 - 枚举在 UI 显示一律走 `Labels`，界面不出现英文枚举 key
-- 大文件要拆：单文件超 ~500 行的 Screen 按职责拆分（参考 CheckupScreen 4 文件拆法，private→internal）
+- 大文件要拆：单文件超 ~500 行的 Screen 按职责拆分（参考 CheckupScreen 4 文件拆法，private→internal）。**这是待落实规范，不是已完成事实**——当前仍有多个超标文件（`WellnessScreen.kt` 1425 行、`TodayScreen.kt` 1396 行、`BackupScreen.kt` 1229 行、`CheckupLabImaging.kt` 932 行、`ReportScreen.kt` 875 行、`EmergencyScreen.kt` 870 行、`MedsScreen.kt` 774 行、`MedEditSections.kt` 739 行、`TrendChart.kt` 701 行、`ExerciseScreen.kt` 632 行、`BackupViewModel.kt` 580 行；行数随手会变，以 `git grep` 或 `wc -l` 现查为准）
 
 ## 7. 工程教训（累积，不按版本组织）
 

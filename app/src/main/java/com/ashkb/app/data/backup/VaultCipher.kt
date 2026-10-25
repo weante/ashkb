@@ -48,6 +48,17 @@ object VaultCipher {
      */
     private const val MIN_ITER = 1_000
     private const val MAX_ITER = 10_000_000
+    /**
+     * v1.2.11（缺陷工单 C02）：密钥槽数量上限。
+     *
+     * 上面的 [MAX_ITER] 只约束了**单个槽**的 PBKDF2 代价，槽数量此前没有任何约束：
+     * 每个槽都要跑一次 PBKDF2，而恢复码场景下候选秘密还会翻倍。一个塞进几百个槽的
+     * 恶意备份因此能把恢复耗时线性放大到「看起来卡死」，与 `iter` DoS 是同一类问题。
+     *
+     * 生产格式只会写入「口令槽 + 恢复码槽」两个；取 16 是为了给未来可能的新槽类型
+     * 留足兼容余量，同时把最坏情况钉在 16 × 2 = 32 次 PBKDF2。
+     */
+    internal const val MAX_SLOTS = 16
     private const val KEY_BITS = 256
     private const val GCM_TAG_BITS = 128
     private const val SALT_LEN = 16
@@ -252,6 +263,15 @@ object VaultCipher {
                                headerBytes: ByteArray, ct: ByteArray): Decrypted {
         val slots = header.optJSONArray("slots")
             ?: throw VaultException("文件头缺少密钥槽", resId = R.string.backup_err_vault_slot_missing)
+        // v1.2.11（缺陷工单 C02）：**在任何 PBKDF2 之前**校验槽数量——这道闸必须在
+        // 下面 `for (cand in candidates(secret))` 的双层循环之前，否则恶意文件已经把
+        // 机器拖住才报错，等于没设防。
+        if (slots.length() > MAX_SLOTS)
+            throw VaultException(
+                "密钥槽数量异常：${slots.length()} > $MAX_SLOTS",
+                resId = R.string.backup_err_vault_too_many_slots,
+                resArgs = listOf(slots.length(), MAX_SLOTS),
+            )
         val prefix = slotAadPrefix(magic)
         var dek: ByteArray? = null
         outer@ for (cand in candidates(secret)) {

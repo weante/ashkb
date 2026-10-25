@@ -8,10 +8,10 @@
 
 **当前状态**：`v1.2.10`（versionCode **122**）已发布为 GitHub **Latest**，已装维护者真机。
 
-- 发布提交 `45b0435` → 修复 `0c33bf4` → 记账 `3302ebb` → 取证 `faaf538`；`origin/main` = `faaf538`，**工作树干净、ahead/behind 0/0**。
+- 发布提交 `45b0435` → 修复 `0c33bf4` → 记账 `3302ebb` → 取证 `faaf538`（以上为 v1.2.10 发布当时的历史快照，**当前 HEAD / `origin/main` 以 `git log` 现查为准，此处不再写死 SHA**）。
 - Release `v1.2.10`：id `416558911`，`target_commitish` = `0c33bf4`，资产 `ashkb-1.2.10-release.apk` **5,213,292 B**，sha256 `9C03C518…FF89`；附注标签 `acaedcf` → `0c33bf4`（已核对远端 `^{}` 剥壳）。
-- 单测 **993 条 / 116 个文件全绿**；detekt **0**；lint **184 条 = 0 error**（176 Warning + 8 Information）；`verifySpecSync` 通过。门禁日志 `E:\ASHKB\ui2-fix-basdai-gate1.log`（3m 18s）。
-- `ASHKB_DB_VERSION` = **19**（无迁移，可覆盖安装）。
+- 单测条数、detekt / lint 计数**以当前源码与 CI 为准**（此文件不再写死数字；`app/build/test-results` 与门禁日志是唯一证据）。`verifySpecSync` 通过。v1.2.10 发布当轮的门禁日志 `E:\ASHKB\ui2-fix-basdai-gate1.log`。
+- `ASHKB_DB_VERSION` = **20**（第 2 批新增 `MIGRATION_19_20`：`lab_results` 加 `ref_low_inclusive` / `ref_high_inclusive`、新增 `report_import_batches` 表；旧版本可覆盖安装、自动迁移）。
 - CI（GitHub Actions `ci.yml`）：最近 5 次 run 全部 `success`。
 - ⚠️ v1.2.10 首发版带出一个 UI 回归（报表「趋势」页 BASDAI 卡标题被截断成「BASDAI 总…」，因「稳定期」胶囊被塞进约 170dp 的两列迷你格），**已修**：胶囊改挂概览页全宽 `SectionCard(action = …)`，`SmallTrendChart.trailing` / `MiniSeries.badge` 全部删除，detekt 基线两条签名同步回退（`2 2` 行往返、零净增）。真机双主题复验通过后**就地重做**了 Release（版本号不变）。
 
@@ -84,14 +84,16 @@
 
 ## 一之二、缺陷工单进度（`ASHKB-缺陷修复执行工单-724cf39.md`，共 22 项）
 
-工单基线 `724cf39`（v1.2.10 之后两条提交）。**第 1 批 10 项与第 2 批 4 项都已落地并过门禁，未发版**；
-第 2 批是库版本 19 → 20 的迁移（`MIGRATION_19_20` + schema `20.json` 已入库）。
+工单基线 `724cf39`（v1.2.10 之后两条提交）。**第 1 批 10 项、第 2 批 4 项、第 3 批 3 项都已落地并过门禁，未发版**；
+第 2 批是库版本 19 → 20 的迁移（`MIGRATION_19_20` + schema `20.json` 已入库）；
+第 3 批（C02 / C03 / C06）**不动库结构**，只加固外部输入处理与文档一致性。**工单还剩 5 项**。
 
 | 批 | 项 | 状态 |
 |---|---|---|
 | 第 1 批（不动 schema） | A02 拆眼部/发热警报身份 · A03 统一红旗重算入口 · A05 跨 vault 恢复前阻断 · A07 化验编辑保留异常兜底 + 表单校验 · B02 upcoming 按 `next_date` · B03 停药事务化 · B04 按需打卡事务化 · B06 `SecureFlagScope` 只还原本 effect 的标志 · C01 新备份口令 6→12 位 · C05 批量闹钟移出 Main | ✅ **已落地并推送**（commit `28d0a30`；门禁 `batch1-gate2.log` 1061 条全绿 / detekt 0 / lint 0 Error），未发版 |
-| 第 2 批（要 v20） | A01 补剂改计划后旧时刻闹钟存活 · A04 档案 JSON 全量保真 · A06 化验 `<`/`>` 严格边界 · B01 AI 报告重复导入 | ✅ **已落地**（门禁 `batch2-gate2.log` 1088 条全绿 / detekt 0 / lint 0 Error），**未提交**、未发版 |
-| 其余 | B05 恢复后运行态刷新 · B07 pre-restore 快照的应用内撤销 · B08 AI 导入草稿旋转后丢失 · B09 提醒重排异常被吞 · C02 恶意备份 KDF 工作量 · C03 附件先落盘后查上限 · C04 CI 只打印签名 · C06 文档与实现不一致 | ⬜ 未开始 |
+| 第 2 批（要 v20） | A01 补剂改计划后旧时刻闹钟存活 · A04 档案 JSON 全量保真 · A06 化验 `<`/`>` 严格边界 · B01 AI 报告重复导入 | ✅ **已落地并推送**（commit `1f92cdc`；门禁 `batch2-gate2.log` 1088 条全绿 / detekt 0 / lint 0 Error），未发版 |
+| 第 3 批（不动 schema） | C02 恶意备份密钥槽上限 · C03 附件有界复制 + 清理路径 · C06 五处文档与实现对齐 | ✅ **已落地**（门禁 `batch3-gate2.log` 1097 条全绿 / detekt 0 / lint 0 Error），未发版、未提交 |
+| 其余 | B05 恢复后运行态刷新 · B07 pre-restore 快照的应用内撤销 · B08 AI 导入草稿旋转后丢失 · B09 提醒重排异常被吞 · C04 CI 只打印签名 | ⬜ 未开始 |
 
 > ⚠️ C01 的边界：**恢复侧刻意不引用** `BackupPasswordRules` —— 旧 6 位口令建的备份必须还能解开。
 > 这条由 `BackupPasswordRulesTest` 的源码断言钉住；不要“顺手”在 `verifyBackup` 里加长度检查。

@@ -700,7 +700,80 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
   detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
 - 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版。
 
+### 十四、缺陷工单第 3 批：C02 / C03 / C06 · 2026-10-25 · 未发版
+
+工单里三项**不动库结构**的加固与文档一致性。第 1 批（A02/A03/A05/A07/B02/B03/B04/B06/C01/C05）、
+第 2 批（A01/A04/A06/B01）见上两节；本批之后工单还剩 B05 / B07 / B08 / B09 / C04。
+
+#### C02：恶意备份用大量密钥槽放大 KDF 工作量
+
+备份文件是**外部输入**（可以来自任何来源，包括别人发来的）。`iter` 早有 MIN/MAX 区间保护，
+但**密钥槽数量**从来没有约束。解密是「候选秘密 × 槽」的双层循环，每个槽跑一次 PBKDF2
+（默认 120k 迭代）；恢复码场景下候选秘密还会翻倍。一个塞进几百个槽的恶意文件因此能把恢复耗时
+线性放大到「看起来卡死」——与 iter DoS 是同一类问题，只是换了个维度。
+
+改法：`VaultCipher` 新增 `internal const val MAX_SLOTS = 16`，在**任何 PBKDF2 之前**校验
+`slots.length() > MAX_SLOTS` ⇒ 抛 `VaultException("密钥槽数量异常：N > 16", resId =
+R.string.backup_err_vault_too_many_slots, resArgs = listOf(N, MAX_SLOTS))`。中英各 1 条新字符串。
+
+**为什么闸门必须排在循环之前**：如果放在循环之后（或干脆没有），恶意文件仍会先跑完
+`min(候选数 × 槽数, …)` 次 KDF 才报错，DoS 的目的已经达到。回归用例用「所有槽的 kdf 都写成非法值」
+来证明顺序——只有闸在前，才会稳定报槽数量异常而不是「不支持的 KDF」。
+
+#### C03：附件导入先全量落盘再判大小
+
+`AttachmentRepository.importFromUri` 原来用 `input.copyTo(out)` 把选择器的内容**整段写完**，
+落完才检查 `sizeBytes > MAX_BYTES`。用户误选一个 2 GB 的视频时，这 2 GB 会真切写进内部存储，
+低端机上可能直接写满磁盘、把应用其他文件挤爆；即便随后删掉，全量写的代价也已经付过了。
+
+改法：新增 `internal fun copyBounded(input, out): Long`，`while (total <= MAX_BYTES)` 循环、
+最多读 `MAX_BYTES + 1` 字节即停手（多读 1 字节是判据关键：读到 `MAX_BYTES + 1` 才说明确实超限，
+恰好 `MAX_BYTES` 的合法文件读满即止、不会被误判）。超限 ⇒ 删文件、返回 null。
+
+同时补了两条**清理路径**（原代码没有）：读取中途抛异常（URI 失效 / 存储拔出 / 写入失败）⇒ 删掉
+半截文件，否则留下一个没有任何 DB 行指向的明文残片；`dao.upsert` 失败 ⇒ 同样删文件，否则库外留
+一个界面上看不到、用户也删不掉的孤儿字节。两处都用 `runCatching{}.onFailure{}` 而不是裸
+`catch (e: Exception)`（既不吞异常，也不触发 detekt `TooGenericExceptionCaught`）。
+
+#### C06：文档与实现不一致（五处）
+
+只改文档，不动实现、不动版本号：
+
+1. `README.md` 活疫苗描述：原「活疫苗 × 生物制剂**强制**医生确认」⇒ 改为「活疫苗且医生确认状态为
+   **待确认**时显示安全警报；**当前不读取生物制剂药单、不阻止保存**」。依据
+   `domain/VaccineSafety.kt:28` 与 `data/repo/HealthRepository.kt:984`——实际行为只是
+   `insertAlertOnce(severity = "high")` 加一条警报，既没有读药单也没有拦保存。
+2. `README.md` 「恢复前自动快照可撤销」⇒ 改为「恢复前自动写入 pre-restore 快照（**快照文件已落盘，
+   应用内「撤销这次恢复」入口尚未实现**）」。撤销入口是工单 B07，本批未做，不得继续宣称已可用。
+3. `HANDOFF.md` 签名回退：原「缺失时自动回退 debug 签名（构建不会报错）」⇒ 改为「**缺正式签名时
+   release 构建直接失败**（`GradleException`，v1.0.75 S-13 起）；只有显式
+   `ASHKB_ALLOW_DEBUG_SIGNING=1` 才允许产出 debug 签名的冒烟包」。依据
+   `app/build.gradle.kts:158-176` 的 `gradle.taskGraph.whenReady` 分支——文档落后了 30 多个版本。
+4. `NEXT-SESSION.md` 删除写死的单测条数、lint 计数与 `origin/main` 固定 SHA ⇒ 改为「以当前源码与
+   CI 为准」。这类数字每次改动都会变，写死必然过期（本次核对时已发现第 2 批那一行还写着
+   「未提交」，而它其实早已推送）。
+5. `HANDOFF.md` 「单文件超 ~500 行的 Screen 按职责拆分」⇒ 补一句「**这是待落实规范，不是已完成
+   事实**」并列出当前 11 个超标文件（`WellnessScreen.kt` 1425 行 … `BackupViewModel.kt` 580 行）。
+
+顺带修掉 `README.md` 的 `Room（v19，含 1→19 链式迁移）` 与 `NEXT-SESSION.md` 的
+`ASHKB_DB_VERSION = 19` 两处过期陈述（第 2 批已升到 20）。
+
+#### 回归与门禁
+
+- 新增 `VaultSlotLimitTest`（4 条，纯 JVM）：17 槽 + 全部 kdf 非法 ⇒ 报槽数量异常（**顺序证明**）；
+  恰好 16 槽不被数量闸拦下、走到口令判定；正常双槽往返不受影响；`resArgs` 逐项相等。
+- 新增 `AttachmentCopyBoundedTest`（5 条，纯 JVM）：小文件完整复制；**恰好等于上限的文件不被截断**
+  （判据若写成 `>=` 就会误伤合法 20 MB 文件）；超限文件读到上限即停手（断言写入 ≤ 上限 + 一个缓冲区、
+  读取次数远小于源可用次数）；读中途抛异常时异常向上抛且已写字节留在流里（由调用方删文件）；
+  空流不产生内容。
+- 负向对照两轮（均造「能编译的违规形状」）：把 C02 闸门放宽成 `MAX_SLOTS * 100` ⇒
+  `槽数量超限时不应先跑 PBKDF2` FAIL；把 C03 的 `while (total <= MAX_BYTES)` 改成 `while (true)` ⇒
+  `超限文件在读到上限之后立刻停手` FAIL。恢复后全绿，`NEGATIVE-CONTROL-TEMP` 残留 0。
+- 全门禁 `E:\ASHKB\batch3-gate2.log`：**BUILD SUCCESSFUL in 1m**；
+  单测 **132 文件 / 1097 条** failures=0 errors=0 skipped=0；
+  detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
 - 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版。
+
 ## [v1.2.9] — 2026-10-10
 
 **两件事：①审查裁决项 2（「已结算」口径三处打架）统一；②首页补剂卡——补剂提醒/打卡从二级页搬到今日页。** 无库结构变更（枚举与状态都存字符串），可覆盖安装。
