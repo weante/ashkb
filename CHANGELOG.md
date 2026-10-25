@@ -774,6 +774,95 @@ R.string.backup_err_vault_too_many_slots, resArgs = listOf(N, MAX_SLOTS))`。中
   detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
 - 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版。
 
+### 十五、缺陷工单第 4 批：B09 / B08 · 2026-10-25 · 未发版
+
+两项**不动库结构**的修复：把「保存成功、提醒却没排上」从无声变成可操作提示，把 AI 导入的
+粘贴草稿从「转屏即失」变成常驻 ViewModel。第 1~3 批见上三节；本批之后工单只剩 **B05 / B07 / C04**。
+
+#### B09：保存后的提醒重排异常被静默吞掉
+
+症状：改药单时刻 / 开关提醒 / 恢复档案之后，数据确实存进去了，但闹钟一条都没排上，
+**全程无声**。用户第二天什么也没响，也无从知道该去哪里查。
+
+根因是三段叠起来：① `AlarmRegister.set` 的 `Boolean` 返回值在 8 个调度器里**全部被丢弃**；
+② 六条 `rescheduleAll` 返回 `Unit`；③ UI 层的保存路径把它们整段 `runCatching` 掉——
+`WellnessViewModel` 与 `TodayViewModel` 的补剂重排连 `runCatching` 都没有，
+异常直接抛进 `scope.launch` 终止进程。
+
+改法（四层，逐层都不改闹钟的身份 / 顺序 / 取消语义）：
+
+1. `AlarmRegister` 新增 `internal class RunTally`（`attempted` / `failed` / `aborted` /
+   `firstError`）与 `fun reschedule(context, source, block): ReminderHealth.RunReport`：
+   把一段重排当**一轮**执行，`CancellationException` 原样抛出、其它异常记
+   `aborted = true` + `CrashLogger.recordNonFatal` 而**不向外抛**（数据已保存，
+   不能因为提醒排不上就报成保存失败），`finally` 恢复上一层的计数器。
+2. 六条 `rescheduleAll`（用药 / 补剂 / 复诊 / 运动 / 久坐 / BASDAI）改为返回
+   `ReminderHealth.RunReport`，内部改用 `AlarmRegister.reschedule`。
+3. `ReminderHealth.RunReport` 加 `aborted: Boolean = false`，`ok` 的判据从
+   `failed == 0` 收紧为 `failed == 0 && !aborted`——**整轮被异常打断时 `failed` 可能仍是 0**
+   （第一个槽位就抛），只数 `failed` 会把「一条都没排上」误报成正常。
+4. 新增 `ui/ReminderNotice.kt`：`postIfFailed(context, report)`，成功（含「没有槽位可排」）
+   直接返回，失败时经 `GlobalMessages` 投递「**数据已保存，但提醒重排失败（…）——
+   请进入「我的 → 提醒可靠性自检」检查后重试**」（错误摘录截 60 字，完整堆栈在
+   `CrashLogger` 的 `last_nonfatal.txt`）。接线到 9 个文件：`MeViewModel`、
+   `TodayViewModel`（用药 + 补剂两条）、`WellnessViewModel`、`CheckupViewModel`、
+   `ExerciseViewModel`、`ExercisePlansViewModel`、`SymptomViewModel`、`BackupViewModel`、
+   `ReminderSettingsSheet`（复诊 / 运动 / 久坐开关与间隔 / BASDAI 周期）。
+   启动期与开机广播的路径（`AshkbApplication`、`BootReceiver`）**刻意不提示**——
+   用户不在操作中，弹一句只会打扰。
+
+文案首句固定是「数据已保存」：写库与重排本来就是两段，提示也必须分开说，
+否则用户会以为刚才那次修改没生效而重复操作。
+
+`BackupViewModel.rematerializeAfterImport` 的**口径变更**：原先「重排失败只记日志、
+不阻断导入成功提示」，理由是「用户重进应用时启动期重排会补上」——但启动期重排同样可能失败，
+而恢复档案恰恰是提醒最容易全丢的时点（旧行被清、新行刚物化）。现在物化失败仍只记日志
+（数据问题另行处理），**重排失败明确告诉用户**，并说清可以重进应用补排。
+
+#### B08：AI 导入草稿转屏即失
+
+`AiImportSheet` 把粘贴文本、解析结果、错误全放在普通 `remember` 里，于是转屏 / 进程重建后
+**草稿凭空消失**：用户刚把一份几十行的化验单粘进去、点完解析，屏幕一转，白忙一场。
+
+改法：草稿上移到 `CheckupViewModel`（它在 `AppShell` 里是**常驻**的，不进 Bundle、
+不随 sheet 卸载丢失），抽成可单测的 `AiImportDraftStore`（四个 `MutableStateFlow` +
+`setDraft` / `markParsed` / `clearDraft`）。
+
+为什么不是 `rememberSaveable`：工单同时要求「大数据不要放进无界 Bundle」，
+而粘贴文本正是**体量无上界**的那一类（一份影像报告含所见/结论能到几十 KB），
+放进 Bundle 有 `TransactionTooLargeException` 风险。代价是进程被杀时草稿也会没——
+这与工单「进程被杀后的超大草稿若不能可靠保存，应明确提示并安全丢弃」一致，
+因为本方案根本不会把超大数据写进去。
+
+三条不变量（也是回归用例的落点）：**超限拒收**（超过 `MAX_CHARS = 200_000` 的写入被整体
+拒绝并**保留原草稿**，静默截断会解析出缺行的化验单）、**草稿一变就作废预览**（改了几个字
+却还挂着旧预览会误导用户）、**入库即清草稿**（重复导入也算已入库，留着草稿会让用户以为
+还有未保存内容，再点保存就真的重复写了——B01 的教训）。
+
+预览**从草稿重算**而不是另存一份解析结果：`LabImport` / `ImagingImport` 都不是 `Parcelable`，
+塞 Bundle 既不合规也没必要；解析是纯函数，文本还在就能原样重建，「点过解析」这个事实
+由 `*_parsed` 标志承载，于是转屏后预览照旧在。`CheckupScreen` 的 `showLabImport` /
+`showImagingImport` 同时改 `rememberSaveable`，转屏后 sheet 不再被关掉。
+超限时提示「粘贴的内容过长（超过 20 万字），已丢弃本次粘贴。请只粘贴报告正文。」（中英各 1 条）。
+
+#### 回归与门禁
+
+- 新增 `ReminderRescheduleReportTest`（9 条）：报告语义三条（没排任何槽位**不算**失败 /
+  整轮被异常中断**必须**算失败 / 有失败就不是 ok）；真实注册路径三条（注册被系统拒绝时
+  计入失败并保留首个错误、`CancellationException` 不记成重排失败、成功一轮的计数与闹钟数一致）；
+  静态守卫三条（**`ui` 层每处 `rescheduleAll` 都把报告交给了 `ReminderNotice`**、
+  守卫的判据能被反例证伪、扫描到的调用点数量足以证明守卫没空转）。
+- 新增 `AiImportDraftTest`（12 条）：超限写入整体拒收且保留原草稿、草稿一变作废旧预览、
+  入库后清对应草稿、化验与影像两份草稿互不覆盖、`clearDraft` 只清指定种类等。
+- 负向对照**四轮**（均造「能编译的违规形状」）：`RunReport.ok` 去掉 `!aborted` ⇒ 2 条红；
+  删掉 `SymptomViewModel` 的一处 `ReminderNotice.postIfFailed` ⇒ 1 条红（静态守卫）；
+  删掉 `setDraft` 的超限检查 ⇒ 1 条红；注释掉 `importLabReport` 的 `clearDraft` ⇒ 1 条红。
+  每轮都只红目标那几条，恢复后全绿，`.negctl` 备份残留 0。
+- 全门禁 `E:\ASHKB\batch4-gate1.log`：**BUILD SUCCESSFUL in 2m 14s**；
+  单测 **134 文件 / 1118 条** failures=0 errors=0 skipped=0；
+  detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
+- 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版。
+
 ## [v1.2.9] — 2026-10-10
 
 **两件事：①审查裁决项 2（「已结算」口径三处打架）统一；②首页补剂卡——补剂提醒/打卡从二级页搬到今日页。** 无库结构变更（枚举与状态都存字符串），可覆盖安装。

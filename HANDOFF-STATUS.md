@@ -1092,3 +1092,18 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 **门禁** `E:\ASHKB\batch3-gate2.log`：BUILD SUCCESSFUL in 1m；单测 **132 文件 / 1097 条** failures=0 errors=0 skipped=0；detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
 
 **仍未做**：B05 / B07 / B08 / B09 / C04；本批未装机（设备无线调试未开）；`versionCode` / `versionName` 仍 122 / "1.2.10"。
+
+### 缺陷工单第 4 批：B09 / B08（2026-10-25 · 未发版 · 未 bump 版本号）
+
+两项不动库结构的修复。第 1~3 批见上三节；本批之后工单只剩 **B05 / B07 / C04**。
+
+| 项 | 原状 | 落地 | 证据 |
+|---|---|---|---|
+| B09 保存后的提醒重排异常被静默吞掉 | 三段叠加：①`AlarmRegister.set` 的 `Boolean` 返回值在 8 个调度器里**全部被丢弃**；②六条 `rescheduleAll` 返回 `Unit`；③UI 保存路径整段 `runCatching` 掉——`WellnessViewModel` / `TodayViewModel` 的补剂重排**连 `runCatching` 都没有**，异常直接抛进 `scope.launch` 终止进程。症状：数据存进去了，闹钟一条没排上，全程无声 | ①`AlarmRegister` 加 `internal class RunTally`（attempted/failed/aborted/firstError）与 `fun reschedule(context, source, block): RunReport`：`CancellationException` 原样抛出、其它异常记 `aborted=true` + `CrashLogger.recordNonFatal` 而**不向外抛**，`finally` 恢复上层计数；②六条 `rescheduleAll`（用药/补剂/复诊/运动/久坐/BASDAI）改返回 `RunReport`；③`RunReport` 加 `aborted`，`ok` 从 `failed == 0` 收紧为 `failed == 0 && !aborted`（**整轮被异常打断时 `failed` 可能仍是 0**）；④新增 `ui/ReminderNotice.kt` 的 `postIfFailed`，成功（含无槽位可排）直接返回，失败经 `GlobalMessages` 提示「数据已保存，但提醒重排失败（…）——请进入「我的 → 提醒可靠性自检」检查后重试」（错误摘 60 字，完整堆栈在 `last_nonfatal.txt`）；⑤接线 9 个文件（`MeViewModel` / `TodayViewModel` 两条 / `WellnessViewModel` / `CheckupViewModel` / `ExerciseViewModel` / `ExercisePlansViewModel` / `SymptomViewModel` / `BackupViewModel` / `ReminderSettingsSheet` 四处），启动期与 `BootReceiver` **刻意不提示**（用户不在操作中）；⑥`BackupViewModel.rematerializeAfterImport` 口径变更：物化失败仍只记日志，**重排失败明确提示**（原先「重进应用会补上」的理由不成立——启动期重排同样可能失败，而恢复档案正是提醒最易全丢的时点） | `ReminderRescheduleReportTest` 9 条（报告语义 3 + 真实注册路径 3 + 静态守卫 3，含「`ui` 层每处 `rescheduleAll` 都把报告交给了 `ReminderNotice`」） |
+| B08 AI 导入草稿转屏即失 | `AiImportSheet` 的 `pasted` / `labImport` / `imagingImport` / `error` 全是普通 `remember`，转屏或进程重建后**草稿凭空消失**；`CheckupScreen` 的 `showLabImport` / `showImagingImport` 也是普通 `remember`，转屏后 sheet 直接关掉 | 草稿上移到 `CheckupViewModel`（`AppShell` 里常驻，不进 Bundle、不随 sheet 卸载丢失），抽成可单测的 `AiImportDraftStore`（四个 `MutableStateFlow` + `setDraft`/`markParsed`/`clearDraft`）。**不用 `rememberSaveable`**：工单同时要求「大数据不进无界 Bundle」，而粘贴文本体量无上界（影像报告几十 KB），放进 Bundle 有 `TransactionTooLargeException` 风险；代价是进程被杀时草稿也没，与工单「超大草稿不能可靠保存就明确提示并安全丢弃」一致。三条不变量：**超限拒收并保留原草稿**（`MAX_CHARS = 200_000`，静默截断会解析出缺行的化验单）、**草稿一变就作废预览**、**入库即清草稿**（重复导入也算已入库，留着草稿会诱发真的重复写——B01 教训）。预览**从草稿重算**而非另存解析结果（两个 `Import` 类都不是 `Parcelable`，解析是纯函数），「点过解析」由 `*_parsed` 标志承载 ⇒ 转屏后预览照旧在。`showLabImport` / `showImagingImport` 改 `rememberSaveable`。中英各 1 条新串 `ai_import_draft_too_long` | `AiImportDraftTest` 12 条 |
+
+**负向对照四轮**（均造「能编译的违规形状」）：`RunReport.ok` 去掉 `!aborted` ⇒ 2 条红；删掉 `SymptomViewModel` 的一处 `ReminderNotice.postIfFailed` ⇒ 1 条红（静态守卫）；删掉 `setDraft` 的超限检查 ⇒ 1 条红；注释掉 `importLabReport` 的 `clearDraft` ⇒ 1 条红。每轮只红目标那几条，恢复后全绿，`.negctl` 备份残留 0。
+
+**门禁** `E:\ASHKB\batch4-gate1.log`：BUILD SUCCESSFUL in 2m 14s；单测 **134 文件 / 1118 条** failures=0 errors=0 skipped=0；detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
+
+**仍未做**：B05 / B07 / C04；本批未装机（设备无线调试未开）；`versionCode` / `versionName` 仍 122 / "1.2.10"。

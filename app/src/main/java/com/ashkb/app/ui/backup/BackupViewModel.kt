@@ -18,6 +18,7 @@ import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.repo.BackupRepository
 import com.ashkb.app.domain.BackupPasswordRules
 import com.ashkb.app.reminder.ReminderScheduler
+import com.ashkb.app.ui.ReminderNotice
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -449,22 +450,29 @@ class BackupViewModel(
      *    `settledSlotRefs` 排；它读的正是上一步刚写好的槽位，所以顺序不能反。
      *
      * 整段在 IO 线程：物化是 N 支药 × 9 天的插入，重排是「药 × 天 × 槽位」量级的
-     * AlarmManager binder 调用，都远超声明的 16ms。失败只记日志、不阻断导入成功提示——
-     * 数据已经进库了，提醒排不上是次要问题，用户重进应用时 `AshkbApplication` 的启动期
-     * 重排会补上。
+     * AlarmManager binder 调用，都远超声明的 16ms。
+     *
+     * v1.2.11（缺陷工单 B09）：**这里改口径了**。原先「失败只记日志、不阻断导入成功提示」，
+     * 理由是「用户重进应用时启动期重排会补上」——但启动期重排同样可能失败，且恢复档案
+     * 恰恰是提醒最容易全丢的时点（旧行被清、新行刚物化）。现在：物化失败仍只记日志
+     * （数据问题另行处理），**重排失败则明确告诉用户**，并说清可以重进应用补排。
      */
     private suspend fun rematerializeAfterImport() = withContext(Dispatchers.IO) {
+        val db = AppDatabase.get(app)
+        val meds = db.medicationDao().listActive()
+        val today = LocalDate.now()
+        // `app` 声明的类型是 Context（构造时传的是 applicationContext），仓库挂在
+        // AshkbApplication 上，故此处要转型——applicationContext 的实例本身就是它。
+        val medRepo = (app as AshkbApplication).medicationRepository
         runCatching {
-            val db = AppDatabase.get(app)
-            val meds = db.medicationDao().listActive()
-            val today = LocalDate.now()
-            // `app` 声明的类型是 Context（构造时传的是 applicationContext），仓库挂在
-            // AshkbApplication 上，故此处要转型——applicationContext 的实例本身就是它。
-            val medRepo = (app as AshkbApplication).medicationRepository
-            medRepo.materializePlannedSlots(meds, today.minusDays(MATERIALIZE_LOOKBACK_DAYS), today.plusDays(MATERIALIZE_LOOKAHEAD_DAYS))
-            ReminderScheduler.rescheduleAll(app, meds, medRepo.settledSlotRefs(today))
+            medRepo.materializePlannedSlots(
+                meds,
+                today.minusDays(MATERIALIZE_LOOKBACK_DAYS),
+                today.plusDays(MATERIALIZE_LOOKAHEAD_DAYS),
+            )
         }
-        Unit
+        val report = ReminderScheduler.rescheduleAll(app, meds, medRepo.settledSlotRefs(today))
+        ReminderNotice.postIfFailed(app, report)
     }
 
     private fun shareFile(file: File, mime: String): Intent {

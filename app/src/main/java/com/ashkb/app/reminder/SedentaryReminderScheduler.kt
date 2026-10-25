@@ -26,11 +26,13 @@ object SedentaryReminderScheduler {
     private const val REQUEST_CODE = 0x5EDE
 
     /** 按当前配置重排（先取消旧的）。开关关闭或窗口非法时不排。 */
-    fun rescheduleAll(context: Context, now: LocalDateTime = LocalDateTime.now()) {
-        cancelAllFuture(context)
-        val cfg = ReminderConfigRepository(context)
-        if (!cfg.sedentaryEnabled()) return
-        scheduleNext(context, cfg, now)
+    fun rescheduleAll(context: Context, now: LocalDateTime = LocalDateTime.now()): ReminderHealth.RunReport {
+        // v1.2.11（缺陷工单 B09）：整轮包进 AlarmRegister.reschedule——失败留档 + 返回本轮报告。
+        return AlarmRegister.reschedule(context, "sedentary") {
+            cancelAllFuture(context)
+            val cfg = ReminderConfigRepository(context)
+            if (cfg.sedentaryEnabled()) scheduleNext(context, cfg, now)
+        }
     }
 
     /** 排下一个提醒时刻（Receiver 触发后链式调用）。 */

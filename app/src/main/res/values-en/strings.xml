@@ -7,6 +7,7 @@
 <resources>
     <string name="app_name">ASHKB</string>
     <string name="ai_import_copy_template">Copy template</string>
+    <string name="ai_import_draft_too_long">The pasted text is too long (over 200,000 characters). This paste was discarded — paste only the report body.</string>
     <string name="ai_import_parse_action">Parse</string>
     <string name="ai_import_parse_result">Parse result</string>
     <string name="ai_import_skipped_summary">Imported %1$d items · %2$d lines unrecognized</string>
@@ -491,6 +492,8 @@
     <string name="reminder_alarm_ok">Tried to register %1$d · no failures (%2$s)</string>
     <string name="reminder_alarm_failed">⚠️ Tried to register %1$d · %2$d failed (most recent: %3$s) — reminders may not go off. Please check the system \"Exact alarms\" setting and Xiaomi permission management.</string>
     <string name="reminder_selfcheck_summary">%1$d/%2$d ready · tap to handle each one</string>
+    <string name="reminder_reschedule_failed">Data saved, but rescheduling reminders failed (%1$s) — open Me → Reminder reliability check, then try again</string>
+    <string name="reminder_reschedule_failed_unknown">Data saved, but rescheduling reminders failed — open Me → Reminder reliability check, then try again</string>
     <string name="report_avg_pain">Average pain</string>
     <string name="report_avg_stiffness">Average morning stiffness</string>
     <string name="report_basdai_section">Disease activity (BASDAI)</string>

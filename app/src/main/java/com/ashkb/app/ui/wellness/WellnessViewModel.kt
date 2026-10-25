@@ -20,6 +20,7 @@ import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.reminder.SupplementReminderScheduler
+import com.ashkb.app.ui.ReminderNotice
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -158,17 +159,19 @@ class WellnessViewModel(
     private suspend fun rescheduleSupplementReminders() {
         // C05（缺陷工单）：重排是「补剂 × 7 天 × 时刻」量级的 AlarmManager binder 调用，
         // 整段放 IO；与 TodayViewModel.rescheduleSupplementReminders 同口径。
+        //
+        // v1.2.11（缺陷工单 B09）：不再 `runCatching` 整段吞掉——重排失败留档并提示用户
+        // （补剂已存下，但提醒没排上）。成功路径一声不响。
         withContext(Dispatchers.IO) {
-            runCatching {
-                val today = dateProvider.today.value
-                SupplementReminderScheduler.rescheduleAll(
-                    app,
-                    repo.listActiveSupplements(),
-                    repo.loggedSupplementIdsOn(today.toString()),
-                    today,
-                    LocalDateTime.now(),
-                )
-            }
+            val today = dateProvider.today.value
+            val report = SupplementReminderScheduler.rescheduleAll(
+                app,
+                repo.listActiveSupplements(),
+                repo.loggedSupplementIdsOn(today.toString()),
+                today,
+                LocalDateTime.now(),
+            )
+            ReminderNotice.postIfFailed(app, report)
         }
     }
 

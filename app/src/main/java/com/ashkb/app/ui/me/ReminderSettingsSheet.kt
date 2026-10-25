@@ -37,6 +37,7 @@ import com.ashkb.app.reminder.BasdaiReminderScheduler
 import com.ashkb.app.reminder.CheckupReminderScheduler
 import com.ashkb.app.reminder.ExerciseReminderScheduler
 import com.ashkb.app.reminder.SedentaryReminderScheduler
+import com.ashkb.app.ui.ReminderNotice
 import com.ashkb.app.ui.theme.Spacing
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -95,11 +96,12 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
                             val db = AppDatabase.get(context)
                             val records = db.checkupRecordDao().listAll()
                             if (v) {
-                                runCatching {
-                                    CheckupReminderScheduler.rescheduleAll(
-                                        context, records, LocalDate.now(), LocalDateTime.now(),
-                                    )
-                                }
+                                // v1.2.11（缺陷工单 B09）：开关已保存，但若提醒没排上必须当场知道
+                                // ——否则「开关是开的、闹钟一条没有」只能在等不到提醒时才发现。
+                                val report = CheckupReminderScheduler.rescheduleAll(
+                                    context, records, LocalDate.now(), LocalDateTime.now(),
+                                )
+                                ReminderNotice.postIfFailed(context, report)
                             } else {
                                 CheckupReminderScheduler.cancelAllFuture(context, records)
                             }
@@ -119,14 +121,14 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
                         withContext(Dispatchers.IO) {
                             if (v) {
                                 val db = AppDatabase.get(context)
-                                runCatching {
-                                    val plan = db.exercisePlanDao().active()
-                                    val hasLogged = db.exerciseLogDao()
-                                        .byDate(LocalDate.now().toString()).isNotEmpty()
-                                    ExerciseReminderScheduler.rescheduleAll(
-                                        context, plan, hasLogged, LocalDate.now(), LocalDateTime.now(),
-                                    )
-                                }
+                                // v1.2.11（缺陷工单 B09）：同上，开关已保存但提醒没排上要可见。
+                                val plan = db.exercisePlanDao().active()
+                                val hasLogged = db.exerciseLogDao()
+                                    .byDate(LocalDate.now().toString()).isNotEmpty()
+                                val report = ExerciseReminderScheduler.rescheduleAll(
+                                    context, plan, hasLogged, LocalDate.now(), LocalDateTime.now(),
+                                )
+                                ReminderNotice.postIfFailed(context, report)
                             } else {
                                 ExerciseReminderScheduler.cancelAllFuture(context, LocalDate.now())
                             }
@@ -168,7 +170,12 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
                     sedentary = v
                     cfg.setSedentaryEnabled(v)
                     scope.launch {
-                        withContext(Dispatchers.IO) { SedentaryReminderScheduler.rescheduleAll(context) }
+                        withContext(Dispatchers.IO) {
+                            // v1.2.11（缺陷工单 B09）：这两处原先连 `runCatching` 都没有——重排异常
+                            // 会直接抛进 scope.launch（协程里未捕获的异常会终止进程）。现在失败留档 + 提示。
+                            val report = SedentaryReminderScheduler.rescheduleAll(context)
+                            ReminderNotice.postIfFailed(context, report)
+                        }
                     }
                 },
             )
@@ -182,7 +189,11 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
                                 sedentaryInterval = min
                                 cfg.setSedentaryIntervalMin(min)
                                 scope.launch {
-                                    withContext(Dispatchers.IO) { SedentaryReminderScheduler.rescheduleAll(context) }
+                                    withContext(Dispatchers.IO) {
+                                        // v1.2.11（缺陷工单 B09）：同上。
+                                        val report = SedentaryReminderScheduler.rescheduleAll(context)
+                                        ReminderNotice.postIfFailed(context, report)
+                                    }
                                 }
                             },
                             label = {
@@ -234,12 +245,12 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
                                 scope.launch {
                                     withContext(Dispatchers.IO) {
                                         val db = AppDatabase.get(context)
-                                        runCatching {
-                                            BasdaiReminderScheduler.rescheduleAll(
-                                                context, db.basdaiDao().latest(), days,
-                                                LocalDate.now(), LocalDateTime.now(),
-                                            )
-                                        }
+                                        // v1.2.11（缺陷工单 B09）：周期已保存，但提醒没排上要可见。
+                                        val report = BasdaiReminderScheduler.rescheduleAll(
+                                            context, db.basdaiDao().latest(), days,
+                                            LocalDate.now(), LocalDateTime.now(),
+                                        )
+                                        ReminderNotice.postIfFailed(context, report)
                                     }
                                 }
                             },

@@ -729,39 +729,43 @@ private fun SkippedLinesHint(importedCount: Int, lines: List<String>) {
 internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: () -> Unit) {
     val clipboard = LocalClipboardManager.current
     val template = stringResource(if (kind == ImportKind.LAB) ImportTemplates.LAB else ImportTemplates.IMAGING)
-    var pasted by remember { mutableStateOf("") }
+    // v1.2.11（缺陷工单 B08）：草稿存在常驻 ViewModel 里，不再随 sheet 卸载 / 转屏消失。
+    // 原来的 `remember { mutableStateOf("") }` 会在屏幕旋转时被整个丢掉——用户刚粘好一份
+    // 几十行的化验单、点完解析，转个屏就白忙一场。
+    val labDraft by vm.labDraft.collectAsStateWithLifecycle()
+    val imagingDraft by vm.imagingDraft.collectAsStateWithLifecycle()
+    val labParsed by vm.labParsed.collectAsStateWithLifecycle()
+    val imagingParsed by vm.imagingParsed.collectAsStateWithLifecycle()
+    val pasted = if (kind == ImportKind.LAB) labDraft else imagingDraft
     var copied by remember { mutableStateOf(false) }
-    var labImport by remember { mutableStateOf<LabImport?>(null) }
-    var imagingImport by remember { mutableStateOf<ImagingImport?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
+    // 错误提示是短字符串，进 Bundle 完全安全，且转屏后应当还在（否则用户看不出上次为什么没解析出来）
+    var error by rememberSaveable(kind) { mutableStateOf<String?>(null) }
     val labParseEmpty = stringResource(R.string.lab_parse_empty)
     val imagingParseEmpty = stringResource(R.string.imaging_parse_empty)
+    // v1.2.11（缺陷工单 B08）：超限草稿明确提示并安全丢弃，而不是让它挂在一个没有上界的字符串上。
+    val draftTooLong = stringResource(R.string.ai_import_draft_too_long)
     // v1.2.6（i18n）：解析兜底文案与多部位分隔符在 Composable 作用域取好，再传给纯函数的 parser。
     val imagingBodyPartUnset = stringResource(R.string.ui_imaging_bodypart_unset)
     val listSeparator = stringResource(R.string.ui_list_separator)
 
+    // 确认预览**从草稿重算**，而不是另存一份解析结果：LabImport / ImagingImport 不是
+    // Parcelable，塞 Bundle 既不合规也没有必要——解析是纯函数，文本还在就能原样重建。
+    // 「点过解析」这个事实由 VM 的 *_parsed 标志承载，于是转屏后预览照旧在。
+    val labImport: LabImport? = remember(pasted, labParsed) {
+        if (labParsed) ReportImportParser.parseLab(pasted)?.takeIf { it.rows.isNotEmpty() } else null
+    }
+    val imagingImport: ImagingImport? = remember(pasted, imagingParsed) {
+        if (imagingParsed) ReportImportParser.parseImaging(pasted, imagingBodyPartUnset, listSeparator) else null
+    }
+
     fun tryParse() {
         error = null
-        labImport = null
-        imagingImport = null
         if (kind == ImportKind.LAB) {
-            val parsed = ReportImportParser.parseLab(pasted)
-            if (parsed == null || parsed.rows.isEmpty()) {
-                error = labParseEmpty
-            } else {
-                labImport = parsed
-            }
+            val ok = ReportImportParser.parseLab(pasted)?.rows?.isNotEmpty() == true
+            if (ok) vm.markParsed(kind) else error = labParseEmpty
         } else {
-            val parsed = ReportImportParser.parseImaging(
-                pasted,
-                imagingBodyPartUnset,
-                listSeparator,
-            )
-            if (parsed == null) {
-                error = imagingParseEmpty
-            } else {
-                imagingImport = parsed
-            }
+            val ok = ReportImportParser.parseImaging(pasted, imagingBodyPartUnset, listSeparator) != null
+            if (ok) vm.markParsed(kind) else error = imagingParseEmpty
         }
     }
 
@@ -805,7 +809,11 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
             Text(stringResource(R.string.ai_import_step2), style = MaterialTheme.typography.bodyMedium)
             AshkbTextField(
                 value = pasted,
-                onValueChange = { pasted = it },
+                onValueChange = { text ->
+                    // 每次编辑都作废上一次的解析结果（改了几个字却还挂着旧预览会误导用户），
+                    // 超限则拒收并提示：截断后的化验单会缺行，用户根本看不出少了什么。
+                    error = if (vm.setDraft(kind, text)) null else draftTooLong
+                },
                 label = { Text(stringResource(R.string.common_paste_ai_reply)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 4,
@@ -823,74 +831,19 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
                 modifier = Modifier.fillMaxWidth().heightIn(min = Size.touchMin),
             ) { Text(stringResource(R.string.ai_import_parse_action)) }
 
-            labImport?.let { imp ->
-                val abnormalCount = imp.rows.count { it.abnormal == "high" || it.abnormal == "low" }
-                Text(
-                    if (abnormalCount > 0) stringResource(R.string.lab_parse_result_abnormal, imp.rows.size, abnormalCount)
-                    else stringResource(R.string.lab_parse_result, imp.rows.size),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Text(
-                    buildString {
-                        append(
-                            stringResource(
-                                R.string.ui_checkup_lab_date_prefix,
-                                imp.date ?: stringResource(R.string.symptom_unrecognized_today),
-                            ),
-                        )
-                        imp.hospital?.let { append(stringResource(R.string.lab_hospital_suffix, it)) }
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Surface(
-                    Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                ) {
-                    Column(
-                        Modifier
-                            .heightIn(max = 200.dp)
-                            .verticalScroll(rememberScrollState())
-                            .padding(Spacing.md),
-                    ) {
-                        DividerList(items = imp.rows) { r: LabImportRow ->
-                            Text(r.testName, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                            // v1.2.10 裁决项 5：预览也按同一判据标临界——refLow/refHigh 就在行里，
-                            // 实时算即可；越界优先由 LabValue 的分支顺序保证。
-                            LabValue(
-                                r.value?.toString() ?: r.valueText,
-                                r.unit,
-                                r.abnormal,
-                                near = r.abnormal != "high" && r.abnormal != "low" &&
-                                    ClinicalThresholds.labNearBoundary(
-                                        r.value,
-                                        r.refLow,
-                                        r.refHigh,
-                                        r.refLowInclusive,
-                                        r.refHighInclusive,
-                                    ),
-                            )
-                        }
-                    }
-                }
-                if (imp.skippedLines.isNotEmpty()) SkippedLinesHint(imp.rows.size, imp.skippedLines)
-            }
-            imagingImport?.let { imp ->
-                Text(stringResource(R.string.ai_import_parse_result), style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "${ImagingRecord.modalityLabel(imp.modality)} · ${imp.bodyPart} · ${imp.date ?: stringResource(R.string.symptom_unrecognized_today)}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                imp.hospital?.let {
-                    Text(stringResource(R.string.checkup_hospital_line, it), style = MaterialTheme.typography.bodySmall)
-                }
-                if (imp.skippedLines.isNotEmpty()) SkippedLinesHint(1, imp.skippedLines)
+            if (kind == ImportKind.LAB) {
+                labImport?.let { imp -> LabImportPreview(imp) }
+            } else {
+                imagingImport?.let { imp -> ImagingImportPreview(imp) }
             }
 
             SheetSaveButton(
                 text = stringResource(R.string.common_save),
                 enabled = labImport != null || imagingImport != null,
                 onClick = {
+                    // v1.2.11（缺陷工单 B08）：草稿由 ViewModel 在导入完成后清空
+                    //（见 CheckupViewModel.importLabReport / importImagingReport），
+                    // 所以这里不再依赖 sheet 卸载来"顺手"丢掉状态。
                     labImport?.let { vm.importLabReport(it) }
                     imagingImport?.let { vm.importImagingReport(it) }
                     onDismiss()
@@ -898,6 +851,76 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
             )
         }
     }
+}
+
+/** 化验单确认预览（B08 抽出成独立 Composable：预览由草稿重算，与 sheet 生命周期解耦）。 */
+@Composable
+private fun LabImportPreview(imp: LabImport) {
+    val abnormalCount = imp.rows.count { it.abnormal == "high" || it.abnormal == "low" }
+    Text(
+        if (abnormalCount > 0) stringResource(R.string.lab_parse_result_abnormal, imp.rows.size, abnormalCount)
+        else stringResource(R.string.lab_parse_result, imp.rows.size),
+        style = MaterialTheme.typography.titleSmall,
+    )
+    Text(
+        buildString {
+            append(
+                stringResource(
+                    R.string.ui_checkup_lab_date_prefix,
+                    imp.date ?: stringResource(R.string.symptom_unrecognized_today),
+                ),
+            )
+            imp.hospital?.let { append(stringResource(R.string.lab_hospital_suffix, it)) }
+        },
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Surface(
+        Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Column(
+            Modifier
+                .heightIn(max = 200.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(Spacing.md),
+        ) {
+            DividerList(items = imp.rows) { r: LabImportRow ->
+                Text(r.testName, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                // v1.2.10 裁决项 5：预览也按同一判据标临界——refLow/refHigh 就在行里，
+                // 实时算即可；越界优先由 LabValue 的分支顺序保证。
+                LabValue(
+                    r.value?.toString() ?: r.valueText,
+                    r.unit,
+                    r.abnormal,
+                    near = r.abnormal != "high" && r.abnormal != "low" &&
+                        ClinicalThresholds.labNearBoundary(
+                            r.value,
+                            r.refLow,
+                            r.refHigh,
+                            r.refLowInclusive,
+                            r.refHighInclusive,
+                        ),
+                )
+            }
+        }
+    }
+    if (imp.skippedLines.isNotEmpty()) SkippedLinesHint(imp.rows.size, imp.skippedLines)
+}
+
+/** 影像报告确认预览（B08 抽出，理由同上）。 */
+@Composable
+private fun ImagingImportPreview(imp: ImagingImport) {
+    Text(stringResource(R.string.ai_import_parse_result), style = MaterialTheme.typography.titleSmall)
+    Text(
+        "${ImagingRecord.modalityLabel(imp.modality)} · ${imp.bodyPart} · " +
+            "${imp.date ?: stringResource(R.string.symptom_unrecognized_today)}",
+        style = MaterialTheme.typography.bodySmall,
+    )
+    imp.hospital?.let {
+        Text(stringResource(R.string.checkup_hospital_line, it), style = MaterialTheme.typography.bodySmall)
+    }
+    if (imp.skippedLines.isNotEmpty()) SkippedLinesHint(1, imp.skippedLines)
 }
 
 // ===== 添加 / 修改化验指标 =====

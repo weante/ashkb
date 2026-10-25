@@ -24,6 +24,7 @@ import com.ashkb.app.domain.PendingDoses
 import com.ashkb.app.reminder.NotificationHelper
 import com.ashkb.app.reminder.ReminderScheduler
 import com.ashkb.app.reminder.SupplementReminderScheduler
+import com.ashkb.app.ui.ReminderNotice
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -238,11 +239,13 @@ class TodayViewModel(
 
         // v1.2.9（审查答复裁决项 2 = A）：传**已结算**集合（done / partial / skipped）——
         // 用户记过「部分完成 / 跳过」的槽位不该被重排重建升级重查。
-        ReminderScheduler.rescheduleAll(app, meds, repo.settledSlotRefs(today))
+        val report = ReminderScheduler.rescheduleAll(app, meds, repo.settledSlotRefs(today))
         // v1.0.77（批次 3b）：与提醒同批补物化——打卡 / 跳过 / 顺延之后计划可能变（注射顺延会挪槽位），
         // 窗口里缺的行在这里补齐；已有行由唯一索引 + IGNORE 挡住，重复调用不会重复插入。
         val win = repo.plannedSlotWindow(today)
         repo.materializePlannedSlots(meds, win.from, win.to)
+        // v1.2.11（缺陷工单 B09）：重排失败必须让用户看得见——打卡已记下，但提醒没排上。
+        ReminderNotice.postIfFailed(app, report)
     }
 
     // ---- v1.0.74：跨零点补记（字段声明见文件上方 init 之前） ----
@@ -369,18 +372,18 @@ class TodayViewModel(
      * 整段在 IO 线程：`rescheduleAll` 是「补剂 × 7 天 × 时刻」量级的 AlarmManager binder 调用。
      */
     private suspend fun rescheduleSupplementReminders() = withContext(Dispatchers.IO) {
-        runCatching {
-            val db = AppDatabase.get(app)
-            val today = date
-            SupplementReminderScheduler.rescheduleAll(
-                app,
-                db.supplementDao().listActive(),
-                db.supplementLogDao().byDate(today.toString()).mapNotNull { it.supId }.toSet(),
-                today,
-                LocalDateTime.now(),
-            )
-        }
-        Unit
+        // v1.2.11（缺陷工单 B09）：不再 `runCatching` 整段吞掉——重排失败留档并提示用户
+        // （打卡已记下，但补剂提醒没排上）。成功路径一声不响。
+        val db = AppDatabase.get(app)
+        val today = date
+        val report = SupplementReminderScheduler.rescheduleAll(
+            app,
+            db.supplementDao().listActive(),
+            db.supplementLogDao().byDate(today.toString()).mapNotNull { it.supId }.toSet(),
+            today,
+            LocalDateTime.now(),
+        )
+        ReminderNotice.postIfFailed(app, report)
     }
 
     companion object {

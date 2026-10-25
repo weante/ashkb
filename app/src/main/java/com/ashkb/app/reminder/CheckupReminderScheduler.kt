@@ -79,11 +79,14 @@ object CheckupReminderScheduler {
         records: List<CheckupRecord>,
         today: LocalDate = LocalDate.now(),
         now: LocalDateTime = LocalDateTime.now(),
-    ) {
-        val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        cancelAllFuture(context, records)
-        for (slot in slotsFor(records, today, now)) {
-            schedule(context, am, slot.nextDate, slot.phase, slot.fire)
+    ): ReminderHealth.RunReport {
+        // v1.2.11（缺陷工单 B09）：整轮包进 AlarmRegister.reschedule——失败留档 + 返回本轮报告。
+        return AlarmRegister.reschedule(context, "checkup") {
+            val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            cancelAllFuture(context, records)
+            for (slot in slotsFor(records, today, now)) {
+                schedule(context, am, slot.nextDate, slot.phase, slot.fire)
+            }
         }
     }
 

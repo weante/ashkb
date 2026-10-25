@@ -19,6 +19,7 @@ import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.data.repo.nowIso
 import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.reminder.BasdaiReminderScheduler
+import com.ashkb.app.ui.ReminderNotice
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
@@ -160,12 +161,13 @@ class SymptomViewModel(
         withContext(Dispatchers.IO) {
             val cfg = ReminderConfigRepository(app)
             val db = com.ashkb.app.data.db.AppDatabase.get(app)
-            runCatching {
-                BasdaiReminderScheduler.rescheduleAll(
-                    app, db.basdaiDao().latest(), cfg.basdaiCycleDays(),
-                    LocalDate.now(), LocalDateTime.now(),
-                )
-            }
+            // v1.2.11（缺陷工单 B09）：不再 `runCatching` 整段吞掉——评估记录已存下，
+            // 但 BASDAI 提醒若没排上，用户必须当场知道。
+            val report = BasdaiReminderScheduler.rescheduleAll(
+                app, db.basdaiDao().latest(), cfg.basdaiCycleDays(),
+                LocalDate.now(), LocalDateTime.now(),
+            )
+            ReminderNotice.postIfFailed(app, report)
         }
     }
 

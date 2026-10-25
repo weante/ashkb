@@ -95,22 +95,25 @@ object SupplementReminderScheduler {
         loggedToday: Set<String>,
         today: LocalDate = LocalDate.now(),
         now: LocalDateTime = LocalDateTime.now(),
-    ) {
-        val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        cancelAllFuture(context, supplements, today)
-        val registered = mutableSetOf<String>()
-        for (sup in supplements) {
-            for (dayOffset in 0..HORIZON_DAYS) {
-                val date = today.plusDays(dayOffset)
-                // 「今日已打卡」只对今天成立：未来 7 天当然还没有打卡记录
-                val logged = date == today && sup.id in loggedToday
-                for (slot in slotsFor(sup, date, logged, now)) {
-                    schedule(context, am, slot)
-                    registered += slotKey(slot.supId, slot.date, slot.time)
+    ): ReminderHealth.RunReport {
+        // v1.2.11（缺陷工单 B09）：整轮包进 AlarmRegister.reschedule——失败留档 + 返回本轮报告。
+        return AlarmRegister.reschedule(context, "supplement") {
+            val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            cancelAllFuture(context, supplements, today)
+            val registered = mutableSetOf<String>()
+            for (sup in supplements) {
+                for (dayOffset in 0..HORIZON_DAYS) {
+                    val date = today.plusDays(dayOffset)
+                    // 「今日已打卡」只对今天成立：未来 7 天当然还没有打卡记录
+                    val logged = date == today && sup.id in loggedToday
+                    for (slot in slotsFor(sup, date, logged, now)) {
+                        schedule(context, am, slot)
+                        registered += slotKey(slot.supId, slot.date, slot.time)
+                    }
                 }
             }
+            writeRegistered(context, registered)
         }
-        writeRegistered(context, registered)
     }
 
     /**

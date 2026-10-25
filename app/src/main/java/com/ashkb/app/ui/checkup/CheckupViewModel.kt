@@ -21,6 +21,7 @@ import com.ashkb.app.domain.ImportResult
 import com.ashkb.app.domain.LabImport
 import com.ashkb.app.reminder.CheckupReminderScheduler
 import com.ashkb.app.ui.GlobalMessages
+import com.ashkb.app.ui.ReminderNotice
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
@@ -158,11 +159,12 @@ class CheckupViewModel(
             val cfg = ReminderConfigRepository(app)
             val all = com.ashkb.app.data.db.AppDatabase.get(app).checkupRecordDao().listAll()
             if (cfg.checkupEnabled()) {
-                runCatching {
-                    CheckupReminderScheduler.rescheduleAll(
-                        app, all, LocalDate.now(), LocalDateTime.now(),
-                    )
-                }
+                // v1.2.11（缺陷工单 B09）：不再 `runCatching` 整段吞掉——复诊记录已存下，
+                // 但提醒若没排上，用户必须当场知道（否则「记录在、提醒不来」只能靠猜）。
+                val report = CheckupReminderScheduler.rescheduleAll(
+                    app, all, LocalDate.now(), LocalDateTime.now(),
+                )
+                ReminderNotice.postIfFailed(app, report)
             } else {
                 CheckupReminderScheduler.cancelAllFuture(app, all)
             }
@@ -192,6 +194,36 @@ class CheckupViewModel(
         _labLimit.value += 100
     }
 
+    // ---- v1.2.11（缺陷工单 B08）：AI 导入草稿 ----
+
+    /**
+     * 化验 / 影像两个入口的粘贴草稿。
+     *
+     * 存在常驻 ViewModel 而不是 sheet 的 `remember`：转屏 / sheet 重开都不丢，且**不进 Bundle**
+     * （粘贴文本没有合理上界，塞 `rememberSaveable` 会撞 1 MB 事务上限）。状态机本身抽在
+     * [AiImportDraftStore] 里，见那里的三条不变量与「为什么选 ViewModel」。
+     */
+    private val drafts = AiImportDraftStore()
+
+    val labDraft: StateFlow<String> = drafts.labDraft
+    val imagingDraft: StateFlow<String> = drafts.imagingDraft
+    val labParsed: StateFlow<Boolean> = drafts.labParsed
+    val imagingParsed: StateFlow<Boolean> = drafts.imagingParsed
+
+    /**
+     * 写入草稿；超过 [AiImportDraft.MAX_CHARS] 时**拒收并保留原草稿**。
+     *
+     * @return true = 已收下；false = 超限被拒（调用方据此提示用户，而不是静默截断——
+     *   截断后的化验单解析出来会缺行，用户根本看不出少了什么）。
+     */
+    internal fun setDraft(kind: ImportKind, text: String): Boolean = drafts.setDraft(kind, text)
+
+    /** 记下「这份草稿已解析」——旋转后据此重建预览。 */
+    internal fun markParsed(kind: ImportKind) = drafts.markParsed(kind)
+
+    /** 清空草稿（入库完成 / 用户主动放弃时调用）。 */
+    internal fun clearDraft(kind: ImportKind) = drafts.clearDraft(kind)
+
     /**
      * v1.2.11（缺陷工单 B01）：导入后**必须告诉用户这次到底写没写**。
      *
@@ -209,6 +241,10 @@ class CheckupViewModel(
                     app.getString(R.string.lab_ai_import_duplicate),
                 )
             }
+            // v1.2.11（缺陷工单 B08）：已入库就清草稿。两种结果都清——
+            // 重复导入同样意味着「这份报告已经在库里了」，留着草稿只会让用户下次打开
+            // sheet 又看到上次那份原文，误以为还有没保存的内容。
+            clearDraft(ImportKind.LAB)
         }
     }
 
@@ -233,6 +269,8 @@ class CheckupViewModel(
                     app.getString(R.string.imaging_ai_import_duplicate),
                 )
             }
+            // v1.2.11（缺陷工单 B08）：同 [importLabReport]，已入库即清草稿。
+            clearDraft(ImportKind.IMAGING)
         }
     }
 

@@ -72,12 +72,15 @@ object BasdaiReminderScheduler {
         cycleDays: Long,
         today: LocalDate = LocalDate.now(),
         now: LocalDateTime = LocalDateTime.now(),
-    ) {
-        val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        cancelAllFuture(context, latest, cycleDays, today)
-        val due = nextDueDate(latest, cycleDays, today)
-        for (slot in slotsFor(due, now)) {
-            schedule(context, am, slot.dueDate, slot.escalation, slot.fire)
+    ): ReminderHealth.RunReport {
+        // v1.2.11（缺陷工单 B09）：整轮包进 AlarmRegister.reschedule——失败留档 + 返回本轮报告。
+        return AlarmRegister.reschedule(context, "basdai") {
+            val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            cancelAllFuture(context, latest, cycleDays, today)
+            val due = nextDueDate(latest, cycleDays, today)
+            for (slot in slotsFor(due, now)) {
+                schedule(context, am, slot.dueDate, slot.escalation, slot.fire)
+            }
         }
     }
 

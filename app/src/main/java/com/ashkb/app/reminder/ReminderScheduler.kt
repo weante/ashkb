@@ -81,14 +81,18 @@ object ReminderScheduler {
         meds: List<Medication>,
         settledSlotRefs: Set<String>,
         now: LocalDateTime = LocalDateTime.now(),
-    ) {
-        val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        cancelAllFuture(context, meds, now.toLocalDate())
-        val today = now.toLocalDate()
+    ): ReminderHealth.RunReport {
+        // v1.2.11（缺陷工单 B09）：整轮包进 AlarmRegister.reschedule——失败留档 + 返回本轮报告，
+        // 调用方据此把「数据已保存」与「提醒排上了没有」分开报告。行为本身一字未改。
+        return AlarmRegister.reschedule(context, "med") {
+            val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            cancelAllFuture(context, meds, now.toLocalDate())
+            val today = now.toLocalDate()
 
-        scheduleFirstReminders(context, am, meds, today, now)
-        rescheduleTodayEscalations(context, am, meds, today, now, settledSlotRefs)
-        rescheduleCrossMidnightEscalations(context, am, meds, today, now)
+            scheduleFirstReminders(context, am, meds, today, now)
+            rescheduleTodayEscalations(context, am, meds, today, now, settledSlotRefs)
+            rescheduleCrossMidnightEscalations(context, am, meds, today, now)
+        }
     }
 
     /**

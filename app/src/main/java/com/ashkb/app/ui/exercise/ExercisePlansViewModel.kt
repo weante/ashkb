@@ -13,6 +13,7 @@ import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.domain.ExercisePlanProgress
 import com.ashkb.app.domain.ExercisePlanTemplates
 import com.ashkb.app.reminder.ExerciseReminderScheduler
+import com.ashkb.app.ui.ReminderNotice
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
@@ -131,13 +132,14 @@ class ExercisePlansViewModel(
             val cfg = ReminderConfigRepository(app)
             val db = com.ashkb.app.data.db.AppDatabase.get(app)
             if (cfg.exerciseEnabled()) {
-                runCatching {
-                    val activePlan = db.exercisePlanDao().active()
-                    val hasLogged = db.exerciseLogDao().byDate(LocalDate.now().toString()).isNotEmpty()
-                    ExerciseReminderScheduler.rescheduleAll(
-                        app, activePlan, hasLogged, LocalDate.now(), LocalDateTime.now(),
-                    )
-                }
+                // v1.2.11（缺陷工单 B09）：不再 `runCatching` 整段吞掉——运动计划已存下，
+                // 但提醒若没排上，用户必须当场知道。
+                val activePlan = db.exercisePlanDao().active()
+                val hasLogged = db.exerciseLogDao().byDate(LocalDate.now().toString()).isNotEmpty()
+                val report = ExerciseReminderScheduler.rescheduleAll(
+                    app, activePlan, hasLogged, LocalDate.now(), LocalDateTime.now(),
+                )
+                ReminderNotice.postIfFailed(app, report)
             } else {
                 withContext(Dispatchers.IO) { ExerciseReminderScheduler.cancelAllFuture(app, LocalDate.now()) }
             }

@@ -13,6 +13,7 @@ import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.repo.MedicationRepository
 import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.reminder.ReminderScheduler
+import com.ashkb.app.ui.ReminderNotice
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
@@ -79,7 +80,10 @@ class MeViewModel(private val repo: MedicationRepository) : ViewModel() {
             val today = LocalDate.now()
             // v1.2.9（审查答复裁决项 2 = A）：传**已结算**集合（done / partial / skipped）——
             // 用户记过「部分完成 / 跳过」的槽位不该被重排重建升级重查。
-            ReminderScheduler.rescheduleAll(context, list, repo.settledSlotRefs(today))
+            val report = ReminderScheduler.rescheduleAll(context, list, repo.settledSlotRefs(today))
+            // v1.2.11（缺陷工单 B09）：本方法是工单点名的两处之一。药单已存下，但提醒若没排上，
+            // 用户必须当场知道——否则「改了时刻、闹钟还是旧的」这类问题永远无从发现。
+            ReminderNotice.postIfFailed(context, report)
             // v1.0.77（批次 3b）：与提醒同批物化计划槽位快照。改药单（改时刻 / 换频次 / 新增）与
             // 停药都走这里，新的计划从今天起就能被计划口径的完成度看见（停药时另有清理，见 repo）。
             val win = repo.plannedSlotWindow(today)
