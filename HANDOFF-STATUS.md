@@ -1107,3 +1107,30 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 **门禁** `E:\ASHKB\batch4-gate1.log`：BUILD SUCCESSFUL in 2m 14s；单测 **134 文件 / 1118 条** failures=0 errors=0 skipped=0；detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
 
 **仍未做**：B05 / B07 / C04；本批未装机（设备无线调试未开）；`versionCode` / `versionName` 仍 122 / "1.2.10"。
+
+### 缺陷工单第 5 批：B05 / B07 / C04（2026-10-26 · 未发版 · 未 bump 版本号）
+
+工单**最后三项**，本批之后 **22 项全部落地**。三项都不动库结构（仍 `ASHKB_DB_VERSION = 20`）。
+第 1~4 批见上四节。
+
+| 项 | 原状 | 落地 | 证据 |
+|---|---|---|---|
+| B05 恢复成功后运行态与提醒不刷新 | `BackupViewModel.doRestore()` 里 `repo.restore()` 写库成功后**只回显结果**：首页卡片与闹钟仍是恢复前的，进程若一直存活要等下次重启才对上 | ①把 `AshkbApplication.onCreate()` 的启动期刷新抽成 `internal suspend fun rescheduleAllChains(db, meds, today, now, purgeGhostSlots)`（`invalidationTracker.refreshVersionsAsync()` → 六条提醒链重排 → `purgeGhostSlots`），启动期与恢复后**共用同一段代码**（否则会长出第二套刷新逻辑）；②`doRestore()` 在 `v.rowsOk` 时调新 `refreshRuntimeAfterRestore()`，失败经 B09 的 `ReminderNotice.postIfFailed` 提示。**为什么放 Application**：重排要 `today`/`now`/`meds` 三个运行态入参与 Application 级 context，放在这里两条路径的参数天然一致 | 既有 `ReminderRescheduleReportTest` 覆盖 `RunReport` 语义；本批未新增专属测试（该路径需真实 Application + 六个调度器） |
+| B07 pre-restore 快照「退路存在但不可达」 | `restore()` 每次都写 `files/backups/pre-restore-<yyyyMMdd-HHmmss>.ashkb`，那是误恢复后**唯一**退路；但备份页从不列出、无任何入口，用户只能进私有目录（做不到）。**更隐蔽**：命名只到秒，同一秒两次恢复会**静默覆盖**先写的那份 | ①新建 `data/repo/PreRestoreSnapshot.kt`：命名常量、`uniquePreRestoreName`（撞了追加 `-2`/`-3`…，绝不覆盖；极端退到毫秒）、`parsePreRestoreStamp`/`preRestoreCollisionIndex`/`isPreRestoreName`（**路径穿越拒绝**：含 `/`、`\`、`..` 一律不认）、`sortPreRestoreNames`（最近在前，同秒按序号倒序）、`PreRestoreStore`（`list`/`latest`/`read` 有界读）；②`restore()` 改用 `uniquePreRestoreName`，**落库值与命名逐字不变**，历史快照仍可读；③VM 新增 `_preRestoreSnapshot` + `refreshPreRestoreSnapshot()` + `undoFromPreRestoreSnapshot(password)`，后者把字节交给新抽的 `verifyBytes()`——与普通恢复**同一条**解密/自校验/密钥域检查路径（工单第 2 条明确要求复用），之后完全复用既有 `doRestore()`；④备份页新增 `PreRestoreSnapshotSection`（**无可用快照则不渲染**，不显示空入口）+ 口令框 + 「用该快照撤销」+ 提示「撤销本身也是一次恢复，执行前会再留一份快照，因此还能再撤回来」；⑤中英各 8 条 `backup_snapshot_*`。**口令不保存**：快照用当时那次恢复的口令加密，必须重输，只进内存态 `restorePassword`（`doRestore` 用毕清零） | `PreRestoreSnapshotTest` 13 条（命名解析 5 / 列举排序 4 / 读取 4，含「时间戳合法但含路径成分的名字必须被显式拒绝」「同秒碰撞追加后缀且绝不覆盖」「超上限标不可用」） |
+| C04 CI 只打印签名，不能证明发布签名身份 | `.github/workflows/ci.yml` 只有一条 `build-and-test` 且**无条件** `ASHKB_ALLOW_DEBUG_SIGNING=1`，验签仅在配了可选 secret 时才严格比对 ⇒ **任何 tag 都能产出 debug 签名的"正式包"**，CI 还绿着 | 拆两条：①`build-and-test`（`if: !startsWith(github.ref, 'refs/tags/')`）保留 debug 冒烟 + 可选比对，文件头写明「这类 APK 不得对外发布」；②`release`（`if: startsWith(github.ref, 'refs/tags/')`）**先验依赖**——keystore/三个口令缺任一即 `::error::`+`exit 1`，`ASHKB_EXPECTED_CERT_SHA256` **未配置直接失败**（不再是 `[ -n ]` 跳过），落 keystore 与 `local.properties` 后 `clean assembleRelease`，再 `apksigner verify --print-certs` 取 SHA-256 **逐字比对**。该 job **刻意不设** `ASHKB_ALLOW_DEBUG_SIGNING`：keystore 缺失/无效时 `app/build.gradle.kts` 的 taskGraph 钩子直接抛异常，不会安静产出 debug 签名的"正式包" | `ReleaseSigningWorkflowTest` 5 条静态守卫（正向 tag 触发 / 不得放行 debug / 摘要必填且不得 `[ -n ]` 跳过 / main 仍 debug 且排除 tag / 写明冒烟包不得发布） |
+
+**负向对照四轮**（均造「能解析的违规形状」）：给 `release` 加 `ASHKB_ALLOW_DEBUG_SIGNING` ⇒ 1 条红；
+`if [ -z "$EXPECTED" ]` 改 `[ -n ... ]` ⇒ 1 条红；release 的 `if` 取反 ⇒ 3 条红；删 main 的 `ASHKB_ALLOW_DEBUG_SIGNING` ⇒ 2 条红。
+每轮只红目标那几条，恢复后全绿，`.negctl` 残留 0。
+
+**守卫自身修过两次**（教训）：①第一版用「job 文本含不含 `refs/tags/`」识别发布 job，把**取反**的 `build-and-test`
+认成了 tag job（子串同样命中）⇒ 判据改为看 `if:` 行的**方向**；②第二版用具体变量名 `$ASHKB_EXPECTED_CERT_SHA256` 做判据，
+被负向对照用 `$EXPECTED` 绕过 ⇒ 改成语义正则 `^\s*if\s+\[\s*-n\s+"\$[A-Za-z_]+"\s*\]`，并**先剥注释**
+（`ci.yml` 里「这里刻意不设 …」这句说明文字否则会把自己判成违规）。
+
+**门禁** `E:\ASHKB\batch5-gate2.log`：BUILD SUCCESSFUL in 2m 13s；单测 **136 文件 / 1136 条** failures=0 errors=0 skipped=0；
+detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
+首次 `batch5-gate1.log` 因 7 条 `MagicNumber`（`PreRestoreSnapshot.kt:90/91/107/108` 裸 `15`/`16`）失败 ⇒ 抽 `STAMP_LENGTH` 后绿。
+
+**仍未做**：本批**未装机**（设备无线调试未开）；`versionCode` / `versionName` 仍 122 / "1.2.10"；
+C04 的 tag 触发只能在 GitHub 上验——**需维护者先配 5 个 secret**（见 CHANGELOG「十六 / C04」与下一节）。

@@ -95,4 +95,13 @@
          信息就是"线画在哪"。 -->
     <string name="backup_file_too_large">%1$s 约 %2$d MB，超过本机处理上限（%3$d MB），已拒绝——不会把整个文件读进内存。请确认选中的是本应用导出的文件。</string>
     <string name="backup_pick_read_failed">读取选中的文件失败——请确认文件仍可访问（未被删除、未被其他应用占用），或换一个位置再试。</string>
+    <!-- v1.2.11（缺陷工单 B07）：pre-restore 快照的应用内撤销。 -->
+    <string name="backup_snapshot_title">上一次恢复前的自动快照</string>
+    <string name="backup_snapshot_meta">%1$s · %2$s · 来源：本机恢复前自动留存</string>
+    <string name="backup_snapshot_status_ok">可用</string>
+    <string name="backup_snapshot_status_unavailable">不可用（文件缺失或损坏）</string>
+    <string name="backup_snapshot_note">撤销本身也是一次恢复：执行前会先为当前状态再留一份快照，因此还能再撤回来。</string>
+    <string name="backup_snapshot_password">快照口令（当时那次恢复所用的口令）</string>
+    <string name="backup_snapshot_undo">用该快照撤销</string>
+    <string name="backup_snapshot_missing">未找到可用的恢复前快照</string>
 </resources>

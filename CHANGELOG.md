@@ -863,6 +863,89 @@ R.string.backup_err_vault_too_many_slots, resArgs = listOf(N, MAX_SLOTS))`。中
   detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
 - 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版。
 
+### 十六、缺陷工单第 5 批：B05 / B07 / C04 · 2026-10-26 · 未发版
+
+工单最后三项。**不动库结构**（仍 `ASHKB_DB_VERSION = 20`，本批三处改动都不碰 schema）。
+第 1~4 批见上四节；本批之后**工单 22 项全部落地**。
+
+#### B05：恢复成功后运行态与提醒不刷新
+
+- **原状**：`BackupViewModel.doRestore()` 里 `restore()` 写库成功后只回显结果，**运行态与提醒都不重排**——
+  用户恢复完档案，首页卡片与闹钟仍是恢复前的（进程若一直存活，可能要等到下次重启才对上）。
+- **落地**：把 `AshkbApplication.onCreate()` 里那段启动期刷新（`invalidationTracker.refreshVersionsAsync()`
+  → 六条提醒链重排 → `purgeGhostSlots`）抽成 `internal suspend fun rescheduleAllChains(db, meds, today, now, purgeGhostSlots)`，
+  启动期与恢复后**共用同一段代码**（否则会出现第二套刷新逻辑，两处慢慢漂移）。
+  `doRestore()` 在 `v.rowsOk` 时调 `refreshRuntimeAfterRestore()`：先刷 Room 失效器（否则 UI 仍读旧缓存），
+  再重排六条链，失败经 `ReminderNotice.postIfFailed` 提示（B09 已有通道）。
+- **为什么抽到 `AshkbApplication` 而不是 `BackupRepository`**：重排需要 `today`/`now`/`meds` 三个运行态入参，
+  且六个调度器都依赖 `Application` 级 context；放在 Application 上，启动与恢复后两条路径的参数天然一致。
+
+#### B07：pre-restore 快照「退路存在但不可达」
+
+- **原状**：`BackupRepository.restore()` 每次恢复前都会把当前库导出一份加密快照写到
+  `files/backups/pre-restore-<yyyyMMdd-HHmmss>.ashkb`——那是误恢复后**唯一**的退路。但备份页从不列出它、
+  也没有任何入口能选它；用户只能靠文件管理器进私有目录（做不到），或重新恢复另一份备份（手上未必有）。
+  另有一个更隐蔽的问题：命名只到秒，**同一秒内两次恢复后写的会静默覆盖先写的**，而被覆盖的那份恰好是退路。
+- **落地**：
+  1. 新建 `data/repo/PreRestoreSnapshot.kt`：命名规则（`PRE_RESTORE_PREFIX` / `PRE_RESTORE_SUFFIX` /
+     `PRE_RESTORE_STAMP`）、碰撞后缀 `uniquePreRestoreName(stamp, exists)`（撞了就追加 `-2`/`-3`…，绝不覆盖；
+     极端情形退到毫秒级时间戳）、读侧解析 `parsePreRestoreStamp` / `preRestoreCollisionIndex` /
+     `isPreRestoreName`（**含路径穿越拒绝**：名字里带 `/`、`\`、`..` 一律不认）、`sortPreRestoreNames`（最近在前，
+     同秒按碰撞序号倒序）、`PreRestoreStore`（`list` / `latest` / `read`，有界读）。
+  2. `BackupRepository.restore()` 的快照写入改用 `uniquePreRestoreName`；**落库与命名逐字不变**，历史快照仍可读。
+  3. `BackupViewModel` 新增 `_preRestoreSnapshot` + `refreshPreRestoreSnapshot()` + `undoFromPreRestoreSnapshot(password)`；
+     后者把快照字节交给新抽出的 `verifyBytes()`——与普通恢复**同一条**解密 / 自校验 / 密钥域检查路径
+     （工单第 2 条明确要求复用），之后的确认与执行完全复用既有 `doRestore()`。
+  4. 备份页 `RestoreSection` 之前新增 `PreRestoreSnapshotSection`：有可用快照才渲染（无快照**不显示空入口**），
+     显示文件名 / 时间 / 来源说明、口令输入框、「用该快照撤销」按钮，以及一句关键提示
+     「撤销本身也是一次恢复：执行前会先为当前状态再留一份快照，因此还能再撤回来」。
+  5. 中英各 8 条新串（`backup_snapshot_*`），插在 `strings_backup.xml` 末尾。
+- **口令语义**：快照是用**当时那次恢复的口令**加密的，应用**不保存**它，用户必须重新输入；
+  输入后只进内存态 `restorePassword`，`doRestore` 用毕清零（与既有恢复链一致）。
+- **为什么不新造第二条恢复链**：两条链必然漂移（一条改了密钥域检查、另一条忘改就是安全洞）。
+  撤销与恢复的差别只有「字节从哪来」，其余必须逐字相同。
+
+#### C04：CI 只打印签名，不能证明发布签名身份
+
+- **原状**：`.github/workflows/ci.yml` 只有一条 `build-and-test`，且**无条件** `ASHKB_ALLOW_DEBUG_SIGNING=1`；
+  验签步骤仅在「配置了可选 secret」时才严格比对。结果：**任何一个 tag 都能产出一个 debug 签名的"正式包"**，而 CI 是绿的。
+- **落地**：拆成两条流水线——
+  - `build-and-test`（main / PR）：`if: !startsWith(github.ref, 'refs/tags/')`，保留 `ASHKB_ALLOW_DEBUG_SIGNING=1` 冒烟，
+    摘要比对保持**可选**语义（配了才比）。文件头写明「这类 debug 签名的 APK 不得对外发布」。
+  - `release`（仅 `refs/tags/`）：`if: startsWith(github.ref, 'refs/tags/')`。**先验外部依赖**——
+    keystore / 三个口令 secret 缺任一即 `::error::` + `exit 1`；`ASHKB_EXPECTED_CERT_SHA256` **未配置直接失败**
+    （不再是 `[ -n ]` 跳过）。然后落 keystore 与 `local.properties`，`gradle clean assembleRelease`，
+    最后 `apksigner verify --print-certs` 取 SHA-256 与预期**逐字比对**，不一致即失败。
+    这条 job **刻意不设** `ASHKB_ALLOW_DEBUG_SIGNING`：keystore 一旦缺失/无效，`app/build.gradle.kts` 的
+    taskGraph 钩子会直接抛异常，而不是安静产出一个 debug 签名的"正式包"。
+- **README**：C06 时改的「应用内撤销入口尚未实现」随本批改为「备份页可用它撤销上一次恢复，撤销本身也会先留一份新快照」。
+
+#### 回归与门禁
+
+- 新增 `PreRestoreSnapshotTest`（13 条）：命名与解析（写侧格式能被读侧原样解析回来、碰撞后缀仍解析回同一时间戳、
+  同秒追加后缀且绝不覆盖、非法名字一律不认、**时间戳合法但含路径成分的名字必须被显式拒绝**）、
+  列举排序（最近在前、同秒带后缀的在前、只列本应用快照、没有快照时 `latest` 为 null 且不创建目录）、
+  读取（逐字节一致、空文件标不可用且 `latest` 跳过它、超上限标不可用、拒绝非法名与不存在文件）。
+- 新增 `ReleaseSigningWorkflowTest`（5 条静态守卫）：存在**正向** tag 触发的发布 job、该 job 不得放行 debug 签名、
+  该 job 必须要求预期摘要（不得 `if [ -n "$VAR" ]` 跳过，必须 `[ -z "$VAR" ]` ⇒ `::error::` ⇒ `exit 1`）、
+  普通 main CI 仍用 debug 签名且显式排除 tag、文件头写明冒烟包不得发布。
+- 负向对照**四轮**（均造「能编译/能解析的违规形状」）：
+  ① 给 `release` job 加 `ASHKB_ALLOW_DEBUG_SIGNING` ⇒ `tag job 不得放行 debug 签名` 红；
+  ② 把 `if [ -z "$EXPECTED" ]` 改成 `if [ -n "$EXPECTED" ]` ⇒ `tag job 必须要求预期签名摘要而不是可选比对` 红；
+  ③ 把 release 的 `if` 取反 ⇒ 3 条红（发布 job 不存在 / 不得放行 debug 签名 / 摘要必填）；
+  ④ 删掉 main job 的 `ASHKB_ALLOW_DEBUG_SIGNING` ⇒ 2 条红。
+  每轮只红目标那几条，恢复后全绿，`.negctl` 备份残留 0。
+- **守卫自身修过一次**（值得记）：第一版用「job 文本含不含 `refs/tags/`」识别发布 job，
+  把取反的 `build-and-test` 认成了 tag job；第二版又用「job 里出现 `[ -n "$ASHKB_EXPECTED_CERT_SHA256" ]`」做判据，
+  被负向对照用 `$EXPECTED` 绕过。最终判据改成**语义匹配**：`^\s*if\s+\[\s*-n\s+"\$[A-Za-z_]+"\s*\]`，
+  且**先剥注释**（`ci.yml` 里「这里刻意不设 ASHKB_ALLOW_DEBUG_SIGNING」这句说明文字否则会把自己判成违规）。
+- 全门禁 `E:\ASHKB\batch5-gate2.log`：**BUILD SUCCESSFUL in 2m 13s**；
+  单测 **136 文件 / 1136 条** failures=0 errors=0 skipped=0；detekt **0**；
+  lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
+  首次门禁 `batch5-gate1.log` 因 7 条 `MagicNumber`（`PreRestoreSnapshot.kt:90/91/107/108` 裸 `15`/`16`）失败 ⇒
+  抽 `STAMP_LENGTH` 常量后重跑绿。
+- 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版、未装机。
+
 ## [v1.2.9] — 2026-10-10
 
 **两件事：①审查裁决项 2（「已结算」口径三处打架）统一；②首页补剂卡——补剂提醒/打卡从二级页搬到今日页。** 无库结构变更（枚举与状态都存字符串），可覆盖安装。

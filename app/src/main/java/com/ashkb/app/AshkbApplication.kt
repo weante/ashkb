@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.entity.KbEntry
+import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.data.repo.AttachmentRepository
 import com.ashkb.app.data.repo.BackupRepository
 import com.ashkb.app.data.repo.HealthRepository
@@ -21,6 +22,7 @@ import com.ashkb.app.reminder.EmergencyLockscreenPublisher
 import com.ashkb.app.reminder.ExerciseReminderScheduler
 import com.ashkb.app.reminder.MissedDoseReminder
 import com.ashkb.app.reminder.NotificationHelper
+import com.ashkb.app.reminder.ReminderHealth
 import com.ashkb.app.reminder.ReminderScheduler
 import com.ashkb.app.reminder.SedentaryReminderScheduler
 import com.ashkb.app.reminder.SupplementReminderScheduler
@@ -82,85 +84,14 @@ class AshkbApplication : Application() {
                 // 重复启动不会重复种入；用户自建内容不受影响
                 recipeRepository.seedIfMissing()
                 healthRepository.seedExercisePlans()
-                // 启动即重排未来 7 天闹钟（覆盖跨日 / 杀后台遗漏）
-                // v1.0.43：带上「今日已打卡槽位」——rescheduleAll 会重建今日未打卡槽位尚未到时的
-                // 升级重查，避免每次冷启动都清掉当天的 +30 / +60 提醒
+                // 启动即重排未来 7 天闹钟（覆盖跨日 / 杀后台遗漏），并同批物化计划槽位、
+                // 刷新锁屏急救卡与久坐链。整段编排与「恢复后刷新运行态」共用同一份实现
+                // （缺陷工单 B05：恢复成功后运行态仍是恢复前内容）。
                 val today = LocalDate.now()
                 val now = LocalDateTime.now()
                 val db = AppDatabase.get(this@AshkbApplication)
                 val meds = db.medicationDao().observeActive().first()
-                ReminderScheduler.rescheduleAll(
-                    // v1.2.9（裁决项 2 = A）：已结算集合（done / partial / skipped）——
-                    // partial / skipped 的槽位同样不该被重建升级重查。
-                    this@AshkbApplication, meds, medicationRepository.settledSlotRefs(today),
-                )
-                // v1.0.77（批次 3b）：**与提醒同批**物化计划槽位快照（今天-1 .. 今天+7）。
-                // 挂在这个位置而不是 ReminderScheduler 里：那是提醒层，不该反向依赖 DAO；
-                // 而窗口与提醒一致，是为了让「有提醒可发」与「有计划可评判」永远同时成立。
-                // 单独 runCatching：物化失败不该连带下面的提醒链与补发通知一起停摆。
-                runCatching {
-                    // v1.2.11（R2）：**存量**顺延幽灵槽位清理——必须排在物化之前。
-                    // v1.1.1 之前的顺延只改锚点、不清旧行，那些行如今日期都在过去，
-                    // `deleteOfMedFrom(today)` 永远碰不到，会被报表永久计为漏服。
-                    // 先删（按 `[顺延当天, 生效日)` 区间，判据见 domain/PostponeGhostSlots），
-                    // 再由下面的物化按当前锚点补回该有的行。
-                    // 闸门：一次性，跑过就写 prefs——这是删历史数据，不该每次冷启动都重扫全表。
-                    purgePostponeGhostSlotsOnce()
-                    val win = medicationRepository.plannedSlotWindow(today)
-                    medicationRepository.materializePlannedSlots(meds, win.from, win.to)
-                    // 昨天有未记录的剂量 → 一条汇总通知（每天最多一条，判定与去重见 MissedDoseReminder）
-                    MissedDoseReminder.checkAndNotify(this@AshkbApplication, today)
-                }.onFailure {
-                    Log.w("ASHKB", "materialize planned slots failed", it)
-                }
-                // v1.0.59 B5：三源提醒——各自 runCatching 兜底，互不影响（与 BootReceiver 对称）
-                val cfg = ReminderConfigRepository(this@AshkbApplication)
-                if (cfg.checkupEnabled()) {
-                    runCatching {
-                        CheckupReminderScheduler.rescheduleAll(
-                            this@AshkbApplication, db.checkupRecordDao().listAll(), today, now,
-                        )
-                    }
-                } else {
-                    CheckupReminderScheduler.cancelAllFuture(
-                        this@AshkbApplication, db.checkupRecordDao().listAll(),
-                    )
-                }
-                runCatching {
-                    BasdaiReminderScheduler.rescheduleAll(
-                        this@AshkbApplication, db.basdaiDao().latest(), cfg.basdaiCycleDays(), today, now,
-                    )
-                }
-                if (cfg.exerciseEnabled()) {
-                    runCatching {
-                        val activePlan = db.exercisePlanDao().active()
-                        val hasLogged = db.exerciseLogDao().byDate(today.toString()).isNotEmpty()
-                        ExerciseReminderScheduler.rescheduleAll(
-                            this@AshkbApplication, activePlan, hasLogged, today, now,
-                        )
-                    }
-                } else {
-                    ExerciseReminderScheduler.cancelAllFuture(this@AshkbApplication, today)
-                }
-                // v1.2.4：补剂提醒——与用药/复诊/BASDAI/运动同批重排。
-                // 补剂没有独立开关：频次是「每日」且填了时刻才排得出闹钟，没填时刻自然一条也不排
-                // （开关的语义在「有没有时刻」里，不需要第二个状态）。
-                runCatching {
-                    val sups = db.supplementDao().listActive()
-                    val loggedSups = db.supplementLogDao().byDate(today.toString())
-                        .mapNotNull { it.supId }.toSet()
-                    SupplementReminderScheduler.rescheduleAll(
-                        this@AshkbApplication, sups, loggedSups, today, now,
-                    )
-                }
-                // v1.0.66 B6a：锁屏紧急信息——启动时同步一次（兜住"改完数据后没进紧急卡页"的情况）；
-                // 开关关闭时该调用内部会撤下通知，故无需外层判断
-                runCatching { EmergencyLockscreenPublisher.refresh(this@AshkbApplication) }
-                // v1.0.68 C8a：久坐起身提醒——链式单发，启动时重排一次（开关关闭则不排）
-                runCatching { SedentaryReminderScheduler.rescheduleAll(this@AshkbApplication, now) }
-                // P2 例行检查：发作第 7 天警报 + 知识条目复核到期（insertAlertOnce 幂等）
-                healthRepository.checkFlareDayAlert(today)
-                healthRepository.checkReviewDue(today.toString())
+                rescheduleAllChains(db, meds, today, now, purgeGhostSlots = true)
             }.onFailure {
                 // v1.0.41：不能只写 Logcat——v1.0.39/40 的根因正是「首次失败被这里吞掉」，
                 // 后续二次触碰才抛 NoClassDefFoundError，导致崩溃留档只看到二次现象。同步留档。
@@ -204,6 +135,123 @@ class AshkbApplication : Application() {
             Log.i("ASHKB", "purged $removed ghost planned slots from pre-v1.1.1 postpones")
         }
         prefs.edit().putBoolean(KEY_GHOST_SLOT_PURGED, true).apply()
+    }
+
+    /**
+     * v1.2.11（缺陷工单 B05）：**刷新全部运行态**——用药提醒链 + 计划槽位 + 复诊 / BASDAI /
+     * 运动 / 补剂提醒 + 锁屏急救卡 + 久坐链。
+     *
+     * ### 为什么抽成一个函数
+     *
+     * 这件事有两个触发点，而它们的实现**必须逐字一致**：
+     *  1. 冷启动（[onCreate] 的 `appScope.launch`）；
+     *  2. **备份恢复成功之后**（`BackupViewModel.doRestore`）。
+     *
+     * 第 2 个点此前根本没有：恢复把整库换成了另一份数据，但闹钟、`planned_slots`、锁屏通知
+     * 全是恢复前按旧库排的。旧实现恢复结束只更新结果状态就报「恢复成功」，用户回到首页
+     * 看到的仍是旧药单、旧提醒（缺陷工单 B05 原文的症状）。
+     *
+     * 工单明确要求「优先抽取并复用现有启动刷新逻辑，不要复制第二份调度实现」，故本函数
+     * 就是启动期那段原样搬过来，两个调用点都调它——不存在第二份实现可漂移。
+     *
+     * ### 顺序不能换
+     *
+     * 先**物化** `planned_slots`（今日卡与完成度读这张表），再**重排**提醒
+     * （`ReminderScheduler` 读的正是刚写好的槽位）。与 A04 的
+     * `BackupViewModel.rematerializeAfterImport` 同款理由。
+     *
+     * ### 失败语义
+     *
+     * 用药链的重排报告**返回给调用方**（启动期只记日志；恢复路径要据此告诉用户
+     * 「数据已恢复但提醒没排上」，见 [ReminderNotice]）。其余各链保持启动期的原样：
+     * 各自 `runCatching` 兜底，互不影响——一条链失败不该连带其它链一起停摆。
+     *
+     * @param meds 当前在用药单。由调用方提供而不是这里查：启动期要
+     *   `observeActive().first()`（带 Room 失效通知），恢复后要 `listActive()`
+     *   （恢复是直接走 `supportDb()` 的裸 SQL，不触发 Room 失效，Flow 未必及时重发）。
+     * @param purgeGhostSlots 是否顺带跑存量顺延幽灵槽位清理（一次性、prefs 闸门，见
+     *   [purgePostponeGhostSlotsOnce]）。恢复后同样传 true：恢复进来的库可能来自旧版本，
+     *   里面可能带着那些会被报表永久计为漏服的行。
+     */
+    internal suspend fun rescheduleAllChains(
+        db: AppDatabase,
+        meds: List<Medication>,
+        today: LocalDate,
+        now: LocalDateTime,
+        purgeGhostSlots: Boolean,
+    ): ReminderHealth.RunReport {
+        // 启动即重排未来 7 天闹钟（覆盖跨日 / 杀后台遗漏）
+        // v1.0.43：带上「今日已打卡槽位」——rescheduleAll 会重建今日未打卡槽位尚未到时的
+        // 升级重查，避免每次冷启动都清掉当天的 +30 / +60 提醒
+        val report = ReminderScheduler.rescheduleAll(
+            // v1.2.9（裁决项 2 = A）：已结算集合（done / partial / skipped）——
+            // partial / skipped 的槽位同样不该被重建升级重查。
+            this, meds, medicationRepository.settledSlotRefs(today),
+        )
+        // v1.0.77（批次 3b）：**与提醒同批**物化计划槽位快照（今天-1 .. 今天+7）。
+        // 挂在这个位置而不是 ReminderScheduler 里：那是提醒层，不该反向依赖 DAO；
+        // 而窗口与提醒一致，是为了让「有提醒可发」与「有计划可评判」永远同时成立。
+        // 单独 runCatching：物化失败不该连带下面的提醒链与补发通知一起停摆。
+        runCatching {
+            // v1.2.11（R2）：**存量**顺延幽灵槽位清理——必须排在物化之前。
+            // v1.1.1 之前的顺延只改锚点、不清旧行，那些行如今日期都在过去，
+            // `deleteOfMedFrom(today)` 永远碰不到，会被报表永久计为漏服。
+            // 先删（按 `[顺延当天, 生效日)` 区间，判据见 domain/PostponeGhostSlots），
+            // 再由下面的物化按当前锚点补回该有的行。
+            // 闸门：一次性，跑过就写 prefs——这是删历史数据，不该每次冷启动都重扫全表。
+            if (purgeGhostSlots) purgePostponeGhostSlotsOnce()
+            val win = medicationRepository.plannedSlotWindow(today)
+            medicationRepository.materializePlannedSlots(meds, win.from, win.to)
+            // 昨天有未记录的剂量 → 一条汇总通知（每天最多一条，判定与去重见 MissedDoseReminder）
+            MissedDoseReminder.checkAndNotify(this, today)
+        }.onFailure {
+            Log.w("ASHKB", "materialize planned slots failed", it)
+        }
+        // v1.0.59 B5：三源提醒——各自 runCatching 兜底，互不影响（与 BootReceiver 对称）
+        val cfg = ReminderConfigRepository(this)
+        if (cfg.checkupEnabled()) {
+            runCatching {
+                CheckupReminderScheduler.rescheduleAll(
+                    this, db.checkupRecordDao().listAll(), today, now,
+                )
+            }
+        } else {
+            CheckupReminderScheduler.cancelAllFuture(this, db.checkupRecordDao().listAll())
+        }
+        runCatching {
+            BasdaiReminderScheduler.rescheduleAll(
+                this, db.basdaiDao().latest(), cfg.basdaiCycleDays(), today, now,
+            )
+        }
+        if (cfg.exerciseEnabled()) {
+            runCatching {
+                val activePlan = db.exercisePlanDao().active()
+                val hasLogged = db.exerciseLogDao().byDate(today.toString()).isNotEmpty()
+                ExerciseReminderScheduler.rescheduleAll(this, activePlan, hasLogged, today, now)
+            }
+        } else {
+            ExerciseReminderScheduler.cancelAllFuture(this, today)
+        }
+        // v1.2.4：补剂提醒——与用药/复诊/BASDAI/运动同批重排。
+        // 补剂没有独立开关：频次是「每日」且填了时刻才排得出闹钟，没填时刻自然一条也不排
+        // （开关的语义在「有没有时刻」里，不需要第二个状态）。
+        runCatching {
+            val sups = db.supplementDao().listActive()
+            val loggedSups = db.supplementLogDao().byDate(today.toString())
+                .mapNotNull { it.supId }.toSet()
+            SupplementReminderScheduler.rescheduleAll(this, sups, loggedSups, today, now)
+        }
+        // v1.0.66 B6a：锁屏紧急信息——同步一次（兜住"改完数据后没进紧急卡页"的情况）；
+        // 开关关闭时该调用内部会撤下通知，故无需外层判断
+        runCatching { EmergencyLockscreenPublisher.refresh(this) }
+        // v1.0.68 C8a：久坐起身提醒——链式单发，重排一次（开关关闭则不排）
+        runCatching { SedentaryReminderScheduler.rescheduleAll(this, now) }
+        // P2 例行检查：发作第 7 天警报 + 知识条目复核到期（insertAlertOnce 幂等）
+        runCatching {
+            healthRepository.checkFlareDayAlert(today)
+            healthRepository.checkReviewDue(today.toString())
+        }
+        return report
     }
 
     /**

@@ -75,6 +75,7 @@ import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.entity.LedgerStatus
 import com.ashkb.app.data.entity.LedgerType
 import com.ashkb.app.data.repo.BackupRepository
+import com.ashkb.app.data.repo.PreRestoreSnapshot
 import com.ashkb.app.domain.BackupPasswordRules
 import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.ui.components.DividerList
@@ -164,6 +165,8 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val davPicked by vm.davPicked.collectAsStateWithLifecycle()
+    // v1.2.11（缺陷工单 B07）：撤销入口的数据源；null ⇒ 不渲染撤销块
+    val preRestoreSnapshot by vm.preRestoreSnapshot.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     // v1.2.10（审查 CRITICAL-2）：两个文件选择器的回调都在**主线程**上，而读入是纯 IO。
@@ -273,6 +276,10 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
     // 所以放在根部零重组代价。
     LaunchedEffect(Unit) { vm.refreshAttachStats() }
 
+    // v1.2.11（缺陷工单 B07）：撤销入口要显示「最近一次恢复前快照」，那是只读的文件系统
+    // 快照（不是 Flow），同样在**进入页面**这一事件上拉一次；恢复结束后由 VM 自己再刷新。
+    LaunchedEffect(Unit) { vm.refreshPreRestoreSnapshot() }
+
     // v1.2.10（审查 HIGH-3）：**离开本页就把密文丢掉**。此前 `pickedBytes` 是个纯 `remember`，
     // 全文件没有一处把它置空——它活的是 NavBackStackEntry 的生命周期，而不是"这屏可见"的时间：
     // 用户选完备份、看一眼、返回主界面，几 MiB 的密文仍挂在内存里，直到该条目被回收。
@@ -328,6 +335,16 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                     vm.loadDavBackups()
                 },
             )
+
+            // ---- v1.2.11（缺陷工单 B07）：用最近一次恢复前快照撤销 ----
+            // 没有快照就整块不渲染（工单第 6 条：不留空入口）。
+            preRestoreSnapshot?.let { snap ->
+                UndoSnapshotBlock(
+                    snapshot = snap,
+                    busy = busy,
+                    onUndo = { pass -> vm.undoFromPreRestoreSnapshot(pass) },
+                )
+            }
 
             // ---- 恢复演练 ----
             SectionCard(title = stringResource(R.string.backup_drill_title)) {
@@ -860,6 +877,73 @@ private fun RestoreSection(
         }
 
         restoreResult?.let { r -> RestoreResultBlock(result = r) }
+    }
+}
+
+/**
+ * v1.2.11（缺陷工单 B07）：**用最近一次恢复前快照撤销**。
+ *
+ * 工单六条要求在这里逐条兑现：
+ *  1. 只显示**最近一次**恢复留下的那份快照（[BackupViewModel.preRestoreSnapshot] 已是 `latest()`）。
+ *  2. 撤销与普通恢复共用同一条链路（VM 里走 `verifyBytes` → `doRestore`），本块只负责
+ *     「把口令交给 VM」+「确认」，不自己解密、不自己写库。
+ *  3. 撤销本身也是一次恢复 ⇒ 它同样会先给当前状态留快照（`repo.restore()` 内建），
+ *     所以「撤销的撤销」也有退路；界面上明说这一点，避免用户以为撤销不可逆。
+ *  4. 口令**不保存**：快照用的是当时那次恢复的口令，用户必须重新输入；输入框只活在
+ *     本块的 `remember` 里，离开即丢。
+ *  5. 快照缺失/损坏/超限 ⇒ VM 报错，入口置灰或提示（`available` 为 false 时不给按钮）。
+ *  6. 没有快照时**整块不渲染**（调用处 `if (snapshot != null)`），不留空入口。
+ */
+@Composable
+private fun UndoSnapshotBlock(
+    snapshot: PreRestoreSnapshot,
+    busy: Boolean,
+    onUndo: (String) -> Unit,
+) {
+    var pass by remember { mutableStateOf("") }
+    SectionCard(title = stringResource(R.string.backup_snapshot_title)) {
+        // 先说清「撤销也是一次恢复」——这是工单第 3 条要求对用户明示的语义，
+        // 否则用户会以为撤销是终局、不敢点。
+        Text(
+            stringResource(R.string.backup_snapshot_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        // 快照的身份：文件名（含写盘时的日期时间）+ 大小。文件名是「什么时候恢复的」
+        // 唯一可信来源（stamp 在写盘那一刻定下，不随后续时区/时钟变化）。
+        Text(
+            stringResource(R.string.backup_snapshot_meta, snapshot.name, formatFileSize(snapshot.sizeBytes)),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            stringResource(
+                if (snapshot.available) R.string.backup_snapshot_status_ok
+                else R.string.backup_snapshot_status_unavailable
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (snapshot.available) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.error,
+        )
+        if (!snapshot.available) {
+            // 文件在、但读不了（损坏/权限/超限）：说清状态并**不给**按钮，
+            // 而不是让用户点了才报错（工单第 6 条：不留空入口，也不给死按钮）。
+            return@SectionCard
+        }
+        Spacer(Modifier.height(Spacing.xs))
+        SecretField(
+            value = pass, onValueChange = { pass = it },
+            label = stringResource(R.string.backup_snapshot_password),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        OutlinedButton(
+            onClick = { onUndo(pass) },
+            enabled = !busy && pass.isNotBlank(),
+            modifier = Modifier.heightIn(min = Size.touchMin),
+        ) { Text(stringResource(R.string.backup_snapshot_undo)) }
     }
 }
 

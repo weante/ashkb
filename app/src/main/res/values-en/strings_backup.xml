@@ -92,4 +92,12 @@
     <string name="backup_verify_incomplete">Verification did not fully pass: %1$s</string>
     <string name="backup_file_too_large">%1$s is about %2$d MB, which exceeds the local processing limit (%3$d MB), so it was rejected — the whole file is never loaded into memory. Please make sure you selected a file exported by this app.</string>
     <string name="backup_pick_read_failed">Could not read the selected file — please check that it is still accessible (not deleted, not locked by another app), or try a copy in another location.</string>
+    <string name="backup_snapshot_title">Automatic snapshot from the last restore</string>
+    <string name="backup_snapshot_meta">%1$s · %2$s · Source: kept automatically before a restore on this device</string>
+    <string name="backup_snapshot_status_ok">Usable</string>
+    <string name="backup_snapshot_status_unavailable">Not usable (file missing or damaged)</string>
+    <string name="backup_snapshot_note">Undoing is itself a restore: a fresh snapshot of the current state is kept first, so you can still undo the undo.</string>
+    <string name="backup_snapshot_password">Snapshot password (the one used for that restore)</string>
+    <string name="backup_snapshot_undo">Undo with this snapshot</string>
+    <string name="backup_snapshot_missing">No usable pre-restore snapshot found</string>
 </resources>

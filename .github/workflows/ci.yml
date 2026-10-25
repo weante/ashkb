@@ -1,4 +1,4 @@
-# CI：构建 + 单测 + 静态分析 + 三道工程门（批次 2 起）
+# CI：构建 + 单测 + 静态分析 + 三道工程门（批次 2 起）+ 发布签名门（v1.2.11 / C04）
 #
 # 本仓库没有 gradlew（本地用固定版 Gradle 8.7），故用 gradle/actions/setup-gradle 提供。
 #
@@ -9,20 +9,36 @@
 #   4. `verifySpecSync`    —— 版本号在代码与 README、HANDOFF-STATUS 两处文档必须一致
 #                            （HANDOFF.md 自 v1.2.9 起不再记版本号；单测条数不再校验，见 build.gradle.kts）
 #   5. `git diff app/schemas` —— 改了实体就必须提交导出的 schema（否则库结构变更无人评审）
-#   6. 验签               —— 打印签名摘要；配置 ASHKB_EXPECTED_CERT_SHA256 后严格比对
+#   6. 验签               —— **分支 CI 只打印摘要；tag / 发布构建必须命中预期 SHA-256**
 #
-# ⚠️ CI 无正式 keystore：app/build.gradle.kts 从 v1.0.75 起在「产出 release 包但缺签名」时
-# 会**直接失败**，故这里显式设置 ASHKB_ALLOW_DEBUG_SIGNING=1（仅 CI 冒烟，产物不得发布）。
+# ⚠️ 两条流水线的签名语义是**故意不同**的（v1.2.11 缺陷工单 C04）：
+#
+#   · `build-and-test`（main / PR）：CI 没有正式 keystore，`app/build.gradle.kts` 从 v1.0.75 起
+#     在「产出 release 包但缺签名」时**直接失败**，故这里显式设置 ASHKB_ALLOW_DEBUG_SIGNING=1
+#     放行，只做冒烟。**这类 debug 签名的 APK 不得对外发布**（无法覆盖安装已发布版本，
+#     用户只能卸载重装并丢数据）。
+#   · `release`（仅 `refs/tags/`）：**绝不放行 debug 签名**。缺 keystore、缺预期摘要 secret、
+#     摘要不匹配三者任一 ⇒ 失败。也就是说 tag 打出来的包必须能证明是正式签名身份。
+#
+# 外部依赖（不由本仓库伪造，维护者需在 GitHub 配置）：
+#   secrets.ASHKB_KEYSTORE_BASE64      正式 keystore 的 base64（tag 构建用）
+#   secrets.ASHKB_STORE_PASSWORD       keystore 口令
+#   secrets.ASHKB_KEY_ALIAS            密钥别名
+#   secrets.ASHKB_KEY_PASSWORD         密钥口令
+#   secrets.ASHKB_EXPECTED_CERT_SHA256 正式证书的 SHA-256（小写十六进制，冒号可有可无）
 name: CI
 
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
 jobs:
   build-and-test:
+    # 分支/PR 冒烟：**不**在 tag 上跑（tag 走下面那条强制正式签名的 release 流水线）
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     env:
       ASHKB_ALLOW_DEBUG_SIGNING: "1"
@@ -55,7 +71,7 @@ jobs:
           fi
           echo "app/schemas 无漂移。"
 
-      - name: Verify APK signature
+      - name: Verify APK signature (smoke only)
         run: |
           APK=app/build/outputs/apk/release/app-release.apk
           test -f "$APK" || { echo "::error::release APK 未产出"; exit 1; }
@@ -69,3 +85,91 @@ jobs:
             exit 1
           fi
           echo "签名摘要：$DIGEST"
+          echo "⚠️ 本次产物为 debug 签名冒烟包，仅用于 CI 验证，不得对外发布。"
+
+  release:
+    # v1.2.11（缺陷工单 C04）：**只有 tag 才走这条**，且必须命中正式签名。
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      # ---- 先验外部依赖，缺一个就失败（绝不伪造"已配置"）----
+      - name: Require release signing material
+        env:
+          KEYSTORE_B64: ${{ secrets.ASHKB_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.ASHKB_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ASHKB_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ASHKB_KEY_PASSWORD }}
+          EXPECTED: ${{ secrets.ASHKB_EXPECTED_CERT_SHA256 }}
+        run: |
+          missing=0
+          for v in KEYSTORE_B64 STORE_PASS KEY_ALIAS KEY_PASS; do
+            if [ -z "${!v}" ]; then echo "::error::缺少 secret $v（tag 构建必须使用正式签名）"; missing=1; fi
+          done
+          if [ -z "$EXPECTED" ]; then
+            echo "::error::未配置 secret ASHKB_EXPECTED_CERT_SHA256——tag 构建必须能证明签名身份，不允许跳过比对"
+            missing=1
+          fi
+          [ "$missing" -eq 0 ] || exit 1
+
+      # ---- 写入 keystore 与 local.properties，让 app/build.gradle.kts 走正式签名分支 ----
+      - name: Materialize keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ASHKB_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.ASHKB_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ASHKB_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ASHKB_KEY_PASSWORD }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/signing"
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/signing/ashkb-release.jks"
+          test -s "$RUNNER_TEMP/signing/ashkb-release.jks" || { echo "::error::keystore 解码为空"; exit 1; }
+          {
+            echo "ashkb.store.file=$RUNNER_TEMP/signing/ashkb-release.jks"
+            echo "ashkb.store.password=$STORE_PASS"
+            echo "ashkb.key.alias=$KEY_ALIAS"
+            echo "ashkb.key.password=$KEY_PASS"
+          } >> local.properties
+
+      # 注意：这里**刻意不设** ASHKB_ALLOW_DEBUG_SIGNING。
+      # 一旦 keystore 缺失或无效，app/build.gradle.kts 的 taskGraph 钩子会直接抛异常，
+      # 而不是安静地产出一个 debug 签名的"正式包"。
+      - name: Build signed release
+        run: gradle clean assembleRelease --console=plain
+
+      - name: Assert release signature matches expected SHA-256
+        env:
+          EXPECTED: ${{ secrets.ASHKB_EXPECTED_CERT_SHA256 }}
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -f "$APK" || { echo "::error::release APK 未产出"; exit 1; }
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs "$APK" > certs.txt || { echo "::error::APK 验签失败（未签名或已损坏）"; exit 1; }
+          cat certs.txt
+          DIGEST=$(grep -i 'SHA-256 digest' certs.txt | head -1 | sed 's/.*digest: *//' | tr 'A-Z' 'a-z')
+          [ -n "$DIGEST" ] || { echo "::error::读不到签名摘要"; exit 1; }
+          WANT=$(echo "$EXPECTED" | tr 'A-Z' 'a-z')
+          if [ "$DIGEST" != "$WANT" ]; then
+            echo "::error::签名摘要不匹配：实际 $DIGEST，预期 $WANT（debug 签名或错误的 keystore 一律失败）"
+            exit 1
+          fi
+          echo "✅ 正式签名身份已验证：$DIGEST"
+
+      - name: Upload signed release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ashkb-release-${{ github.ref_name }}
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error

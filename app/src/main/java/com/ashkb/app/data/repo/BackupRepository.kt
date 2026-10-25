@@ -370,7 +370,13 @@ class BackupRepository(private val context: Context) {
                 vaultKeyOrThrow(), snapshotPassword, recoverySlot(), snapshot.payload,
                 BackupEngine.schemaVersion(supportDb()), nowIso())
             val dir = File(context.filesDir, "backups").apply { mkdirs() }
-            val snapFile = dir.resolve("pre-restore-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))}.ashkb")
+            // v1.2.11（缺陷工单 B07）：**同名绝不覆盖**。
+            //
+            // 文件名原本只有到秒的时间戳。两次恢复落在同一秒时（撤销紧接着恢复、脚本化演练、
+            // 秒级时钟回拨），第二份快照会静默覆盖第一份——而被覆盖的那份恰好是用户唯一的退路，
+            // 工单第 6 条正是「快照轮换/清理不得把唯一退路静默删掉」。碰撞时加 `-2`/`-3` 后缀。
+            val stamp = LocalDateTime.now().format(PRE_RESTORE_STAMP)
+            val snapFile = dir.resolve(uniquePreRestoreName(stamp) { dir.resolve(it).exists() })
             snapFile.writeBytes(snapBytes)
             val modeNote = when (mode) {
                 BackupEngine.RestoreMode.FULL_ROLLBACK -> context.getString(R.string.backup_restore_full_rollback)

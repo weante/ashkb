@@ -16,6 +16,8 @@ import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.db.AttachmentSyncCounts
 import com.ashkb.app.data.entity.BackupLedger
 import com.ashkb.app.data.repo.BackupRepository
+import com.ashkb.app.data.repo.PreRestoreSnapshot
+import com.ashkb.app.data.repo.PreRestoreStore
 import com.ashkb.app.domain.BackupPasswordRules
 import com.ashkb.app.reminder.ReminderScheduler
 import com.ashkb.app.ui.ReminderNotice
@@ -30,6 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 /**
  * P4 R20 备份与数据自主 ViewModel。
@@ -82,6 +85,8 @@ class BackupViewModel(
         _davUser.value = usr
         // 附件统计不在这里拉：页面用 LaunchedEffect 拉，既满足"进页面就有数"，
         // 又能在每次回到该页时刷新，避免 init 只跑一次的陈旧快照
+        // v1.2.11（缺陷工单 B07）：撤销入口的快照同样交给页面的 LaunchedEffect 刷新，
+        // 这样「上次恢复留下的快照」不会因为 VM 存活时间而陈旧（应用重启、恢复完成都会变）。
     }
 
     // ---- 恢复流程状态（协议 §6 五步） ----
@@ -97,6 +102,16 @@ class BackupViewModel(
     private val _restoreMode = MutableStateFlow(BackupEngine.RestoreMode.FULL_ROLLBACK)
     val restoreMode: StateFlow<BackupEngine.RestoreMode> = _restoreMode
     fun setRestoreMode(mode: BackupEngine.RestoreMode) { _restoreMode.value = mode }
+
+    // ---- v1.2.11（缺陷工单 B07）：pre-restore 快照的应用内撤销 ----
+    /**
+     * 最近一次恢复前的自动快照。null = 没有可用快照 ⇒ UI **不渲染**撤销入口
+     * （工单：「无快照时不显示空入口」）。
+     */
+    private val _preRestoreSnapshot = MutableStateFlow<PreRestoreSnapshot?>(null)
+    val preRestoreSnapshot: StateFlow<PreRestoreSnapshot?> = _preRestoreSnapshot
+
+    private val preRestoreStore = PreRestoreStore(app)
 
     /** 恢复口令（内存暂存，用毕清零；pre-restore 快照复用同一口令）。 */
     private var restorePassword: CharArray? = null
@@ -300,20 +315,71 @@ class BackupViewModel(
         viewModelScope.launch {
             _busy.value = true
             try {
-                val d = repo.decryptAndSelfCheck(bytes, password.toCharArray())
-                _pendingRestore.value = d
-                _pendingFileName.value = fileName
-                _restoreResult.value = null
-                wipeRestorePassword()
-                restorePassword = password.toCharArray()
-                val rows = org.json.JSONObject(d.payload).getJSONObject("manifest")
-                    .keys().asSequence().map { k ->
-                    org.json.JSONObject(d.payload).getJSONObject("tables")
-                        .getJSONArray(k).length() }.sum()
-                info(app.getString(
-                    R.string.vm_restore_verify_ok,
-                    d.schemaVersion, d.createdAt.take(19), rows,
-                ))
+                verifyBytes(fileName, bytes, password)
+            } catch (e: Exception) {
+                fail(errText(e).ifEmpty { app.getString(R.string.vm_restore_verify_failed) })
+            } finally { _busy.value = false }
+        }
+    }
+
+    /**
+     * 解密 + 自校验 + 落到 `_pendingRestore`（恢复链路的公共前半段）。
+     *
+     * 抽出来是为了让**撤销快照**走完全同一条路径（工单第 2 条「复用 `verifyBackup` 的
+     * 解密、自校验和 A05 密钥域检查」）：撤销与普通恢复的差别只在「字节从哪来」，
+     * 后面的解密、自校验、口令暂存、待确认块都必须逐字一致，否则就出现了第二条恢复链。
+     */
+    private suspend fun verifyBytes(fileName: String, bytes: ByteArray, password: String) {
+        val d = repo.decryptAndSelfCheck(bytes, password.toCharArray())
+        _pendingRestore.value = d
+        _pendingFileName.value = fileName
+        _restoreResult.value = null
+        wipeRestorePassword()
+        restorePassword = password.toCharArray()
+        val payload = org.json.JSONObject(d.payload)
+        val rows = payload.getJSONObject("manifest").keys().asSequence().map { k ->
+            payload.getJSONObject("tables").getJSONArray(k).length() }.sum()
+        info(app.getString(
+            R.string.vm_restore_verify_ok,
+            d.schemaVersion, d.createdAt.take(19), rows,
+        ))
+    }
+
+    /** 重新读一次「最近一次恢复前快照」（进页面、以及每次恢复结束后都要刷新）。 */
+    fun refreshPreRestoreSnapshot() {
+        viewModelScope.launch {
+            _preRestoreSnapshot.value = withContext(Dispatchers.IO) { preRestoreStore.latest() }
+        }
+    }
+
+    /**
+     * v1.2.11（缺陷工单 B07）：用最近一次 pre-restore 快照撤销。
+     *
+     * 三件事按顺序做，缺一不可：
+     *  1. **读**快照字节（有界读；文件缺失/损坏/超限都在这里抛，走 `errText` 报给用户）。
+     *  2. 交给 [verifyBytes] —— 与普通恢复同一条解密/自校验/密钥域检查路径。
+     *  3. 之后的确认与执行完全复用 [doRestore]；`repo.restore()` 本身会先为**当前**状态
+     *     再留一份快照，于是工单第 3 条「撤销本身也是一次恢复」天然成立，
+     *     而且「撤销的撤销」也有退路。
+     *
+     * 口令：**不保存**。快照是用当时那次恢复的口令加密的，用户必须重新输入；
+     * 这里只把口令传进内存态 `restorePassword`（`doRestore` 用毕清零）。
+     */
+    fun undoFromPreRestoreSnapshot(password: String) {
+        if (_busy.value) return
+        val snapshot = _preRestoreSnapshot.value ?: run {
+            fail(app.getString(R.string.backup_snapshot_missing))
+            return
+        }
+        if (!snapshot.available) {
+            fail(app.getString(R.string.backup_snapshot_missing))
+            return
+        }
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                val bytes = withContext(Dispatchers.IO) { preRestoreStore.read(snapshot) }
+                verifyBytes(snapshot.name, bytes, password)
             } catch (e: Exception) {
                 fail(errText(e).ifEmpty { app.getString(R.string.vm_restore_verify_failed) })
             } finally { _busy.value = false }
@@ -342,6 +408,18 @@ class BackupViewModel(
                 val v = repo.restore(d, pass, mode)
                 wipeRestorePassword()
                 _restoreResult.value = v
+                // v1.2.11（缺陷工单 B05）：**报成功之前**把运行态刷成恢复后的库。
+                //
+                // 缺陷原状：恢复把整库换成了另一份数据，但闹钟、`planned_slots`、锁屏急救卡
+                // 全是恢复前按旧库排的，而刷新只在冷启动跑。用户看到「恢复成功」回到首页，
+                // 药单与提醒仍是旧的，直到下次冷启动才对齐（锁屏急救卡同理——那是急救场景，
+                // 显示恢复前的诊断/联系人后果最重）。
+                //
+                // 顺序与理由见 `AshkbApplication.rescheduleAllChains`：与启动期同一份实现，
+                // 不复制第二份调度。只在 `rowsOk` 时刷新——校验没过的事务已整体回滚，
+                // 库还是恢复前的样子，重排一遍纯属多余（工单：「恢复失败/回滚路径不得触发
+                // 不必要的重排」）。
+                if (v.rowsOk) refreshRuntimeAfterRestore()
                 if (v.rowsOk) info(app.getString(R.string.vm_restore_done, modeNote, v.totalRows))
                 else info(app.getString(R.string.vm_restore_incomplete, verifyIssues(v)))
             } catch (e: Exception) {
@@ -356,6 +434,9 @@ class BackupViewModel(
                 _pendingRestore.value = null
                 _pendingFileName.value = null
                 wipeRestorePassword()
+                // v1.2.11（缺陷工单 B07）：这一次恢复刚刚写出了**新的** pre-restore 快照，
+                // 撤销入口要指向它（而不是上一次的那份），否则用户想撤的其实是更早的历史。
+                refreshPreRestoreSnapshot()
                 _busy.value = false
             }
         }
@@ -472,6 +553,40 @@ class BackupViewModel(
             )
         }
         val report = ReminderScheduler.rescheduleAll(app, meds, medRepo.settledSlotRefs(today))
+        ReminderNotice.postIfFailed(app, report)
+    }
+
+    /**
+     * v1.2.11（缺陷工单 B05）：恢复成功后把**全部运行态**刷成恢复后的库。
+     *
+     * 与 A04 的 [rematerializeAfterImport] 的区别：那条只管「用药提醒链 + 计划槽位」，
+     * 因为档案 JSON 导入只改 profile / medications 两张表。恢复换的是整库——复诊、BASDAI、
+     * 运动、补剂四条提醒链的输入（各自表）、锁屏急救卡（诊断 / 联系人 / 用药）、久坐链
+     * 全部可能变了，故必须走 [AshkbApplication.rescheduleAllChains] 这份完整实现。
+     *
+     * 工单的三条硬要求对应的实现选择：
+     *  1. 「优先抽取并复用现有启动刷新逻辑，不要复制第二份调度实现」⇒ 调启动期那个函数本身。
+     *  2. 「恢复失败/回滚路径不得触发不必要的重排」⇒ 调用点已用 `v.rowsOk` 把关。
+     *  3. 「使提醒、计划槽位、锁屏急救卡和用户可见数据与恢复后的 DB 一致」⇒
+     *     前三个由 rescheduleAllChains 覆盖；「用户可见数据」靠 Room 的失效通知：
+     *     恢复走 `supportDb()` 裸 SQL（不经过 Room 的写入包装），Room 的 InvalidationTracker
+     *     未必感知，故这里**主动** `invalidate()` 一次，让所有 `observeXxx` Flow 立刻重发。
+     *     少了这一步，页面会一直停在恢复前的旧列表上——这正是缺陷的可见症状。
+     */
+    private suspend fun refreshRuntimeAfterRestore() = withContext(Dispatchers.IO) {
+        val db = AppDatabase.get(app)
+        // 恢复走 `supportDb()` 裸 SQL（不经过 Room 的写入包装）。Room 在每张表上装的触发器
+        // 仍会记下「该表已变」，但 `InvalidationTracker` 是**惰性**消费的——要等下一次查询
+        // 或轮询才刷新版本号。这里主动推一次，让所有 `observeXxx` Flow 立刻重发。
+        // 少了这一步，页面会停在恢复前的旧列表上，而这正是缺陷的可见症状。
+        runCatching { db.invalidationTracker.refreshVersionsAsync() }
+        val report = (app as AshkbApplication).rescheduleAllChains(
+            db = db,
+            meds = db.medicationDao().listActive(),
+            today = LocalDate.now(),
+            now = LocalDateTime.now(),
+            purgeGhostSlots = true,
+        )
         ReminderNotice.postIfFailed(app, report)
     }
 
