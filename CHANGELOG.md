@@ -408,7 +408,27 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
 
 ---
 
-### 九、体验与结构整理（2026-10-24 · 未发版）
+## [v1.2.11] — 2026-10-26
+
+**v1.2.10 之后逐批落地、一直没发版的九批改动，本版一次发出。** 依次是：体验与结构整理（补剂「部分完成」入口、孤儿字符串清理）、
+R1 + R2（急救卡药名行改换行、清理存量顺延幽灵槽位）、化验「临界」第四态、缺陷修复执行工单的**全部 22 项**（分五批：第 1 批 10 项、
+第 2 批 4 项需迁移、第 3 批 3 项、第 4 批 2 项、第 5 批 3 项）。
+
+**⚠️ 本版有库结构变更**：`ASHKB_DB_VERSION` **19 → 20**（第 2 批的 `*_inclusive` 两列 + `ai_abnormal` 列，`MIGRATION_19_20` 已入库，
+导出 schema `app/schemas/com.ashkb.app.data.db.AppDatabase/20.json` 已提交）。首次启动会跑迁移，**升级前请照例先做一份备份**。
+
+**⚠️ 本版起 CI 能证明发布签名身份**（C04）：tag 构建必须配齐 5 个 secret，`apksigner` 读出的证书 SHA-256 与
+`ASHKB_EXPECTED_CERT_SHA256` 逐字比对，不一致即失败；main / PR 的分支流水线仍用 debug 签名冒烟、且已显式排除 tag。
+本机已实测三次探针 tag 闭环（正例成功、错摘要失败、缺 secret 秒级失败），探针与 run 均已清理。
+
+**工单 22 项全部落地并推送**：第 1 批 `28d0a30`、第 2 批 `1f92cdc`、第 3 批 `a59286e`、第 4 批 `60d1391`、第 5 批 `dedabee`
+（+ 文档补记 `4856235` / `da2cb4d`）。每批都过了完整门禁（`batch1-gate2` … `batch5-gate2`），最后一次
+**136 测试文件 / 1136 条全绿、detekt 0、lint 0 Error**。
+
+> 说明：下列「九 ~ 十六」各节写于每批落地当时，正文里的「本批未发版 / 未 bump」是**当时的状态记录**，原样保留；
+> 现在它们随本版一起发布，因此标题里的「· 未发版」已去掉。
+
+### 九、体验与结构整理（2026-10-24 · 随 v1.2.11 发布）
 
 发布后回补的一批「不改变行为」的整理，全部只动 `ui/` 层与资源，不动 `domain/`、`data/`、ViewModel 的对外接口。
 
@@ -443,7 +463,7 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
 - 拆分后完整门禁 `E:\ASHKB\agroup-gate1.log`：BUILD SUCCESSFUL in 1m 29s；单测 **118 文件 / 1003 条**全绿；detekt 0；lint **167**（159 Warning + 8 Information，**0 Error**）；`verifySpecSync` 通过。
 - 本批**未发版、未 bump 版本号**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19），未装机（设备无线调试未开）。
 
-### 十、R1 + R2：急救卡药名行改换行、清理存量顺延幽灵槽位（2026-10-24 · 未发版）
+### 十、R1 + R2：急救卡药名行改换行、清理存量顺延幽灵槽位（2026-10-24 · 随 v1.2.11 发布）
 
 维护者裁决（m15462）：「R1胶囊换行 / R2 同意」——**R2 此前多轮裁决都是「不做」**（清理属删用户数据），本次明确同意，故落地。
 
@@ -471,7 +491,7 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
 - 完整门禁 `E:\ASHKB\r1r2-gate1.log`：BUILD SUCCESSFUL in 2m 51s；单测 **119 文件 / 1009 条**全绿；detekt **0**；lint **167**（159 Warning + 8 Information，**0 Error**，且无一条落在本轮改动的文件上）；`verifySpecSync` 通过。
 - 本批**未发版、未 bump 版本号**（仍 `versionCode 122 / versionName "1.2.10"`，`ASHKB_DB_VERSION` 19）。R1 已装机真机复验（见上）；R2 的清理只在启动时跑一次，本次装机启动已执行（`app_prefs` 闸门 `ghost_slot_purged_v1` 已置真），未单独构造历史幽灵数据验证。
 
-### 十一、「临界」第四态：化验值距参考边界 ≤5% 量程时单独标注（2026-10-24 · 未发版）
+### 十一、「临界」第四态：化验值距参考边界 ≤5% 量程时单独标注（2026-10-24 · 随 v1.2.11 发布）
 
 审查裁决项 5 的落地。此前 `ClinicalThresholds.LAB_NEAR_BOUNDARY_RATIO` 是**零引用死常量**——KDoc 写着「距任一参考边界 ≤ 5% 量程视为临界」，但代码里从没用过，化验判读只有偏高 / 偏低 / 正常三态。
 
@@ -513,7 +533,7 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
 
 - **未真机复验**：需要一条参考范围内、距边界 ≤5% 的真实化验值才看得出效果；设备当前无线调试状态未知。
 - 未发版、未 bump 版本号。
-### 十二、缺陷工单第 1 批（10 项不需 schema 的修复）· 2026-10-25 · 未发版
+### 十二、缺陷工单第 1 批（10 项不需 schema 的修复）· 2026-10-25 · 随 v1.2.11 发布
 
 工单《ASHKB 缺陷修复执行工单-724cf39.md》第 1 批：**不动 Room schema** 的 10 项。
 第 2 批（A01 / A04 / A06 / B01）需要一次 v19→v20 迁移，另开一笔。
@@ -589,7 +609,7 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
   detekt **0**；lint total **168** = **0 Error** + 160 Warning + 8 Information，
   **本轮改动文件零命中**；`verifySpecSync` 通过。
 - 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版。
-### 十三、缺陷工单第 2 批：四项需 v19→v20 迁移的修复 · 2026-10-25 · 未发版
+### 十三、缺陷工单第 2 批：四项需 v19→v20 迁移的修复 · 2026-10-25 · 随 v1.2.11 发布
 
 工单 `ASHKB-缺陷修复执行工单-724cf39.md` 里剩下的四项（A01 / A04 / A06 / B01）都需要落库结构配合，
 按维护者裁决「先做不需 schema 的 10 项、再单独一笔 v20 做剩 4 项」放在这一批。**库版本 19 → 20**，
@@ -700,7 +720,7 @@ isCycleGatedBy(freq, route) = CUSTOM || MONTHLY || (Q2W && route == "injection")
   detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
 - 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版。
 
-### 十四、缺陷工单第 3 批：C02 / C03 / C06 · 2026-10-25 · 未发版
+### 十四、缺陷工单第 3 批：C02 / C03 / C06 · 2026-10-25 · 随 v1.2.11 发布
 
 工单里三项**不动库结构**的加固与文档一致性。第 1 批（A02/A03/A05/A07/B02/B03/B04/B06/C01/C05）、
 第 2 批（A01/A04/A06/B01）见上两节；本批之后工单还剩 B05 / B07 / B08 / B09 / C04。
@@ -774,7 +794,7 @@ R.string.backup_err_vault_too_many_slots, resArgs = listOf(N, MAX_SLOTS))`。中
   detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
 - 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版。
 
-### 十五、缺陷工单第 4 批：B09 / B08 · 2026-10-25 · 未发版
+### 十五、缺陷工单第 4 批：B09 / B08 · 2026-10-25 · 随 v1.2.11 发布
 
 两项**不动库结构**的修复：把「保存成功、提醒却没排上」从无声变成可操作提示，把 AI 导入的
 粘贴草稿从「转屏即失」变成常驻 ViewModel。第 1~3 批见上三节；本批之后工单只剩 **B05 / B07 / C04**。
@@ -863,7 +883,7 @@ R.string.backup_err_vault_too_many_slots, resArgs = listOf(N, MAX_SLOTS))`。中
   detekt **0**；lint total **169** = **0 Error** + 161 Warning + 8 Information；`verifySpecSync` 通过。
 - 本批**未改** `versionCode` / `versionName`（仍 122 / "1.2.10"），未发版。
 
-### 十六、缺陷工单第 5 批：B05 / B07 / C04 · 2026-10-26 · 未发版
+### 十六、缺陷工单第 5 批：B05 / B07 / C04 · 2026-10-26 · 随 v1.2.11 发布
 
 工单最后三项。**不动库结构**（仍 `ASHKB_DB_VERSION = 20`，本批三处改动都不碰 schema）。
 第 1~4 批见上四节；本批之后**工单 22 项全部落地**。
