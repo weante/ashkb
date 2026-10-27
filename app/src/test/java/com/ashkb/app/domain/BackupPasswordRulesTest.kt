@@ -50,6 +50,39 @@ class BackupPasswordRulesTest {
         )
     }
 
+    /**
+     * v1.2.12（C01 真机遗留）：标签里的「≥6 位」在真机上原样显示，而下限早已是 12 位。
+     *
+     * 这不是文案瑕疵而是**误导**：用户照着「≥6 位」敲 8 位，两个按钮静默变灰，
+     * 屏幕上没有任何一行字解释为什么点不动。所以断言分两层：
+     * ① 标签与提示都把位数交给占位符，不再写死数字；
+     * ② 调用点确实把 [BackupPasswordRules.MIN_LENGTH] 传了进去——只改字符串不改调用点，
+     *    格式化参数缺失会直接崩在运行期，比写死更难查。
+     */
+    @Test
+    fun `口令标签与提示的位数都来自同一个常量`() {
+        for (file in listOf("app/src/main/res/values/strings.xml", "app/src/main/res/values-en/strings.xml")) {
+            val xml = readSource(file)
+            val field = xml.substringAfter("<string name=\"backup_password_field\">", "")
+                .substringBefore("</string>")
+            val short = xml.substringAfter("<string name=\"backup_password_too_short\">", "")
+                .substringBefore("</string>")
+            assertTrue("$file 的标签必须带 %1\$d 占位符，否则位数又会与常量漂移：$field", field.contains("%1\$d"))
+            assertFalse("$file 的标签不得写死 6 位：$field", field.contains("6 位") || field.contains("6 characters"))
+            assertTrue("$file 缺少口令过短的提示文案", short.contains("%1\$d"))
+        }
+
+        val screen = readSource("app/src/main/java/com/ashkb/app/ui/backup/BackupScreen.kt")
+        assertTrue(
+            "BackupScreen 的标签必须把 MIN_LENGTH 传给占位符，否则 %1\$d 无值可填",
+            screen.contains("R.string.backup_password_field, BackupPasswordRules.MIN_LENGTH"),
+        )
+        assertTrue(
+            "口令不足时必须就地给出原因，不能只把按钮变灰",
+            screen.contains("R.string.backup_password_too_short, BackupPasswordRules.MIN_LENGTH"),
+        )
+    }
+
     private fun repoRoot(): File {
         var dir: File? = File(".").absoluteFile
         while (dir != null) {

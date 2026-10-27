@@ -44,8 +44,9 @@
     <string name="backup_local_storage_note">本机文件存于 app 私有目录（files/backups），可通过分享另存到下载 / 云盘 / 电脑。</string>
     <string name="backup_modify_dav">修改 WebDAV 配置</string>
     <string name="backup_no_file_selected">未选择备份文件</string>
-    <string name="backup_password_field">备份口令（≥6 位）</string>
+    <string name="backup_password_field">备份口令（≥%1$d 位）</string>
     <string name="backup_password_longpress_hint">长按右侧图标可显示明文</string>
+    <string name="backup_password_too_short">至少 %1$d 位才能新建备份（恢复旧备份不受此限）</string>
     <string name="backup_prerestore_note">「执行恢复」将先对当前数据做 pre-restore 快照（可撤销退路），</string>
     <string name="backup_processing">处理中…（加密 / 网络操作可能需要数十秒）</string>
     <string name="backup_profile_json_note">明文 JSON：档案 + 在用药清单（不含打卡日志）。新设备导入后可快速建档。</string>

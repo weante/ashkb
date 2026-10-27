@@ -551,8 +551,20 @@ private fun LocalBackupSection(vm: BackupViewModel, busy: Boolean) {
     SectionCard(title = stringResource(R.string.backup_local_full)) {
         SecretField(
             value = backupPass, onValueChange = { backupPass = it },
-            label = stringResource(R.string.backup_password_field),
+            label = stringResource(R.string.backup_password_field, BackupPasswordRules.MIN_LENGTH),
             modifier = Modifier.fillMaxWidth(),
+            // v1.2.12（C01 遗留）：此前标签写死「≥6 位」而新建下限已是 12 位——输入 8 位时
+            // 按钮静默变灰，用户得不到任何解释。标签与提示都从同一个常量取，杜绝再次漂移。
+            supportingText = if (backupPass.isNotEmpty() && !BackupPasswordRules.newBackupOk(backupPass)) {
+                {
+                    Text(
+                        stringResource(R.string.backup_password_too_short, BackupPasswordRules.MIN_LENGTH),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            } else {
+                null
+            },
         )
         Spacer(Modifier.height(Spacing.sm))
         val shareTitle = stringResource(R.string.backup_save_share)
