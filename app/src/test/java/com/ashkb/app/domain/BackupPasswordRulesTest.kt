@@ -72,7 +72,10 @@ class BackupPasswordRulesTest {
             assertTrue("$file 缺少口令过短的提示文案", short.contains("%1\$d"))
         }
 
-        val screen = readSource("app/src/main/java/com/ashkb/app/ui/backup/BackupScreen.kt")
+        // 这两处调用点在 LocalBackupSection 里。v1.2.13（C1-①）把 1325 行的 BackupScreen.kt
+        // 按分区拆成 8 个文件后，写死单个路径会立刻失配，所以改成扫整个 ui/backup 目录：
+        // 断言的本意是「调用点确实存在」，而不是「它恰好在某个具体文件里」。
+        val screen = readSourcesUnder("app/src/main/java/com/ashkb/app/ui/backup")
         assertTrue(
             "BackupScreen 的标签必须把 MIN_LENGTH 传给占位符，否则 %1\$d 无值可填",
             screen.contains("R.string.backup_password_field, BackupPasswordRules.MIN_LENGTH"),
@@ -93,4 +96,11 @@ class BackupPasswordRulesTest {
     }
 
     private fun readSource(relative: String): String = File(repoRoot(), relative).readText()
+
+    /** 把某个源码目录下所有 .kt 拼起来读——用于断言「某调用点在目录里某处」。 */
+    private fun readSourcesUnder(relativeDir: String): String {
+        val dir = File(repoRoot(), relativeDir)
+        val files = dir.walkTopDown().filter { it.isFile && it.extension == "kt" }.sortedBy { it.path }
+        return files.joinToString("\n") { it.readText() }
+    }
 }

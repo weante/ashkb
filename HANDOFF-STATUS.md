@@ -1,6 +1,7 @@
 # ASHKB 状态交接文档
 
 > **时点快照**：截至 **v1.2.12（versionCode 124）· 2026-10-29 · C01 口令标签遗留修正（v1.2.11 装机走查发现）**，**已落地、门禁全绿、已推送并发布**（发布提交 `f39dead`，附注标签 `v1.2.12`（tag 对象 `a84cff9`）→ `f39dead`；Release **GitHub Latest**，release id `427925638`，资产 `ashkb-1.2.12-release.apk` **5,278,382 B**，sha256 `F54DE718…E7DE`，**由 tag 触发的 CI 正式签名构建产出**，`apksigner` 证书摘要 `38ca80a6…d7d` 与 `ASHKB_EXPECTED_CERT_SHA256` 逐字一致）。上一版 **v1.2.11（versionCode 123）· 2026-10-26 · 体验整理 + R1/R2 + 化验「临界」第四态 + 缺陷修复执行工单全部 22 项（五批）**，已全部落地、门禁全绿、已推送并发布（第 1 批 `28d0a30` / 第 2 批 `1f92cdc` / 第 3 批 `a59286e` / 第 4 批 `60d1391` / 第 5 批 `dedabee`，+ 文档补记 `4856235`、`da2cb4d`，+ 发布提交 `4e40137`；逐批取证见文末「九 ~ 十六」节）。发布形态：**GitHub Latest**，release id `424324363`，资产 `ashkb-1.2.11-release.apk` 5,277,782 B，sha256 `280EFC55…1938`（**CI 在 tag 上构建的产物**，C04 已逐字比对签名摘要），附注标签 `v1.2.11`（tag 对象 `0e9535c`）→ `4e40137`。**v1.2.11 有库结构变更：`ASHKB_DB_VERSION` 19 → 20**（`MIGRATION_19_20` + schema `20.json` 已入库），首次启动跑迁移，升级前先备份；**v1.2.12 无库结构变更**（仍 20）。再上一版 **v1.2.10（versionCode 122）· 2026-10-19 · 审查第二批 / 第三批 + 裁决项 3、6、7 + §6.7 + 按需用药每天一次 + UI 2.0 批次 B–E + §06 双主题验收 + 真机启动崩溃修复**（release id `416558911`，资产 5,213,292 B，sha256 `9C03C518…FF89`，2026-10-21 就地重做过一次），更早 **v1.2.9（versionCode 121）**（release id `410782041`）、**v1.2.8（versionCode 120）**（id `408053469`）。
+> **2026-10-31 工作树状态**：v1.2.12 之后又落了一批**未发版**改动（Compose 性能审查 ①：`BackupScreen` 从 1325 行拆成 8 个文件，纯结构动作、无行为变更），已过全门禁（1137 条 / 136 文件、detekt 0、lint 0 Error、verifySpecSync 过）但**未 bump 版本号、未发布**。版本号仍 `versionCode 124` / `versionName "1.2.12"`；按维护者裁决，等剩下的活都做完再一次性发版。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号以 `app/build.gradle.kts` 为准（v1.2.9 起**不再把单测条数抄进文档**，见根 `build.gradle.kts` 里 `verifySpecSync` 的注释）。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -11,15 +12,16 @@
 
 | 项 | 结果 |
 |---|---|
-| 工作树 | **干净，全部已在 `origin/main`**：v1.2.10 发布提交 `45b0435`（106 files / +7097 / −2044）；此前 `5ecbf33`（v1.2.9 裁决项 1）、`6285d69`、`86e50df`、`c0ee3b1`、`f68350b`、`b1781c8`（裁决项 3）。附注标签 `v1.2.10`（tag 对象 `0649fb2`）→ `45b0435`，`v1.2.9` → `c0ee3b1`（远端 `refs/tags/v1.2.10^{}` / `v1.2.9^{}` 均已核对）。发布记录回填（本行所在提交）随后推送 |
+| 工作树 | **干净，全部已在 `origin/main`**：最新推送提交 `b249190`（§7 / §3.2 口径重写）；本批 C1-① 拆分改动随本行所在提交推送。历史：v1.2.10 发布提交 `45b0435`（106 files / +7097 / −2044）；此前 `5ecbf33`（v1.2.9 裁决项 1）、`6285d69`、`86e50df`、`c0ee3b1`、`f68350b`、`b1781c8`（裁决项 3）。附注标签 `v1.2.10`（tag 对象 `0649fb2`）→ `45b0435`，`v1.2.9` → `c0ee3b1`（远端 `refs/tags/v1.2.10^{}` / `v1.2.9^{}` 均已核对）。发布记录回填（本行所在提交）随后推送 |
 | 全量单测 | **全绿，0 失败 / 0 错误 / 0 跳过**（约 102 个测试文件；**实际条数以 CI 为准，文档不记数**——v1.2.9 起如此）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
 | APK 版本 | **v1.2.11 已由 CI 构建并发布**：`aapt dump badging` 核对为 versionCode 123 / versionName 1.2.11，正式证书 `38ca80a6…d7d`（`apksigner --print-certs` 实测，未回退 debug 签名），**5,277,782 B**，sha256 `280EFC55…1938`。⚠️ 本地同源码构建的 `app-release.apk` 是 **5,277,782 B / sha256 `D66CF5A8…FB93A`**——**体积相同、摘要不同**，因为 APK 内嵌 `META-INF` 签名块带时间戳、且 Gradle 打包顺序受文件系统枚举影响，**这不代表内容有差异**；发布用的是 CI 产物（C04 保证其证书摘要正确）。上一版 v1.2.10 为 versionCode 122 / versionName 1.2.10（本地构建，5,213,292 B） |
 | 本版版本 | versionCode 124 / versionName 1.2.12；`ASHKB_DB_VERSION` 仍 **20**（**无库结构变更、无新迁移**，升级不跑迁移） |
 | 本版内容（v1.2.12） | **C01 口令标签遗留修正**（v1.2.11 装机走查照出）：`backup_password_field` 中英标签由写死的「≥6 位」改为占位符 `%1$d`、调用点传 `BackupPasswordRules.MIN_LENGTH`，新增 `backup_password_too_short` 中英两条（口令不足就地红字说明，不再只是静默变灰），`BackupPasswordRulesTest` 补 1 条守卫（标签/提示不得写死数字 + 调用点必须传常量，只改字符串会缺格式化参数在运行期崩）。门禁 `E:\ASHKB\v1212-gate1.log` 全绿（**1137 条 / 136 文件**，detekt 0，lint 184 = 0 Error，verifySpecSync 过），真机复核标签已变「≥12 位」 |
+| 未发布的改动（在工作树上） | **C1-① `BackupScreen` 拆分**（2026-10-31，纯结构动作）：`ui/backup/BackupScreen.kt` **1325 → 332 行**，按分区拆出 7 个新文件（`BackupRestoreSection.kt` 306 / `BackupSyncSection.kt` 246 / `BackupSheets.kt` 181 / `BackupRecoverySection.kt` 179 / `BackupLocalSection.kt` 153 / `BackupLedgerSection.kt` 119 / `BackupFormat.kt` 19）；13 个跨文件符号 `private` → `internal`；detekt 基线 307 → 301（删掉 6 条：4 条 `MagicNumber` + 2 条 `MaxLineLength`，都是本次在代码里修掉/改名的条目失效，**没有新增豁免**）；`BackupPasswordRulesTest` 的源码断言由「读单个文件」改为「扫 `ui/backup` 整个目录」。门禁 `E:\ASHKB\c1-split-gate1.log` 全绿。**未 bump 版本号、未入 Release** |
 | 审查裁决进度 | **裁决项 1、2 已落地并发布（v1.2.9）；裁决项 3 已落地（未发布）**。① 对乙酰氨基酚 `MedClass.NSAID` → 新增 `MedClass.ANALGESIC`，`DrugInteractionKeys` 的 `nsaid`/`nsaid_longterm` 摘除 acetaminophen，新增 2 条回归（`MedicationInteractionChainTest`）；②「已结算」统一到 `AdherenceCalc.SETTLED_STATUSES` 唯一口径——删掉 `MedicationRepository.doneSlotRefs`、`ReminderReceiver` 改引 `settledSlotRefs`、`TodayItem` 新增 `partial`/`isSettled`、今日页 partial 不再显示成「漏服」也不计入待办，连带按铁律重写 4 条 detekt 复杂度（不进基线）并清掉 2 条签名过期的基线条目；③ **口服不再提供「每两周」**——新增 `ui/me/MedEditSections.kt` 的 `routeVisible`（chips 按 route 过滤 + 保留当前值逃生口）、`MedEditScreen.onPrimary()` 提交拦截 + `med_route_frequency_error` 红字，**domain 层刻意不动**（`ScheduleCalc.isCycleGatedBy` 只加 KDoc），新增 10 条回归（`MedRouteFrequencyGuardTest`）。其余 5 项待裁决；其中**裁决项 6、7 与审查第二、三批（含 §6.7）已落地、门禁全绿、未发版**（见文末「批次 B」）；另按维护者指令（m00936）落地**按需用药常驻首页 + 每天只记一次**（见文末「批次 C」） |
 | B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
-| GitHub 正式版（Latest） | **v1.2.11**（2026-10-26，release id `424324363`，资产 `ashkb-1.2.11-release.apk` 5,277,782 B，sha256 `280efc55…1938`，**由 tag 触发的 CI 正式签名构建产出**，`apksigner` 证书摘要 `38ca80a6…d7d` 与 `ASHKB_EXPECTED_CERT_SHA256` 逐字一致）；上一版 **v1.2.10**（id `416558911`，5213292 B，`109909e0…0186`）、**v1.2.9**（id `410782041`，5224936 B，`413f82b8…`）、**v1.2.8**（id `408053469`，5220504 B，`ece175f8…`）、**v1.2.7**（id `407916739`，5220504 B，`e09e6990…`）、**v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——v1.2.11 的摘要取自**上传前对同一份 CI 产物**的 `Get-FileHash`（发布后 `gh api` 回读 `assets[].digest` 逐字一致）；v1.2.10 及更早六版为**本地构建**，摘要与本地 `Get-FileHash` **逐字节一致** |
+| GitHub 正式版（Latest） | **v1.2.12**（2026-10-29，release id `427925638`，资产 `ashkb-1.2.12-release.apk` 5,278,382 B，sha256 `F54DE718…E7DE`，附注标签 `v1.2.12` → `f39dead`，CI tag 构建，正式签名）；上一版 **v1.2.11**（2026-10-26，release id `424324363`，资产 `ashkb-1.2.11-release.apk` 5,277,782 B，sha256 `280efc55…1938`，**由 tag 触发的 CI 正式签名构建产出**，`apksigner` 证书摘要 `38ca80a6…d7d` 与 `ASHKB_EXPECTED_CERT_SHA256` 逐字一致）；上一版 **v1.2.10**（id `416558911`，5213292 B，`109909e0…0186`）、**v1.2.9**（id `410782041`，5224936 B，`413f82b8…`）、**v1.2.8**（id `408053469`，5220504 B，`ece175f8…`）、**v1.2.7**（id `407916739`，5220504 B，`e09e6990…`）、**v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——v1.2.11 的摘要取自**上传前对同一份 CI 产物**的 `Get-FileHash`（发布后 `gh api` 回读 `assets[].digest` 逐字一致）；v1.2.10 及更早六版为**本地构建**，摘要与本地 `Get-FileHash` **逐字节一致** |
 | GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 / v1.2.7 / v1.2.8 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |
 
 > **最关键的一句话**：真机走查（Xiaomi 15 Pro / Android 16，被测制品 = v1.0.70 发布资产，SHA-256 逐字节一致）已完成：
@@ -113,7 +115,7 @@ gh release edit v1.0.70 --prerelease=false --latest
 |---|---|---|
 | **R16 批量 CSV / JSON 导入**（模板 + 导入预检） | **待需求方拍板** | v2.1 定为 P1，但 **v3 需求表已不继承**（R14 / R15 / R16 均未继承）。按 v3 可判「不在本期范围」 |
 | **趋势页方案 B「总览 + 展开」** | 未做 | 顶部「指标总览」卡（每指标一行：名称 + 当前值 + 变化 + sparkline），点行进详情大图。方案 A 已落 v1.0.45、C 已落 v1.0.54；若继续做 B，**必须基于 C 已实现的「点格展开大图」收敛**，否则两套详情入口重复 |
-| **Compose 性能审查剩余结构性重构** | **7 项中 3 项已完成 / 1 项判定不做 / 剩 3 项未做**（2026-10-31 逐项实测更新，旧版把这 7 项一概写成「未做」是错的） | ① **MedEdit 已拆、Backup 未拆**：`ui/me/MedEditSections.kt`（739 行）早已独立成文件，`MedEditScreen.kt` 收敛到 425 行；`ui/backup/BackupScreen.kt` 仍 **1325 行**未做字段级拆分 ⇒ **未完成（只剩 Backup 一侧）**。② **未做**：各 root `Screen` 里 `collectAsState` 实测 `CheckupScreen` 10 / `SymptomScreen` 6 / `ExerciseScreen` 5 / `BackupScreen` 4 / `KnowledgeScreen` 3 / `TodayScreen` 3（`EmergencyScreen` / `MedEditScreen` / `ProfileEditScreen` / `ReminderCheckScreen` / `WellnessScreen` 的 root 函数为 0，已由子 Composable 各自收集）。③ **未做**：`BackupViewModel.kt` **20 个** `MutableStateFlow`、`ReportViewModel.kt` **7 个**，均未合并成单一 `UiState`。④ ✅ **已完成**（v1.0.40 + 批次 11）：`AppShell.kt` 只剩 `meVm` / `wellnessVm` / `checkupVm` / `emergencyVm` 四个在 shell 里创建，且每个都有**多路由共用**的硬理由（`AppShell.kt:189-212` 的注释逐条写了三条下沉判据）；其余 8 个 VM 全部在各自的 `composable<X>` 里 `viewModel(factory = ...)` 取，返回栈语义不变。⑤ ❌ **已判定不做**：项目既有先例一律是「默认截断 5 条 + 显式展开」，改成进父 `LazyListScope` 的 `LazyColumn` 会破坏 `DividerList` 现用的 `RowScope` 契约。⑥ **未做**：14 个文件共 37 处 `verticalScroll`（`BackupScreen.kt` 6、`CheckupLabImaging.kt` 6、`SymptomDialogs.kt` 3，其余各 1~2）。⑦ ✅ **已完成**（v1.0.86 / 批次 11）：`domain/DateProvider.kt` 已是进程级单例，改监听 `ACTION_DATE_CHANGED` / `ACTION_TIME_CHANGED` / `ACTION_TIMEZONE_CHANGED` 三条系统广播（**不再用 `delay` 推算零点**——`postDelayed` 按 `uptimeMillis` 计时，深睡不计时，夜里会漏跨日），注册 `RECEIVER_NOT_EXPORTED`（API 33+），并保留 `refreshIfStale()` 供各页 `ON_RESUME` 兜底；7 个 VM 已全部改用它 |
+| **Compose 性能审查剩余结构性重构** | **7 项中 4 项已完成 / 1 项判定不做 / 剩 2 项未做**（2026-10-31 逐项实测更新；旧版把这 7 项一概写成「未做」是错的，旧计数口径也有误） | ① ✅ **已完成**（2026-10-31，C1-①，见文末小节）：MedEdit 早已拆（`ui/me/MedEditSections.kt` 739 行 / `ui/me/MedEditScreen.kt` 425 行）；Backup 也已拆——`ui/backup/BackupScreen.kt` **1325 → 332 行**，按分区新增 7 个文件（`BackupRestoreSection.kt` 306 / `BackupSyncSection.kt` 246 / `BackupSheets.kt` 181 / `BackupRecoverySection.kt` 179 / `BackupLocalSection.kt` 153 / `BackupLedgerSection.kt` 119 / `BackupFormat.kt` 19）。② **未做**：各 root `Screen` 里 `collectAsState` 实测 `CheckupScreen` 10 / `SymptomScreen` 6 / `ExerciseScreen` 5 / `BackupScreen` 4（拆分后这 4 条就在根函数 `BackupScreen` 自己身上，已达标）/ `KnowledgeScreen` 3 / `TodayScreen` 3（`EmergencyScreen` / `MedEditScreen` / `ProfileEditScreen` / `ReminderCheckScreen` / `WellnessScreen` 的 root 函数为 0，已由子 Composable 各自收集）。③ **未做**：`BackupViewModel.kt` **20 个** `MutableStateFlow`、`ReportViewModel.kt` **7 个**，均未合并成单一 `UiState`。④ ✅ **已完成**（v1.0.40 + 批次 11）：`AppShell.kt` 只剩 `meVm` / `wellnessVm` / `checkupVm` / `emergencyVm` 四个在 shell 里创建，且每个都有**多路由共用**的硬理由（`AppShell.kt:189-212` 的注释逐条写了三条下沉判据）；其余 8 个 VM 全部在各自的 `composable<X>` 里 `viewModel(factory = ...)` 取，返回栈语义不变。⑤ ❌ **已判定不做**：项目既有先例一律是「默认截断 5 条 + 显式展开」，改成进父 `LazyListScope` 的 `LazyColumn` 会破坏 `DividerList` 现用的 `RowScope` 契约。⑥ **未做**：14 个文件共 20 处 `verticalScroll` **真实调用**（`CheckupLabImaging.kt` 5、`BackupSheets.kt` 2、`SymptomDialogs.kt` 2，其余各 1：`BackupScreen.kt` / `DisclaimerScreen` / `AttachmentSheet` / `EmergencyEventSheet` / `ExerciseScreen` / `KbDetailDialog` / `MedEditScreen` / `ProfileEditScreen` / `ReminderCheckScreen` / `RecipesScreen` / `WellnessScreen`）。⚠️ 旧版写「37 处」是**关键字计数口径**（把注释与 `import` 一起数了，全仓关键字出现 40 次）；拆分后 backup 目录只剩 3 处真实调用（`BackupScreen.kt:209`、`BackupSheets.kt:61` / `:117`），与拆分前 `.orig` 逐处对应，零丢失。⑦ ✅ **已完成**（v1.0.86 / 批次 11）：`domain/DateProvider.kt` 已是进程级单例，改监听 `ACTION_DATE_CHANGED` / `ACTION_TIME_CHANGED` / `ACTION_TIMEZONE_CHANGED` 三条系统广播（**不再用 `delay` 推算零点**——`postDelayed` 按 `uptimeMillis` 计时，深睡不计时，夜里会漏跨日），注册 `RECEIVER_NOT_EXPORTED`（API 33+），并保留 `refreshIfStale()` 供各页 `ON_RESUME` 兜底；7 个 VM 已全部改用它 |
 | **S1b 滑杆手势回归测试** | ❌ **已实测证伪，不落地** | Robolectric 能注入触摸，但**裸 M3 `Slider` 也拖不动**——环境能力边界，不是应用缺陷。**勿再起这个坑** |
 | **知识库完整编辑器 / 内容导入导出** | 后移 | 明确「后移阶段 2 之后」 |
 | **文档不一致** | 已修（本次） | 见本文件末尾「本次复验修正」 |
@@ -286,7 +288,7 @@ gh release edit v1.0.70 --prerelease=false --latest
 
 **C. 可自行开工（无需外部输入）**
 
-1. **Compose 性能重构剩下的 3 项**（§3.2 那行）：`BackupScreen` 字段级拆分、6 个屏幕顶层 Flow 下沉、`BackupViewModel` / `ReportViewModel` 合并单一 `UiState`、Sheet 内嵌套 `verticalScroll` 冲突。
+1. **Compose 性能重构剩下的 2 项**（§3.2 那行）：① ~~`BackupScreen` 字段级拆分~~ —— **已于 2026-10-31 完成**（1325 → 332 行 + 7 个分区文件，见文末小节）；② 深层 Flow 下沉（`CheckupScreen` 10 / `SymptomScreen` 6 / `ExerciseScreen` 5 等 root 收集）；③ `BackupViewModel`（20 个 `MutableStateFlow`）/ `ReportViewModel`（7 个）合并单一 `UiState`。⚠️ 注意 `BackupScreen` 根函数的 4 条 Flow 已随拆分落到位，不要再按旧口径重复做。
 2. **B6 钥匙扣二维码重做**（§3.1 的 4 处已定位缺陷）。**验证方法必须是「与 segno 逐格比对」**，不能自编自解自测。
 3. ~~`DividerList` 展平~~ —— 已判定不做（见 §3.2 ⑤）。
 
@@ -1196,3 +1198,36 @@ C01 遗留，修复后随 **v1.2.12** 发布（`backup_password_field` 改占位
 **测试数据已回滚**：走查期间新建的 `TestDrugB05 20mg` 及其打卡记录、以及那次恢复产生的测试化验记录均已删除；
 设备最终状态 = 走查前（只剩真实药品「依那西普 25mg · 停用于 2026-10-08 · 原因：经济原因」）。
 **设备侧设置已还原**：`uimode night no`、`auto_time_zone 1`、`time_zone Asia/Hong_Kong`、`wm density reset`、`font_scale 1.0`。
+---
+
+## C1-① `BackupScreen` 字段级拆分（2026-10-31 · 未发版 · 未 bump 版本号）
+
+**性质**：纯结构动作——签名、注解、文案、状态来源、业务逻辑**一律未改**；无库结构变更、无新迁移、无 `strings.xml` 改动。
+
+| 文件 | 行数 | 说明 |
+|---|---|---|
+| `ui/backup/BackupScreen.kt` | **1325 → 332** | 只剩根 Composable + 分区装配 |
+| `ui/backup/BackupRestoreSection.kt` | 306 | 恢复区 |
+| `ui/backup/BackupSyncSection.kt` | 246 | WebDAV 同步区 |
+| `ui/backup/BackupSheets.kt` | 181 | `WebDavSheet` / `DavBackupPickerSheet` / `DavBackupRow` |
+| `ui/backup/BackupRecoverySection.kt` | 179 | 恢复码区 |
+| `ui/backup/BackupLocalSection.kt` | 153 | 本机备份区 |
+| `ui/backup/BackupLedgerSection.kt` | 119 | 台账区 |
+| `ui/backup/BackupFormat.kt` | 19 | `formatFileSize` / `formatBytes` |
+
+`BackupViewModel.kt`（703 行）未动。
+
+**连带处理三件事**：
+
+1. **源码静态断言放宽路径范围**——`BackupPasswordRulesTest` 原本 `readSource(".../ui/backup/BackupScreen.kt")`，断言的两处调用点拆分后落在 `BackupLocalSection.kt:114` / `:121`。改为 `readSourcesUnder("app/src/main/java/com/ashkb/app/ui/backup")`（递归拼所有 `.kt`）。理由写进测试注释：断言本意是「调用点确实存在」，不是「它恰好在某个具体文件里」。
+2. **消掉两条历史问题**（按项目铁律：历史问题进基线、基线外新问题改代码）——`BackupFormat.kt` 把 `1_024` / `1_048_576` 提成 `BYTES_PER_KB` / `BYTES_PER_MB` 常量；台账那条 150 列长行折成 `val label = if (...) {...} else {...}` + `Text(label)`。baseline 里按「文件名 + 字面量」登记的 4 条 `MagicNumber:BackupScreen.kt$1_024.0/...` 与 2 条 `MaxLineLength` 因此失配，一并删除（307 → **301** 条），**没有新增任何豁免**。保留 `CyclomaticComplexMethod` / `LongMethod` 两条——签名未变、根函数体仍 241 行，问题真实存在。
+3. **逐行核对零丢失**——从 `.orig` 按 28 个声明区间取正文，归一化（`internal`→`private`、去掉新增常量与注释）后与新版全集比对：**丢失 0 行**；多出 27 行全是上述两处重写。26 个未改动声明逐行 100% 一致。
+
+**负向对照**（决定性）：把 `BackupLocalSection.kt` 里 `R.string.backup_password_field` 的 `BackupPasswordRules.MIN_LENGTH` 实参去掉 ⇒ `BackupPasswordRulesTest` 5 条里**正好 1 条红**，其余 4 条过；恢复后 5 条全绿，`.negctl` 残留 0。
+
+**门禁**（`E:\ASHKB\c1-split-gate1.log`）：`BUILD SUCCESSFUL in 2m 34s`；单测 **136 文件 / 1137 条**全绿；detekt 0；lint **171** = 0 Error + 163 Warning + 8 Information（比上版少 13）；`verifySpecSync` 通过。
+
+**踩到的坑（下次拆分复用）**：
+- `by` 委托靠 `androidx.compose.runtime.getValue` / `setValue` 展开，这两个名字**在正文字面里从不出现**——按「符号名出现在正文」自动挑 import 必然丢掉它们，表现为 `Type 'State<...>' has no method 'getValue(Nothing?, KProperty0<*>)'`。生成脚本必须：正文里出现 `^\s*(val|var)\s+\w+\s+by\s` 就强制补这两个 import。
+- 任何按「文件名 + 字面量/签名」登记的 detekt 基线条目，**拆分改名后都会失配并重新上报**；涉及改名时必须同步剪枝基线，否则门禁假红。
+- 任何「静态读某个具体源码文件做断言」的测试，**拆分改名后都会失效**；优先改成语义范围（扫目录），而不是把路径改成新文件名。

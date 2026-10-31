@@ -102,10 +102,6 @@
     <ID>MagicNumber:AttachmentSheet.kt$1_048_576L</ID>
     <ID>MagicNumber:BackupRepository.kt$BackupRepository$120_000</ID>
     <ID>MagicNumber:BackupRepository.kt$BackupRepository$500</ID>
-    <ID>MagicNumber:BackupScreen.kt$1_024.0</ID>
-    <ID>MagicNumber:BackupScreen.kt$1_024L</ID>
-    <ID>MagicNumber:BackupScreen.kt$1_048_576.0</ID>
-    <ID>MagicNumber:BackupScreen.kt$1_048_576L</ID>
     <ID>MagicNumber:BackupViewModel.kt$BackupViewModel$12</ID>
     <ID>MagicNumber:BackupViewModel.kt$BackupViewModel$19</ID>
     <ID>MagicNumber:BackupViewModel.kt$BackupViewModel$6</ID>
@@ -192,8 +188,6 @@
     <ID>MagicNumber:WebDavClient.kt$WebDavClient$405</ID>
     <ID>MaxLineLength:AppDatabase.kt$AppDatabase.Companion.&lt;no name provided&gt;$db.execSQL("CREATE INDEX IF NOT EXISTS `index_medication_changes_effective_date` ON `medication_changes` (`effective_date`)")</ID>
     <ID>MaxLineLength:AppDatabase.kt$AppDatabase.Companion.&lt;no name provided&gt;$db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_supplement_logs_date_sup_id_slot_key` ON `supplement_logs` (`date`, `sup_id`, `slot_key`)")</ID>
-    <ID>MaxLineLength:BackupScreen.kt$)</ID>
-    <ID>MaxLineLength:BackupScreen.kt$Text(if (showAllLedger) stringResource(R.string.common_collapse) else stringResource(R.string.backup_view_all_count, ledger.size))</ID>
     <ID>MaxLineLength:CheckupLabImaging.kt$"${ImagingRecord.modalityLabel(imp.modality)} · ${imp.bodyPart} · ${imp.date ?: stringResource(R.string.symptom_unrecognized_today)}"</ID>
     <ID>MaxLineLength:CheckupLabImaging.kt$"high" -&gt; StatusChip(text = stringResource(R.string.lab_value_high, text), tone = StatusTone.Danger, icon = Icons.Rounded.TrendingUp, onClick = onClick)</ID>
     <ID>MaxLineLength:CheckupLabImaging.kt$"low" -&gt; StatusChip(text = stringResource(R.string.lab_value_low, text), tone = StatusTone.Warning, icon = Icons.Rounded.TrendingDown, onClick = onClick)</ID>

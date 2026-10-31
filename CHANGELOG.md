@@ -4,6 +4,31 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
 
+## [未发布] — 2026-10-31 · Compose 性能审查 ①：拆分 BackupScreen
+
+**纯结构改动，零行为变化。** `ui/backup/BackupScreen.kt` 原本一个文件 1325 行，把六个业务分区（恢复码 / 本机备份 / 同步 / 恢复 / 台账 / 弹层）
+全塞在一起。按 `ui/me/MedEditScreen` + `MedEditSections` 的既有先例拆成 8 个文件，每块只重组自己那份状态。
+
+- 拆分结果（行数）：`BackupScreen.kt` 1325 → **332**（根函数 + `queryName`/`querySize`），新增
+  `BackupLocalSection.kt` 153 · `BackupRecoverySection.kt` 179 · `BackupSyncSection.kt` 246 ·
+  `BackupRestoreSection.kt` 306 · `BackupLedgerSection.kt` 119 · `BackupSheets.kt` 181 · `BackupFormat.kt` 19。
+- 跨文件被引用的 13 个符号由 `private` 改 `internal`（`SecretField`、五个 Section、`UndoSnapshotBlock`、
+  `LedgerSection`、`BusyFooter`、`DavBackupPickerSheet`、`WebDavSheet`、`formatFileSize`、`formatBytes`）；
+  文件内私有的 `PassKeyboard` / `RecoveryCodeDialog` / `RecoveryRegenDialog` / `AttachSync*` / `LedgerRow` /
+  `DavBackupRow` / `verifyIssueText` 保持 `private`。
+- **顺手消掉两条历史问题**（按项目口径：历史问题进基线、基线外新问题改代码。文件改名会让按「文件名 + 字面量」
+  登记的基线条目失配，所以这里不改基线而是把问题本身消掉）：`formatFileSize`/`formatBytes` 里的
+  `1_024`/`1_048_576` 提成 `BYTES_PER_KB`/`BYTES_PER_MB` 命名常量；台账「展开全部」那条 150 列长行折行。
+- `config/detekt/baseline.xml` 307 条 → **301** 条（删掉已失效的 4 条 `MagicNumber` + 2 条 `MaxLineLength`；
+  `BackupScreen` 的 `CyclomaticComplexMethod` / `LongMethod` 两条**保留**——函数签名没变、函数体仍 241 行，问题真实存在）。
+- 回归断言放宽并加负向对照：`BackupPasswordRulesTest` 原来写死读 `BackupScreen.kt` 单文件，拆完必然失配，改为扫整个
+  `ui/backup` 目录（断言本意是「调用点存在」，不是「它恰好在某个具体文件」）。负向对照实测：把
+  `R.string.backup_password_field, BackupPasswordRules.MIN_LENGTH` 的实参去掉，该文件 5 条里正好 1 条红，恢复后 5 条全绿。
+- 逐行核对：26 个未改动的声明（含 KDoc、注解、注释）与拆分前**逐行 100% 一致，丢失 0 行**；总行数增量全部是新的
+  文件头、import 与上面两处有意改动。
+- 门禁 `E:\ASHKB\c1-split-gate1.log`：`BUILD SUCCESSFUL in 2m 34s`，单测 **1137 条 / 136 文件**全绿，detekt 0，
+  lint 171 = 0 Error + 163 Warning + 8 Information，`verifySpecSync` 通过。
+- 本批**无库结构变更**，也未改 `versionCode` / `versionName`（仍 124 / "1.2.12"）——按裁决先攒着，全部做完一次性发版。
 ## [v1.2.12] — 2026-10-29
 
 **v1.2.11 装机复验照出的一处误导性文案，本版单独修掉。** 备份页新建口令的字段标签仍写「备份口令（≥6 位）」，
