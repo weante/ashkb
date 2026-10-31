@@ -113,7 +113,7 @@ gh release edit v1.0.70 --prerelease=false --latest
 |---|---|---|
 | **R16 批量 CSV / JSON 导入**（模板 + 导入预检） | **待需求方拍板** | v2.1 定为 P1，但 **v3 需求表已不继承**（R14 / R15 / R16 均未继承）。按 v3 可判「不在本期范围」 |
 | **趋势页方案 B「总览 + 展开」** | 未做 | 顶部「指标总览」卡（每指标一行：名称 + 当前值 + 变化 + sparkline），点行进详情大图。方案 A 已落 v1.0.45、C 已落 v1.0.54；若继续做 B，**必须基于 C 已实现的「点格展开大图」收敛**，否则两套详情入口重复 |
-| **Compose 性能审查剩余结构性重构** | 未做（改动面大） | ① MedEdit / Backup 字段级 Composable 拆分 ② 6 个屏幕顶层 Flow 收集下沉到叶子 ③ `BackupViewModel` / `ReportViewModel` 合并单一 UiState ④ `AppShell` 按需创建 VM（**其余 10 个 VM 仍一次性创建**，仅 Recipes / ExercisePlans 已改）⑤ `DividerList` 展平进父 `LazyListScope` ⑥ Sheet 内嵌套 `verticalScroll` 冲突 ⑦ `DateProvider` 抽象（统一 7 个 VM 的日期 ticker 样板） |
+| **Compose 性能审查剩余结构性重构** | **7 项中 3 项已完成 / 1 项判定不做 / 剩 3 项未做**（2026-10-31 逐项实测更新，旧版把这 7 项一概写成「未做」是错的） | ① **MedEdit 已拆、Backup 未拆**：`ui/me/MedEditSections.kt`（739 行）早已独立成文件，`MedEditScreen.kt` 收敛到 425 行；`ui/backup/BackupScreen.kt` 仍 **1325 行**未做字段级拆分 ⇒ **未完成（只剩 Backup 一侧）**。② **未做**：各 root `Screen` 里 `collectAsState` 实测 `CheckupScreen` 10 / `SymptomScreen` 6 / `ExerciseScreen` 5 / `BackupScreen` 4 / `KnowledgeScreen` 3 / `TodayScreen` 3（`EmergencyScreen` / `MedEditScreen` / `ProfileEditScreen` / `ReminderCheckScreen` / `WellnessScreen` 的 root 函数为 0，已由子 Composable 各自收集）。③ **未做**：`BackupViewModel.kt` **20 个** `MutableStateFlow`、`ReportViewModel.kt` **7 个**，均未合并成单一 `UiState`。④ ✅ **已完成**（v1.0.40 + 批次 11）：`AppShell.kt` 只剩 `meVm` / `wellnessVm` / `checkupVm` / `emergencyVm` 四个在 shell 里创建，且每个都有**多路由共用**的硬理由（`AppShell.kt:189-212` 的注释逐条写了三条下沉判据）；其余 8 个 VM 全部在各自的 `composable<X>` 里 `viewModel(factory = ...)` 取，返回栈语义不变。⑤ ❌ **已判定不做**：项目既有先例一律是「默认截断 5 条 + 显式展开」，改成进父 `LazyListScope` 的 `LazyColumn` 会破坏 `DividerList` 现用的 `RowScope` 契约。⑥ **未做**：14 个文件共 37 处 `verticalScroll`（`BackupScreen.kt` 6、`CheckupLabImaging.kt` 6、`SymptomDialogs.kt` 3，其余各 1~2）。⑦ ✅ **已完成**（v1.0.86 / 批次 11）：`domain/DateProvider.kt` 已是进程级单例，改监听 `ACTION_DATE_CHANGED` / `ACTION_TIME_CHANGED` / `ACTION_TIMEZONE_CHANGED` 三条系统广播（**不再用 `delay` 推算零点**——`postDelayed` 按 `uptimeMillis` 计时，深睡不计时，夜里会漏跨日），注册 `RECEIVER_NOT_EXPORTED`（API 33+），并保留 `refreshIfStale()` 供各页 `ON_RESUME` 兜底；7 个 VM 已全部改用它 |
 | **S1b 滑杆手势回归测试** | ❌ **已实测证伪，不落地** | Robolectric 能注入触摸，但**裸 M3 `Slider` 也拖不动**——环境能力边界，不是应用缺陷。**勿再起这个坑** |
 | **知识库完整编辑器 / 内容导入导出** | 后移 | 明确「后移阶段 2 之后」 |
 | **文档不一致** | 已修（本次） | 见本文件末尾「本次复验修正」 |
@@ -265,10 +265,35 @@ gh release edit v1.0.70 --prerelease=false --latest
 
 ## 7. 接手建议（按优先级）
 
-1. **推 v1.0.70 转正**——真机走一遍 v1.0.61 ~ v1.0.70 的关键路径（尤其**跨设备提醒**：强提醒全屏权限、免打扰、久坐窗口、锁屏通知）；确认后 `gh release edit v1.0.70 --prerelease=false --latest`
-2. **跑 P5 手册 A / B / C 三组**（`HANDOFF.md` §9 可勾选清单）
-3. **B6 二维码**若要重做：从 §3.1 的 4 处已定位缺陷入手，且**验证方法必须是「与 segno 逐格比对」**
-4. **R16 批量导入**需需求方拍板是否纳入 v3
+> **2026-10-31 重写**：本节原来写的是 v1.0.70 时代的待办（「推 v1.0.70 转正」「跑 P5 手册 A/B/C 三组」），早已失效——v1.0.70 之后又发了 v1.2.0 ~ v1.2.12 共十余版，P5 手册也已不是当前交付路径。下面按「谁来定 / 需不需要真机」重排。
+
+**A. 只有维护者能拍板（做完前不要自行决定）**
+
+1. **审查报告 §十 的 5 条医学规则澄清**——原件在 `C:\Users\weant\Documents\Qoder\2026-09-28\a6159f90\ASHKB-代码审查报告.md:260-266`，原文明确「在你不回答之前，第 3 批『医学规则』那类改动不应该动」。**这是当前唯一挡住医学规则改动的闸门。**
+2. **R16 批量导入**是否纳入 v3（见 §3.2；v3 需求表未继承 R14 / R15 / R16）。
+3. **趋势页方案 B** 是否要做——若做，**必须基于方案 C 已实现的「点格展开大图」收敛**，否则两套详情入口重复。
+4. **知识库完整编辑器**（§3.2 记为「后移阶段 2 之后」，需确认是否已到时机）。
+
+**B. 需要真机（设备开无线调试即可，代码侧已就绪）**
+
+1. **裁决项 5「临界」的真机观感**——功能已验（化验摘要 `56 项 · 10 项异常 · 5 项临界` 已见），但仍缺一条**距参考边界 ≤5%** 的真实化验值来目视第四态胶囊。
+2. `MedEditScreen` 保存路径、`WellnessScreen` 下半屏、`KeyValueRow` 新对齐（UI 2.0 批次 B–E 的三处未验点）。
+3. `restoreMutex` 真机双击（并发恢复互斥）。
+4. WebDAV 真实网络 20 MB 附件往返。
+5. `DateProvider` 的 `start` / `stop` **广播注册**分支（纯 JVM 部分已有 `DateProviderTest.kt` 5 条，广播注册需要 `Context`）。
+6. 级联删除的附件分支。
+7. 批次 B 的四个小看点：64 MiB 上限提示 / 档案 JSON 7 字段往返 / 用药史 90 天窗 / 运动反馈去代号。
+
+**C. 可自行开工（无需外部输入）**
+
+1. **Compose 性能重构剩下的 3 项**（§3.2 那行）：`BackupScreen` 字段级拆分、6 个屏幕顶层 Flow 下沉、`BackupViewModel` / `ReportViewModel` 合并单一 `UiState`、Sheet 内嵌套 `verticalScroll` 冲突。
+2. **B6 钥匙扣二维码重做**（§3.1 的 4 处已定位缺陷）。**验证方法必须是「与 segno 逐格比对」**，不能自编自解自测。
+3. ~~`DividerList` 展平~~ —— 已判定不做（见 §3.2 ⑤）。
+
+**D. 卫生（低风险，建议随手做）**
+
+1. `E:\ASHKB` 根目录清理（已于 2026-10-31 归档，见根 `NEXT-SESSION.md`）。
+2. 本文件 §7 与 §3.2 的口径同步（**本次已完成**）。
 ---
 
 ## v1.0.73 批次 1「看不见的失效」——待真机人工验证的 7 项
