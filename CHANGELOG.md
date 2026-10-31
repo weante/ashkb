@@ -11,7 +11,7 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 
 - 拆分结果（行数）：`BackupScreen.kt` 1325 → **332**（根函数 + `queryName`/`querySize`），新增
   `BackupLocalSection.kt` 153 · `BackupRecoverySection.kt` 179 · `BackupSyncSection.kt` 246 ·
-  `BackupRestoreSection.kt` 306 · `BackupLedgerSection.kt` 119 · `BackupSheets.kt` 181 · `BackupFormat.kt` 19。
+  `BackupRestoreSection.kt` 306 · `BackupLedgerSection.kt` 124 · `BackupSheets.kt` 181 · `BackupFormat.kt` 26。
 - 跨文件被引用的 13 个符号由 `private` 改 `internal`（`SecretField`、五个 Section、`UndoSnapshotBlock`、
   `LedgerSection`、`BusyFooter`、`DavBackupPickerSheet`、`WebDavSheet`、`formatFileSize`、`formatBytes`）；
   文件内私有的 `PassKeyboard` / `RecoveryCodeDialog` / `RecoveryRegenDialog` / `AttachSync*` / `LedgerRow` /
