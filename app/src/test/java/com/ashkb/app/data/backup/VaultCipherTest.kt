@@ -227,10 +227,16 @@ class VaultCipherTest {
         assertEquals(2, slots.length())
         assertEquals("pass", slots.getJSONObject(0).getString("id"))
         assertEquals("recovery", slots.getJSONObject(1).getString("id"))
-        // 槽内 KDF 参数进头（后续 Argon2id 升级不破坏旧文件的格式基础）
-        assertEquals("pbkdf2-sha256", slots.getJSONObject(0).getString("kdf"))
-        assertTrue(slots.getJSONObject(0).getInt("iter") > 0)
+        // 槽内 KDF 参数进头（协议 §2 兜底切换条款：旧文件按头内参数解）
+        // v1.2.13 起新槽改用 Argon2id——这里断言的是「kdf 由槽头自己声明且参数齐全」，
+        // 而不是「kdf 恰好是 pbkdf2-sha256」：后者是算法选择，前者才是兼容性契约。
+        val slot0 = slots.getJSONObject(0)
+        assertEquals("argon2id", slot0.getString("kdf"))
+        assertTrue(slot0.getInt("iter") > 0)
+        // Argon2id 的三个参数都要进头，否则读侧无从复现派生（旧版 PBKDF2 只写 iter）
+        assertTrue(slot0.getInt("m") >= 8 * slot0.getInt("p"))
+        assertTrue(slot0.getInt("p") >= 1)
         // Base64 可解码（salt/iv/wrapped 均为合法 Base64）
-        Base64.getDecoder().decode(slots.getJSONObject(0).getString("salt"))
+        Base64.getDecoder().decode(slot0.getString("salt"))
     }
 }

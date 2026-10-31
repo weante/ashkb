@@ -13,8 +13,13 @@ import com.ashkb.app.data.entity.Profile
  *
  * **为什么只做「可见通知」而不是自定义锁屏页**：Android 没有面向普通应用的
  * 自定义锁屏控件（锁屏 Widget 早已废弃），官方唯一受支持的途径就是
- * 「`VISIBILITY_PUBLIC` 的常驻通知」——它在锁屏上直接显示完整内容、
- * 无需解锁，且各厂商 ROM 行为一致。
+ * 「带 `setPublicVersion` 的常驻通知」——它在锁屏上显示的是 publicVersion，
+ * 解锁后才露出完整内容。
+ *
+ * **未发布（审查报告 §十 第 4 问）**：锁屏可见性由 PUBLIC 改为 PRIVATE + publicVersion。
+ * 本对象构建的 [Content] 因此只用于「解锁后 / 通知栏」的完整正文；锁屏上露出的是
+ * `NotificationHelper` 里两串**不含任何用户数据**的固定文案。急救可用性靠
+ * 「通知可点」兜住——捡到手机的人仍知道该解锁看详情。
  *
  * **隐私**：健康信息上锁屏属敏感操作，故**默认关闭**，由用户在紧急卡页显式开启
  * （见 [com.ashkb.app.data.repo.EmergencyLockscreenStore]）。

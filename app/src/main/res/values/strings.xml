@@ -297,7 +297,24 @@
     <string name="lab_ref_upper">参考上限</string>
     <!-- v1.2.11（缺陷工单 A07）：表单校验。此前非法数字静默变 null 落库、反向区间能存进去并生成伪异常。 -->
     <string name="lab_field_number_invalid">请输入数字（留空表示未填）</string>
-    <string name="lab_ref_range_reversed">参考下限不能大于参考上限</string>
+    <string name="lab_ref_range_reversed">参考下限不能大于参考上限</string>
+    <!-- v1.2.13（医学缺口③）：按化验项配置「临界」容差 -->
+    <string name="lab_tolerance_title">临界容差</string>
+    <string name="lab_tolerance_entry_subtitle">按化验项调整「临界」的判定范围（默认 5%）</string>
+    <string name="lab_tolerance_section_what">这是什么</string>
+    <string name="lab_tolerance_what_body">临界指「在参考范围内、但离边界很近」的数值——不标异常，只提醒留意。默认容差是参考区间宽度的百分之五。不同化验项的临床意义不同，可以只给某一项单独设值。</string>
+    <string name="lab_tolerance_section_add">按化验项添加</string>
+    <string name="lab_tolerance_section_list">已单独配置</string>
+    <string name="lab_tolerance_empty">还没有单独配置，所有项目都按默认 5% 判断</string>
+    <string name="lab_tolerance_save">保存</string>
+    <string name="lab_tolerance_note">容差不随备份带走：换机恢复后回到默认 5%。调大只会多报临界、调小只会少报，都不会改变「异常」的判定。</string>
+    <string name="lab_tolerance_field_name">化验项名称（如 ESR）</string>
+    <string name="lab_tolerance_field_percent">容差（百分比）</string>
+    <string name="lab_tolerance_field_percent_hint">填 0.5 到 20 之间的数字，表示参考区间宽度的百分比</string>
+    <string name="lab_tolerance_add">添加</string>
+    <string name="lab_tolerance_remove">移除这一项</string>
+    <string name="lab_tolerance_err_name">请填写化验项名称</string>
+    <string name="lab_tolerance_err_range">容差需在 0.5 到 20 之间</string>
     <string name="lab_value">数值</string>
     <string name="me_backup_section">备份与数据</string>
     <string name="me_about_title">关于</string>
@@ -863,8 +880,11 @@
     <string name="backup_recovery_dialog_saved">我已妥善保存</string>
     <string name="backup_recovery_regen_confirm">重新生成仅影响之后的新备份；已存在的备份仍用生成时的恢复码。确定重新生成？</string>
     <string name="backup_recovery_hint_for_restore">忘记口令？可输入备份时设置的恢复码代替</string>
+    <string name="backup_recovery_verify_title">验证身份</string>
+    <string name="backup_recovery_verify_body">恢复码等同于备份口令，查看前请先验证身份</string>
     <string name="vm_recovery_generate_failed">恢复码生成失败：%1$s</string>
     <string name="vm_recovery_not_set">尚未设置恢复码</string>
+    <string name="vm_recovery_view_blocked">这台手机的系统验证界面无法打开，因此没有显示恢复码</string>
 
     <!-- ========== v1.0.26：紧急卡「当前用药」（自动汇总药单） ========== -->
     <string name="emergency_meds_section">当前用药（急救参考）</string>
@@ -1133,9 +1153,12 @@
     <string name="supp_dose_unit_label">单位（如 mg / IU）</string>
     <string name="supp_daily_max_label">每日参考上限（可选）</string>
     <string name="supp_daily_max_hint">按医生 / 营养师给的值填写；留空则不警示。App 不内置任何医学上限数值</string>
+    <string name="supp_daily_max_unit_label">上限单位（可留空）</string>
+    <string name="supp_limit_unit_assumed">上限没填单位，按与单次剂量相同的 %1$s 比较</string>
+    <string name="supp_over_limit_unit_mismatch">单次剂量用 %1$s、上限用 %2$s，单位不同，无法判断是否超限</string>
     <string name="supp_reminder_time_field">提醒时刻（到点提醒）</string>
     <string name="supp_reminder_hint">留空则不提醒。补剂打卡按天记，当天记过一次后其余时刻不再打扰</string>
-    <string name="supp_over_limit">当日累计 %1$s %2$s，已超过你设置的上限 %3$s %2$s</string>
+    <string name="supp_over_limit">当日累计 %1$s %2$s，已超过你设置的上限 %3$s %4$s</string>
     <string name="supp_timing_conflict">与「%1$s」服用时间过近（间隔约 %2$d 分钟）——钙等矿物会与其螯合、影响吸收，建议间隔 2 小时以上</string>
     <string name="supp_merged_title">今日服药 / 补剂时间表</string>
     <string name="supp_merged_empty">今日暂无服药或补剂计划</string>

@@ -49,7 +49,7 @@ import com.ashkb.app.data.entity.WeightLog
  *   `ref_high_inclusive`（参考边界是否包含，区分 `<5` 与 `≤5`），并新增
  *   `report_import_batches`（AI 报告导入批次指纹，挡重复导入）。
  */
-internal const val ASHKB_DB_VERSION = 20
+internal const val ASHKB_DB_VERSION = 21
 
 @Database(
     entities = [
@@ -556,6 +556,21 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
+         * v1.2.13（审查报告 §十 第 2 条）：补剂的每日上限有了自己的单位。
+         *
+         * 只加一列、可空、**不设默认值**。默认值在这里毫无意义：`DEFAULT ''` 与 `DEFAULT NULL`
+         * 在业务上都是「没填」，而 `daily_max_unit IS NULL` 正是 [SupplementLimits.exceedsDailyMax]
+         * 判定「沿用单次剂量单位」的依据，写空串反而要多一层归一化。
+         *
+         * 迁移必须与 Room 导出的 `schemas/…/21.json` 逐字一致，否则 `SchemaDriftTest` 会红。
+         */
+        private val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `supplements` ADD COLUMN `daily_max_unit` TEXT")
+            }
+        }
+
+        /**
          * 批次 2（测试安全网）：**迁移清单的唯一来源**。
          *
          * 由 [get] 与迁移测试共用。此前清单直接内联在 `addMigrations(...)` 里，测试看不到，
@@ -566,7 +581,7 @@ abstract class AppDatabase : RoomDatabase() {
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
             MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
             MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
-            MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
+            MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
         )
 
         fun get(context: Context): AppDatabase =

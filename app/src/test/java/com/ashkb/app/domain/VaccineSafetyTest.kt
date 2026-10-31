@@ -1,5 +1,6 @@
 package com.ashkb.app.domain
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -58,5 +59,76 @@ class VaccineSafetyTest {
     @Test
     fun `两侧都未知时不报警（类型未知不算活疫苗）`() {
         assertFalse(VaccineSafety.needsLiveVaccineAlert(null, null))
+    }
+
+    // =========================================================================
+    // v1.2.13（审查报告 §十 第 2 条 + P0-2 第 14 条）：当前是否在用免疫抑制药物
+    // =========================================================================
+
+    private fun drug(name: String, cls: String?) = VaccineSafety.ActiveDrug(name, cls)
+
+    @Test
+    fun `生物制剂与 JAK 与 csDMARD 都算免疫抑制药物`() {
+        val hit = VaccineSafety.immunosuppressantDrugs(
+            listOf(drug("依那西普", "BIOLOGIC"), drug("托法替布", "JAK"), drug("甲氨蝶呤", "CSDMARD"))
+        )
+        assertEquals(listOf("依那西普", "托法替布", "甲氨蝶呤"), hit.map { it.name })
+    }
+
+    @Test
+    fun `非免疫抑制类别不算（含糖皮质激素，刻意排除）`() {
+        val hit = VaccineSafety.immunosuppressantDrugs(
+            listOf(
+                drug("塞来昔布", "NSAID"),
+                drug("对乙酰氨基酚", "ANALGESIC"),
+                drug("泼尼松", "GLUCOCORTICOID"),
+                drug("钙片", "OTHER"),
+            )
+        )
+        assertTrue("糖皮质激素刻意不计入：拿不到可靠剂量判定，误报会淹没真正的警示", hit.isEmpty())
+    }
+
+    @Test
+    fun `分类脏值按 OTHER 处理而不是猜`() {
+        val hit = VaccineSafety.immunosuppressantDrugs(
+            listOf(drug("来源不明的药", null), drug("乱码分类", "not-a-class"))
+        )
+        assertTrue(hit.isEmpty())
+    }
+
+    @Test
+    fun `分类比较大小写无关（存库值可能被手工改过）`() {
+        val hit = VaccineSafety.immunosuppressantDrugs(listOf(drug("阿达木单抗", "biologic")))
+        assertEquals(listOf("阿达木单抗"), hit.map { it.name })
+    }
+
+    @Test
+    fun `点名的药最多三支（再多就说不出重点）`() {
+        val many = (1..6).map { drug("生物制剂$it", "BIOLOGIC") }
+        val hit = VaccineSafety.immunosuppressantDrugs(many)
+        assertEquals(VaccineSafety.MAX_NAMED_DRUGS, hit.size)
+        assertEquals(listOf("生物制剂1", "生物制剂2", "生物制剂3"), hit.map { it.name })
+    }
+
+    @Test
+    fun `空名字的条目被丢掉（文案里不能出现空药名）`() {
+        val hit = VaccineSafety.immunosuppressantDrugs(
+            listOf(drug("", "BIOLOGIC"), drug("   ", "JAK"), drug("依那西普", "BIOLOGIC"))
+        )
+        assertEquals(listOf("依那西普"), hit.map { it.name })
+    }
+
+    @Test
+    fun `同名药只点名一次`() {
+        val hit = VaccineSafety.immunosuppressantDrugs(
+            listOf(drug("依那西普", "BIOLOGIC"), drug("依那西普 ", "BIOLOGIC"))
+        )
+        assertEquals(listOf("依那西普"), hit.map { it.name })
+    }
+
+    @Test
+    fun `没在用药单时返回空但仍按活疫苗待确认报警`() {
+        assertTrue("判据不含药单：停了药也不该让警报消失", VaccineSafety.needsLiveVaccineAlert("LIVE", "PENDING"))
+        assertTrue(VaccineSafety.immunosuppressantDrugs(emptyList()).isEmpty())
     }
 }

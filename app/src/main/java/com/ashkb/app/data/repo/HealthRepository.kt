@@ -82,6 +82,15 @@ class HealthRepository(private val context: Context) {
     private val emergencyDao = db.emergencyEventDao()
     private val contactDao = db.contactDao()
 
+    /**
+     * v1.2.13（审查报告 §十 第 2 条）：活疫苗警报要看「当前是否在用免疫抑制药物」。
+     *
+     * 本仓储此前不碰药单——用药归 `MedicationRepository`。这里只**读**在用药单、
+     * 拿名字与药理分类做文案分档，不写、不改、不参与排程，故直接取 DAO 比注入
+     * 整个 `MedicationRepository` 轻：后者会带来「配件仓储 ↔ 主仓储」的双向依赖。
+     */
+    private val medDao = db.medicationDao()
+
     companion object {
         const val FEVER_THRESHOLD = 38.5
         // v1.0.77（批次 4）：原 `BASDAI_THRESHOLD = 4.0` 已删除——与 `ClinicalThresholds.BASDAI_HIGH` 是同一个值，
@@ -984,7 +993,7 @@ class HealthRepository(private val context: Context) {
         if (VaccineSafety.needsLiveVaccineAlert(record.vaccineType, record.doctorConfirm)) {
             insertAlertOnce(
                 type = DerivedAlerts.VACCINE_LIVE_PENDING, severity = "high", refDate = record.date,
-                message = context.getString(R.string.ui_alert_live_vaccine, record.vaccineName),
+                message = liveVaccineAlertMessage(record),
                 kbRef = "itx-010",
             )
         }
@@ -1010,11 +1019,37 @@ class HealthRepository(private val context: Context) {
     /**
      * 按**库里当天的实际记录**重算活疫苗警报：已无任何一条满足「活疫苗 × 未确认」时，
      * 清掉该日未被确认的警报（已确认的保留——那是用户看过的留痕，见 [AlertDao.deleteUnackedByRef]）。
+     *
+     * v1.2.13 补注：**已存在的警报文案不改写**。`insertAlertOnce` 见同 `(type, ref_date)` 已存在
+     * 即跳过，于是「先记疫苗、后加生物制剂」的用户看到的仍是通用文案。这是有意的——
+     * 警报是**那一刻的留痕**，用户可能已经读过并按通用文案去问了医生；事后悄悄改掉他读过的那句
+     * 比不改更让人困惑。想让文案跟上现状，重新保存一次该疫苗记录即可（走同一条判定路径）。
      */
     private suspend fun refreshVaccineLiveAlert(date: String) {
         val stillNeeded = vaccineDao.byDate(date)
             .any { VaccineSafety.needsLiveVaccineAlert(it.vaccineType, it.doctorConfirm) }
         if (!stillNeeded) alertDao.deleteUnackedByRef(DerivedAlerts.VACCINE_LIVE_PENDING, date)
+    }
+
+    /**
+     * v1.2.13（审查报告 §十 第 2 条 + P0-2 第 14 条）：活疫苗警报的文案分档。
+     *
+     * 分档**只改文案、不改是否报警**（理由见 `VaccineSafety` 的 KDoc）：用户当前在用免疫抑制
+     * 药物时，点名那几支药，把「一般性患者教育」变成「针对你这个药单的具体提醒」；
+     * 没命中时退回通用文案，**绝不声称「你没在用」**——药单为空与「真的没用」在数据上分不开。
+     *
+     * 读药单失败不该让疫苗记录存不进去（保存路径在事务里）：异常时退回通用文案。
+     */
+    private suspend fun liveVaccineAlertMessage(record: VaccineRecord): String {
+        val generic = context.getString(R.string.ui_alert_live_vaccine, record.vaccineName)
+        val drugs = runCatching {
+            VaccineSafety.immunosuppressantDrugs(
+                medDao.listActive().map { VaccineSafety.ActiveDrug(it.name, it.medClass) }
+            )
+        }.getOrDefault(emptyList())
+        if (drugs.isEmpty()) return generic
+        val names = drugs.joinToString(context.getString(R.string.dom_lock_list_separator)) { it.name }
+        return context.getString(R.string.ui_alert_live_vaccine_on_immunosuppressant, record.vaccineName, names)
     }
 
     // =========================================================================

@@ -619,6 +619,19 @@ data class Supplement(
      * ⚠️ **刻意不内置任何医学上限数值**——App 只做「当日累计 vs 上限」的比较，不代替专业判断。
      */
     @ColumnInfo(name = "daily_max") val dailyMax: Double? = null,
+    /**
+     * v1.2.13（审查报告 §十 第 2 条 / 医学缺口）：上限的单位。
+     *
+     * 此前 `dailyMax` 是**裸数字**，UI 把同一个 [doseUnit] 同时贴给「当日累计」与「上限」两处，
+     * 于是「每次 1 粒、每日上限 1000 mg」这种真实写法在算术上变成 `1 > 1000` → false，
+     * 或者「每次 500 mg、上限 2 粒」变成 `500 > 2` → true 然后报一句毫无意义的超限。
+     * 单位不同时比较**不是精度问题而是类型错误**，本列让这个前提可被检出。
+     *
+     * 可空 = 存量数据与旧备份没填。**不能要求必填**：那会让所有已存在的补剂上限警示静默消失，
+     * 属功能回退。为 null 时按「与 [doseUnit] 同单位」处理（即修复前的隐含假设），
+     * 界面会明说这个假设（见 `SupplementLimits.UnitAssumption`）。
+     */
+    @ColumnInfo(name = "daily_max_unit") val dailyMaxUnit: String? = null,
     @ColumnInfo(name = "frequency") val frequency: String = "daily",
     @ColumnInfo(name = "times") val times: String? = null,
     @ColumnInfo(name = "take_with_food") val takeWithFood: String? = null,

@@ -86,6 +86,14 @@
     <string name="dom_lock_doctor">Doctor: %1$s %2$s</string>
     <string name="dom_lock_unspecified">Not provided</string>
     <string name="dom_lock_list_separator">", "</string>
+    <!--
+      Unreleased (review report §10 Q4): the lock screen only admits that the card exists,
+      never any user data. Emergency usability is carried by "the notification is tappable" —
+      whoever picks up the phone still knows to unlock for details, but blood type, diagnosis,
+      allergies and family phone numbers are no longer exposed to anyone walking past.
+    -->
+    <string name="dom_lock_public_title">Health emergency info</string>
+    <string name="dom_lock_public_text">Unlock to see blood type, allergies and emergency contacts</string>
 
     <!-- ===== LifestylePrescription.kt: lifestyle -> exercise prescription tips ===== -->
     <string name="dom_life_smoking_current">Smoking is a risk factor for spinal inflammation and disease progression in axSpA, so stopping is advised (your doctor can help you plan how). An honest note: guidelines recommend stopping because of the known health risks of smoking; dedicated evidence that it improves axSpA outcomes is still lacking.</string>

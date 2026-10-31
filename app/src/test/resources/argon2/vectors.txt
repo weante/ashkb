@@ -1,0 +1,293 @@
+# Argon2 黄金向量 —— 全部由独立参考实现生成，本项目的 Kotlin 实现从未参与生成
+#
+# 生成器：@noble/hashes 1.7.1（MIT，纯 JS、零依赖）
+#   下载自 https://cdn.jsdelivr.net/npm/@noble/hashes@1.7.1/
+#   argon2.js / blake2b.js / _blake.js / _u64.js / utils.js / crypto.js
+#   运行环境：Node v24.21.0（无 npm，直接 require 下载下来的单文件）
+#
+# 为什么必须用外部实现：上一轮二维码用「自己编、自己解」自测全绿却在真机上
+# 扫不出来，因为编解码犯的是同一个错。密码派生同理——自己生成期望值，就等于
+# 用同一个可能错误的实现给自己判卷。因此下面每一个 tag_hex 都来自 @noble/hashes。
+#
+# 该参考实现本身的可信度：它逐字节复现了 RFC 9106 §5.1 / §5.2 / §5.3 的三组
+# 官方 Tag（见前三个 case）。RFC 原文取自 https://www.rfc-editor.org/rfc/rfc9106.txt，
+# 是实际下载核对过的文本，不是凭记忆抄写。
+#
+# 本文件由 convert.js 从生成器输出**直接转换**而成，不经任何手工转录——转录
+# 阶段曾抄错 4 组 tag_hex 与 1 组 salt_hex，用参考实现重算才发现。
+#
+# 唯一例外：tag65 组的 tag_hex 来自 Node.js v24 内置的 crypto.argon2Sync
+# （OpenSSL C 实现）。原因：@noble/hashes 1.7.1 的 Hp() 末尾是 `return u32(out)`，
+# 而 u32() 是 `new Uint32Array(buf, off, floor(len/4))`，对 65 字节会截掉最后
+# 一个字节、只返回 64 字节——这是参考实现自身的缺陷，不是 RFC 语义。该组已用
+# Node 内置实现交叉验证：noble 返回的 64 字节与 OpenSSL 返回的前 64 字节完全
+# 一致，第 65 字节为 0x24。两个独立实现互证，不是本仓库代码产物。
+#
+# 格式：每个 case 以 [case name] 开头，随后若干 key=value，以 tag_hex 结束。
+#   type=id|i|d          必填。i/d 仅用于跑 RFC 官方向量，验证内部通用结构
+#   parallelism=p        必填
+#   memory_kib=m         必填（用户请求值，非对齐后的 m'）
+#   iterations=t         必填
+#   tag_length=τ         必填
+#   password_hex / salt_hex / secret_hex / ad_hex   必填，未提供时为空
+# 注释行以 # 开头，空行忽略。
+
+[case rfc9106-argon2d]
+note=RFC 9106 §5.1（32 KiB, t=3, p=4, secret 8B, ad 12B）
+type=d
+parallelism=4
+memory_kib=32
+iterations=3
+tag_length=32
+password_hex=0101010101010101010101010101010101010101010101010101010101010101
+salt_hex=02020202020202020202020202020202
+secret_hex=0303030303030303
+ad_hex=040404040404040404040404
+tag_hex=512b391b6f1162975371d30919734294f868e3be3984f3c1a13a4db9fabe4acb
+
+[case rfc9106-argon2i]
+note=RFC 9106 §5.2（同上参数，数据无关寻址）
+type=i
+parallelism=4
+memory_kib=32
+iterations=3
+tag_length=32
+password_hex=0101010101010101010101010101010101010101010101010101010101010101
+salt_hex=02020202020202020202020202020202
+secret_hex=0303030303030303
+ad_hex=040404040404040404040404
+tag_hex=c814d9d1dc7f37aa13f0d77f2494bda1c8de6b016dd388d29952a4c4672b6ce8
+
+[case rfc9106-argon2id]
+note=RFC 9106 §5.3（同上参数，混合寻址）
+type=id
+parallelism=4
+memory_kib=32
+iterations=3
+tag_length=32
+password_hex=0101010101010101010101010101010101010101010101010101010101010101
+salt_hex=02020202020202020202020202020202
+secret_hex=0303030303030303
+ad_hex=040404040404040404040404
+tag_hex=0d640df58d78766c08c037a34a8b53c9d01ef0452d75b65eb52520e96b01e659
+
+[case ascii-min]
+note=最小内存 8 KiB，t=1，p=1
+type=id
+parallelism=1
+memory_kib=8
+iterations=1
+tag_length=32
+password_hex=70617373776f7264
+salt_hex=736f6d6573616c74
+secret_hex=
+ad_hex=
+tag_hex=f137f8e186a403a679ccd0606e5ab5dcdafe43c1640855ac8c6e33e9bd63eeb3
+
+[case ascii-min-tag16]
+note=同上但 tagLength=16
+type=id
+parallelism=1
+memory_kib=8
+iterations=1
+tag_length=16
+password_hex=70617373776f7264
+salt_hex=736f6d6573616c74
+secret_hex=
+ad_hex=
+tag_hex=f73a73d271859d21ef45465da12bdf86
+
+[case ascii-p2]
+note=p=2，32 KiB，t=2
+type=id
+parallelism=2
+memory_kib=32
+iterations=2
+tag_length=32
+password_hex=70617373776f7264
+salt_hex=736f6d6573616c74
+secret_hex=
+ad_hex=
+tag_hex=a39304746fad031df4e911a7f51b33081120391f342506f70f0ce824112fa561
+
+[case ascii-p4]
+note=p=4，32 KiB，t=2
+type=id
+parallelism=4
+memory_kib=32
+iterations=2
+tag_length=32
+password_hex=70617373776f7264
+salt_hex=736f6d6573616c74
+secret_hex=
+ad_hex=
+tag_hex=d74d7db154b312931625cde5a51f76bc52113b4b0515aa94952203b3cc45b800
+
+[case ascii-p4-min]
+note=p=4 且 m 恰好 8p，t=1
+type=id
+parallelism=4
+memory_kib=32
+iterations=1
+tag_length=32
+password_hex=70617373776f7264
+salt_hex=736f6d6573616c74
+secret_hex=
+ad_hex=
+tag_hex=299d5e50f0022a4eef2d510ade9b1743bd1f568feefc042c3dff926a271e7fb2
+
+[case salt8]
+note=salt 恰 8 字节，256 KiB，t=3，p=1
+type=id
+parallelism=1
+memory_kib=256
+iterations=3
+tag_length=32
+password_hex=636f727265637420686f727365206261747465727920737461706c65
+salt_hex=3132333435363738
+secret_hex=
+ad_hex=
+tag_hex=b59472cf360034eca37a46dc8ea1e8529c164fa2cea564ce3d4953cc0e4301d6
+
+[case salt16]
+note=salt 16 字节，256 KiB，t=3，p=1
+type=id
+parallelism=1
+memory_kib=256
+iterations=3
+tag_length=32
+password_hex=636f727265637420686f727365206261747465727920737461706c65
+salt_hex=31323334353637383930616263646566
+secret_hex=
+ad_hex=
+tag_hex=27464894cbe1edbeeb8c22314bb22458afa3af7af69dd2ff2a312135ca80c153
+
+[case utf8-chinese]
+note=密码含中文（UTF-8 多字节）
+type=id
+parallelism=1
+memory_kib=64
+iterations=2
+tag_length=32
+password_hex=e79785e682a3e581a5e5bab7e6a1a3e6a1882de58fa3e4bba4
+salt_hex=e79b90e580bc73616c742d3136e5ad97e88a82
+secret_hex=
+ad_hex=
+tag_hex=9c9a29e79f57bb9324a2c996bf28cca0a1b7e36b7812b815ee82ec14adf46b94
+
+[case empty-pwd]
+note=空密码（0 字节），salt 16 字节
+type=id
+parallelism=1
+memory_kib=8
+iterations=1
+tag_length=32
+password_hex=
+salt_hex=30313233343536373839616263646566
+secret_hex=
+ad_hex=
+tag_hex=d440eba67886df93d643dcb8a69b02af68c16d284cd6f68659553e245bf9efc0
+
+[case tag64]
+note=tagLength 恰 64（H' 的 T<=64 分支上界）
+type=id
+parallelism=1
+memory_kib=16
+iterations=1
+tag_length=64
+password_hex=70617373776f7264
+salt_hex=736f6d6573616c74
+secret_hex=
+ad_hex=
+tag_hex=bece5e6ce84c25be1ef6f2655a757a1e7c1726c41151361a6749329d8069e8924ac668fb2b251ce04b59b0d6ccb8f0de3d704da6d19d7843808eb03ad533b9f9
+
+[case tag65]
+note=tagLength 恰 65（跨过 H' 的 T<=64 分支）
+type=id
+parallelism=1
+memory_kib=16
+iterations=1
+tag_length=65
+password_hex=70617373776f7264
+salt_hex=736f6d6573616c74
+secret_hex=
+ad_hex=
+tag_hex=e3c9690c6a3c835c7df44c3534f2dc45ba39e408b5ba6c20aae383f7c48f2ac94a49493245f84a1ca6e0650c3cee70b919c678aada99dbca7beaf7d5edde08fa24
+
+[case tag100]
+note=tagLength 100（H' 多块拼接）
+type=id
+parallelism=1
+memory_kib=16
+iterations=1
+tag_length=100
+password_hex=70617373776f7264
+salt_hex=736f6d6573616c74
+secret_hex=
+ad_hex=
+tag_hex=5cda8e426e892c87fdf7f752f7ee113cc798c25ddb387b2d140cb3a8c8eada854fda0e3c35dc5a7300a90213e4f0b885c2f4c78f152eca382a569228298fd00133a8755f6c2502456647e7ccef9fe69846a9f4e0766cea531cdb70e97308290e221cb70f
+
+[case m1024-p4-tag64]
+note=1024 KiB，t=2，p=4，tagLength=64
+type=id
+parallelism=4
+memory_kib=1024
+iterations=2
+tag_length=64
+password_hex=70617373776f7264
+salt_hex=30313233343536373839616263646566
+secret_hex=
+ad_hex=
+tag_hex=c18c12aade781c68e817db82c8869aa9e0848da62c63f649d23a896804e1abf8693901b0003c11e94115a94973759b5e72f149369185e3aa6062b1adb130a373
+
+[case m47104-t1]
+note=46 MiB（OWASP 量级），t=1，p=1
+type=id
+parallelism=1
+memory_kib=47104
+iterations=1
+tag_length=32
+password_hex=70617373776f7264
+salt_hex=30313233343536373839616263646566
+secret_hex=
+ad_hex=
+tag_hex=9b361c3540bc7d6c648882a4619339f431eb0a91214865c26943865d74389bfe
+
+[case m19456-t2]
+note=19 MiB（RFC 9106 §4 第二推荐档），t=2，p=1
+type=id
+parallelism=1
+memory_kib=19456
+iterations=2
+tag_length=32
+password_hex=70617373776f7264
+salt_hex=30313233343536373839616263646566
+secret_hex=
+ad_hex=
+tag_hex=d2ab07b39ef7f8b806227cd86fbb11aa5393066a98e17eacacd126eb26e9276d
+
+[case secret-ad]
+note=自定义 secret + associated data，32 KiB，t=3，p=2
+type=id
+parallelism=2
+memory_kib=32
+iterations=3
+tag_length=32
+password_hex=70617373776f7264
+salt_hex=30313233343536373839616263646566
+secret_hex=7065707065722d39
+ad_hex=636f6e746578742d7631
+tag_hex=55a8971646e58c90b5b67ce195811bfc93a823f940d7995315d4ab0bf32fc836
+
+[case m-non-multiple]
+note=m=100（不是 4p 的倍数，验证 m' 向下取整），p=2
+type=id
+parallelism=2
+memory_kib=100
+iterations=2
+tag_length=32
+password_hex=70617373776f7264
+salt_hex=736f6d6573616c74
+secret_hex=
+ad_hex=
+tag_hex=f1a74466af6e15dd9e1db582166db350b97b5738dfe0c48a8fbfa368b132a77b

@@ -1,7 +1,7 @@
 # ASHKB 状态交接文档
 
 > **时点快照**：截至 **v1.2.12（versionCode 124）· 2026-10-29 · C01 口令标签遗留修正（v1.2.11 装机走查发现）**，**已落地、门禁全绿、已推送并发布**（发布提交 `f39dead`，附注标签 `v1.2.12`（tag 对象 `a84cff9`）→ `f39dead`；Release **GitHub Latest**，release id `427925638`，资产 `ashkb-1.2.12-release.apk` **5,278,382 B**，sha256 `F54DE718…E7DE`，**由 tag 触发的 CI 正式签名构建产出**，`apksigner` 证书摘要 `38ca80a6…d7d` 与 `ASHKB_EXPECTED_CERT_SHA256` 逐字一致）。上一版 **v1.2.11（versionCode 123）· 2026-10-26 · 体验整理 + R1/R2 + 化验「临界」第四态 + 缺陷修复执行工单全部 22 项（五批）**，已全部落地、门禁全绿、已推送并发布（第 1 批 `28d0a30` / 第 2 批 `1f92cdc` / 第 3 批 `a59286e` / 第 4 批 `60d1391` / 第 5 批 `dedabee`，+ 文档补记 `4856235`、`da2cb4d`，+ 发布提交 `4e40137`；逐批取证见文末「九 ~ 十六」节）。发布形态：**GitHub Latest**，release id `424324363`，资产 `ashkb-1.2.11-release.apk` 5,277,782 B，sha256 `280EFC55…1938`（**CI 在 tag 上构建的产物**，C04 已逐字比对签名摘要），附注标签 `v1.2.11`（tag 对象 `0e9535c`）→ `4e40137`。**v1.2.11 有库结构变更：`ASHKB_DB_VERSION` 19 → 20**（`MIGRATION_19_20` + schema `20.json` 已入库），首次启动跑迁移，升级前先备份；**v1.2.12 无库结构变更**（仍 20）。再上一版 **v1.2.10（versionCode 122）· 2026-10-19 · 审查第二批 / 第三批 + 裁决项 3、6、7 + §6.7 + 按需用药每天一次 + UI 2.0 批次 B–E + §06 双主题验收 + 真机启动崩溃修复**（release id `416558911`，资产 5,213,292 B，sha256 `9C03C518…FF89`，2026-10-21 就地重做过一次），更早 **v1.2.9（versionCode 121）**（release id `410782041`）、**v1.2.8（versionCode 120）**（id `408053469`）。
-> **2026-10-31 工作树状态**：v1.2.12 之后又落了两批**未发版**改动 —— ① Compose 性能审查 ①：`BackupScreen` 从 1325 行拆成 8 个文件（纯结构动作、无行为变更）；② **B6 钥匙扣二维码从零重写**（7 个新 `domain/` 文件 + `QrPngWriter` + 三处接入，第四批 C2）。前者门禁 1137 条 / 136 文件，后者门禁 **1154 条 / 138 文件**（detekt 0、lint 0 Error、verifySpecSync 过），但都**未 bump 版本号、未发布**。版本号仍 `versionCode 124` / `versionName "1.2.12"`；按维护者裁决，等剩下的活都做完再一次性发版。
+> **2026-11-01 工作树状态**：v1.2.12 之后又落了三批**未发版**改动 —— ① Compose 性能审查 ①：`BackupScreen` 从 1325 行拆成 8 个文件（纯结构动作、无行为变更）；② **B6 钥匙扣二维码从零重写**（7 个新 `domain/` 文件 + `QrPngWriter` + 三处接入，第四批 C2）；③ **审查 §十 五问的落地**：锁屏卡改 PRIVATE + publicVersion、三个医学缺口（活疫苗×免疫抑制药 / 补剂上限单位含 v20→**v21** 迁移 / 临界容差按项可配）、备份 KDF 换 Argon2id、恢复码查看前验设备凭证 + 剪贴板 60 秒清除。三者门禁分别 1137 / 1154 / **1210 条 / 145 文件**（detekt 0、lint 171 = 0 Error、verifySpecSync 过），但都**未 bump 版本号、未发布**。版本号仍 `versionCode 124` / `versionName "1.2.12"`；按维护者裁决，等剩下的活都做完再一次性发版。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号以 `app/build.gradle.kts` 为准（v1.2.9 起**不再把单测条数抄进文档**，见根 `build.gradle.kts` 里 `verifySpecSync` 的注释）。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -16,9 +16,9 @@
 | 全量单测 | **全绿，0 失败 / 0 错误 / 0 跳过**（约 102 个测试文件；**实际条数以 CI 为准，文档不记数**——v1.2.9 起如此）；含 13 条 `MigrationPathProofTest`（起点 4..16 → 19）；androidTest 源集首个用例 `RealDatabaseSchemaTest` |
 | 构建 | `testDebugUnitTest assembleRelease assembleDebug` → **BUILD SUCCESSFUL** |
 | APK 版本 | **v1.2.11 已由 CI 构建并发布**：`aapt dump badging` 核对为 versionCode 123 / versionName 1.2.11，正式证书 `38ca80a6…d7d`（`apksigner --print-certs` 实测，未回退 debug 签名），**5,277,782 B**，sha256 `280EFC55…1938`。⚠️ 本地同源码构建的 `app-release.apk` 是 **5,277,782 B / sha256 `D66CF5A8…FB93A`**——**体积相同、摘要不同**，因为 APK 内嵌 `META-INF` 签名块带时间戳、且 Gradle 打包顺序受文件系统枚举影响，**这不代表内容有差异**；发布用的是 CI 产物（C04 保证其证书摘要正确）。上一版 v1.2.10 为 versionCode 122 / versionName 1.2.10（本地构建，5,213,292 B） |
-| 本版版本 | versionCode 124 / versionName 1.2.12；`ASHKB_DB_VERSION` 仍 **20**（**无库结构变更、无新迁移**，升级不跑迁移） |
+| 本版版本 | versionCode 124 / versionName 1.2.12；`ASHKB_DB_VERSION` 工作树上已升到 **21**（未发版；已发布的 v1.2.12 仍是 20，无库结构变更） |
 | 本版内容（v1.2.12） | **C01 口令标签遗留修正**（v1.2.11 装机走查照出）：`backup_password_field` 中英标签由写死的「≥6 位」改为占位符 `%1$d`、调用点传 `BackupPasswordRules.MIN_LENGTH`，新增 `backup_password_too_short` 中英两条（口令不足就地红字说明，不再只是静默变灰），`BackupPasswordRulesTest` 补 1 条守卫（标签/提示不得写死数字 + 调用点必须传常量，只改字符串会缺格式化参数在运行期崩）。门禁 `E:\ASHKB\v1212-gate1.log` 全绿（**1137 条 / 136 文件**，detekt 0，lint 184 = 0 Error，verifySpecSync 过），真机复核标签已变「≥12 位」 |
-| 未发布的改动（在工作树上） | **C1-① `BackupScreen` 拆分**（2026-10-31，纯结构动作）：`ui/backup/BackupScreen.kt` **1325 → 332 行**，按分区拆出 7 个新文件（`BackupRestoreSection.kt` 306 / `BackupSyncSection.kt` 246 / `BackupSheets.kt` 181 / `BackupRecoverySection.kt` 179 / `BackupLocalSection.kt` 153 / `BackupLedgerSection.kt` 124 / `BackupFormat.kt` 26）；13 个跨文件符号 `private` → `internal`；detekt 基线 307 → 301（删掉 6 条：4 条 `MagicNumber` + 2 条 `MaxLineLength`，都是本次在代码里修掉/改名的条目失效，**没有新增豁免**）；`BackupPasswordRulesTest` 的源码断言由「读单个文件」改为「扫 `ui/backup` 整个目录」。门禁 `E:\ASHKB\c1-split-gate1.log` 全绿。**未 bump 版本号、未入 Release**。同批还有 **C2 B6 钥匙扣二维码从零重写**（7 个 `domain/` 文件 + `QrPngWriter` + 导出页卡片 / 紧急卡 PDF / 系统分享三处接入，门禁 `E:\ASHKB\c2-qr-gate2.log` 全绿 1154 条 / 138 文件） |
+| 未发布的改动（在工作树上） | **C1-① `BackupScreen` 拆分**（2026-10-31，纯结构动作）：`ui/backup/BackupScreen.kt` **1325 → 332 行**，按分区拆出 7 个新文件（`BackupRestoreSection.kt` 306 / `BackupSyncSection.kt` 246 / `BackupSheets.kt` 181 / `BackupRecoverySection.kt` 179 / `BackupLocalSection.kt` 153 / `BackupLedgerSection.kt` 124 / `BackupFormat.kt` 26）；13 个跨文件符号 `private` → `internal`；detekt 基线 307 → 301（删掉 6 条：4 条 `MagicNumber` + 2 条 `MaxLineLength`，都是本次在代码里修掉/改名的条目失效，**没有新增豁免**）；`BackupPasswordRulesTest` 的源码断言由「读单个文件」改为「扫 `ui/backup` 整个目录」。门禁 `E:\ASHKB\c1-split-gate1.log` 全绿。**未 bump 版本号、未入 Release**。同批还有 **C2 B6 钥匙扣二维码从零重写**（7 个 `domain/` 文件 + `QrPngWriter` + 导出页卡片 / 紧急卡 PDF / 系统分享三处接入，门禁 `E:\ASHKB\c2-qr-gate2.log` 全绿 1154 条 / 138 文件）。**第三批（2026-11-01）：审查 §十 五问的落地**——锁屏卡 PRIVATE + publicVersion、三个医学缺口（活疫苗×免疫抑制药 / 补剂上限单位 + `ASHKB_DB_VERSION` 20→21 / 临界容差按项可配）、备份 KDF 换 Argon2id、恢复码查看前验设备凭证 + 剪贴板 60 秒清除；门禁 `E:\ASHKB\medgap-gate3.log` 全绿 **1210 条 / 145 文件**（detekt 0、lint 171 = 0 Error）。详见文末「审查 §十 落地」节 |
 | 审查裁决进度 | **裁决项 1、2 已落地并发布（v1.2.9）；裁决项 3 已落地（未发布）**。① 对乙酰氨基酚 `MedClass.NSAID` → 新增 `MedClass.ANALGESIC`，`DrugInteractionKeys` 的 `nsaid`/`nsaid_longterm` 摘除 acetaminophen，新增 2 条回归（`MedicationInteractionChainTest`）；②「已结算」统一到 `AdherenceCalc.SETTLED_STATUSES` 唯一口径——删掉 `MedicationRepository.doneSlotRefs`、`ReminderReceiver` 改引 `settledSlotRefs`、`TodayItem` 新增 `partial`/`isSettled`、今日页 partial 不再显示成「漏服」也不计入待办，连带按铁律重写 4 条 detekt 复杂度（不进基线）并清掉 2 条签名过期的基线条目；③ **口服不再提供「每两周」**——新增 `ui/me/MedEditSections.kt` 的 `routeVisible`（chips 按 route 过滤 + 保留当前值逃生口）、`MedEditScreen.onPrimary()` 提交拦截 + `med_route_frequency_error` 红字，**domain 层刻意不动**（`ScheduleCalc.isCycleGatedBy` 只加 KDoc），新增 10 条回归（`MedRouteFrequencyGuardTest`）。其余 5 项待裁决；其中**裁决项 6、7 与审查第二、三批（含 §6.7）已落地、门禁全绿、未发版**（见文末「批次 B」）；另按维护者指令（m00936）落地**按需用药常驻首页 + 每天只记一次**（见文末「批次 C」） |
 | B6 二维码 | **第一版已完整回退（回退后 grep 零命中），第二版从零重写完成、未发版**（2026-10-31）：`domain/` 新增 `QrBitBuffer` / `QrSegment` / `QrEcc` / `QrReedSolomon` / `QrTables` / `QrCode`（552 行）/ `EmergencyQr` 共 7 个纯 Kotlin 文件（零第三方依赖），`ui/report/QrPngWriter` 负责矩阵 → PNG（含 4 模块静区）。验证双轨：Nayuki 参考实现 **27 组黄金向量逐格一致** + ZXing 3.5.3 **端到端解码 5/5 通过**；负向对照三层（改常量位 ⇒ 3 红 / 去 `distinct()` ⇒ 1 红 / 翻转 35×35 数据区 ⇒ 解码 `NotFoundException`）。原四缺陷（`placeSeparators` 漏两带、`writeFormatBits` 位映射、N3、N4）全部修正。详见文末「C2」节 |
 | GitHub 正式版（Latest） | **v1.2.12**（2026-10-29，release id `427925638`，资产 `ashkb-1.2.12-release.apk` 5,278,382 B，sha256 `F54DE718…E7DE`，附注标签 `v1.2.12` → `f39dead`，CI tag 构建，正式签名）；上一版 **v1.2.11**（2026-10-26，release id `424324363`，资产 `ashkb-1.2.11-release.apk` 5,277,782 B，sha256 `280efc55…1938`，**由 tag 触发的 CI 正式签名构建产出**，`apksigner` 证书摘要 `38ca80a6…d7d` 与 `ASHKB_EXPECTED_CERT_SHA256` 逐字一致）；上一版 **v1.2.10**（id `416558911`，5213292 B，`109909e0…0186`）、**v1.2.9**（id `410782041`，5224936 B，`413f82b8…`）、**v1.2.8**（id `408053469`，5220504 B，`ece175f8…`）、**v1.2.7**（id `407916739`，5220504 B，`e09e6990…`）、**v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——v1.2.11 的摘要取自**上传前对同一份 CI 产物**的 `Get-FileHash`（发布后 `gh api` 回读 `assets[].digest` 逐字一致）；v1.2.10 及更早六版为**本地构建**，摘要与本地 `Get-FileHash` **逐字节一致** |
@@ -272,7 +272,7 @@ gh release edit v1.0.70 --prerelease=false --latest
 
 **A. 只有维护者能拍板（做完前不要自行决定）**
 
-1. **审查报告 §十 的 5 条医学规则澄清**——原件在 `C:\Users\weant\Documents\Qoder\2026-09-28\a6159f90\ASHKB-代码审查报告.md:260-266`，原文明确「在你不回答之前，第 3 批『医学规则』那类改动不应该动」。**这是当前唯一挡住医学规则改动的闸门。**
+1. ✅ **审查报告 §十 的 5 条医学规则澄清**——**2026-11-01 维护者已作答**（原件 `C:\Users\weant\Documents\Qoder\2026-09-28\a6159f90\ASHKB-代码审查报告.md:260-266`）。裁决：①审查目的权重 = 自用可靠性优先；②医疗规则处置权 = 允许把安全默认值改保守；③备份威胁模型 = **不信任 WebDAV 服务商**（⇒ S-1 Argon2id 升 P1、S-3 恢复码保护升 P1）；④锁屏急救卡 = **只公开标题、详情需解锁**；⑤改造预算 = 第 3 批医学规则可以动。**其中 3、4 与三条医学缺口已落地（见文末「审查 §十 落地」节）；这条闸门已解除。** 仍留维护者裁决的只剩下面 2~4 项。
 2. **R16 批量导入**是否纳入 v3（见 §3.2；v3 需求表未继承 R14 / R15 / R16）。
 3. **趋势页方案 B** 是否要做——若做，**必须基于方案 C 已实现的「点格展开大图」收敛**，否则两套详情入口重复。
 4. **知识库完整编辑器**（§3.2 记为「后移阶段 2 之后」，需确认是否已到时机）。
@@ -1286,3 +1286,40 @@ C01 遗留，修复后随 **v1.2.12** 发布（`backup_password_field` 改占位
 1. 逐格比对：从 `https://github.com/nayuki/QR-Code-generator` 取 `java/src/main/java/io/nayuki/qrcodegen/{QrCode,QrSegment,BitBuffer,DataTooLongException}.java`，`javac -encoding UTF-8 -d out`。生成向量时**必须**用 `QrCode.encodeSegments(QrSegment.makeSegments(text), ecc, MIN_VERSION, MAX_VERSION, -1, false)`（`mask=-1` 自动选、`boostEcl=false`），否则与 `QrGoldenVectorsTest` 的期望不一致。
 2. 端到端解码：从 Maven Central 取 `com.google.zxing:core:3.5.3` 与 `com.google.zxing:javase:3.5.3` 两个 jar，把模块矩阵按每模块 8 px、静区 4 模块渲染成 PNG，再用 `MultiFormatReader` + `HybridBinarizer` + `BufferedImageLuminanceSource` 解码，比对正文逐字相同。
 3. 负向对照：**单模块翻转会被 ECC=H 纠回、仍 PASS**（正确行为），必须破坏到超出纠错容量才能验证解码断言不是空转——实测翻转 35×35 数据区可稳定得到 `NotFoundException`。
+---
+
+## 审查 §十 落地（2026-11-01 · 未发版 · 未 bump 版本号）
+
+维护者对审查报告 §十 五问作答后，本批把其中还悬着的部分全部落完。**§十 的闸门已解除。**
+逐条取证见 `CHANGELOG.md` 顶部同日期小节；本节只记「做了什么、为什么这么做、怎么验的」。
+
+| 项 | 落点 | 判据 |
+|---|---|---|
+| 锁屏卡只公开标题 | `reminder/NotificationHelper.kt`（PRIVATE + `setPublicVersion`）、`values*/strings_domain.xml` 两条固定文案 | `LockscreenPrivacyTest` 4 条；负向对照删 `setPublicVersion` ⇒ 1 红 |
+| 缺口① 活疫苗 × 免疫抑制药 | `domain/VaccineSafety.kt`（`ActiveDrug` / `immunosuppressantDrugs`）、`HealthRepository.liveVaccineAlertMessage` | `VaccineSafetyTest` 15 条 + `VaccineLiveAlertMessageTest` 3 条（Robolectric 真库）；两次负向对照均命中 |
+| 缺口② 补剂上限单位 | `supplements.daily_max_unit`（`ASHKB_DB_VERSION` 20 → **21**）、`domain/SupplementLimits.kt` 三态 `UnitMatch`、`WellnessScreen` 三处 | `SupplementLimitsTest` 10 条；负向对照删 MISMATCH 早退 ⇒ 1 红 |
+| 缺口③ 临界容差按项可配 | `domain/LabBoundaryTolerance.kt`（新）、`ClinicalThresholds.labNearBoundary(ratio=)`、`ui/me/LabToleranceScreen.kt`（新） | `LabBoundaryToleranceTest` 11 条；两次负向对照均命中 |
+| S-1 备份 KDF → Argon2id | `domain/Argon2id.kt`（新 826 行）、`VaultCipher.deriveKeyFor` 按槽头分派 | `Argon2idTest` 7 条（RFC 9106 + 20 组黄金向量）、`VaultKdfMigrationTest` 8 条；两次负向对照（回落 PBKDF2 ⇒ 1 红 / 声明与实现不一致 ⇒ 11 红） |
+| S-3 恢复码保护 | `ui/backup/RecoveryRevealGuard.kt`、`RecoveryClipboard.kt`（均新）、`BackupRecoverySection.kt` 三处改动 | `RecoveryClipboardTest` 7 条、`RecoveryRevealWiringTest` 5 条；负向对照 2 次均命中 |
+
+**三条刻意不做的取舍（都被写进对应 KDoc，改动前必须读）**
+
+1. **不给 `ashkb_prefs_key` 加 `setUserAuthenticationRequired`**——它同时解密 WebDAV 账号密码，加认证
+   会让所有凭据读取都弹系统验证；已生成的密钥不能原地改属性，要轮换（旧凭据全部作废）。
+2. **不用「备份口令」验恢复码查看**——口令不落盘，验它只能拿真实备份试解，而恢复码存在的意义正是
+   「忘了口令时的退路」。改用设备凭证（`KeyguardManager.createConfirmDeviceCredentialIntent`）；
+   本机没设锁屏时放行（那时本机本无身份屏障，单拦恢复码不增加安全性）。
+3. **不把糖皮质激素算进「免疫抑制」**——AS 常见低剂量泼尼松，`Medication.dose` 是自由文本拿不到可靠
+   剂量判定，计进去会淹没真正的警示。
+
+**发布时必须写明的两件事**
+
+- **新备份的 KDF 已改为 Argon2id，旧版 App 打不开新备份**（旧备份在新版仍可打开）。
+- 本批含库结构变更：`ASHKB_DB_VERSION` 20 → **21**（`MIGRATION_20_21` 只加一列 `daily_max_unit TEXT`），
+  首次启动跑迁移，升级前建议备份。
+
+**怎么复跑这些验证**
+
+- 全门禁：`. E:\ASHKB\build-env\env.ps1; & "E:\ASHKB\build-env\gradle-8.7\bin\gradle.bat" -p E:\ASHKB\patient-health-app cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug verifySpecSync --console=plain`
+- Argon2id 性能那档默认跳过（`assumeTrue`），要看数字必须先 `$env:ARGON2_BENCH="1"`。
+- 剪贴板 / 设备凭证两条走 Robolectric，**不需要真机**；但「系统验证界面长什么样」只能在真机看。

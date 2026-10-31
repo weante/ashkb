@@ -16,6 +16,7 @@ import com.ashkb.app.data.repo.ReminderConfigRepository
 import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.domain.KbSearch
 import com.ashkb.app.domain.KbSeedRefresh
+import com.ashkb.app.domain.LabBoundaryTolerance
 import com.ashkb.app.reminder.BasdaiReminderScheduler
 import com.ashkb.app.reminder.CheckupReminderScheduler
 import com.ashkb.app.reminder.EmergencyLockscreenPublisher
@@ -68,6 +69,10 @@ class AshkbApplication : Application() {
         // 不等启动期那批 IO（下面 appScope.launch 里的例行工作），否则冷启动恰好跨零点时，
         // 页面可能先读到还没校正的旧日期。
         dateProvider.start(this)
+        // v1.2.13（医学缺口③）：临界容差按化验项配置后，判据要查这份配置。在这里同步装载一次，
+        // 让第一帧渲染就拿到正确容差——若等某个 Composable 首次调用才装载，会有一帧按默认 5%
+        // 算出的「临界」闪一下再消失（列表逐行判定，闪的是所有行）。
+        runCatching { LabBoundaryTolerance.ensureLoaded(this) }
         appScope.launch {
             // v1.0.40：启动期例行工作**整体兜底**。这里的异常发生在协程内（appScope 无
             // CoroutineExceptionHandler），会直接冒泡到线程未捕获处理器并杀进程——必须显式捕获，

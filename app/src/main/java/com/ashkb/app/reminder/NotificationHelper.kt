@@ -97,21 +97,25 @@ object NotificationHelper {
                 setSound(null, null)
             }
         )
-        // v1.0.66 B6a：锁屏紧急信息——静默 + 锁屏公开可见
+        // v1.0.66 B6a：锁屏紧急信息——静默 + 锁屏**不公开内容**
         //
-        // ⚠️ v1.0.72 真机结论（小米 15 Pro / HyperOS 2）：这里的 `lockscreenVisibility = PUBLIC`
+        // ⚠️ v1.0.72 真机结论（小米 15 Pro / HyperOS 2）：这里的 `lockscreenVisibility`
         // **在小米上不生效也不会回写**——`dumpsys notification` 里该通道始终是
         // `mLockscreenVisibility=-1000`（NO_OVERRIDE），用户改与不改都一样；MIUI 把「每通道锁屏
         // 可见性」存在它自己的存储里。实测**唯一的开关在系统侧**：
         //   设置 → 应用设置 → ASHKB → 通知管理 → 锁屏紧急信息 → 在锁定屏幕上 → 显示通知及其内容
         // （默认**不是**这一项；用户改成它之后，锁屏上即稳定可见 —— 见 HANDOFF §7）。
-        // AOSP 侧保留 PUBLIC 仍然正确（Pixel 等原生系统按此显示内容），故不删，仅在此备案。
+        // AOSP 侧保留此设置仍然正确（Pixel 等原生系统按此显示内容），故不删，仅在此备案。
+        //
+        // 未发布（审查报告 §十 第 4 问）：PUBLIC → PRIVATE。真正漏到锁屏的是**通知级的**
+        // `setPublicVersion`（见 postLockscreenEmergencyCard），通道这里只是把默认口径对齐；
+        // 且通道的锁屏可见性一旦创建就不可修改，老用户机器上仍是旧值，故不依赖它。
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_EMERGENCY_LOCKSCREEN, context.getString(R.string.notif_channel_emergency_name), NotificationManager.IMPORTANCE_LOW).apply {
                 description = context.getString(R.string.notif_channel_emergency_desc)
                 enableVibration(false)
                 setSound(null, null)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
             }
         )
         // v1.0.68 C8a：久坐起身提醒——DEFAULT（要有存在感），免打扰时段内改走静默通道
@@ -514,12 +518,25 @@ object NotificationHelper {
     }
 
     /**
-     * v1.0.66 B6a：锁屏紧急信息——**常驻 + 锁屏公开可见**。
+     * v1.0.66 B6a：锁屏紧急信息——**常驻**。
      *
-     * `VISIBILITY_PUBLIC` 让内容在锁屏直接显示、无需解锁（急救场景的关键）；
      * `setOngoing(true)` 使其不可被划掉（避免家人误清）；
      * 通道为 IMPORTANCE_LOW，故不响不震（常驻卡不是"提醒"）。
      * 刻意**不归入提醒折叠组**——它不是待处理提醒。
+     *
+     * **未发布（审查报告 §十 第 4 问）：锁屏可见性由 PUBLIC 改为 PRIVATE + `setPublicVersion`。**
+     *
+     * 原来整张卡在锁屏上明文可见（血型 / 诊断 / 过敏 / 用药 / 家属与医生电话）。那个取舍
+     * 只在「手机在救命的人手里」成立；同一张卡在通勤地铁、办公桌上同样亮着，等于把诊断与
+     * 家属电话广播给任何路过的人。改成 PRIVATE 后：
+     *  - 锁屏只显示 [R.string.dom_lock_public_title] / [R.string.dom_lock_public_text] 两串
+     *    **不含任何用户数据**的固定文案——既不泄露病情，也仍然告诉捡到手机的人「这里有急救信息」；
+     *  - 解锁后（或通知栏下拉）看到的仍是完整内容，急救可用性不减；
+     *  - `setPublicVersion` 的点击沿用主通知的 contentIntent，故不解锁时点一下也会跳到解锁界面。
+     *
+     * ⚠️ 小米实测结论仍然适用（见 [ensureChannels] 注释）：MIUI/HyperOS 的每通道锁屏可见性
+     * 存在它自己的存储里，AOSP 侧的 `lockscreenVisibility` 不生效也不回写。因此这条改动的
+     * 实际效果在 MIUI 上取决于系统侧「在锁定屏幕上」的设置；本改动保证 AOSP 行为正确。
      */
     fun postLockscreenEmergencyCard(context: Context, title: String, lines: List<String>) {
         if (!canPost(context)) return
@@ -532,13 +549,29 @@ object NotificationHelper {
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(lockscreenPublicVersion(context))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(open)
             .build()
         postNotification(context, NOTIF_ID_EMERGENCY_CARD, n)
     }
+
+    /**
+     * 锁屏上真正露出的那一版：**只有两句固定文案，不含任何用户数据**。
+     *
+     * 刻意不设 contentIntent / group / style——系统在展示 publicVersion 时会以主通知为准，
+     * 这里多设一次只是增加两处需要同步维护的状态，没有收益。
+     */
+    private fun lockscreenPublicVersion(context: Context): Notification =
+        NotificationCompat.Builder(context, CHANNEL_EMERGENCY_LOCKSCREEN)
+            .setSmallIcon(R.drawable.ic_stat_pill)
+            .setContentTitle(context.getString(R.string.dom_lock_public_title))
+            .setContentText(context.getString(R.string.dom_lock_public_text))
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .build()
 
     fun cancelLockscreenEmergencyCard(context: Context) {
         runCatching { NotificationManagerCompat.from(context).cancel(NOTIF_ID_EMERGENCY_CARD) }

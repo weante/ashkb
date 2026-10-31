@@ -23,9 +23,12 @@ class LabNearBoundaryWiringTest {
 
     @Test
     fun `列表行的数值胶囊接了临界态`() {
+        // v1.2.13（医学缺口③）：容差改为按化验项查表后，调用点从 isNearBoundary() 变成
+        // isNearBoundary(ratios)。这里钉的是「LabRow 把临界结论传给了 LabValue」这件事，
+        // 不该钉实参是不是恰好为空——否则每次容差来源变一次，守卫就要跟着改一次。
         assertTrue(
-            "LabRow 必须把 isNearBoundary() 传给 LabValue",
-            imaging.contains("near = lab.isNearBoundary()"),
+            "LabRow 必须把 isNearBoundary(...) 传给 LabValue",
+            imaging.contains("near = lab.isNearBoundary("),
         )
     }
 
@@ -39,6 +42,12 @@ class LabNearBoundaryWiringTest {
             "预览必须走 ClinicalThresholds.labNearBoundary，不能自己再写一套比较",
             squash(imaging).contains(
                 "ClinicalThresholds.labNearBoundary(r.value,r.refLow,r.refHigh,r.refLowInclusive,r.refHighInclusive",
+            ),
+        )
+        assertTrue(
+            "v1.2.13（医学缺口③）：导入预览也要用按项容差，否则保存前后同一行观感不一致",
+            squash(imaging).contains(
+                "LabBoundaryTolerance.ratioFor(LabBoundaryTolerance.snapshot(),r.testName)",
             ),
         )
     }
@@ -70,7 +79,7 @@ class LabNearBoundaryWiringTest {
     fun `临界单独计数 不进异常计数`() {
         assertTrue(
             "分组副标题必须单独统计临界（维护者裁决项 3）",
-            imaging.contains("val nearCount = rows.count { it.isNearBoundary() }"),
+            imaging.contains("val nearCount = rows.count { it.isNearBoundary(ratios) }"),
         )
         val body = functionBody(imaging, "private fun LabDateGroup(")
         assertTrue(
@@ -94,6 +103,12 @@ class LabNearBoundaryWiringTest {
             "PDF 的临界判据也要走 ClinicalThresholds.labNearBoundary",
             squash(nearBlock).contains(
                 "ClinicalThresholds.labNearBoundary(it.value,it.refLow,it.refHigh,it.refLowInclusive,it.refHighInclusive",
+            ),
+        )
+        assertTrue(
+            "v1.2.13（医学缺口③）：PDF 与界面读同一份按项容差，否则屏幕上两项临界、打印出来一项",
+            squash(nearBlock).contains(
+                "LabBoundaryTolerance.ratioFor(LabBoundaryTolerance.snapshot(),it.testName)",
             ),
         )
         assertTrue(

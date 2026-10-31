@@ -684,6 +684,51 @@ internal data class SupplementRowActions(
  * 「跳过」不弹任何表单、不要求填理由：补剂不是处方药，没有「为什么没吃」这一问
  * （药品那套 `SkipReason` 是给漏服追责用的，照搬到补剂只是多一步无用输入）。
  */
+/**
+ * B11：当日累计（单次剂量 × 每日次数）超出用户自填的每日上限 → 警示。
+ *
+ * v1.2.13（审查报告 §十 第 2 条）：上限现在有自己的单位。三种情形分开说话——
+ *  · 超限 → 红字报数，两处各用各自的单位（此前把 `doseUnit` 同时贴给两边，
+ *    「每次 1 粒 / 上限 1000 mg」会算成 1 > 1000 而永远静默）；
+ *  · 单位对不上 → **必须说出来**。此时 [SupplementLimits.exceedsDailyMax] 返回 null
+ *    （判不了，不是没超）；若什么都不显示，用户看到的正是「没警告 = 安全」，比报错更危险；
+ *  · 上限没填单位 / 未量化剂量 / 未填上限 → 静默不提示（存量口径，假设与单次剂量同单位）。
+ *
+ * 抽成独立 Composable 而非内联：`SupplementCardRow` 已顶到 detekt 的函数长度上限，
+ * 而这段分支本身就是完整的一件「展示某一种结论」的事，拆开不影响语义。
+ */
+@Composable
+private fun SupplementLimitWarning(sup: Supplement) {
+    val overLimit = SupplementLimits.exceedsDailyMax(sup)
+    when {
+        overLimit == true -> {
+            val total = SupplementLimits.dailyTotal(sup)
+            val max = sup.dailyMax
+            if (total != null && max != null) {
+                Text(
+                    stringResource(
+                        R.string.supp_over_limit,
+                        fmtNum(total), SupplementLimits.unitLabel(sup),
+                        fmtNum(max), SupplementLimits.limitUnitLabel(sup),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+        SupplementLimits.unitMatch(sup) == SupplementLimits.UnitMatch.MISMATCH -> {
+            Text(
+                stringResource(
+                    R.string.supp_over_limit_unit_mismatch,
+                    SupplementLimits.unitLabel(sup), SupplementLimits.limitUnitLabel(sup),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SupplementCardRow(
@@ -718,22 +763,7 @@ private fun SupplementCardRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            // B11：当日累计（单次剂量 × 每日次数）超出用户自填的每日上限 → 警示；
-            // 未填上限 / 未量化单次剂量时 exceedsDailyMax 返回 null，静默不提示
-            if (SupplementLimits.exceedsDailyMax(sup) == true) {
-                val total = SupplementLimits.dailyTotal(sup)
-                val max = sup.dailyMax
-                if (total != null && max != null) {
-                    Text(
-                        stringResource(
-                            R.string.supp_over_limit,
-                            fmtNum(total), SupplementLimits.unitLabel(sup), fmtNum(max),
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
+            SupplementLimitWarning(sup)
         }
         // 动作行：独占名称下方的一行。用 FlowRow 而不是 Row——见上方 KDoc 的宽度推算，
         // 窄屏 / 大字号下它会整体折行，而 Row 只会把末尾按钮挤出屏幕。
@@ -1036,6 +1066,63 @@ private fun BodyMeasureSheet(vm: WellnessViewModel, onDismiss: () -> Unit) {
     }
 }
 
+/**
+ * 量化剂量四输入的一组值 + 各自写回。单独定义而不是嵌在某个 Composable 里：
+ * 这里只是把四个输入状态打包成参数，平铺成顶层类型最省事。
+ */
+private data class SupplementDoseInput(
+    val amount: String, val onAmount: (String) -> Unit,
+    val unit: String, val onUnit: (String) -> Unit,
+    val max: String, val onMax: (String) -> Unit,
+    val maxUnit: String, val onMaxUnit: (String) -> Unit,
+)
+/**
+ * 补剂的量化剂量四输入（单次剂量 / 单位 / 每日上限 / 上限单位）+ 一行说明。
+ *
+ * v1.2.13（审查报告 §十 第 2 条）：上限有了自己的单位之后，这段输入从 3 个框变成 4 个，
+ * 连同上限单位那层「沿用单次剂量单位」的提示，已经撑不进 `SupplementSheet` 的函数长度上限。
+ * 抽出来时**不改任何一处的语义**：四个值仍是各自独立的输入状态，提示仍读当前输入框的值。
+ */
+@Composable
+private fun SupplementDoseFields(state: SupplementDoseInput) {
+    AshkbTextField(
+        state.amount, state.onAmount, label = { Text(stringResource(R.string.supp_dose_amount_label)) },
+        singleLine = true,
+    )
+    AshkbTextField(
+        state.unit, state.onUnit, label = { Text(stringResource(R.string.supp_dose_unit_label)) },
+        singleLine = true,
+    )
+    AshkbTextField(
+        state.max, state.onMax, label = { Text(stringResource(R.string.supp_daily_max_label)) },
+        singleLine = true,
+    )
+    AshkbTextField(
+        state.maxUnit, state.onMaxUnit,
+        label = { Text(stringResource(R.string.supp_daily_max_unit_label)) },
+        singleLine = true,
+        supportingText = {
+            // 只在「上限填了数、上限单位留空、单次剂量单位也有」时提示这层假设——
+            // 三个条件缺一个就不构成一次比较，多说一句只是噪音。
+            // 判据读的是**当前输入框的值**而不是既有记录：用户正在改单次剂量单位，
+            // 提示得跟着他输入的内容变，不能等他点保存才更新。
+            val doseUnitNow = state.unit.trim()
+            if (state.max.isNotBlank() && state.maxUnit.isBlank() && doseUnitNow.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.supp_limit_unit_assumed, doseUnitNow),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+    )
+    Text(
+        stringResource(R.string.supp_daily_max_hint),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, onDismiss: () -> Unit) {
@@ -1046,6 +1133,10 @@ private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, 
     var doseAmount by remember { mutableStateOf(current?.doseAmount?.let { fmtNum(it) } ?: "") }
     var doseUnit by remember { mutableStateOf(current?.doseUnit ?: "") }
     var dailyMax by remember { mutableStateOf(current?.dailyMax?.let { fmtNum(it) } ?: "") }
+    // v1.2.13（审查报告 §十 第 2 条）：上限自己的单位。留空 = 沿用单次剂量单位（存量数据的口径），
+    // 编辑既有补剂时预填已存的值，**不替用户猜一个填进去**——猜错会把「1 粒 / 1000 mg」悄悄变成
+    // 「1000 粒」这种更离谱的错误。
+    var dailyMaxUnit by remember { mutableStateOf(current?.dailyMaxUnit ?: "") }
     var category by remember { mutableStateOf(SupplementCategory.fromKey(current?.category)) }
     var notes by remember { mutableStateOf(current?.notes ?: "") }
     // v1.2.4：提醒时刻——预填既有值（`times` 是 JSON 数组字符串，解析口径与调度器同一份实现）
@@ -1065,16 +1156,13 @@ private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, 
             AshkbTextField(brand, { brand = it }, label = { Text(stringResource(R.string.nutrition_brand_field)) }, singleLine = true)
             AshkbTextField(dose, { dose = it }, label = { Text(stringResource(R.string.nutrition_dose_field)) }, singleLine = true)
             // B11：量化剂量三输入——单次剂量 / 单位 / 每日参考上限（上限由用户自填，App 不内置医学数值）
-            AshkbTextField(
-                doseAmount, { doseAmount = it }, label = { Text(stringResource(R.string.supp_dose_amount_label)) },
-                singleLine = true,
-            )
-            AshkbTextField(doseUnit, { doseUnit = it }, label = { Text(stringResource(R.string.supp_dose_unit_label)) }, singleLine = true)
-            AshkbTextField(dailyMax, { dailyMax = it }, label = { Text(stringResource(R.string.supp_daily_max_label)) }, singleLine = true)
-            Text(
-                stringResource(R.string.supp_daily_max_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            SupplementDoseFields(
+                SupplementDoseInput(
+                    amount = doseAmount, onAmount = { doseAmount = it },
+                    unit = doseUnit, onUnit = { doseUnit = it },
+                    max = dailyMax, onMax = { dailyMax = it },
+                    maxUnit = dailyMaxUnit, onMaxUnit = { dailyMaxUnit = it },
+                ),
             )
             Text(stringResource(R.string.common_category), style = MaterialTheme.typography.labelMedium)
             ChipGroup(
@@ -1118,6 +1206,9 @@ private fun SupplementSheet(vm: WellnessViewModel, current: Supplement? = null, 
                                 doseAmount = doseAmount.trim().toDoubleOrNull(),
                                 doseUnit = doseUnit.trim().ifBlank { null },
                                 dailyMax = dailyMax.trim().toDoubleOrNull(),
+                                // v1.2.13：上限单位与单次剂量单位各存各的。空串落 null =「沿用单次
+                                // 剂量单位」，这样存量补剂（此列必然为 null）行为与修复前一致。
+                                dailyMaxUnit = dailyMaxUnit.trim().ifBlank { null },
                                 createdAt = current?.createdAt ?: nowIso(),
                                 updatedAt = nowIso(),
                             )

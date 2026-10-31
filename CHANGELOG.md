@@ -1,3 +1,117 @@
+## [未发布] — 2026-11-01 · 审查 §十 五问的落地：三个医学缺口 + 备份威胁模型（Argon2id / 恢复码保护）
+
+维护者对审查报告 §十 五问给出裁决后，本批落地其中真正还悬着的部分。三条流水线互不相干，分开记。
+
+### 一、锁屏急救卡只承认「这张卡存在」（§十 第 4 问裁决：详情需解锁）
+
+- `reminder/NotificationHelper.kt`：`postLockscreenEmergencyCard` 的通知级可见性由 `VISIBILITY_PUBLIC` 改为
+  `VISIBILITY_PRIVATE`，并挂上 `setPublicVersion(lockscreenPublicVersion(context))`；新增私有函数
+  `lockscreenPublicVersion` 只写两条**固定文案**（`dom_lock_public_title`「有健康急救信息」/
+  `dom_lock_public_text`「解锁手机后可查看血型、过敏与急救电话」），不含任何用户数据、不设 contentIntent。
+- 通道的 `lockscreenVisibility` 同步改为 `VISIBILITY_PRIVATE`，但注释写明**不依赖它**：通道一旦创建
+  就不可修改，老用户机器上仍是旧值；真正漏到锁屏的是通知级 `setPublicVersion`。
+- 取舍写进 `domain/EmergencyLockscreen.kt` 的 KDoc：原 PUBLIC 只在「手机正握在救命的人手里」成立，
+  同一张卡在地铁、办公桌上等于把诊断与家属电话广播出去。
+- 新增 `LockscreenPrivacyTest`（4 条静态源码断言）：主通知必须 PRIVATE 且不得出现 PUBLIC 字面量、
+  必须挂 publicVersion、publicVersion 块内不得引用 `lines`/`body` 或任何用户数据资源、
+  两条锁屏文案本身不得含占位符。负向对照：删掉 `setPublicVersion` 行 ⇒ 4 条里 1 红。
+
+### 二、医学缺口①：活疫苗 × 免疫抑制药交叉校验（原先文案自称核对过，代码从未核）
+
+- `domain/VaccineSafety.kt`：新增 `data class ActiveDrug(name, medClass)` 与
+  `fun immunosuppressantDrugs(active): List<ActiveDrug>`——生物制剂（BIOLOGIC）/ JAK 抑制剂 / csDMARD
+  三类算免疫抑制，`MAX_NAMED_DRUGS = 3` 上限、同名去重、空名丢弃、分类比较大小写无关。
+- **刻意不做的三件事**（KDoc 已写明，改动前必读）：①不改变「要不要报警」——用免疫抑制状态做开关会
+  造成「停药后警报消失」的漏报；②不在「没在用」时声称「没在用」——返回空只代表药单里没有；
+  ③不把糖皮质激素算进来——AS 常见低剂量泼尼松，`dose` 是自由文本拿不到可靠剂量判定，计进去会淹没真正警示。
+- `data/repo/HealthRepository.kt`：新增 `private val medDao = db.medicationDao()` 与
+  `liveVaccineAlertMessage(record)`；`saveVaccineRecord` 的警报文案改为走它，命中免疫抑制时用新串
+  `ui_alert_live_vaccine_on_immunosuppressant`（点名药名），否则沿用原串。读药单失败用 `runCatching`
+  兜底成通用文案——**保存路径在事务里，读药单失败不该让疫苗记录存不进去**。
+- `refreshVaccineLiveAlert` 的 KDoc 补注「已存在的警报文案不改写」：`insertAlertOnce` 见同
+  `(type, ref_date)` 即跳过，警报是那一刻的留痕，事后悄悄改掉用户读过的那句比不改更让人困惑。
+- 测试：`VaccineSafetyTest` 8 → 15 条；新增 `VaccineLiveAlertMessageTest`（Robolectric + 真库，3 条），
+  断言一律看**落库的 message 文本**而不是纯函数返回值——「判定对了但仓储没接上」正是这类改动最容易
+  漏掉的形态。负向对照各一次，均命中。
+
+### 三、医学缺口②：补剂每日上限没有单位（`ASHKB_DB_VERSION` 20 → 21）
+
+- 原实现 `exceedsDailyMax` 直接 `dailyTotal > dailyMax`，而 `dailyMax` 是裸 `Double?`，UI 把同一个
+  `doseUnit` 同时贴给累计与上限两处 ⇒「每次 1 粒 / 上限 1000 mg」算成 `1 > 1000` 永远静默通过，
+  「每次 500 mg / 上限 2 粒」算成 `500 > 2` 报无意义超限。**单位不同时比较不是精度问题，是类型错误。**
+- `data/entity/Entities.kt`：`Supplement` 新增 `@ColumnInfo(name = "daily_max_unit") val dailyMaxUnit: String? = null`；
+  `AppDatabase` 版本 20 → 21，新增 `MIGRATION_20_21`（一条 `ALTER TABLE supplements ADD COLUMN daily_max_unit TEXT`，
+  只加可空列、不设默认值——`IS NULL` 正是「沿用单次剂量单位」的判据，写空串反而要多归一化）。
+  导出 schema `21.json` 入库。`BackupEngine` 无需改（备份恢复按 `PRAGMA table_info` 动态绑定）。
+- `domain/SupplementLimits.kt` 重写：新增 `enum class UnitMatch { SAME, ASSUMED, MISMATCH }` 与
+  `unitMatch(sup)` / `limitUnitLabel(sup)`；`exceedsDailyMax` 首行 `if (unitMatch(sup) == MISMATCH) return null`
+  ——**返回 null 而不是 false**（false 的含义是「比过了，没超」；null 的含义是「没法比」）。
+  刻意不做同义词映射（mg↔毫克、IU↔国际单位）：本地无权威换算表，猜错就是在剂量上给错结论。
+- UI 三处：卡片警示改为 `when` 三分支（真超限红字四参数 / MISMATCH 明说单位不一致 / 其它静默）、
+  编辑表单新增「上限单位（可留空）」输入框（留空 = 沿用单次剂量单位，且**不替用户猜一个填进去**）、
+  保存写 `dailyMaxUnit`。字符串 `supp_over_limit` 由三参数改为四参数。
+- 测试：`SupplementLimitsTest` 7 → 10 条；负向对照删掉 MISMATCH 早退行 ⇒ 1 红。
+
+### 四、医学缺口③：临界容差可按化验项配置
+
+- 新增 `domain/LabBoundaryTolerance.kt`（SharedPreferences 存储，**不进库**）：容差是展示口径、不参与
+  诊断与 PDF 异常计数、不改 `lab_results.abnormal`；为几条容差加表要连带一次迁移，代价与收益不成比例。
+  代价已写进 KDoc：SharedPreferences 不随备份走，换机恢复后回默认 5%。
+- `domain/ClinicalThresholds.kt`：`labNearBoundary` 末尾新增 `ratio: Float = LAB_NEAR_BOUNDARY_RATIO` 参数
+  （必须带默认值：3 个生产点 + 14 条既有判据测试直接调用）；末行改用 `ratio`，并加
+  `if (!ratio.isFinite() || ratio <= 0f) return false`——NaN 参与比较恒为 false，会**静默**抹掉整类临界。
+- 接线三处：列表（`CheckupLabImaging.kt` 逐层下传 `ratios`，在 `LabsList` 里 collect 一次）、
+  AI 导入预览（否则同一行保存前后「预览里临界、列表里正常」）、紧急卡以外的 PDF 临界段
+  （屏幕两项临界、打印一项是同一类不一致）。
+- 新增二级页 `ui/me/LabToleranceScreen.kt`（路由 `LabTolerance`，入口在「我的」），可增删「指标名 = 百分比」；
+  容差区间 `0.5% ~ 20%`，越界在界面报错而不是夹到边界。**刻意不提供「关掉临界」**——那等于作废
+  v1.2.10 的裁决项 5，想让某项不显示就调到 0.5%。
+- 测试：新增 `LabBoundaryToleranceTest`（11 条，含「按项容差真的会改变临界判定」）；
+  同步 `LabNearBoundaryWiringTest` 的 4 条静态断言（调用点已有第 6 实参）。两次负向对照均命中。
+
+### 五、S-1：备份 KDF 换 Argon2id（§十 第 3 问裁决：不信任 WebDAV 服务商）
+
+- 新增 `domain/Argon2id.kt`（826 行纯 Kotlin，零第三方依赖）：Argon2id 全流程 + Blake2b 变长哈希 +
+  引用实现；参数校验 `salt ≥ 8 字节` / `tagLength ≥ 4` / `memoryKiB ≥ 8×parallelism`。
+- `data/backup/VaultCipher.kt`：新增 `KDF_ARGON2ID` 与 RFC 9106 §4 第二推荐档参数
+  （`m=19456 KiB` / `t=2` / `p=1`），`wrapSlot` 写 `kdf=argon2id` 与 `iter/m/p`；
+  读侧新增 `deriveKeyFor(slot, ...)` 按槽头 `kdf` 分派，**未知 KDF 一律拒绝、绝不回落 PBKDF2**
+  （静默回落会让伪造槽头把强度降回去）；`argon2ParametersOrThrow` 在**分配内存之前**校验 m/p 区间
+  （`m=4 GiB` 的伪造头能让恢复直接 OOM）。`decryptV1` 分支未动（历史文件只有 pbkdf2）。
+- 新增 `Argon2idTest`（7 条，含 RFC 9106 三组官方向量 + 20 组 @noble/hashes 黄金向量；性能实测那条
+  以 `ARGON2_BENCH=1` 为开关跳过，日常单测不被拖慢）与 `VaultKdfMigrationTest`（8 条：旧 PBKDF2
+  双槽文件仍可解、新文件槽头声明 argon2id、把槽头改回 pbkdf2 就解不开、未知 KDF 拒绝、m/p/iter 越界拒绝）。
+- 两次负向对照：回落 PBKDF2 ⇒ 1 红；密钥派生改回 PBKDF2 但槽头仍写 argon2id ⇒ backup 包 104 条里 11 红。
+
+### 六、S-3：恢复码再显示前要求设备凭证 + 剪贴板保护
+
+- 新增 `ui/backup/RecoveryRevealGuard.kt`：`hasSecureLock` / `deviceCredentialPrompt`（走平台
+  `KeyguardManager.createConfirmDeviceCredentialIntent`，不引 androidx.biometric）。
+  **为什么不用「备份口令」验证**：口令本身不落盘，想验只能拿真实备份试解——而恢复码存在的全部意义
+  就是「忘了口令时的退路」，那样等于自己堵死退路；设备凭证验的是「能解锁这台手机的人」，恰好是对的门槛。
+  本机没设锁屏时 `deviceCredentialPrompt` 返回 null 并放行（那时本机本来就没有身份屏障，单拦恢复码
+  不增加安全性，只会制造「自己的码自己看不到」）。
+- 刻意**不**给 `ashkb_prefs_key` 加 `setUserAuthenticationRequired`：那把密钥同时解密 WebDAV 账号密码，
+  加认证要求会让所有凭据读取都弹系统验证；且已生成的密钥不能原地改属性，要轮换（旧凭据全部作废）。
+- `ui/backup/BackupRecoverySection.kt`：「查看」按钮改为先过设备凭证（`StartActivityForResult`，
+  `RESULT_OK` 才 reveal；启动失败走 `GlobalMessages` 明说「系统验证界面无法打开」而不是静默）；
+  弹窗去掉 `SelectionContainer`（否则长按选中即可把明文塞进系统剪贴板，绕过下面两道保护）；
+  复制改走新增的 `ui/backup/RecoveryClipboard.kt`——API 33+ 给剪贴板条目打 `IS_SENSITIVE`
+  （不进剪贴板历史/跨设备同步），并在 60 秒后**仅当内容仍是这段码时**清空。
+- 新增 `RecoveryClipboardTest`（7 条，走 Robolectric 真剪贴板）与 `RecoveryRevealWiringTest`（5 条，
+  含「reveal 不得被 onClick 直接调用」「弹窗不得再出现 SelectionContainer」「guard 不得调
+  `setUserAuthenticationRequired(`」）。两次负向对照均命中。
+
+### 门禁与状态
+
+- 全门禁 `cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug verifySpecSync`
+  → **BUILD SUCCESSFUL in 2m 21s**（日志 `E:\ASHKB\medgap-gate3.log`）；单测 **145 文件 / 1210 条 /
+  0 失败 / 0 错误 / 1 跳过**（唯一跳过是 Argon2id 的性能实测）；detekt 0 issues；
+  lint **171 = 0 Error + 163 Warning + 8 Information**；`verifySpecSync` 过。
+- **本批**未 bump `versionCode` / `versionName`（仍 124 / "1.2.12"），按维护者裁决等剩下的活做完一次性发版。
+- ⚠️ 发布时必须写明：**新备份的 KDF 已改为 Argon2id，旧版 App 打不开新备份**（旧备份仍可在新版打开）。
+- ⚠️ 本版含库结构变更：`ASHKB_DB_VERSION` 20 → 21（只加一列），首次启动跑迁移。
+
 ## [未发布] — 2026-10-31 · B6 钥匙扣二维码（从零重写，第四批 C2）
 
 **这是第二次实现。** 第一版被完整回退，原因不是「不好看」而是**扫不出来**：自写编解码器用「自己编、自己解」回读自测，

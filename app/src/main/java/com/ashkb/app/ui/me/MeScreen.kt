@@ -14,6 +14,7 @@ import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
+import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.domain.Labels
 import com.ashkb.app.domain.Lifestyle
 import com.ashkb.app.domain.LifestylePrescription
@@ -50,6 +52,7 @@ fun MeScreen(
     onOpenBackup: () -> Unit = {},
     onEditProfile: () -> Unit = {},
     onOpenReminderCheck: () -> Unit = {},
+    onOpenLabTolerance: () -> Unit = {},
 ) {
     val profile by vm.profile.collectAsStateWithLifecycle()
     val meds by vm.meds.collectAsStateWithLifecycle()
@@ -62,50 +65,7 @@ fun MeScreen(
         item { Spacer(Modifier.height(Spacing.xxl)) }
 
         // ---- 档案卡 ----
-        item {
-            SectionCard(
-                title = stringResource(R.string.profile_health_record),
-                subtitle = if (profile == null) stringResource(R.string.profile_not_built_short) else null,
-                action = {
-                    if (profile != null) {
-                        TextButton(onClick = onEditProfile) { Text(stringResource(R.string.common_edit)) }
-                    }
-                },
-            ) {
-                val p = profile
-                if (p == null) {
-                    Text(
-                        stringResource(R.string.profile_data_note),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(Spacing.md))
-                    Button(onClick = onEditProfile) { Text(stringResource(R.string.profile_start_building)) }
-                } else {
-                    KeyValueRow(stringResource(R.string.profile_display_name), p.displayName)
-                    KeyValueRow(stringResource(R.string.profile_diagnosis), p.diagnosis)
-                    KeyValueRow(stringResource(R.string.profile_diagnosis_year), p.diagnoseYear?.toString() ?: stringResource(R.string.common_unfilled))
-                    KeyValueRow("HLA-B27", stringResource(Labels.hlaB27(p.hlaB27)))
-                    KeyValueRow(stringResource(R.string.profile_disease_stage), stageLabel(p.diseaseStage))
-                    KeyValueRow(stringResource(R.string.profile_spine_mobility), spineLabel(p.spineMobility))
-                    KeyValueRow(
-                        stringResource(R.string.profile_sacroiliitis_field),
-                        stringResource(Labels.sacroiliitisGrade(p.sacroiliitisGrade)),
-                    )
-                    // v1.2.3：生活方式**逐项一行**（见 lifestyleItems 的注释）。
-            // 用现成的 KeyValueRow 逐项渲染：标签只在第一项显示，其余项标签留空——
-            // 这样值仍然从同一列起排，而每项各占一行、各自右对齐。
-            lifestyleItems(p.lifestyle).forEachIndexed { idx, item ->
-                KeyValueRow(
-                    label = if (idx == 0) stringResource(R.string.profile_lifestyle_title) else "",
-                    value = item,
-                )
-            }
-                    KeyValueRow(stringResource(R.string.profile_allergy_history), p.allergies ?: stringResource(R.string.common_unfilled))
-                    KeyValueRow(stringResource(R.string.profile_blood_type), p.emergencyBloodType ?: stringResource(R.string.common_unfilled))
-                }
-            }
-        }
+        item { ProfileCard(profile = profile, onEditProfile = onEditProfile) }
 
         // ---- 药单管理入口（实时摘要 + 数量 badge）----
         item {
@@ -153,6 +113,16 @@ fun MeScreen(
             )
         }
 
+        // ---- v1.2.13（医学缺口③）：按化验项配置「临界」容差 ----
+        item {
+            NavRow(
+                icon = Icons.Rounded.Tune,
+                title = stringResource(R.string.lab_tolerance_title),
+                subtitle = stringResource(R.string.lab_tolerance_entry_subtitle),
+                onClick = onOpenLabTolerance,
+            )
+        }
+
         // ---- P4 R20 备份与数据自主 ----
         item {
             NavRow(
@@ -173,6 +143,67 @@ fun MeScreen(
     if (showReminderSettings) {
         ReminderSettingsSheet { showReminderSettings = false }
     }
+}
+
+/** 档案卡：全空态与已建档两种形态。抽出来是为了让 [MeScreen] 不超函数长度上限。 */
+@Composable
+private fun ProfileCard(profile: Profile?, onEditProfile: () -> Unit) {
+    SectionCard(
+        title = stringResource(R.string.profile_health_record),
+        subtitle = if (profile == null) stringResource(R.string.profile_not_built_short) else null,
+        action = {
+            if (profile != null) {
+                TextButton(onClick = onEditProfile) { Text(stringResource(R.string.common_edit)) }
+            }
+        },
+    ) {
+        if (profile == null) {
+            Text(
+                stringResource(R.string.profile_data_note),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(Spacing.md))
+            Button(onClick = onEditProfile) { Text(stringResource(R.string.profile_start_building)) }
+        } else {
+            ProfileRows(profile)
+        }
+    }
+}
+
+/** 已建档时的逐行内容。 */
+@Composable
+private fun ProfileRows(p: Profile) {
+    KeyValueRow(stringResource(R.string.profile_display_name), p.displayName)
+    KeyValueRow(stringResource(R.string.profile_diagnosis), p.diagnosis)
+    KeyValueRow(
+        stringResource(R.string.profile_diagnosis_year),
+        p.diagnoseYear?.toString() ?: stringResource(R.string.common_unfilled),
+    )
+    KeyValueRow("HLA-B27", stringResource(Labels.hlaB27(p.hlaB27)))
+    KeyValueRow(stringResource(R.string.profile_disease_stage), stageLabel(p.diseaseStage))
+    KeyValueRow(stringResource(R.string.profile_spine_mobility), spineLabel(p.spineMobility))
+    KeyValueRow(
+        stringResource(R.string.profile_sacroiliitis_field),
+        stringResource(Labels.sacroiliitisGrade(p.sacroiliitisGrade)),
+    )
+    // v1.2.3：生活方式**逐项一行**（见 lifestyleItems 的注释）。
+    // 用现成的 KeyValueRow 逐项渲染：标签只在第一项显示，其余项标签留空——
+    // 这样值仍然从同一列起排，而每项各占一行、各自右对齐。
+    lifestyleItems(p.lifestyle).forEachIndexed { idx, item ->
+        KeyValueRow(
+            label = if (idx == 0) stringResource(R.string.profile_lifestyle_title) else "",
+            value = item,
+        )
+    }
+    KeyValueRow(
+        stringResource(R.string.profile_allergy_history),
+        p.allergies ?: stringResource(R.string.common_unfilled),
+    )
+    KeyValueRow(
+        stringResource(R.string.profile_blood_type),
+        p.emergencyBloodType ?: stringResource(R.string.common_unfilled),
+    )
 }
 
 /** 关于卡：用 PackageManager 取版本（不动 buildFeatures.buildConfig，AGP 8 默认关闭）。 */

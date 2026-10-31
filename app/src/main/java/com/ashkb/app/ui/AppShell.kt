@@ -70,6 +70,7 @@ import com.ashkb.app.ui.exercise.ExerciseScreen
 import com.ashkb.app.ui.exercise.ExerciseViewModel
 import com.ashkb.app.ui.knowledge.KnowledgeScreen
 import com.ashkb.app.ui.knowledge.KnowledgeViewModel
+import com.ashkb.app.ui.me.LabToleranceScreen
 import com.ashkb.app.ui.me.MeScreen
 import com.ashkb.app.ui.me.MeViewModel
 import com.ashkb.app.ui.me.MedEditScreen
@@ -83,6 +84,7 @@ import com.ashkb.app.ui.navigation.Exercise
 import com.ashkb.app.ui.navigation.ExercisePlans
 import com.ashkb.app.ui.navigation.Health
 import com.ashkb.app.ui.navigation.Knowledge
+import com.ashkb.app.ui.navigation.LabTolerance
 import com.ashkb.app.ui.navigation.Me
 import com.ashkb.app.ui.navigation.MedEdit
 import com.ashkb.app.ui.navigation.Meds
@@ -411,6 +413,7 @@ fun AppShell() {
                     onOpenBackup = { nav.navigate(Backup) },
                     onEditProfile = { nav.navigate(ProfileEdit) },
                     onOpenReminderCheck = { nav.navigate(ReminderCheck) },
+                    onOpenLabTolerance = { nav.navigate(LabTolerance) },
                 )
             }
 
@@ -436,6 +439,8 @@ fun AppShell() {
             composable<Emergency> { EmergencyScreen(vm = emergencyVm, onBack = { nav.popBackStack() }) }
             // v1.0.72：提醒可靠性自检（从「我的」入口进入的二级页）
             composable<ReminderCheck> { ReminderCheckScreen(onBack = { nav.popBackStack() }) }
+            // v1.2.13（医学缺口③）：临界容差按化验项配置（同属一次性设置，二级页）
+            composable<LabTolerance> { LabToleranceScreen(onBack = { nav.popBackStack() }) }
             composable<Backup> {
                 BackupScreen(
                     // v1.0.86（批次 11）：备份页 VM 只被本路由使用；其构造期要解 Keystore 读

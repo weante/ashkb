@@ -14,6 +14,7 @@ import com.ashkb.app.R
 import com.ashkb.app.data.repo.ReportRepository
 import com.ashkb.app.domain.EmergencyQr
 import com.ashkb.app.domain.Labels
+import com.ashkb.app.domain.LabBoundaryTolerance
 import com.ashkb.app.domain.QrCode
 import com.ashkb.app.domain.QrEcc
 import java.util.Locale
@@ -352,6 +353,9 @@ object ReportPdfWriter {
                     it.refHigh,
                     it.refLowInclusive,
                     it.refHighInclusive,
+                    // v1.2.13（医学缺口③）：PDF 与界面读同一份按项容差（进程内快照，
+                    // 启动时已装载）；否则同一份报告屏幕上两项临界、打印出来一项，没法解释
+                    LabBoundaryTolerance.ratioFor(LabBoundaryTolerance.snapshot(), it.testName),
                 )
         }
         if (near.isNotEmpty()) {

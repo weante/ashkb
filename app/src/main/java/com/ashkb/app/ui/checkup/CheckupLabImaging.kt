@@ -49,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
@@ -62,6 +63,7 @@ import com.ashkb.app.data.entity.LabResult
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.ImportTemplates
+import com.ashkb.app.domain.LabBoundaryTolerance
 import com.ashkb.app.domain.LabImport
 import com.ashkb.app.domain.LabImportRow
 import com.ashkb.app.domain.LabUnits
@@ -119,13 +121,25 @@ private fun LabResult.isAbnormal() = abnormal == "high" || abnormal == "low"
  * 判据在 [ClinicalThresholds.labNearBoundary]，**只在参考范围内的值上判**——越界优先，
  * 所以 `isAbnormal()` 的行这里恒为 false，两态互斥、不会同时出现两枚胶囊。
  *
+ * v1.2.13（医学缺口③）：容差按化验项查 [LabBoundaryTolerance]。默认参数取进程内快照，
+ * 逐行判定不必每次读盘；列表与详情弹窗各观察一次配置流，改配置后立即重组。
+ *
  * 为什么不把"临界"写进库里的 `abnormal` 列：那需要一次库迁移，且会把「本地判读结果」
  * 这一列的含义从三态改成四态，连带影响 AI 标记并列展示、PDF 计数、以及既有判读测试；
  * 而 `value` / `refLow` / `refHigh` 三列本来就齐全，实时算即可，历史数据立刻生效。
  */
-private fun LabResult.isNearBoundary() =
+private fun LabResult.isNearBoundary(
+    ratios: Map<String, Float> = LabBoundaryTolerance.snapshot(),
+) =
     !isAbnormal() &&
-        ClinicalThresholds.labNearBoundary(value, refLow, refHigh, refLowInclusive, refHighInclusive)
+        ClinicalThresholds.labNearBoundary(
+            value,
+            refLow,
+            refHigh,
+            refLowInclusive,
+            refHighInclusive,
+            LabBoundaryTolerance.ratioFor(ratios, testName),
+        )
 
 /**
  * v1.0.78（批次 4 收尾）：异常标记 key（`high` / `low` / `normal` / …）→ 展示文案。
@@ -171,7 +185,11 @@ private fun refRangeText(lab: LabResult): String {
 
 /** X1：点击偏高/偏低胶囊展开该指标的参考范围——复诊沟通时「正常值是多少」张口就来。 */
 @Composable
-private fun RowScope.LabRow(lab: LabResult, onEdit: ((LabResult) -> Unit)?) {
+private fun RowScope.LabRow(
+    lab: LabResult,
+    onEdit: ((LabResult) -> Unit)?,
+    ratios: Map<String, Float> = LabBoundaryTolerance.snapshot(),
+) {
     var showRef by remember { mutableStateOf(false) }
     Column(Modifier.weight(1f)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -180,7 +198,7 @@ private fun RowScope.LabRow(lab: LabResult, onEdit: ((LabResult) -> Unit)?) {
                 labValueText(lab),
                 lab.unit,
                 lab.abnormal,
-                near = lab.isNearBoundary(),
+                near = lab.isNearBoundary(ratios),
                 onClick = if (lab.isAbnormal()) ({ showRef = !showRef }) else null,
             )
         }
@@ -219,7 +237,11 @@ private fun RowScope.LabRow(lab: LabResult, onEdit: ((LabResult) -> Unit)?) {
  * 不会被误当成同一列数值直接比较。组头用 R.string.lab_unit_label 标注单位（unit 为空则不占行）。
  */
 @Composable
-private fun LabUnitGroups(rows: List<LabResult>, onEdit: ((LabResult) -> Unit)? = null) {
+private fun LabUnitGroups(
+    rows: List<LabResult>,
+    onEdit: ((LabResult) -> Unit)? = null,
+    ratios: Map<String, Float> = LabBoundaryTolerance.snapshot(),
+) {
     val groups = remember(rows) { LabUnits.groupByUnit(rows) }
     // 只有「同一项目存在多个单位」时才需要标出单位——否则行内已带单位，再挂一行会白白把列表拉长一倍
     val mixed = remember(rows) { LabUnits.mixedUnitTests(rows).toSet() }
@@ -238,7 +260,7 @@ private fun LabUnitGroups(rows: List<LabResult>, onEdit: ((LabResult) -> Unit)? 
                         )
                     }
                 }
-                DividerList(items = group.results, key = { lab -> lab.id }) { lab -> LabRow(lab, onEdit) }
+                DividerList(items = group.results, key = { lab -> lab.id }) { lab -> LabRow(lab, onEdit, ratios) }
             }
         }
     }
@@ -250,11 +272,15 @@ private fun LabUnitGroups(rows: List<LabResult>, onEdit: ((LabResult) -> Unit)? 
  * v1.0.80（批次 6）：[onEdit] 一路透传到行内图标（化验详情弹窗里也给入口，两处行为一致）。
  */
 @Composable
-private fun LabGroup(rows: List<LabResult>, onEdit: ((LabResult) -> Unit)? = null) {
+private fun LabGroup(
+    rows: List<LabResult>,
+    onEdit: ((LabResult) -> Unit)? = null,
+    ratios: Map<String, Float> = LabBoundaryTolerance.snapshot(),
+) {
     val (abnormal, normal) = remember(rows) { rows.partition { it.isAbnormal() } }
     var showNormal by remember { mutableStateOf(false) }
     if (abnormal.isNotEmpty()) {
-        LabUnitGroups(abnormal, onEdit)
+        LabUnitGroups(abnormal, onEdit, ratios)
     }
     if (normal.isNotEmpty()) {
         if (abnormal.isNotEmpty()) {
@@ -264,7 +290,7 @@ private fun LabGroup(rows: List<LabResult>, onEdit: ((LabResult) -> Unit)? = nul
             )
         }
         if (showNormal) {
-            LabUnitGroups(normal, onEdit)
+            LabUnitGroups(normal, onEdit, ratios)
         }
         TextButton(
             onClick = { showNormal = !showNormal },
@@ -343,6 +369,10 @@ internal fun LabsList(
     onEditLab: (LabResult) -> Unit,
     totalCount: Int = labs.size,
 ) {
+    // v1.2.13（医学缺口③）：在这里观察一次配置流并下传——`LazyListScope` 不是 @Composable
+    // 作用域，组内的 LabDateGroup 无法自己去 collect；而且逐行判定不该各自读盘。
+    val context = LocalContext.current
+    val ratios by LabBoundaryTolerance.observe(context).collectAsStateWithLifecycle()
     // 派生计算上提到 LazyColumn 之外并 remember：LazyListScope 不是 @Composable 作用域，
     // 写在 item/forEach 内会随每次重组重跑 groupBy / maxOfOrNull（数十条化验 × 每次重组）
     val grouped = remember(labs) { labs.groupBy { it.date } }
@@ -406,6 +436,7 @@ internal fun LabsList(
                     LabDateGroup(
                         date = date, rows = rows, isLatest = date == latestDate,
                         onEditLab = onEditLab, onLinkDate = onLinkDate, onAttachDate = onAttachDate,
+                        ratios = ratios,
                     )
                 }
             }
@@ -443,11 +474,12 @@ private fun LabDateGroup(
     onEditLab: (LabResult) -> Unit,
     onLinkDate: (String) -> Unit,
     onAttachDate: (String) -> Unit,
+    ratios: Map<String, Float> = LabBoundaryTolerance.snapshot(),
 ) {
     val abnormalCount = rows.count { it.isAbnormal() }
     // v1.2.10 裁决项 5：临界**单独统计**，不进"异常"计数（维护者裁决项 3）——
     // 临界是"看着还算正常但值得留意"，混进异常计数会把一次正常抽血说成有异常项。
-    val nearCount = rows.count { it.isNearBoundary() }
+    val nearCount = rows.count { it.isNearBoundary(ratios) }
     // 整组化验共用一条归属：同一天的一次抽血属于同一次复诊，逐项设置只会变成负担
     val linkedId = rows.firstOrNull { it.checkupId != null }?.checkupId
     var expanded by rememberSaveable { mutableStateOf(abnormalCount > 0 || isLatest) }
@@ -493,7 +525,7 @@ private fun LabDateGroup(
                 modifier = Modifier.heightIn(min = Size.touchMin),
             ) { Text(stringResource(R.string.attach_title)) }
         }
-        if (expanded) LabGroup(rows, onEdit = onEditLab)
+        if (expanded) LabGroup(rows, onEdit = onEditLab, ratios = ratios)
     }
 }
 
@@ -900,6 +932,9 @@ private fun LabImportPreview(imp: LabImport) {
                             r.refHigh,
                             r.refLowInclusive,
                             r.refHighInclusive,
+                            // v1.2.13（医学缺口③）：预览也用同一份按项容差——否则保存前后
+                            // 同一行会在预览里「临界」、在列表里「正常」，用户只会以为存坏了
+                            LabBoundaryTolerance.ratioFor(LabBoundaryTolerance.snapshot(), r.testName),
                         ),
                 )
             }

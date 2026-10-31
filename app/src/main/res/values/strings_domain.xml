@@ -89,6 +89,13 @@
     <string name="dom_lock_doctor">医生 %1$s %2$s</string>
     <string name="dom_lock_unspecified">未填</string>
     <string name="dom_lock_list_separator">"、"</string>
+    <!--
+      未发布（审查报告 §十 第 4 问）：锁屏上只承认「这张卡存在」，不印任何用户数据。
+      急救可用性靠「通知本身可点」兜住——捡到手机的人仍知道该解锁看详情，
+      但血型、诊断、过敏与家属电话不再对任何路过屏幕的人裸露。
+    -->
+    <string name="dom_lock_public_title">有健康急救信息</string>
+    <string name="dom_lock_public_text">解锁手机后可查看血型、过敏与急救电话</string>
 
     <!-- ===== LifestylePrescription.kt：生活方式 → 运动处方个性化提示 ===== -->
     <string name="dom_life_smoking_current">吸烟是 axSpA 脊柱炎症与疾病进展的风险因素，建议戒烟（可请医生协助制定戒烟方案）。诚实口径：指南明确戒烟是基于吸烟的已知健康风险推荐，其对 axSpA 结局的专项获益尚无正式研究。</string>

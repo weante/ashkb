@@ -86,7 +86,8 @@
     <string name="ui_alert_flare_days">本次发作已第 %1$d 天。若自我处理（休息 / 温和活动 / 热敷）后 7–10 天仍无改善，建议联系风湿科（频繁反复发作可能需调整用药）。</string>
     <string name="ui_alert_kb_review_due">知识条目「%1$s」已过复核日（%2$s）——内容可能过期，就医核对时请以医生意见为准。</string>
     <string name="ui_alert_vitals_fever">体征体温 %1$s℃ ≥ 阈值 %2$s℃。感染发热需先评估再注射生物制剂——请查看应急处理卡。</string>
-    <string name="ui_alert_live_vaccine">记录了活疫苗（%1$s）但医生确认状态为「待确认」——AS 患者使用生物制剂 / DMARD 期间接种活疫苗有严重感染风险，请务必先与风湿科医生确认（itx-010/012）。</string>
+    <string name="ui_alert_live_vaccine">记录了活疫苗（%1$s）但医生确认状态为「待确认」——AS 患者使用生物制剂 / DMARD 期间接种活疫苗有严重感染风险，请务必先与风湿科医生确认（itx-010/012）。</string>
+    <string name="ui_alert_live_vaccine_on_immunosuppressant">记录了活疫苗（%1$s）但医生确认状态为「待确认」——你的药单里正有 %2$s，属于免疫抑制药物，用这类药期间接种活疫苗有严重感染风险，请务必先与风湿科医生确认（itx-010/012）。</string>
 
     <!-- ===== 列表分隔与括号（半角/全角随语言变） ===== -->
     <string name="ui_list_separator_semicolon">"；"</string>

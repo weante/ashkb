@@ -95,7 +95,8 @@ object ClinicalThresholds {
      * @param value 本次数值；为 null（只有文字结果）时无从判定，返回 false
      * @param refLow 参考下限，缺失传 null
      * @param refHigh 参考上限，缺失传 null
-     * @return 值在参考范围内、且距最近边界不超过 5% 量程时为 true
+     * @param ratio 本项生效的容差（占量程比例），默认全局 [LAB_NEAR_BOUNDARY_RATIO]
+     * @return 值在参考范围内、且距最近边界不超过容差比例的量程时为 true
      */
     fun labNearBoundary(
         value: Double?,
@@ -110,6 +111,14 @@ object ClinicalThresholds {
          */
         refLowInclusive: Boolean = true,
         refHighInclusive: Boolean = true,
+        /**
+         * v1.2.13（医学缺口③）：本项生效的容差（占量程比例）。
+         *
+         * 默认 [LAB_NEAR_BOUNDARY_RATIO]，故既有调用点与测试一律不受影响；实际取值由
+         * [LabBoundaryTolerance.ratioFor] 按化验项名查表给出。**必须带默认值**——本函数
+         * 被 3 个生产点与 14 条既有判据测试直接调用，「改签名」不能变成「改全部调用点」。
+         */
+        ratio: Float = LAB_NEAR_BOUNDARY_RATIO,
     ): Boolean {
         if (value == null) return false
         // 没有任何参考范围：本地判不了，交给 AI 标记兜底（与 saveLabResult 的口径一致）
@@ -118,10 +127,13 @@ object ClinicalThresholds {
         val overHigh = refHigh != null && if (refHighInclusive) value > refHigh else value >= refHigh
         val underLow = refLow != null && if (refLowInclusive) value < refLow else value <= refLow
         if (overHigh || underLow) return false
-        val span = labSpan(refLow, refHigh) ?: return false
-        // 量程为 0 或负数（脏数据：下限≥上限）时不判临界，避免把整段都算成临界
-        if (span <= 0.0) return false
-        return labBoundaryDistance(value, refLow, refHigh) <= span * LAB_NEAR_BOUNDARY_RATIO
+        // 量程缺失或为 0 / 负数（脏数据：下限≥上限）时不判临界，避免把整段都算成临界。
+        // v1.2.13：合成一次早退——ReturnCount 上限是 6，这里与「取不到量程」是同一件事
+        val span = labSpan(refLow, refHigh)?.takeIf { it > 0.0 } ?: return false
+        // 容差非有限或非正：配置层已经夹过界，这里再挡一次——NaN 参与比较恒为 false，
+        // 会静默把「临界」整类抹掉，且没有任何提示（比报错更难查）
+        if (!ratio.isFinite() || ratio <= 0f) return false
+        return labBoundaryDistance(value, refLow, refHigh) <= span * ratio
     }
 
     /**
