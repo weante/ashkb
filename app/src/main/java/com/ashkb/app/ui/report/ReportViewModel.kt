@@ -10,6 +10,9 @@ import androidx.lifecycle.viewmodel.initializer
 import com.ashkb.app.AshkbApplication
 import com.ashkb.app.R
 import com.ashkb.app.data.repo.ReportRepository
+import com.ashkb.app.domain.EmergencyQr
+import com.ashkb.app.domain.QrCode
+import com.ashkb.app.domain.QrEcc
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -207,6 +210,54 @@ class ReportViewModel(
         }
     }
 
+    /** B6（v1.2.13）：钥匙扣二维码 PNG。内容为空（档案四项全缺）时走 [onUnavailable]。 */
+    fun generateEmergencyQrPng(onReady: (Intent) -> Unit, onError: (String) -> Unit, onUnavailable: () -> Unit) {
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                val card = repo.emergencyCard()
+                val text = EmergencyQr.payload(emergencyQrLabels(), emergencyQrFields(card), card.profile?.allergies)
+                if (text == null) {
+                    onUnavailable()
+                    return@launch
+                }
+                // 与 PDF 同理：编码 + 位图渲染 + 文件写入都在 IO 线程
+                val png = withContext(Dispatchers.IO) {
+                    val qr = QrCode.encodeText(text, QrEcc.HIGH)
+                    QrPngWriter.writePng(app, qr, QR_FILE_NAME)
+                }
+                onReady(shareIntent(png, "image/png"))
+            } catch (e: Exception) {
+                onError(app.getString(R.string.emergency_qr_png_failed, e.message))
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    /** 二维码正文用的四个标签——与 UI 侧同源（同一批资源串），中英文各自取本语言。 */
+    private fun emergencyQrLabels(): EmergencyQr.Labels = EmergencyQr.Labels(
+        blood = app.getString(R.string.emergency_qr_label_blood),
+        diagnosis = app.getString(R.string.emergency_qr_label_diagnosis),
+        allergy = app.getString(R.string.emergency_qr_label_allergy),
+        call = app.getString(R.string.emergency_qr_label_call),
+        allergyJoiner = app.getString(R.string.dom_lock_list_separator),
+    )
+
+    /**
+     * 急救电话取「家属性紧急联系人」的第一位。
+     *
+     * 为什么不是 `isEmergency` 的第一位：`isEmergency` 默认值为 true，医生条目也可能带着它，
+     * 而急救现场首先要找的是**能到场的人**——与 [EmergencyLockscreen] 的取法保持一致。
+     */
+    private fun emergencyQrFields(card: ReportRepository.EmergencyCard): EmergencyQr.Fields =
+        EmergencyQr.Fields(
+            bloodType = card.profile?.emergencyBloodType,
+            diagnosis = card.profile?.diagnosis,
+            allergies = emptyList(),
+            emergencyPhone = card.contacts.firstOrNull { it.isEmergency && !it.isDoctor }?.phone,
+        )
+
     private fun shareIntent(file: File, mime: String): Intent {
         val uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", file)
         return Intent(Intent.ACTION_SEND).apply {
@@ -218,6 +269,9 @@ class ReportViewModel(
     }
 
     companion object {
+        /** 钥匙扣二维码的固定文件名——同一台设备只保留最新一张，不随日期堆积。 */
+        private const val QR_FILE_NAME = "ashkb-emergency-qr.png"
+
         val Factory: ViewModelProvider.Factory = androidx.lifecycle.viewmodel.viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication

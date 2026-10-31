@@ -197,6 +197,16 @@
     <string name="emergency_neuro_redflag">Numbness / weakness / changes in bowel or bladder control — seek care immediately</string>
     <string name="emergency_no_contacts">No emergency contact added yet</string>
     <string name="emergency_pdf_note">M7 emergency card printout: patient information, emergency contacts, and handling cards for five emergency scenarios — print it and carry it with you.</string>
+    <string name="emergency_qr_label_allergy">Allergies</string>
+    <string name="emergency_qr_label_blood">Blood type</string>
+    <string name="emergency_qr_label_call">Emergency phone</string>
+    <string name="emergency_qr_label_diagnosis">Diagnosis</string>
+    <string name="emergency_qr_png_action">Generate keychain QR</string>
+    <string name="emergency_qr_png_failed">Could not generate the QR code: %1$s</string>
+    <string name="emergency_qr_png_note">Packs blood type, diagnosis, allergies and the emergency phone number into one QR code that can be printed and stuck on a keychain or wallet. Paramedics scan it directly — no app install, no phone unlock needed. If you need the full medication list, use the printout PDF above instead.</string>
+    <string name="emergency_qr_png_share">Share keychain QR</string>
+    <string name="emergency_qr_png_title">Keychain QR code</string>
+    <string name="emergency_qr_unavailable">The profile still has no blood type, diagnosis, allergies or emergency phone number — fill at least one in first. A QR code that only says the app name is of no use in an emergency.</string>
     <string name="emergency_phone">Phone</string>
     <string name="emergency_record_action">Log</string>
     <string name="emergency_record_event">Record emergency event</string>

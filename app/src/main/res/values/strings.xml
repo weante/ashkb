@@ -192,6 +192,16 @@
     <string name="emergency_neuro_redflag">麻木 / 无力 / 大小便控制变化——需立即就医</string>
     <string name="emergency_no_contacts">尚未添加紧急联系人</string>
     <string name="emergency_pdf_note">M7 紧急卡纸质版：患者信息、紧急联系人、五应急场景处理卡，打印后随身携带。</string>
+    <string name="emergency_qr_label_allergy">过敏</string>
+    <string name="emergency_qr_label_blood">血型</string>
+    <string name="emergency_qr_label_call">急救电话</string>
+    <string name="emergency_qr_label_diagnosis">诊断</string>
+    <string name="emergency_qr_png_action">生成钥匙扣二维码</string>
+    <string name="emergency_qr_png_failed">二维码生成失败：%1$s</string>
+    <string name="emergency_qr_png_note">把血型、诊断、过敏与急救电话压进一张二维码，打印后贴在钥匙扣或钱包上。急救人员扫码即可读到，无需安装本应用、也无需解锁手机。内容较多时请改用上面的打印版 PDF。</string>
+    <string name="emergency_qr_png_share">分享钥匙扣二维码</string>
+    <string name="emergency_qr_png_title">钥匙扣二维码</string>
+    <string name="emergency_qr_unavailable">档案里还没有血型、诊断、过敏或急救电话——先补全再生成。只有品牌名的二维码对急救没有帮助。</string>
     <string name="emergency_phone">电话</string>
     <string name="emergency_record_action">登记</string>
     <string name="emergency_record_event">记录紧急事件</string>

@@ -1,7 +1,7 @@
 # ASHKB 状态交接文档
 
 > **时点快照**：截至 **v1.2.12（versionCode 124）· 2026-10-29 · C01 口令标签遗留修正（v1.2.11 装机走查发现）**，**已落地、门禁全绿、已推送并发布**（发布提交 `f39dead`，附注标签 `v1.2.12`（tag 对象 `a84cff9`）→ `f39dead`；Release **GitHub Latest**，release id `427925638`，资产 `ashkb-1.2.12-release.apk` **5,278,382 B**，sha256 `F54DE718…E7DE`，**由 tag 触发的 CI 正式签名构建产出**，`apksigner` 证书摘要 `38ca80a6…d7d` 与 `ASHKB_EXPECTED_CERT_SHA256` 逐字一致）。上一版 **v1.2.11（versionCode 123）· 2026-10-26 · 体验整理 + R1/R2 + 化验「临界」第四态 + 缺陷修复执行工单全部 22 项（五批）**，已全部落地、门禁全绿、已推送并发布（第 1 批 `28d0a30` / 第 2 批 `1f92cdc` / 第 3 批 `a59286e` / 第 4 批 `60d1391` / 第 5 批 `dedabee`，+ 文档补记 `4856235`、`da2cb4d`，+ 发布提交 `4e40137`；逐批取证见文末「九 ~ 十六」节）。发布形态：**GitHub Latest**，release id `424324363`，资产 `ashkb-1.2.11-release.apk` 5,277,782 B，sha256 `280EFC55…1938`（**CI 在 tag 上构建的产物**，C04 已逐字比对签名摘要），附注标签 `v1.2.11`（tag 对象 `0e9535c`）→ `4e40137`。**v1.2.11 有库结构变更：`ASHKB_DB_VERSION` 19 → 20**（`MIGRATION_19_20` + schema `20.json` 已入库），首次启动跑迁移，升级前先备份；**v1.2.12 无库结构变更**（仍 20）。再上一版 **v1.2.10（versionCode 122）· 2026-10-19 · 审查第二批 / 第三批 + 裁决项 3、6、7 + §6.7 + 按需用药每天一次 + UI 2.0 批次 B–E + §06 双主题验收 + 真机启动崩溃修复**（release id `416558911`，资产 5,213,292 B，sha256 `9C03C518…FF89`，2026-10-21 就地重做过一次），更早 **v1.2.9（versionCode 121）**（release id `410782041`）、**v1.2.8（versionCode 120）**（id `408053469`）。
-> **2026-10-31 工作树状态**：v1.2.12 之后又落了一批**未发版**改动（Compose 性能审查 ①：`BackupScreen` 从 1325 行拆成 8 个文件，纯结构动作、无行为变更），已过全门禁（1137 条 / 136 文件、detekt 0、lint 0 Error、verifySpecSync 过）但**未 bump 版本号、未发布**。版本号仍 `versionCode 124` / `versionName "1.2.12"`；按维护者裁决，等剩下的活都做完再一次性发版。
+> **2026-10-31 工作树状态**：v1.2.12 之后又落了两批**未发版**改动 —— ① Compose 性能审查 ①：`BackupScreen` 从 1325 行拆成 8 个文件（纯结构动作、无行为变更）；② **B6 钥匙扣二维码从零重写**（7 个新 `domain/` 文件 + `QrPngWriter` + 三处接入，第四批 C2）。前者门禁 1137 条 / 136 文件，后者门禁 **1154 条 / 138 文件**（detekt 0、lint 0 Error、verifySpecSync 过），但都**未 bump 版本号、未发布**。版本号仍 `versionCode 124` / `versionName "1.2.12"`；按维护者裁决，等剩下的活都做完再一次性发版。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号以 `app/build.gradle.kts` 为准（v1.2.9 起**不再把单测条数抄进文档**，见根 `build.gradle.kts` 里 `verifySpecSync` 的注释）。
 > **本文是快照，不是副本**——新增版本时只需更新本文件的「快照头」与第 2 节，**不要**在此重复维护约定性内容，避免又多一处需要同步的副本。
@@ -18,9 +18,9 @@
 | APK 版本 | **v1.2.11 已由 CI 构建并发布**：`aapt dump badging` 核对为 versionCode 123 / versionName 1.2.11，正式证书 `38ca80a6…d7d`（`apksigner --print-certs` 实测，未回退 debug 签名），**5,277,782 B**，sha256 `280EFC55…1938`。⚠️ 本地同源码构建的 `app-release.apk` 是 **5,277,782 B / sha256 `D66CF5A8…FB93A`**——**体积相同、摘要不同**，因为 APK 内嵌 `META-INF` 签名块带时间戳、且 Gradle 打包顺序受文件系统枚举影响，**这不代表内容有差异**；发布用的是 CI 产物（C04 保证其证书摘要正确）。上一版 v1.2.10 为 versionCode 122 / versionName 1.2.10（本地构建，5,213,292 B） |
 | 本版版本 | versionCode 124 / versionName 1.2.12；`ASHKB_DB_VERSION` 仍 **20**（**无库结构变更、无新迁移**，升级不跑迁移） |
 | 本版内容（v1.2.12） | **C01 口令标签遗留修正**（v1.2.11 装机走查照出）：`backup_password_field` 中英标签由写死的「≥6 位」改为占位符 `%1$d`、调用点传 `BackupPasswordRules.MIN_LENGTH`，新增 `backup_password_too_short` 中英两条（口令不足就地红字说明，不再只是静默变灰），`BackupPasswordRulesTest` 补 1 条守卫（标签/提示不得写死数字 + 调用点必须传常量，只改字符串会缺格式化参数在运行期崩）。门禁 `E:\ASHKB\v1212-gate1.log` 全绿（**1137 条 / 136 文件**，detekt 0，lint 184 = 0 Error，verifySpecSync 过），真机复核标签已变「≥12 位」 |
-| 未发布的改动（在工作树上） | **C1-① `BackupScreen` 拆分**（2026-10-31，纯结构动作）：`ui/backup/BackupScreen.kt` **1325 → 332 行**，按分区拆出 7 个新文件（`BackupRestoreSection.kt` 306 / `BackupSyncSection.kt` 246 / `BackupSheets.kt` 181 / `BackupRecoverySection.kt` 179 / `BackupLocalSection.kt` 153 / `BackupLedgerSection.kt` 124 / `BackupFormat.kt` 26）；13 个跨文件符号 `private` → `internal`；detekt 基线 307 → 301（删掉 6 条：4 条 `MagicNumber` + 2 条 `MaxLineLength`，都是本次在代码里修掉/改名的条目失效，**没有新增豁免**）；`BackupPasswordRulesTest` 的源码断言由「读单个文件」改为「扫 `ui/backup` 整个目录」。门禁 `E:\ASHKB\c1-split-gate1.log` 全绿。**未 bump 版本号、未入 Release** |
+| 未发布的改动（在工作树上） | **C1-① `BackupScreen` 拆分**（2026-10-31，纯结构动作）：`ui/backup/BackupScreen.kt` **1325 → 332 行**，按分区拆出 7 个新文件（`BackupRestoreSection.kt` 306 / `BackupSyncSection.kt` 246 / `BackupSheets.kt` 181 / `BackupRecoverySection.kt` 179 / `BackupLocalSection.kt` 153 / `BackupLedgerSection.kt` 124 / `BackupFormat.kt` 26）；13 个跨文件符号 `private` → `internal`；detekt 基线 307 → 301（删掉 6 条：4 条 `MagicNumber` + 2 条 `MaxLineLength`，都是本次在代码里修掉/改名的条目失效，**没有新增豁免**）；`BackupPasswordRulesTest` 的源码断言由「读单个文件」改为「扫 `ui/backup` 整个目录」。门禁 `E:\ASHKB\c1-split-gate1.log` 全绿。**未 bump 版本号、未入 Release**。同批还有 **C2 B6 钥匙扣二维码从零重写**（7 个 `domain/` 文件 + `QrPngWriter` + 导出页卡片 / 紧急卡 PDF / 系统分享三处接入，门禁 `E:\ASHKB\c2-qr-gate2.log` 全绿 1154 条 / 138 文件） |
 | 审查裁决进度 | **裁决项 1、2 已落地并发布（v1.2.9）；裁决项 3 已落地（未发布）**。① 对乙酰氨基酚 `MedClass.NSAID` → 新增 `MedClass.ANALGESIC`，`DrugInteractionKeys` 的 `nsaid`/`nsaid_longterm` 摘除 acetaminophen，新增 2 条回归（`MedicationInteractionChainTest`）；②「已结算」统一到 `AdherenceCalc.SETTLED_STATUSES` 唯一口径——删掉 `MedicationRepository.doneSlotRefs`、`ReminderReceiver` 改引 `settledSlotRefs`、`TodayItem` 新增 `partial`/`isSettled`、今日页 partial 不再显示成「漏服」也不计入待办，连带按铁律重写 4 条 detekt 复杂度（不进基线）并清掉 2 条签名过期的基线条目；③ **口服不再提供「每两周」**——新增 `ui/me/MedEditSections.kt` 的 `routeVisible`（chips 按 route 过滤 + 保留当前值逃生口）、`MedEditScreen.onPrimary()` 提交拦截 + `med_route_frequency_error` 红字，**domain 层刻意不动**（`ScheduleCalc.isCycleGatedBy` 只加 KDoc），新增 10 条回归（`MedRouteFrequencyGuardTest`）。其余 5 项待裁决；其中**裁决项 6、7 与审查第二、三批（含 §6.7）已落地、门禁全绿、未发版**（见文末「批次 B」）；另按维护者指令（m00936）落地**按需用药常驻首页 + 每天只记一次**（见文末「批次 C」） |
-| B6 二维码残留 | grep `QrCode` / `QrImage` / `EmergencyQr` / `KeychainQr` / `emergency_qr` → **零命中**（回退干净） |
+| B6 二维码 | **第一版已完整回退（回退后 grep 零命中），第二版从零重写完成、未发版**（2026-10-31）：`domain/` 新增 `QrBitBuffer` / `QrSegment` / `QrEcc` / `QrReedSolomon` / `QrTables` / `QrCode`（552 行）/ `EmergencyQr` 共 7 个纯 Kotlin 文件（零第三方依赖），`ui/report/QrPngWriter` 负责矩阵 → PNG（含 4 模块静区）。验证双轨：Nayuki 参考实现 **27 组黄金向量逐格一致** + ZXing 3.5.3 **端到端解码 5/5 通过**；负向对照三层（改常量位 ⇒ 3 红 / 去 `distinct()` ⇒ 1 红 / 翻转 35×35 数据区 ⇒ 解码 `NotFoundException`）。原四缺陷（`placeSeparators` 漏两带、`writeFormatBits` 位映射、N3、N4）全部修正。详见文末「C2」节 |
 | GitHub 正式版（Latest） | **v1.2.12**（2026-10-29，release id `427925638`，资产 `ashkb-1.2.12-release.apk` 5,278,382 B，sha256 `F54DE718…E7DE`，附注标签 `v1.2.12` → `f39dead`，CI tag 构建，正式签名）；上一版 **v1.2.11**（2026-10-26，release id `424324363`，资产 `ashkb-1.2.11-release.apk` 5,277,782 B，sha256 `280efc55…1938`，**由 tag 触发的 CI 正式签名构建产出**，`apksigner` 证书摘要 `38ca80a6…d7d` 与 `ASHKB_EXPECTED_CERT_SHA256` 逐字一致）；上一版 **v1.2.10**（id `416558911`，5213292 B，`109909e0…0186`）、**v1.2.9**（id `410782041`，5224936 B，`413f82b8…`）、**v1.2.8**（id `408053469`，5220504 B，`ece175f8…`）、**v1.2.7**（id `407916739`，5220504 B，`e09e6990…`）、**v1.2.6**（id `407329934`，5219392 B）与 **v1.2.5**（id `407329822`，5084704 B）——v1.2.11 的摘要取自**上传前对同一份 CI 产物**的 `Get-FileHash`（发布后 `gh api` 回读 `assets[].digest` 逐字一致）；v1.2.10 及更早六版为**本地构建**，摘要与本地 `Get-FileHash` **逐字节一致** |
 | GitHub 预发布 | 无（v1.2.0 / v1.2.2 / v1.2.3 / v1.2.4 / v1.2.5 / v1.2.6 / v1.2.7 / v1.2.8 均已转正式版；历史预发布 v1.0.61 ~ v1.0.70 各页带「已被取代」横幅） |
 
@@ -89,9 +89,10 @@ gh release edit v1.0.70 --prerelease=false --latest
 
 ## 3. 未实现 / 未完成
 
-### 3.1 B6「钥匙扣二维码模板」——本轮尝试后**已回退**
+### 3.1 B6「钥匙扣二维码模板」——第一版**已回退**，第二版**已于 2026-10-31 从零重写（未发版）**
 
 唯一被打回的功能项。B6 主项「锁屏紧急信息」已于 v1.0.66 落地，只剩二维码模板。
+**第二版已重写完成并双重独立验证通过，详见文末「C2 B6 钥匙扣二维码（第二版）」一节**；下面保留第一版的失败记录作为对照。
 
 - **需求**：紧急卡生成可打印 / 贴钥匙扣的二维码
 - **硬约束**：零第三方依赖 → 必须**从零手写 QR 编码器**
@@ -289,7 +290,7 @@ gh release edit v1.0.70 --prerelease=false --latest
 **C. 可自行开工（无需外部输入）**
 
 1. **Compose 性能重构剩下的 2 项**（§3.2 那行）：① ~~`BackupScreen` 字段级拆分~~ —— **已于 2026-10-31 完成**（1325 → 332 行 + 7 个分区文件，见文末小节）；② 深层 Flow 下沉（`CheckupScreen` 10 / `SymptomScreen` 6 / `ExerciseScreen` 5 等 root 收集）；③ `BackupViewModel`（20 个 `MutableStateFlow`）/ `ReportViewModel`（7 个）合并单一 `UiState`。⚠️ 注意 `BackupScreen` 根函数的 4 条 Flow 已随拆分落到位，不要再按旧口径重复做。
-2. **B6 钥匙扣二维码重做**（§3.1 的 4 处已定位缺陷）。**验证方法必须是「与 segno 逐格比对」**，不能自编自解自测。
+2. ✅ **B6 钥匙扣二维码重做** —— **已于 2026-10-31 完成**（§3.1 的 4 处缺陷全部修正，见文末「C2」节）。验证改用 **Nayuki QR-Code-generator 逐格比对（27 组黄金向量全部一致）+ ZXing 3.5.3 端到端解码（5/5 通过）**，三层负向对照均能变红。⚠️ 原定的 segno 1.6.6 在本机不可用（无 Python 运行时）。
 3. ~~`DividerList` 展平~~ —— 已判定不做（见 §3.2 ⑤）。
 
 **D. 卫生（低风险，建议随手做）**
@@ -1231,3 +1232,57 @@ C01 遗留，修复后随 **v1.2.12** 发布（`backup_password_field` 改占位
 - `by` 委托靠 `androidx.compose.runtime.getValue` / `setValue` 展开，这两个名字**在正文字面里从不出现**——按「符号名出现在正文」自动挑 import 必然丢掉它们，表现为 `Type 'State<...>' has no method 'getValue(Nothing?, KProperty0<*>)'`。生成脚本必须：正文里出现 `^\s*(val|var)\s+\w+\s+by\s` 就强制补这两个 import。
 - 任何按「文件名 + 字面量/签名」登记的 detekt 基线条目，**拆分改名后都会失配并重新上报**；涉及改名时必须同步剪枝基线，否则门禁假红。
 - 任何「静态读某个具体源码文件做断言」的测试，**拆分改名后都会失效**；优先改成语义范围（扫目录），而不是把路径改成新文件名。
+
+---
+
+## C2 B6 钥匙扣二维码（第二版）· 2026-10-31 · 未发版 · 未 bump 版本号
+
+第一版因「图案看起来像二维码但扫不出来」被完整回退（§3.1 保留其失败记录）。本次从零重写，**核心变化是验证方法**：不再自编自解自测，改用两重互相独立的验证。
+
+**新增生产代码（全部零第三方依赖，`app/src/main/java/com/ashkb/app/`）**
+
+| 文件 | 行数 | 职责 |
+|---|---|---|
+| `domain/QrBitBuffer.kt` | 85 | 位缓冲（appendBits / appendBytes / 大端切字节） |
+| `domain/QrSegment.kt` | 210 | 数字 / 字母数字 / 字节三模式分段与字符计数位 |
+| `domain/QrEcc.kt` | 36 | 四种纠错等级（ordinal 用于查表，`formatBits` 是规范编码顺序 M=0 L=1 H=2 Q=3） |
+| `domain/QrReedSolomon.kt` | 89 | GF(256) 上的生成多项式与余式（本原多项式 `0x11D`） |
+| `domain/QrTables.kt` | 180 | v1–v40 容量表 / 纠错块表 / 对齐图案位置 / 原始数据模块数 |
+| `domain/QrCode.kt` | 552 | 功能图案、码字铺放、八种掩码、罚分（N1–N4）、格式与版本信息 |
+| `domain/EmergencyQr.kt` | 106 | 急救卡正文组装（纯函数，不碰 `Context`） |
+| `ui/report/QrPngWriter.kt` | 80 | 矩阵 → ARGB_8888 位图，含 **4 模块静区**（ISO/IEC 18004 §6.3.6） |
+
+**三处接入**：①导出页新增「钥匙扣二维码」卡片（整卡是独立 `QrCard` composable，避免 `ExportPage` 触发 `LongMethod`）；②紧急卡打印版 PDF 末尾并入二维码，打印边长 `QR_PRINT_SIDE_PT = 110f`（≈38.8mm；v8 的 49 模块 + 8 静区 = 57 模块 ⇒ 每模块约 0.68mm，高于约 0.5mm 可读下限）；③生成后走 `shareOrReport` 系统分享。
+
+**正文格式**（扫码即读，无需安装本应用、无需解锁手机）：首行 `ASHKB`，其后 `血型:B` / `诊断:…` / `过敏:青霉素、磺胺` / `急救电话:…`。过敏最多 4 条、去重、并列分隔符**按语言注入**（中文「、」/ 英文「, 」）。**四项全缺时不生成**——只有「ASHKB」五个字母的贴纸对急救毫无价值。
+
+**验证一：与独立参考实现逐格比对**
+- 对照物 = **Nayuki QR-Code-generator**（MIT，仅作测试期对照，**不进 App 依赖**）。
+- 27 组黄金向量存 `app/src/test/resources/qr/vectors.txt`（48,796 B），覆盖 v1 / v2 / v4 / v7+ / v10+ / v15+ 与四种等级，含中文急救卡、英文同义、长重复串、纯数字、空串。
+- `QrGoldenVectorsTest` 6 条断言：**27/27 逐模块完全一致**，含「自动选掩码的结果与参考实现相同」。
+
+**验证二：第三方解码器端到端**
+- 把编码器产出的矩阵渲染成带静区的 PNG（模拟真实贴纸），用 **ZXing 3.5.3** 走完整图像识别链路解码。
+- 5 组样本（v1 / v5 / v8 / v10 / v11，含中文与纯数字）：**正文逐字相同，5/5 通过**。
+
+**负向对照（三层，证明验证手段不是空转）**
+1. 把 `drawFormatBits` 的常量改错一位 ⇒ 3 条断言变红。
+2. 去掉过敏 `distinct()` ⇒ 只有「去重」那条变红。**这条最初没变红**：原断言用 `contains`，「青霉素、磺胺」作为**前缀**照样命中；已改成整行相等。
+3. 把 35×35 数据区整块翻转 ⇒ ZXing 解码抛 `NotFoundException`。（单模块翻转会被 ECC=H 纠回、仍 PASS —— 这是正确行为，所以负向对照必须破坏到超出纠错容量。）
+
+**第一版四处缺陷的修正方式**
+1. `placeSeparators` 覆盖不全 → 改为三处定位图案统一绘制 + 时序图案，不再单独打「分隔符」。
+2. `writeFormatInfo` 位置映射错 → `drawFormatBits` 的 **bit6/7/8 走时序缺口**（(8,7)/(8,8)/(7,8)），第二份格式信息**横排 8 位 + 竖排 7 位**，「恒深」模块在 (8, size-8)。
+3. `penaltyRule3`（N3）→ 只查 7 模块核心 `1011101`，再判贴边或前后 4 格全浅（`countQuietSides`）。
+4. `penaltyRule4`（N4）→ `k = (|dark*20 − total*10| + total − 1) / total − 1`，得分 `k × 10`。
+
+**detekt**：首跑报 **48 条**（MagicNumber 36 / MaxLineLength 8 / NestedBlockDepth 1 / SpreadOperator 1 / LongMethod 1 / ComplexCondition 1），**全部改代码消掉、零进基线**：抽 20 余个命名常量、`drawCodewords` 拆出 `drawColumnPair` / `drawPairRow`、`countQuietSides` 独立、二维码卡片抽成 `QrCard`。**重构铺码主链后重跑黄金向量，27 组仍逐格一致**。
+
+**门禁**（`E:\ASHKB\c2-qr-gate2.log`）：`BUILD SUCCESSFUL in 2m 41s`；单测 **1154 条 / 138 文件**全绿；detekt 0；lint **171** = 0 Error + 163 Warning + 8 Information；`verifySpecSync` 通过。
+
+**本批无库结构变更**（`ASHKB_DB_VERSION` 仍 20），未改 `versionCode` / `versionName`（仍 124 / "1.2.12"）。
+
+**如何复跑这两重验证（临时对照物已清理，按此重建）**
+1. 逐格比对：从 `https://github.com/nayuki/QR-Code-generator` 取 `java/src/main/java/io/nayuki/qrcodegen/{QrCode,QrSegment,BitBuffer,DataTooLongException}.java`，`javac -encoding UTF-8 -d out`。生成向量时**必须**用 `QrCode.encodeSegments(QrSegment.makeSegments(text), ecc, MIN_VERSION, MAX_VERSION, -1, false)`（`mask=-1` 自动选、`boostEcl=false`），否则与 `QrGoldenVectorsTest` 的期望不一致。
+2. 端到端解码：从 Maven Central 取 `com.google.zxing:core:3.5.3` 与 `com.google.zxing:javase:3.5.3` 两个 jar，把模块矩阵按每模块 8 px、静区 4 模块渲染成 PNG，再用 `MultiFormatReader` + `HybridBinarizer` + `BufferedImageLuminanceSource` 解码，比对正文逐字相同。
+3. 负向对照：**单模块翻转会被 ECC=H 纠回、仍 PASS**（正确行为），必须破坏到超出纠错容量才能验证解码断言不是空转——实测翻转 35×35 数据区可稳定得到 `NotFoundException`。

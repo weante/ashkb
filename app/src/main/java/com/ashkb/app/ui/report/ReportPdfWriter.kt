@@ -1,15 +1,21 @@
 package com.ashkb.app.ui.report
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.R
 import com.ashkb.app.data.repo.ReportRepository
+import com.ashkb.app.domain.EmergencyQr
 import com.ashkb.app.domain.Labels
+import com.ashkb.app.domain.QrCode
+import com.ashkb.app.domain.QrEcc
 import java.util.Locale
 import java.io.File
 import java.time.LocalDate
@@ -63,6 +69,7 @@ object ReportPdfWriter {
             color = Color.rgb(30, 30, 34); textSize = 16f; isAntiAlias = true
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
+        private val imagePaint = Paint().apply { isFilterBitmap = true; isAntiAlias = true }
 
         private fun newPage() {
             finishPage()
@@ -135,6 +142,23 @@ object ReportPdfWriter {
             y += 24f
         }
 
+        /**
+         * 画一张位图（v1.2.13 · B6：紧急卡并入钥匙扣二维码）。
+         *
+         * 用 `FILTER_BITMAP_FLAG` 而不是默认的硬缩放：二维码是对角矩阵，
+         * 硬缩放（最近邻）在非整数倍率下会让模块宽度不均，打印出来一眼能看出「有的格子宽有的窄」。
+         */
+        fun image(bitmap: Bitmap, side: Float) {
+            ensure(side + IMAGE_TRAILING_GAP)
+            canvas!!.drawBitmap(
+                bitmap,
+                Rect(0, 0, bitmap.width, bitmap.height),
+                RectF(M, y, M + side, y + side),
+                imagePaint,
+            )
+            y += side + IMAGE_TRAILING_GAP
+        }
+
         fun gap(h: Float = 8f) { y += h }
 
         fun close(target: File) {
@@ -142,6 +166,11 @@ object ReportPdfWriter {
             target.parentFile?.mkdirs()
             target.outputStream().use { doc.writeTo(it) }
             doc.close()
+        }
+
+        private companion object {
+            /** 位图与下一段文字之间的间距（避免二维码紧贴正文）。 */
+            const val IMAGE_TRAILING_GAP = 10f
         }
     }
 
@@ -429,6 +458,31 @@ object ReportPdfWriter {
             d.line(kb.summary, warn = kb.severityLevel == "high")
         }
 
+        // v1.2.13（B6 重做）：把钥匙扣二维码并进打印版——打印一张纸就同时得到
+        // 「给人读的文字」与「给扫码器读的同一份信息」。内容为空时整节不出。
+        EmergencyQr.payload(
+            labels = EmergencyQr.Labels(
+                blood = context.getString(R.string.emergency_qr_label_blood),
+                diagnosis = context.getString(R.string.emergency_qr_label_diagnosis),
+                allergy = context.getString(R.string.emergency_qr_label_allergy),
+                call = context.getString(R.string.emergency_qr_label_call),
+                allergyJoiner = context.getString(R.string.dom_lock_list_separator),
+            ),
+            fields = EmergencyQr.Fields(
+                bloodType = p?.emergencyBloodType,
+                diagnosis = p?.diagnosis,
+                allergies = emptyList(),
+                emergencyPhone = c.contacts.firstOrNull { it.isEmergency && !it.isDoctor }?.phone,
+            ),
+            allergiesJson = p?.allergies,
+        )?.let { text ->
+            d.h2(context.getString(R.string.emergency_qr_png_title))
+            val qr = QrCode.encodeText(text, QrEcc.HIGH)
+            val bitmap = QrPngWriter.render(qr)
+            d.image(bitmap, QR_PRINT_SIDE_PT)
+            bitmap.recycle()
+        }
+
         d.gap(12f)
         d.line(context.getString(R.string.pdf_emergency_call), warn = true)
 
@@ -439,6 +493,15 @@ object ReportPdfWriter {
 
     /** 紧急卡单行药条字符上限（line() 折行阈值 ≈ (PW - 2M) / 10.5 ≈ 47，留余量给免疫抑制标签）。 */
     private const val MED_LINE_CHARS = 44
+
+    /**
+     * 紧急卡上二维码的打印边长（pt）。
+     *
+     * 110pt ≈ 38.8mm，在 A4 的 595pt 宽里只占左侧一小块、右侧仍留给文字；
+     * v8（49 模块）+ 8 模块静区 = 57 模块 ⇒ 每模块约 1.93pt ≈ 0.68mm，高于常见扫码器
+     * 约 0.5mm 的可读下限。取整到 110 而不是「画满整行」，是为了不挤掉正文。
+     */
+    private const val QR_PRINT_SIDE_PT = 110f
 
     /** 单行截断：超上限以省略号收尾，保证紧急卡一行一药、不折行溢出。 */
     private fun fit(text: String, max: Int): String =

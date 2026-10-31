@@ -1,4 +1,4 @@
-# 下次接手从这里开始（v1.2.12 已发布 + v1.2.11 已真机复验 + C1-① BackupScreen 已拆（未发版）· 2026-10-31 更新）
+# 下次接手从这里开始（v1.2.12 已发布 + v1.2.11 已真机复验 + C1-① BackupScreen 已拆 + C2 二维码已重写（均未发版）· 2026-10-31 更新）
 
 > **本文件是仓库内唯一权威的接手文档**，随仓库一起分发。
 > `E:\ASHKB\NEXT-SESSION.md`（仓库根之外、**不被 git 跟踪**）是会话工作日志，记的是过程细节与踩坑现场；两者内容会有出入，**以本文件为准**。
@@ -9,7 +9,7 @@
 **当前状态**：`v1.2.12`（versionCode **124**）已发布为 GitHub **Latest**（2026-10-29，release id `427925638`，资产 `ashkb-1.2.12-release.apk` 5,278,382 B、sha256 `F54DE718…E7DE`，附注标签 `a84cff9` → `f39dead`）。v1.2.12 只有一处文案修正（备份口令标签不再写死「≥6 位」）。上一版 `v1.2.11`（versionCode **123**）是第一个带库结构 19→20 迁移的发布，**已于 2026-10-27/28/30 真机覆盖安装并复验通过**（B01 / B05 / B07 三项补齐，迁移后数据完整）。
 
 - **工作树上有未发版的改动（2026-10-31）**：Compose 性能审查 ①「`BackupScreen` 字段级拆分」已落地并过全门禁（`E:\ASHKB\c1-split-gate1.log`：1137 条 / 136 文件全绿、detekt 0、lint 171 = 0 Error、verifySpecSync 过），`ui/backup/BackupScreen.kt` **1325 → 332 行** + 7 个分区文件（`BackupRestoreSection.kt` 306 / `BackupSyncSection.kt` 246 / `BackupSheets.kt` 181 / `BackupRecoverySection.kt` 179 / `BackupLocalSection.kt` 153 / `BackupLedgerSection.kt` 124 / `BackupFormat.kt` 26）；**纯结构动作，无行为变更、无库结构变更、无 strings 改动**。detekt 基线 307 → 301（只删因改名失配的条目，没新增豁免）。**按维护者裁决：版本号攒着，等剩下的活做完再一次性发版**（仍 `versionCode 124` / `versionName "1.2.12"`）。详见 `HANDOFF-STATUS.md` 文末「C1-① `BackupScreen` 字段级拆分」一节。
-- 发布提交链：v1.2.10 是 `45b0435` → `0c33bf4` → `3302ebb` → `faaf538`；**v1.2.11 是单提交 `4e40137`**（+ 此前五批各自独立的 `28d0a30` / `1f92cdc` / `a59286e` / `60d1391` / `dedabee`，+ 文档补记 `4856235` / `da2cb4d`）。**当前 HEAD / `origin/main` 以 `git log` 现查为准，此处不写死 SHA。**
+- **工作树上另有一批未发版改动（2026-10-31，C2 B6 钥匙扣二维码从零重写）**：第一版因「看起来像二维码但扫不出来」被回退，本次重写并改用**两重独立验证**——Nayuki 参考实现 **27 组黄金向量逐格一致** + ZXing 3.5.3 **端到端解码 5/5 通过**，三层负向对照均能变红。新增 `domain/` 7 个文件（`QrCode.kt` 552 / `QrSegment.kt` 210 / `QrTables.kt` 180 / `EmergencyQr.kt` 106 / `QrReedSolomon.kt` 89 / `QrBitBuffer.kt` 85 / `QrEcc.kt` 36）+ `ui/report/QrPngWriter.kt` 80；三处接入（导出页卡片 / 紧急卡 PDF / 系统分享）。门禁 `E:\ASHKB\c2-qr-gate2.log` **1154 条 / 138 文件全绿**、detekt 0、lint 171 = 0 Error。**无库结构变更、无版本号改动**。⚠️ 原定的 segno 1.6.6 验证手段在本机不可用（无 Python 运行时）。详见 `HANDOFF-STATUS.md` 文末「C2」一节。- 发布提交链：v1.2.10 是 `45b0435` → `0c33bf4` → `3302ebb` → `faaf538`；**v1.2.11 是单提交 `4e40137`**（+ 此前五批各自独立的 `28d0a30` / `1f92cdc` / `a59286e` / `60d1391` / `dedabee`，+ 文档补记 `4856235` / `da2cb4d`）。**当前 HEAD / `origin/main` 以 `git log` 现查为准，此处不写死 SHA。**
 - Release `v1.2.11`：id `424324363`，`target_commitish` = `main`（tag 剥壳后指向 `4e40137`），资产 `ashkb-1.2.11-release.apk` **5,277,782 B**，sha256 `280EFC55…1938`；附注标签 `v1.2.11`（tag 对象 `0e9535c`）。**该资产是 CI 在 tag 上构建的**，C04 已用 `apksigner` 与 `ASHKB_EXPECTED_CERT_SHA256` 逐字比对签名摘要。
   ⚠️ 本地同源码构建的 `app-release.apk` **体积同为 5,277,782 B 但 sha256 是 `D66CF5A8…FB93A`**——签名块时间戳 + 打包顺序差异，**不是内容不一致**；发布一律用 CI 产物。
 - Release `v1.2.10`（上一版）：id `416558911`，`target_commitish` = `0c33bf4`，资产 `ashkb-1.2.10-release.apk` **5,213,292 B**，sha256 `9C03C518…FF89`；附注标签 `acaedcf` → `0c33bf4`（已核对远端 `^{}` 剥壳）。

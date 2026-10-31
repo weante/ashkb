@@ -91,6 +91,8 @@ internal fun ExportPage(vm: ReportViewModel, busy: Boolean, context: android.con
             }
         }
 
+        item { QrCard(vm = vm, busy = busy, context = context) }
+
         item {
             NavRow(
                 icon = Icons.Rounded.Backup,
@@ -101,6 +103,36 @@ internal fun ExportPage(vm: ReportViewModel, busy: Boolean, context: android.con
         }
 
         item { Spacer(Modifier.height(20.dp)) }
+    }
+}
+
+/**
+ * 钥匙扣二维码那一卡（v1.2.13 · B6 重做）。
+ *
+ * 抽成独立 composable 是为了让 [ExportPage] 保持在 detekt 的 80 行上限内——
+ * 内容本身没有任何特殊：一句说明 + 一个按钮，生成结果走系统分享面板。
+ */
+@Composable
+private fun QrCard(vm: ReportViewModel, busy: Boolean, context: android.content.Context) {
+    SectionCard(title = stringResource(R.string.emergency_qr_png_title)) {
+        Text(
+            stringResource(R.string.emergency_qr_png_note),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(10.dp))
+        val shareTitle = stringResource(R.string.emergency_qr_png_share)
+        val unavailable = stringResource(R.string.emergency_qr_unavailable)
+        OutlinedButton(
+            onClick = {
+                vm.generateEmergencyQrPng(
+                    onReady = { intent -> shareOrReport(context, intent, shareTitle) },
+                    onError = { vm.reportError(it) },
+                    onUnavailable = { vm.reportError(unavailable) },
+                )
+            },
+            enabled = !busy,
+        ) { Text(stringResource(R.string.emergency_qr_png_action)) }
     }
 }
 

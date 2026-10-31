@@ -1,3 +1,40 @@
+## [未发布] — 2026-10-31 · B6 钥匙扣二维码（从零重写，第四批 C2）
+
+**这是第二次实现。** 第一版被完整回退，原因不是「不好看」而是**扫不出来**：自写编解码器用「自己编、自己解」回读自测，
+无法排除编解码犯同一个错。本次从零重写，并改用**独立参考实现逐格比对 + 第三方解码器端到端解码**两重验证。
+
+- 新增 `domain/` 下 7 个纯 Kotlin 文件（零第三方依赖，生产侧编码器全部手写）：`QrBitBuffer.kt` 85 行、
+  `QrSegment.kt` 210 行（数字/字母数字/字节三模式）、`QrEcc.kt` 36 行、`QrReedSolomon.kt` 89 行、
+  `QrTables.kt` 180 行（版本容量表 + 纠错块表 + 对齐图案位置）、`QrCode.kt` 552 行（功能图案 / 码字铺放 / 八种掩码 / 罚分）、
+  `EmergencyQr.kt` 106 行（急救卡正文组装）。版本 1–40、四种纠错等级全支持。
+- 新增 `ui/report/QrPngWriter.kt` 80 行：模块矩阵 → ARGB_8888 位图，含 **4 模块静区**（ISO/IEC 18004 §6.3.6，
+  少了静区扫码器无法定位符号边界），写入 `filesDir/exports/`（`file_paths.xml` 已覆盖）。**这是本仓库第一次产出位图。**
+- 三处接入：①导出页新增「钥匙扣二维码」卡片，生成后走系统分享（`shareOrReport`）；②紧急卡打印版 PDF 末尾并入二维码
+  （打印尺寸 `QR_PRINT_SIDE_PT = 110f` ≈ 38.8mm，v8 的 49 模块 + 8 静区 = 57 模块 ⇒ 每模块约 0.68mm，高于约 0.5mm 可读下限）；
+  ③`ReportViewModel.generateEmergencyQrPng` 统一组装，档案四项（血型/诊断/过敏/急救电话）**全缺时不生成**——
+  一张只有「ASHKB」五个字母的贴纸对急救毫无价值。
+- 正文格式（扫码即读，无需安装本应用）：首行 `ASHKB`，其后 `血型:B` / `诊断:…` / `过敏:青霉素、磺胺` / `急救电话:…`。
+  过敏最多 4 条、去重、并列分隔符**按语言注入**（中文「、」/英文「, 」），避免英文界面的扫码结果出现中文顿号。
+- **验证一：独立参考实现逐格比对。** 用 Nayuki QR-Code-generator（MIT，仅作测试期对照物、不进 App 依赖）生成 27 组
+  黄金向量（覆盖 v1–v40、四种纠错等级、中文急救卡、纯数字、空串），存 `app/src/test/resources/qr/vectors.txt`（48,796 B），
+  `QrGoldenVectorsTest` 6 条断言逐模块比对 **27/27 全部一致**（含自动选掩码的结果）。
+- **验证二：第三方解码器端到端。** 把编码器产出的矩阵渲染成带静区的 PNG，用 ZXing 3.5.3（与本实现无关的第三方）
+  走完整图像识别链路解码，5 组样本（v1/v5/v8/v10/v11）**正文逐字相同 5/5 通过**。
+- **负向对照做过三层**：①把 `drawFormatBits` 的常量改错一位 ⇒ 3 条断言变红；②去掉过敏 `distinct()` ⇒ 只有「去重」那条变红
+  （这条最初**没变红**——原断言用 `contains`，「青霉素、磺胺」作为前缀照样命中；已改成整行相等）；
+  ③把 35×35 数据区整块翻转 ⇒ ZXing 解码抛 `NotFoundException`。
+- **第一版四处缺陷本次全部修对**：①`placeSeparators` 覆盖不全（漏右上/左下带）→ 改为三处定位图案统一绘制 + 时序图案；
+  ②`writeFormatBits` 位置映射错（读回 `decMask=1` 却编 `encMask=3`）→ `drawFormatBits` 的 bit6/7/8 走时序缺口、第二份 format
+  信息横排 8 位 + 竖排 7 位；③`penaltyRule3`（N3）→ 只查 7 模块核心 `1011101` 再判前后 4 格；
+  ④`penaltyRule4`（N4）→ `k = (|dark*20 − total*10| + total − 1) / total − 1`，得分 `k × 10`。
+- detekt 首跑报 **48 条**（MagicNumber 36 / MaxLineLength 8 / NestedBlockDepth 1 / SpreadOperator 1 / LongMethod 1 / ComplexCondition 1），
+  **全部改代码消掉、零进基线**：抽 20 余个命名常量（`SIZE_PER_VERSION`、`BITS_PER_CODEWORD`、`FIELD_TOP_BIT` 等）、
+  `drawCodewords` 拆出 `drawColumnPair`/`drawPairRow`、`countQuietSides` 独立、二维码卡片抽成 `QrCard` composable。
+  **重构铺码主链后重跑黄金向量，27 组仍逐格一致**（重构不是「只要 detekt 绿就算过」）。
+- 门禁 `E:\ASHKB\c2-qr-gate2.log`：`BUILD SUCCESSFUL in 2m 41s`，单测 **1154 条 / 138 文件**全绿，detekt 0，
+  lint 171 = 0 Error + 163 Warning + 8 Information，`verifySpecSync` 通过。
+- 本批**无库结构变更**，也未改 `versionCode` / `versionName`（仍 124 / "1.2.12"）——按裁决先攒着，全部做完一次性发版。
+
 # Changelog
 
 ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面向强直性脊柱炎患者的离线优先个人健康管理应用。
