@@ -1,8 +1,20 @@
-## [未发布] — 2026-11-01 · 审查 §十 五问的落地：三个医学缺口 + 备份威胁模型（Argon2id / 恢复码保护）
+## [v1.2.13] — 2026-11-01
+
+**三批各自独立的工作合并成一版**。v1.2.12 之后工作树上先后落了三批改动，都过了全门禁但按维护者裁决攒着没发版；本版一次性发出去。
+
+⚠️ **发版前必须看这两条**：
+
+1. **新备份的 KDF 已由 PBKDF2 换成 Argon2id，旧版 App 打不开新备份**（反向没问题：旧 PBKDF2 备份在新版仍能打开）。如果要在别的设备上用旧版 App 读备份，先用旧版做一份。
+2. **库结构 `ASHKB_DB_VERSION` 20 → 21**（只给 `supplements` 加一列可空 `daily_max_unit TEXT`），首次启动跑 `MIGRATION_20_21`。升级前照例建议先备份。
+
+三块内容：审查报告 §十 五问裁决后的落地（三个医学缺口 + 备份威胁模型）、B6 钥匙扣二维码从零重写（第二版）、Compose 性能审查 ①「`BackupScreen` 拆分」。
+
+### 一、审查 §十 五问的落地：三个医学缺口 + 备份威胁模型
+
 
 维护者对审查报告 §十 五问给出裁决后，本批落地其中真正还悬着的部分。三条流水线互不相干，分开记。
 
-### 一、锁屏急救卡只承认「这张卡存在」（§十 第 4 问裁决：详情需解锁）
+#### 一、锁屏急救卡只承认「这张卡存在」（§十 第 4 问裁决：详情需解锁）
 
 - `reminder/NotificationHelper.kt`：`postLockscreenEmergencyCard` 的通知级可见性由 `VISIBILITY_PUBLIC` 改为
   `VISIBILITY_PRIVATE`，并挂上 `setPublicVersion(lockscreenPublicVersion(context))`；新增私有函数
@@ -16,7 +28,7 @@
   必须挂 publicVersion、publicVersion 块内不得引用 `lines`/`body` 或任何用户数据资源、
   两条锁屏文案本身不得含占位符。负向对照：删掉 `setPublicVersion` 行 ⇒ 4 条里 1 红。
 
-### 二、医学缺口①：活疫苗 × 免疫抑制药交叉校验（原先文案自称核对过，代码从未核）
+#### 二、医学缺口①：活疫苗 × 免疫抑制药交叉校验（原先文案自称核对过，代码从未核）
 
 - `domain/VaccineSafety.kt`：新增 `data class ActiveDrug(name, medClass)` 与
   `fun immunosuppressantDrugs(active): List<ActiveDrug>`——生物制剂（BIOLOGIC）/ JAK 抑制剂 / csDMARD
@@ -34,7 +46,7 @@
   断言一律看**落库的 message 文本**而不是纯函数返回值——「判定对了但仓储没接上」正是这类改动最容易
   漏掉的形态。负向对照各一次，均命中。
 
-### 三、医学缺口②：补剂每日上限没有单位（`ASHKB_DB_VERSION` 20 → 21）
+#### 三、医学缺口②：补剂每日上限没有单位（`ASHKB_DB_VERSION` 20 → 21）
 
 - 原实现 `exceedsDailyMax` 直接 `dailyTotal > dailyMax`，而 `dailyMax` 是裸 `Double?`，UI 把同一个
   `doseUnit` 同时贴给累计与上限两处 ⇒「每次 1 粒 / 上限 1000 mg」算成 `1 > 1000` 永远静默通过，
@@ -52,7 +64,7 @@
   保存写 `dailyMaxUnit`。字符串 `supp_over_limit` 由三参数改为四参数。
 - 测试：`SupplementLimitsTest` 7 → 10 条；负向对照删掉 MISMATCH 早退行 ⇒ 1 红。
 
-### 四、医学缺口③：临界容差可按化验项配置
+#### 四、医学缺口③：临界容差可按化验项配置
 
 - 新增 `domain/LabBoundaryTolerance.kt`（SharedPreferences 存储，**不进库**）：容差是展示口径、不参与
   诊断与 PDF 异常计数、不改 `lab_results.abnormal`；为几条容差加表要连带一次迁移，代价与收益不成比例。
@@ -69,7 +81,7 @@
 - 测试：新增 `LabBoundaryToleranceTest`（11 条，含「按项容差真的会改变临界判定」）；
   同步 `LabNearBoundaryWiringTest` 的 4 条静态断言（调用点已有第 6 实参）。两次负向对照均命中。
 
-### 五、S-1：备份 KDF 换 Argon2id（§十 第 3 问裁决：不信任 WebDAV 服务商）
+#### 五、S-1：备份 KDF 换 Argon2id（§十 第 3 问裁决：不信任 WebDAV 服务商）
 
 - 新增 `domain/Argon2id.kt`（826 行纯 Kotlin，零第三方依赖）：Argon2id 全流程 + Blake2b 变长哈希 +
   引用实现；参数校验 `salt ≥ 8 字节` / `tagLength ≥ 4` / `memoryKiB ≥ 8×parallelism`。
@@ -83,7 +95,7 @@
   双槽文件仍可解、新文件槽头声明 argon2id、把槽头改回 pbkdf2 就解不开、未知 KDF 拒绝、m/p/iter 越界拒绝）。
 - 两次负向对照：回落 PBKDF2 ⇒ 1 红；密钥派生改回 PBKDF2 但槽头仍写 argon2id ⇒ backup 包 104 条里 11 红。
 
-### 六、S-3：恢复码再显示前要求设备凭证 + 剪贴板保护
+#### 六、S-3：恢复码再显示前要求设备凭证 + 剪贴板保护
 
 - 新增 `ui/backup/RecoveryRevealGuard.kt`：`hasSecureLock` / `deviceCredentialPrompt`（走平台
   `KeyguardManager.createConfirmDeviceCredentialIntent`，不引 androidx.biometric）。
@@ -101,18 +113,7 @@
 - 新增 `RecoveryClipboardTest`（7 条，走 Robolectric 真剪贴板）与 `RecoveryRevealWiringTest`（5 条，
   含「reveal 不得被 onClick 直接调用」「弹窗不得再出现 SelectionContainer」「guard 不得调
   `setUserAuthenticationRequired(`」）。两次负向对照均命中。
-
-### 门禁与状态
-
-- 全门禁 `cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug verifySpecSync`
-  → **BUILD SUCCESSFUL in 2m 21s**（日志 `E:\ASHKB\medgap-gate3.log`）；单测 **145 文件 / 1210 条 /
-  0 失败 / 0 错误 / 1 跳过**（唯一跳过是 Argon2id 的性能实测）；detekt 0 issues；
-  lint **171 = 0 Error + 163 Warning + 8 Information**；`verifySpecSync` 过。
-- **本批**未 bump `versionCode` / `versionName`（仍 124 / "1.2.12"），按维护者裁决等剩下的活做完一次性发版。
-- ⚠️ 发布时必须写明：**新备份的 KDF 已改为 Argon2id，旧版 App 打不开新备份**（旧备份仍可在新版打开）。
-- ⚠️ 本版含库结构变更：`ASHKB_DB_VERSION` 20 → 21（只加一列），首次启动跑迁移。
-
-## [未发布] — 2026-10-31 · B6 钥匙扣二维码（从零重写，第四批 C2）
+### 二、B6 钥匙扣二维码（从零重写，第二版）
 
 **这是第二次实现。** 第一版被完整回退，原因不是「不好看」而是**扫不出来**：自写编解码器用「自己编、自己解」回读自测，
 无法排除编解码犯同一个错。本次从零重写，并改用**独立参考实现逐格比对 + 第三方解码器端到端解码**两重验证。
@@ -154,8 +155,7 @@
 ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面向强直性脊柱炎患者的离线优先个人健康管理应用。
 
 > ⚠️ **免责声明**：本应用为个人健康管理记录工具，不构成任何医疗建议，不能替代医生诊疗。用药与治疗方案请始终遵医嘱。
-
-## [未发布] — 2026-10-31 · Compose 性能审查 ①：拆分 BackupScreen
+### 三、Compose 性能审查 ①：拆分 `BackupScreen`
 
 **纯结构改动，零行为变化。** `ui/backup/BackupScreen.kt` 原本一个文件 1325 行，把六个业务分区（恢复码 / 本机备份 / 同步 / 恢复 / 台账 / 弹层）
 全塞在一起。按 `ui/me/MedEditScreen` + `MedEditSections` 的既有先例拆成 8 个文件，每块只重组自己那份状态。
@@ -180,6 +180,16 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）版本变更记录。面�
 - 门禁 `E:\ASHKB\c1-split-gate1.log`：`BUILD SUCCESSFUL in 2m 34s`，单测 **1137 条 / 136 文件**全绿，detekt 0，
   lint 171 = 0 Error + 163 Warning + 8 Information，`verifySpecSync` 通过。
 - 本批**无库结构变更**，也未改 `versionCode` / `versionName`（仍 124 / "1.2.12"）——按裁决先攒着，全部做完一次性发版。
+### 门禁与状态
+
+- 全门禁 `cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug verifySpecSync`
+  → **BUILD SUCCESSFUL in 2m 21s**（日志 `E:\ASHKB\medgap-gate3.log`）；单测
+  **145 文件 / 1210 条 / 0 失败 / 0 错误 / 1 跳过**（唯一跳过是 `Argon2idTest` 的性能实测，
+  `assumeTrue(System.getenv("ARGON2_BENCH") == "1")` 设计如此）；detekt 0 issues；
+  lint **171 = 0 Error + 163 Warning + 8 Information**；`verifySpecSync` 通过。
+- 版本号 versionCode 124 → **125**、versionName "1.2.12" → **"1.2.13"**。
+- 本版含一次库结构变更（20 → 21）；三批合计新增单测 73 条（1137 → 1210）。
+
 ## [v1.2.12] — 2026-10-29
 
 **v1.2.11 装机复验照出的一处误导性文案，本版单独修掉。** 备份页新建口令的字段标签仍写「备份口令（≥6 位）」，
