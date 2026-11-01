@@ -1,9 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  S-6（2026-11-01）：Android 12+ 的云备份与设备迁移规则。
+
+  与 `backup_rules.xml` 同一取舍：本应用的备份能力由**应用内加密备份**承担
+  （`VaultCipher` + Argon2id + 恢复码），系统云备份不承担任何数据。
+  旧版只排除 `ashkb.db` 一条，等于把 `shared_prefs/`（恢复码密文、WebDAV 账号）、
+  `files/backups/`、`files/checkup_attachments/`（明文化验附件）、
+  `files/exports/`（明文报告 PDF 与二维码 PNG）全交给系统——
+  这正是审查报告 S-6 指出的风险。改为整域排除。
+
+  ⚠️ `device-transfer` 也要关：那条路走的是「换新手机时整包搬迁」，
+  同样会把上面这些明文文件搬过去。用户要迁移数据时应该用应用内的
+  「导出档案 / 导入档案」或备份恢复，那两条路径有口令与台账。
+-->
 <data-extraction-rules>
     <cloud-backup>
-        <exclude domain="database" path="ashkb.db" />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="root" path="." />
+        <exclude domain="external" path="." />
     </cloud-backup>
     <device-transfer>
-        <exclude domain="database" path="ashkb.db" />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="root" path="." />
+        <exclude domain="external" path="." />
     </device-transfer>
 </data-extraction-rules>

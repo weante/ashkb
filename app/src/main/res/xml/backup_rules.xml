@@ -1,4 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  S-6（2026-11-01）：系统云备份 / 设备迁移的排除规则。
+
+  ### 为什么是「整域排除」而不是逐项列举
+  旧版只写了 `<exclude domain="database" path="ashkb.db" />` 一条 —— 那等于宣称
+  「除了 ashkb.db，其它都随系统备份走」。而实际落在备份范围内的高敏内容至少还有：
+    - `shared_prefs/vault_config`：备份恢复码的 Keystore 密文、vault key 版本号
+    - `shared_prefs/webdav_config`：WebDAV 地址与账号（口令另存，但地址与账号已足够定位）
+    - `shared_prefs/app_prefs`：种子导入版本、各类一次性标记（能反推用户用过哪些功能）
+    - `files/backups/`：本机加密备份本体 + 恢复前自动快照
+    - `files/checkup_attachments/`：化验单与影像附件（**明文**，见 S-4）
+    - `files/exports/`：导出的报告 PDF 与钥匙扣二维码 PNG（**明文**）
+    - `files/ashkb-crash-*.txt`：崩溃日志（含机型、版本、堆栈）
+    - `ashkb.db` 连同 `-wal` / `-shm` / `-journal` 旁文件
+  逐项列举的问题不是这次漏了哪个，而是**每新增一个导出目录或一份偏好文件，都得记得回来加一条**，
+  而漏掉时不会有任何报错——只会安静地把 PHI 送上云。所以这里按「域」整域关掉。
+
+  ### 为什么这是对的取舍
+  本应用的备份能力由**应用内加密备份**（`VaultCipher` + WebDAV / 本机备份文件）承担，
+  那条链有自己的口令、Argon2id KDF 与恢复台账。系统云备份不承担任何数据，
+  因此关掉它不减少任何可用能力。
+
+  ### 当前还有一道闸
+  `AndroidManifest.xml` 里 `android:allowBackup="false"`，系统本就不会备份。
+  本文件是**第二道防线**：只要有人把 allowBackup 改回 true、或用 debug 构建、
+  或未来上架要求打开备份，这里仍然什么都不放行。
+  `BackupRulesCoverageTest` 会把这两件事一起钉住（改回只排除 ashkb.db 就会红）。
+-->
 <full-backup-content>
-    <exclude domain="database" path="ashkb.db" />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="root" path="." />
+    <exclude domain="external" path="." />
 </full-backup-content>

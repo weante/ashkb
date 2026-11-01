@@ -1,6 +1,6 @@
 # ASHKB 状态交接文档
 
-> **时点快照**：截至 **v1.2.13（versionCode 125）· 2026-11-01 · 三批攒着的改动一次性发出（Compose 性能审查 ① 拆分 BackupScreen / B6 钥匙扣二维码从零重写 / 审查 §十 五问的落地）**，**已落地、门禁全绿、已推送并发布**（发布提交见本行下方「GitHub 正式版」与 §0；Release **GitHub Latest**）。⚠️ **本版含两条破坏性提示**：① 备份 KDF 由 PBKDF2 换成 Argon2id，**旧版 App 打不开新备份**（旧备份在新版仍可打开）；② 库结构 `ASHKB_DB_VERSION` **20 → 21**（`supplements` 加一列可空 `daily_max_unit`），首次启动跑 `MIGRATION_20_21`。上一版 **v1.2.12（versionCode 124）· 2026-10-29 · C01 口令标签遗留修正（v1.2.11 装机走查发现）**（发布提交 `f39dead`，附注标签 `v1.2.12`（tag 对象 `a84cff9`）→ `f39dead`；release id `427925638`，资产 `ashkb-1.2.12-release.apk` **5,278,382 B**，sha256 `F54DE718…E7DE`）。上一版 **v1.2.11（versionCode 123）· 2026-10-26 · 体验整理 + R1/R2 + 化验「临界」第四态 + 缺陷修复执行工单全部 22 项（五批）**，已全部落地、门禁全绿、已推送并发布（第 1 批 `28d0a30` / 第 2 批 `1f92cdc` / 第 3 批 `a59286e` / 第 4 批 `60d1391` / 第 5 批 `dedabee`，+ 文档补记 `4856235`、`da2cb4d`，+ 发布提交 `4e40137`；逐批取证见文末「九 ~ 十六」节）。发布形态：**GitHub Latest**，release id `424324363`，资产 `ashkb-1.2.11-release.apk` 5,277,782 B，sha256 `280EFC55…1938`（**CI 在 tag 上构建的产物**，C04 已逐字比对签名摘要），附注标签 `v1.2.11`（tag 对象 `0e9535c`）→ `4e40137`。**v1.2.11 有库结构变更：`ASHKB_DB_VERSION` 19 → 20**（`MIGRATION_19_20` + schema `20.json` 已入库），首次启动跑迁移，升级前先备份；**v1.2.12 无库结构变更**（仍 20）。再上一版 **v1.2.10（versionCode 122）· 2026-10-19 · 审查第二批 / 第三批 + 裁决项 3、6、7 + §6.7 + 按需用药每天一次 + UI 2.0 批次 B–E + §06 双主题验收 + 真机启动崩溃修复**（release id `416558911`，资产 5,213,292 B，sha256 `9C03C518…FF89`，2026-10-21 就地重做过一次），更早 **v1.2.9（versionCode 121）**（release id `410782041`）、**v1.2.8（versionCode 120）**（id `408053469`）。
+> **时点快照**：截至 **v1.2.13（versionCode 125）· 2026-11-01**，**工作树上有未发版的 S-6 补丁**（系统云备份改整域排除 + README 知情披露，门禁 `E:\ASHKB\s6-gate1.log` 全绿 1215 条）。v1.2.13 本身是 **三批攒着的改动一次性发出（Compose 性能审查 ① 拆分 BackupScreen / B6 钥匙扣二维码从零重写 / 审查 §十 五问的落地）**，**已落地、门禁全绿、已推送并发布**（发布提交见本行下方「GitHub 正式版」与 §0；Release **GitHub Latest**）。⚠️ **本版含两条破坏性提示**：① 备份 KDF 由 PBKDF2 换成 Argon2id，**旧版 App 打不开新备份**（旧备份在新版仍可打开）；② 库结构 `ASHKB_DB_VERSION` **20 → 21**（`supplements` 加一列可空 `daily_max_unit`），首次启动跑 `MIGRATION_20_21`。上一版 **v1.2.12（versionCode 124）· 2026-10-29 · C01 口令标签遗留修正（v1.2.11 装机走查发现）**（发布提交 `f39dead`，附注标签 `v1.2.12`（tag 对象 `a84cff9`）→ `f39dead`；release id `427925638`，资产 `ashkb-1.2.12-release.apk` **5,278,382 B**，sha256 `F54DE718…E7DE`）。上一版 **v1.2.11（versionCode 123）· 2026-10-26 · 体验整理 + R1/R2 + 化验「临界」第四态 + 缺陷修复执行工单全部 22 项（五批）**，已全部落地、门禁全绿、已推送并发布（第 1 批 `28d0a30` / 第 2 批 `1f92cdc` / 第 3 批 `a59286e` / 第 4 批 `60d1391` / 第 5 批 `dedabee`，+ 文档补记 `4856235`、`da2cb4d`，+ 发布提交 `4e40137`；逐批取证见文末「九 ~ 十六」节）。发布形态：**GitHub Latest**，release id `424324363`，资产 `ashkb-1.2.11-release.apk` 5,277,782 B，sha256 `280EFC55…1938`（**CI 在 tag 上构建的产物**，C04 已逐字比对签名摘要），附注标签 `v1.2.11`（tag 对象 `0e9535c`）→ `4e40137`。**v1.2.11 有库结构变更：`ASHKB_DB_VERSION` 19 → 20**（`MIGRATION_19_20` + schema `20.json` 已入库），首次启动跑迁移，升级前先备份；**v1.2.12 无库结构变更**（仍 20）。再上一版 **v1.2.10（versionCode 122）· 2026-10-19 · 审查第二批 / 第三批 + 裁决项 3、6、7 + §6.7 + 按需用药每天一次 + UI 2.0 批次 B–E + §06 双主题验收 + 真机启动崩溃修复**（release id `416558911`，资产 5,213,292 B，sha256 `9C03C518…FF89`，2026-10-21 就地重做过一次），更早 **v1.2.9（versionCode 121）**（release id `410782041`）、**v1.2.8（versionCode 120）**（id `408053469`）。
 > **v1.2.13 的三批内容**（原先各自未发版，本版合并）——① Compose 性能审查 ①：`BackupScreen` 从 1325 行拆成 8 个文件（纯结构动作、无行为变更）；② **B6 钥匙扣二维码从零重写**（7 个新 `domain/` 文件 + `QrPngWriter` + 三处接入，第四批 C2）；③ **审查 §十 五问的落地**：锁屏卡改 PRIVATE + publicVersion、三个医学缺口（活疫苗×免疫抑制药 / 补剂上限单位含 v20→**v21** 迁移 / 临界容差按项可配）、备份 KDF 换 Argon2id、恢复码查看前验设备凭证 + 剪贴板 60 秒清除。三者门禁分别 1137 / 1154 / **1210 条 / 145 文件**（detekt 0、lint 171 = 0 Error、verifySpecSync 过）。
 > 本文按「**已完成 / 未验证 / 未实现 / 踩坑**」四桶组织，用于快速交接。
 > ⚠️ **权威来源**：工程约定、交付流程、签名、GitHub 同步、逐版本回归清单以 `HANDOFF.md` 为准；版本历史以 `CHANGELOG.md` 为准；版本号以 `app/build.gradle.kts` 为准（v1.2.9 起**不再把单测条数抄进文档**，见根 `build.gradle.kts` 里 `verifySpecSync` 的注释）。
@@ -18,6 +18,7 @@
 | APK 版本 | **v1.2.13 已由 CI 构建并发布**：`aapt2 dump badging` 核对 versionCode 125 / versionName 1.2.13，正式证书 `38ca80a6…d7d`（`apksigner --print-certs` 实测），**5,304,008 B**，sha256 `9B06296F…D1B0`（`gh api` 回读 `assets[].digest` = `sha256:9b06296f…d1b0` 逐字一致）。⚠️ 本地同源码构建的 `app-release.apk` 是 **5,304,012 B / sha256 `6DDF9BF2…9565`**——**差 4 字节、摘要不同**，签名块时间戳 + 打包顺序所致，不代表内容有差异；发布用 CI 产物。上一版 **v1.2.11** 为 versionCode 123 / 1.2.11（**5,277,782 B**，sha256 `280EFC55…1938`；本地同源码为 `D66CF5A8…FB93A`）：`aapt dump badging` 核对为 versionCode 123 / versionName 1.2.11，正式证书 `38ca80a6…d7d`（`apksigner --print-certs` 实测，未回退 debug 签名），**5,277,782 B**，sha256 `280EFC55…1938`。⚠️ 本地同源码构建的 `app-release.apk` 是 **5,277,782 B / sha256 `D66CF5A8…FB93A`**——**体积相同、摘要不同**，因为 APK 内嵌 `META-INF` 签名块带时间戳、且 Gradle 打包顺序受文件系统枚举影响，**这不代表内容有差异**；发布用的是 CI 产物（C04 保证其证书摘要正确）。上一版 v1.2.10 为 versionCode 122 / versionName 1.2.10（本地构建，5,213,292 B） |
 | 本版版本 | **versionCode 125 / versionName 1.2.13**；`ASHKB_DB_VERSION` **21**（由 `MIGRATION_20_21` 加一列 `supplements.daily_max_unit TEXT`，可空无默认值） |
 | 本版内容（v1.2.13） | **三批合并发布**（详见各行与文末三节）。上一版 v1.2.12 内容为：**C01 口令标签遗留修正**（v1.2.11 装机走查照出）：`backup_password_field` 中英标签由写死的「≥6 位」改为占位符 `%1$d`、调用点传 `BackupPasswordRules.MIN_LENGTH`，新增 `backup_password_too_short` 中英两条（口令不足就地红字说明，不再只是静默变灰），`BackupPasswordRulesTest` 补 1 条守卫（标签/提示不得写死数字 + 调用点必须传常量，只改字符串会缺格式化参数在运行期崩）。门禁 `E:\ASHKB\v1212-gate1.log` 全绿（**1137 条 / 136 文件**，detekt 0，lint 184 = 0 Error，verifySpecSync 过），真机复核标签已变「≥12 位」 |
+| 未发布的改动（工作树上） | **审查 S-6：系统云备份改整域排除 + README 知情披露**（2026-11-01）。`res/xml/backup_rules.xml` 原只有 `<exclude domain="database" path="ashkb.db" />` 一条，含义是「除 `ashkb.db` 外全都随系统备份走」——而 `shared_prefs/vault_config`（恢复码密文）、`webdav_config`（WebDAV 账号）、`files/backups/`、`files/checkup_attachments/`（**明文**附件）、`files/exports/`（**明文** PDF 与二维码 PNG）、崩溃日志全在范围内；现改为对 `database` / `sharedpref` / `file` / `root` / `external` 五域写 `path="."`，且 `data_extraction_rules.xml` 的 `cloud-backup` 与 `device-transfer` **两段都覆盖**。新增 `BackupRulesCoverageTest`（5 条纯静态解析：全域覆盖 / 两段都覆盖 / 禁 `<include>`（会覆盖同域 `exclude`）/ 清单仍 `allowBackup="false"` 且仍引用两文件 / 域名取值合法）；两次负向对照均命中。README 新增「已知的边界与取舍（知情披露）」五条：Argon2id 反向不兼容、S-2 单一 vault key 且改口令不换数据密钥、S-4 活动库明文（不防拿到已解锁设备的人）、S-6 云备份关闭、恢复码需设备凭证 + 剪贴板 60 秒清除。门禁 `E:\ASHKB\s6-gate1.log` 全绿 **146 文件 / 1215 条**（detekt 0、lint 171 = 0 Error）。**未 bump 版本号**（仍 125 / "1.2.13"） |
 | 本版三批之一 | **C1-① `BackupScreen` 拆分**（2026-10-31，纯结构动作）：`ui/backup/BackupScreen.kt` **1325 → 332 行**，按分区拆出 7 个新文件（`BackupRestoreSection.kt` 306 / `BackupSyncSection.kt` 246 / `BackupSheets.kt` 181 / `BackupRecoverySection.kt` 179 / `BackupLocalSection.kt` 153 / `BackupLedgerSection.kt` 124 / `BackupFormat.kt` 26）；13 个跨文件符号 `private` → `internal`；detekt 基线 307 → 301（删掉 6 条：4 条 `MagicNumber` + 2 条 `MaxLineLength`，都是本次在代码里修掉/改名的条目失效，**没有新增豁免**）；`BackupPasswordRulesTest` 的源码断言由「读单个文件」改为「扫 `ui/backup` 整个目录」。门禁 `E:\ASHKB\c1-split-gate1.log` 全绿。已随 **v1.2.13** 发布。同批还有 **C2 B6 钥匙扣二维码从零重写**（7 个 `domain/` 文件 + `QrPngWriter` + 导出页卡片 / 紧急卡 PDF / 系统分享三处接入，门禁 `E:\ASHKB\c2-qr-gate2.log` 全绿 1154 条 / 138 文件）。**第三批（2026-11-01）：审查 §十 五问的落地**——锁屏卡 PRIVATE + publicVersion、三个医学缺口（活疫苗×免疫抑制药 / 补剂上限单位 + `ASHKB_DB_VERSION` 20→21 / 临界容差按项可配）、备份 KDF 换 Argon2id、恢复码查看前验设备凭证 + 剪贴板 60 秒清除；门禁 `E:\ASHKB\medgap-gate3.log` 全绿 **1210 条 / 145 文件**（detekt 0、lint 171 = 0 Error）。详见文末「审查 §十 落地」节 |
 | 审查裁决进度 | **裁决项 1、2 已落地并发布（v1.2.9）；裁决项 3 已落地（随 v1.2.13 发布）**。① 对乙酰氨基酚 `MedClass.NSAID` → 新增 `MedClass.ANALGESIC`，`DrugInteractionKeys` 的 `nsaid`/`nsaid_longterm` 摘除 acetaminophen，新增 2 条回归（`MedicationInteractionChainTest`）；②「已结算」统一到 `AdherenceCalc.SETTLED_STATUSES` 唯一口径——删掉 `MedicationRepository.doneSlotRefs`、`ReminderReceiver` 改引 `settledSlotRefs`、`TodayItem` 新增 `partial`/`isSettled`、今日页 partial 不再显示成「漏服」也不计入待办，连带按铁律重写 4 条 detekt 复杂度（不进基线）并清掉 2 条签名过期的基线条目；③ **口服不再提供「每两周」**——新增 `ui/me/MedEditSections.kt` 的 `routeVisible`（chips 按 route 过滤 + 保留当前值逃生口）、`MedEditScreen.onPrimary()` 提交拦截 + `med_route_frequency_error` 红字，**domain 层刻意不动**（`ScheduleCalc.isCycleGatedBy` 只加 KDoc），新增 10 条回归（`MedRouteFrequencyGuardTest`）。其余 5 项待裁决；其中**裁决项 6、7 与审查第二、三批（含 §6.7）已落地、门禁全绿、未发版**（见文末「批次 B」）；另按维护者指令（m00936）落地**按需用药常驻首页 + 每天只记一次**（见文末「批次 C」） |
 | B6 二维码 | **第一版已完整回退（回退后 grep 零命中），第二版从零重写完成、已随 v1.2.13 发布**（2026-10-31）：`domain/` 新增 `QrBitBuffer` / `QrSegment` / `QrEcc` / `QrReedSolomon` / `QrTables` / `QrCode`（552 行）/ `EmergencyQr` 共 7 个纯 Kotlin 文件（零第三方依赖），`ui/report/QrPngWriter` 负责矩阵 → PNG（含 4 模块静区）。验证双轨：Nayuki 参考实现 **27 组黄金向量逐格一致** + ZXing 3.5.3 **端到端解码 5/5 通过**；负向对照三层（改常量位 ⇒ 3 红 / 去 `distinct()` ⇒ 1 红 / 翻转 35×35 数据区 ⇒ 解码 `NotFoundException`）。原四缺陷（`placeSeparators` 漏两带、`writeFormatBits` 位映射、N3、N4）全部修正。详见文末「C2」节 |
@@ -1323,3 +1324,50 @@ C01 遗留，修复后随 **v1.2.12** 发布（`backup_password_field` 改占位
 - 全门禁：`. E:\ASHKB\build-env\env.ps1; & "E:\ASHKB\build-env\gradle-8.7\bin\gradle.bat" -p E:\ASHKB\patient-health-app cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug verifySpecSync --console=plain`
 - Argon2id 性能那档默认跳过（`assumeTrue`），要看数字必须先 `$env:ARGON2_BENCH="1"`。
 - 剪贴板 / 设备凭证两条走 Robolectric，**不需要真机**；但「系统验证界面长什么样」只能在真机看。
+
+---
+
+## S-6 系统云备份改整域排除 + README 知情披露（2026-11-01 · 未发版 · 未 bump 版本号）
+
+### 改了什么
+
+| 文件 | 改动 |
+|---|---|
+| `app/src/main/res/xml/backup_rules.xml` | 单条 `ashkb.db` 排除 → `database` / `sharedpref` / `file` / `root` / `external` 五域各一条 `path="."`（整域），KDoc 式注释说明为什么是整域而非逐项 |
+| `app/src/main/res/xml/data_extraction_rules.xml` | `cloud-backup` 与 `device-transfer` **两段**都写同一组五域排除（换新手机整包搬迁同样会搬走明文附件） |
+| `app/src/test/java/com/ashkb/app/data/backup/BackupRulesCoverageTest.kt` | 新增 5 条静态解析测试 |
+| `README.md` | 「数据与隐私」节新增「已知的边界与取舍（知情披露）」五条 |
+
+### 为什么是整域排除而不是补几条路径
+
+逐项列举的问题不是这次漏了哪个，而是**每新增一个导出目录或一份偏好文件都得记得回来加一条**，而漏掉时不会有任何报错——只会安静地把 PHI 送上云。本应用的数据迁移能力由应用内加密备份（`VaultCipher` + Argon2id + 恢复码）承担，系统云备份不承担任何数据，关掉它不减少任何可用能力。
+
+这不是「已经泄露」而是「一道闸失效即泄露」：`AndroidManifest.xml` 的 `allowBackup="false"` 仍是第一道闸，规则文件是第二道。只要有人把 allowBackup 改回 true、用 debug 构建、或上架要求打开备份，第二道闸仍然什么都不放行。
+
+### 守卫测试钉住的四件事
+
+1. 两个规则文件对五个域全覆盖，且每条都是 `path="."`；
+2. `cloud-backup` 与 `device-transfer` 两段都覆盖；
+3. **不得出现 `<include>`**——按 AOSP 语义 `include` 会覆盖同一域上的 `exclude`，是"改对了却仍漏"的最隐蔽写法；
+4. `AndroidManifest.xml` 仍写 `android:allowBackup="false"` 且仍引用这两个规则文件（否则规则写了没人读）。
+   另有一条校验域取值都在平台支持的五个之内（写错域名如 `sharedprefs` 不会报错，那条规则会被静默忽略）。
+
+用 `DocumentBuilderFactory` 解 XML 而不是字符串匹配，是为了让注释里出现 `domain="file"` 这类举例不会误判——本文件与 `backup_rules.xml` 的注释正是大量举例。
+
+### 负向对照（两次，均命中）
+
+1. 从 `backup_rules.xml` 删掉 `sharedpref` 那一行 ⇒ 「全量备份规则覆盖全部五个域且都是整域排除」红，其余 4 条绿；
+2. 加一条 `<include domain="sharedpref" path="vault_config.xml" />` ⇒ 该条与「不许出现 include 元素」两条同时红。
+   恢复后 5 条全绿，`NEGCTL` 残留 0。
+
+### README 知情披露的五条（维护者裁决：S-2 / S-4 只披露、不改代码）
+
+1. 备份口令 KDF 是 Argon2id（m=19456 / t=2 / p=1，槽头记 `kdf`/`iter`/`m`/`p`），旧文件按自己头里的参数解；**反向不成立**——新版写出的备份旧版打不开；
+2. **S-2**：全历史共用一把 vault key（v3 不再每文件生成 DEK），「改口令」只重包槽、**不轮换数据密钥**；彻底修需密钥轮换 + 重加密云端附件或 per-attachment 密钥环，属产品级改造；
+3. **S-4**：活动库是明文 SQLite，加密只覆盖导出/同步那一刻 ⇒ **本 App 不防「拿到已解锁设备的人」，防的是「拿到备份文件/云盘的人」**；
+4. **S-6**：系统云备份整体关闭，迁移只走「导出档案 / 导入档案」或加密备份；
+5. 恢复码查看需设备凭证（`createConfirmDeviceCredentialIntent`，未设锁屏则不拦），复制到剪贴板打敏感标记 + 60 秒后自动清除。
+
+### 门禁
+
+`E:\ASHKB\s6-gate1.log`：**BUILD SUCCESSFUL in 5m 5s**；单测 **146 文件 / 1215 条 / 0 失败 / 0 错误 / 1 跳过**（1210 → 1215）；detekt 0 issues；lint **171 = 0 Error + 163 Warning + 8 Information**；`verifySpecSync` 通过。**未改** `versionCode` / `versionName`（仍 125 / "1.2.13"）。

@@ -1,3 +1,31 @@
+## [未发布] — 2026-11-01 · 审查 S-6：系统云备份改整域排除 + README 知情披露
+
+**纯配置与文档改动，零代码逻辑变更。** 修审查报告 S-6（`ASHKB-代码审查报告.md:129`），并按维护者裁决（2026-11-01）把 S-2 / S-4 改为 README 知情披露、不改代码。
+
+### S-6：备份规则从「只排除一个文件」改为整域排除
+
+改动前 `res/xml/backup_rules.xml` 只有一条 `<exclude domain="database" path="ashkb.db" />`，`data_extraction_rules.xml` 是两条同样的排除。这个写法的含义是「除了 `ashkb.db`，其余全都会随系统备份走」——而实际上落在备份范围内的高敏内容至少还有：`shared_prefs/vault_config`（恢复码的 Keystore 密文）、`shared_prefs/webdav_config`（WebDAV 地址与账号）、`shared_prefs/app_prefs`、`files/backups/`（加密备份本体与恢复前快照）、`files/checkup_attachments/`（**明文**化验与影像附件）、`files/exports/`（**明文**报告 PDF 与钥匙扣二维码 PNG）、崩溃日志，以及 `ashkb.db-wal` / `-shm` 旁文件。
+
+现在两个文件都对 `database` / `sharedpref` / `file` / `root` / `external` 五个域写 `path="."`（整域），并且 `data_extraction_rules.xml` 的 **`cloud-backup` 与 `device-transfer` 两段都覆盖**——换新手机时整包搬迁同样会搬走明文附件。
+
+为什么是整域而不是补几条具体路径：漏项不会有任何报错，只会安静地把 PHI 送上云；而每新增一个导出目录就得记得回来加一条，这个约束守不住。
+
+这不是「已经泄露」而是「一道闸失效即泄露」：`AndroidManifest.xml` 的 `allowBackup="false"` 仍是第一道闸，规则文件是第二道。本应用的数据迁移能力由**应用内加密备份**（`VaultCipher` + Argon2id + 恢复码）承担，系统云备份不承担任何数据，关掉它不减少任何可用能力。
+
+### 新增 `BackupRulesCoverageTest`（5 条，纯静态解析）
+
+用 `DocumentBuilderFactory` 解 XML 而不是字符串匹配，这样注释里出现 `domain="file"` 这类举例不会误判。钉住四件事：①两个文件对五个域全覆盖且每条都是 `path="."`；②`cloud-backup` 与 `device-transfer` 两段都要覆盖；③不得出现 `<include>`——按 AOSP 语义 `include` 会覆盖同一域上的 `exclude`，是"改对了却仍漏"的最隐蔽写法；④`AndroidManifest.xml` 仍写 `allowBackup="false"` 且仍引用这两个规则文件，否则规则写了没人读。另有一条校验域取值都在平台支持的五个之内（写错域名如 `sharedprefs` 不会报错，那条规则会被静默忽略）。
+
+**两次负向对照**（均命中目标用例，恢复后 5 条全绿、`NEGCTL` 残留 0）：①从 `backup_rules.xml` 删掉 `sharedpref` 那一行 ⇒ 「全量备份规则覆盖全部五个域」红；②加一条 `<include domain="sharedpref" path="vault_config.xml" />` ⇒ 同一条与「不许出现 include」两条同时红。
+
+### README「已知的边界与取舍（知情披露）」
+
+在「数据与隐私」节下新增五条：①KDF 现在是 Argon2id（m=19456 / t=2 / p=1），旧文件按自己头里的参数解，**反向不成立**——新版写出的备份旧版打不开；②S-2 全历史共用一把 vault key，「改口令」只重包槽、不轮换数据密钥；③S-4 活动库是明文 SQLite，加密只覆盖导出/同步那一刻，**本 App 不防"拿到已解锁设备的人"，防的是"拿到备份文件/云盘的人"**；④S-6 系统云备份整体关闭；⑤恢复码查看需设备凭证、剪贴板敏感标记 + 60 秒清除。
+
+### 门禁与状态
+
+- 全门禁 `E:\ASHKB\s6-gate1.log`：**BUILD SUCCESSFUL in 5m 5s**；单测 **146 文件 / 1215 条 / 0 失败 / 0 错误 / 1 跳过**（1210 → 1215，增量就是新增的 5 条守卫）；detekt 0 issues；lint **171 = 0 Error + 163 Warning + 8 Information**；`verifySpecSync` 通过。
+- 本批**未改** `versionCode` / `versionName`（仍 125 / "1.2.13"）——属已发布版本的补丁，随下一个版本发出。
 ## [v1.2.13] — 2026-11-01
 
 **三批各自独立的工作合并成一版**。v1.2.12 之后工作树上先后落了三批改动，都过了全门禁但按维护者裁决攒着没发版；本版一次性发出去。
