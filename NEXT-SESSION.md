@@ -161,6 +161,17 @@ README「数据与隐私」节新增「已知的边界与取舍（知情披露�
 **两项未定论**：① B5 `restoreMutex` 真机验不到——`doRestore()` 首行 `if (_busy.value) return` 先挡住了双击，仓库层 Mutex 应改用并发单测（当前零覆盖）；② 「执行恢复演练」首次点击无反应、连点 3 次无效、进程未崩，第 4 次成功。
 
 测试数据已回滚（`TestDrugB2` 永久删除、`CascadeFileTest` 随级联清空、`big20.pdf` 已删），设备设置已还原（输入法 / `screen_off_timeout` 30000 / 时区 `Asia/Hong_Kong` + `auto_time_zone=1`）。遗留两份备份文件（本机 + WebDAV）——应用没有「删除单份备份」的 UI 入口。
+---
+
+## 一·补三 · 补记卡不随药单变化刷新（2026-11-03，真机反馈查出）
+
+**缺陷**：在「我的 → 药单管理」停用并永久删除某支药后，今日页「昨天还有 1 剂未记录」补记卡仍挂着那支药，`force-stop` 重启进程才消失。删除本身是干净的（`deleteArchivedMedication` 同一事务清 logs / changes / planned_slots / 药档），是**展示层陈旧缓存**。
+
+**根因**：`TodayViewModel._yesterdayPending` 只在构造 / 跨日广播 / 本页打卡跳过时重算，「在别的页面改了药单」不在其中；而 `refreshYesterdayPending()` 读的正是 `listActive()`。
+
+**修法**：`init` 里加 `repo.observeMedications().collect { refreshYesterdayPending() }`。选观察而非「删药后通知」——停用与删除写同一张 `medications` 表，Room 都会让 `observeActive()` 重发，一处订阅盖两条路径。
+
+**守卫**：`TodayYesterdayPendingRefreshTest` 5 条（init 订阅 + collect 重算 / 读 listActive / 停用与删除都发新值 / 唯一口径 + 空药单空卡）。负向对照命中。门禁 `E:\ASHKB\stale-pending-gate1.log` 全绿 147 文件 / 1220 条。
 ## 二、三处"我没能验证"的地方（维护者若碰到，优先看）
 
 | # | 未验项 | 为什么没验 | 怎么验 |

@@ -89,6 +89,21 @@ class TodayViewModel(
     init {
         // v1.0.74：进页面即算一次「昨天未记录」（跨零点补记卡的初值）
         viewModelScope.launch { refreshYesterdayPending() }
+        // v1.2.14（真机反馈）：药单变化后补记卡必须重算。
+        //
+        // 缺陷原状：`_yesterdayPending` 只在三个时机重算——构造、跨日、本页打卡/跳过。
+        // 于是「在『我的』里把某支药停用或删掉，回到今日页」时，补记卡仍挂着那支药的
+        // 旧计划（真机实证：删掉测试药后卡片依旧显示 `TestDrugB2 · 计划 09:00`，
+        // 重启进程才消失）。而 `refreshYesterdayPending` 读的正是 `listActive()`，
+        // 它本该跟着药单走。
+        //
+        // 为什么是观察活跃药单而不是「删药后通知」：停用（归档）与删除都会让
+        // `observeActive()` 发一次新值（归档药从 `is_archived = 0` 的集合里消失），
+        // 一处订阅就把两条路径都盖住；反过来说，靠调用方记得来通知一次，
+        // 就是这次漏掉的那种写法。
+        viewModelScope.launch {
+            repo.observeMedications().collect { refreshYesterdayPending() }
+        }
         // v1.0.86（批次 11）：跨日后「昨天」变了，补记卡必须重算。此前这段逻辑写在各自的
         // ticker 循环里（深睡不触发）；现在挂在日期源上——**只在日期真的变了时**回调一次。
         unregisterDateListener = dateProvider.addOnDateChangedListener {

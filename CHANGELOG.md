@@ -1,3 +1,39 @@
+## [未发布] — 2026-11-03 · 真机反馈：补记卡不随药单变化刷新
+
+**v1.2.13 真机复验顺带查出的缺陷**（维护者当场发现：「我今日页怎么有个未记录的，你没删除，TestDrugB2」）。
+
+### 缺陷形态
+
+在「我的 → 药单管理」里把某支药停用、并从「已停用药品」永久删除后，回到今日页，「昨天还有 1 剂未记录」补记卡**仍然挂着那支药**（真机原文：`TestDrugB2 · 计划 09:00 · 补记已服`）。`force-stop` 重启进程后才消失。
+
+### 根因
+
+`TodayViewModel._yesterdayPending` 只有三个重算时机：**构造 VM**、**跨日广播**、**本页打卡 / 跳过**。「在别的页面改了药单」不在其中。
+
+而 `refreshYesterdayPending()` 读的正是 `medicationDao.listActive()`——它本就该跟着药单走，只是没有人订阅药单的变化。删除动作本身是干净的（`deleteArchivedMedication` 在同一事务里删掉 logs / changes / planned_slots / 药档），所以这是纯粹的**展示层陈旧缓存**，不是数据残留。
+
+### 修法
+
+`E:\ASHKB\patient-health-app\app\src\main\java\com\ashkb\app\ui\today\TodayViewModel.kt` 的 `init` 里加一条订阅：
+
+```kotlin
+viewModelScope.launch {
+    repo.observeMedications().collect { refreshYesterdayPending() }
+}
+```
+
+为什么是「观察活跃药单」而不是「删药后通知一次」：停用（归档 → `UPDATE medications SET is_archived = 1`）与删除（`DELETE FROM medications`）写的是同一张表，Room 的 InvalidationTracker 都会让 `observeActive()` 重发新值——一处订阅同时盖住两条路径。反之，靠调用方记得来通知一次，就是这次漏掉的那种写法。
+
+### 新增 `TodayYesterdayPendingRefreshTest`（5 条）
+
+钉住四件事：①`init` 里确实订阅了 `observeMedications()` 且 `collect` 里调 `refreshYesterdayPending()`；②重算读的是 `listActive()`（不是全量）；③停用与删除都会让活跃药单发新值（守「一处订阅盖两条路径」这个前提）；④补记卡仍走 `PendingDoses.unsettledOn` 唯一口径（不另算一份），并直接断言「药单为空 ⇒ 补记卡为空」。
+
+**负向对照**：删掉那条 `collect` 行 ⇒ 「init 里订阅了活跃药单」红、其余 4 条绿；恢复后 5 条全绿，`NEGCTL` 残留 0。
+
+### 门禁与状态
+
+- 全门禁 `E:\ASHKB\stale-pending-gate1.log`：**BUILD SUCCESSFUL in 2m 53s**；单测 **147 文件 / 1220 条 / 0 失败 / 0 错误 / 1 跳过**（1215 → 1220，增量就是新增的 5 条）；detekt 0 issues；lint **171 = 0 Error + 163 Warning + 8 Information**；`verifySpecSync` 通过。
+- 本批**未改** `versionCode` / `versionName`（仍 125 / "1.2.13"）。
 ## [未发布] — 2026-11-01 · 审查 S-6：系统云备份改整域排除 + README 知情披露
 
 **纯配置与文档改动，零代码逻辑变更。** 修审查报告 S-6（`ASHKB-代码审查报告.md:129`），并按维护者裁决（2026-11-01）把 S-2 / S-4 改为 README 知情披露、不改代码。
