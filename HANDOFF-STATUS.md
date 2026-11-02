@@ -1371,3 +1371,43 @@ C01 遗留，修复后随 **v1.2.12** 发布（`backup_password_field` 改占位
 ### 门禁
 
 `E:\ASHKB\s6-gate1.log`：**BUILD SUCCESSFUL in 5m 5s**；单测 **146 文件 / 1215 条 / 0 失败 / 0 错误 / 1 跳过**（1210 → 1215）；detekt 0 issues；lint **171 = 0 Error + 163 Warning + 8 Information**；`verifySpecSync` 通过。**未改** `versionCode` / `versionName`（仍 125 / "1.2.13"）。
+
+---
+
+## v1.2.13 + S-6 真机复验（2026-11-02 · Xiaomi 2410DPN6CC / Android 16 / 1440x3200 density 600）
+
+被测制品 = 当前工作树 `43043d1` 本地构建的 release APK（`versionCode 125` / `versionName 1.2.13`，正式证书 `38ca80a6…d7d`），从设备上的 v1.2.12（124）覆盖安装。
+
+### 七项通过
+
+| 项目 | 证据（真机实测原文） |
+|---|---|
+| **装机 + 库迁移** | `install -r` Success；`dumpsys package` = `versionCode=125 / versionName=1.2.13`。库从 **v19/v20 双跳到 v21** 后首页数据完整：档案「曾庆城 · 强直性脊柱炎」、补剂「维生素 D3 4000IU」、化验「172 项」、体重「近 30 天 6 条记录 / 均值 71.2」全在 |
+| **S-6 备份规则** | 不是读源码，而是**解 APK 里编译后的 XML**：`aapt2 dump xmltree --file AndroidManifest.xml` 得 `allowBackup=false`；`res/Qq.xml`（full-backup）五域各 `path="."`；`res/4j.xml`（data-extraction）的 `cloud-backup` 与 `device-transfer` **两段都覆盖五域** |
+| **B2 MedEdit 保存路径** | 新建 `TestDrugB2 40mg`（NSAIDs / 口服 / 每日）→ 核对页「保存入库」→ 药单立即出现「在用药品（1）」+「核对待办」标记 → 首页立即出现 `计划 09:00 · 尚未记录` ⇒ 保存 → 建槽 → 排提醒链路通 |
+| **B3 Wellness 下半屏** | 饮食画像 `KeyValueRow` 三行（饮食模式=杂食 / 海鱼摄入=经常 / 乳制品=不耐受）标签左对齐、值右对齐，无错位 |
+| **B6 WebDAV 20MB 附件** | 造 20MB PDF 上传为附件 → 备份页「本地 1 个 · 已同步 0 · **待传 1**」→ 点同步 → **已同步 1**；「校验远端」回读「附件同步完成：上传 1 / 待传 1；远端清理 0 / 待删 0」 |
+| **级联删除附件** | 删除复诊记录时确认框写明「**1 个附件（连磁盘文件一起删除）**」→ 删后「本地 0 个 · 0 KB · **待清理 1**」（同步开启 + 有远端副本 ⇒ 留墓碑而非物理删行，与单测口径一致）→ 再点同步得「**远端清理 1 / 待删 1**」→ 待清理 0 |
+| **DateProvider 广播** | `service call alarm 3 s16 Pacific/Kiritimati` 把设备推到 11-03 → 首页立即变「11月3日 星期二」并正确提示「昨天还有 1 剂未记录（补记会写入 2026-11-02 的用药记录，不会算作今天）」⇒ `ACTION_TIMEZONE_CHANGED` → `DateProvider` → 各 ViewModel 全链生效 |
+
+### 附带验证
+
+- **恢复演练**：点「执行恢复演练」得「恢复演练通过：加密链路✓ 解密✓ 恢复双校验✓ 复核一致✓；**30 表 448 行**（旁路副本，生产库零写入）」，台账记 `演练 · drill / 成功`。
+- **§6.7 顺延键**：停用药品时的原因列表里**没有「顺延」**（`StopReason.pickable()` 在真机生效）。
+- **FLAG_SECURE**：备份页 `screencap` 全黑 —— `SecureWindow` 生效的正常表现（不是缺陷）。
+
+### 两项未定论（不写成通过）
+
+1. **B5 `restoreMutex` 真机验不到**：`BackupViewModel.doRestore()` 首行 `if (_busy.value) return` 让双击第二次根本进不来，UI 层就把并发挡住了，仓库层 Mutex 无法从真机触发。**该层目前 `app/src/test` 零覆盖**（全仓 `restoreMutex` 仅 3 处引用，均在 `BackupRepository.kt`）⇒ 应改用并发单测验证，不是真机项。
+2. **「执行恢复演练」首次点击无反应**：连点 3 次无反应、进程存活（pid 未变）、无崩溃日志，第 4 次成功。可能与 `uiautomator dump` 抢焦点有关，未能定论。
+
+### 测试数据回滚与设备还原（已完成）
+
+- 测试药品 `TestDrugB2 40mg`：停用后从「已停用药品」永久删除 → 已停用列表回到 1 个（只剩真实的「依那西普 25mg · 停用于 2026-10-08 · 原因：经济原因」）。
+- 测试复诊记录 `CascadeFileTest` 及其 20MB 附件：已随级联删除清空（本地 0 个 / 远端清理 1）。
+- 设备上 `/sdcard/Download/big20.pdf`：已删。
+- 设备设置还原：`default_input_method` 回微信输入法（`com.tencent.wetype/.plugin.hld.WxHldService`）、`screen_off_timeout` 回 30000、`time_zone` = `Asia/Hong_Kong`、`auto_time_zone` = 1。
+
+### 遗留（不影响结论）
+
+- 本机备份文件 `ashkb-2026-11-02.ashkb` 与 WebDAV 上的 `ashkb-backup-2026-11-02-230216.ashkb` 仍在：**应用当前没有「删除某一份备份」的 UI 入口**（本机文件在 `filesDir/backups/`，`run-as` 对 release 包不可用），故这两份留在设备/云盘上。

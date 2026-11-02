@@ -6,7 +6,7 @@
 
 ---
 
-**当前状态**：`v1.2.13`（versionCode **125**）已发布为 GitHub **Latest**（2026-11-01），**工作树上有未发版的 S-6 补丁**（系统云备份改整域排除 + README 知情披露，门禁 `E:\ASHKB\s6-gate1.log` 全绿 1215 条、**未 bump 版本号**）。本版把 v1.2.12 之后攒着的**三批**改动一次发出：Compose 性能审查 ①「`BackupScreen` 拆分」、B6 钥匙扣二维码从零重写、审查报告 §十 五问的落地（三个医学缺口 + 备份威胁模型）。⚠️ **两条破坏性提示**：① 备份 KDF 换成 Argon2id，**旧版 App 打不开新备份**（旧备份在新版仍可打开）；② 库结构 `ASHKB_DB_VERSION` **20 → 21**（`supplements` 加一列可空 `daily_max_unit`），首次启动跑 `MIGRATION_20_21`，升级前先备份。上一版 `v1.2.12`（versionCode **124**）只有一处文案修正（备份口令标签不再写死「≥6 位」）；上上版 `v1.2.11`（versionCode **123**）是第一个带库结构 19→20 迁移的发布，**已于 2026-10-27/28/30 真机覆盖安装并复验通过**（B01 / B05 / B07 三项补齐，迁移后数据完整）。
+**当前状态**：`v1.2.13`（versionCode **125**）已发布为 GitHub **Latest**（2026-11-01），**工作树上有未发版的 S-6 补丁**（已真机复验通过，见下）（系统云备份改整域排除 + README 知情披露，门禁 `E:\ASHKB\s6-gate1.log` 全绿 1215 条、**未 bump 版本号**）。本版把 v1.2.12 之后攒着的**三批**改动一次发出：Compose 性能审查 ①「`BackupScreen` 拆分」、B6 钥匙扣二维码从零重写、审查报告 §十 五问的落地（三个医学缺口 + 备份威胁模型）。⚠️ **两条破坏性提示**：① 备份 KDF 换成 Argon2id，**旧版 App 打不开新备份**（旧备份在新版仍可打开）；② 库结构 `ASHKB_DB_VERSION` **20 → 21**（`supplements` 加一列可空 `daily_max_unit`），首次启动跑 `MIGRATION_20_21`，升级前先备份。上一版 `v1.2.12`（versionCode **124**）只有一处文案修正（备份口令标签不再写死「≥6 位」）；上上版 `v1.2.11`（versionCode **123**）是第一个带库结构 19→20 迁移的发布，**已于 2026-10-27/28/30 真机覆盖安装并复验通过**（B01 / B05 / B07 三项补齐，迁移后数据完整）。
 
 - **本版三批之一（2026-10-31）**：Compose 性能审查 ①「`BackupScreen` 字段级拆分」已落地并过全门禁（`E:\ASHKB\c1-split-gate1.log`：1137 条 / 136 文件全绿、detekt 0、lint 171 = 0 Error、verifySpecSync 过），`ui/backup/BackupScreen.kt` **1325 → 332 行** + 7 个分区文件（`BackupRestoreSection.kt` 306 / `BackupSyncSection.kt` 246 / `BackupSheets.kt` 181 / `BackupRecoverySection.kt` 179 / `BackupLocalSection.kt` 153 / `BackupLedgerSection.kt` 124 / `BackupFormat.kt` 26）；**纯结构动作，无行为变更、无库结构变更、无 strings 改动**。detekt 基线 307 → 301（只删因改名失配的条目，没新增豁免）。已随 v1.2.13 发布。详见 `HANDOFF-STATUS.md` 文末「C1-① `BackupScreen` 字段级拆分」一节。
 - **本版三批之二（2026-10-31，C2 B6 钥匙扣二维码从零重写）**：第一版因「看起来像二维码但扫不出来」被回退，本次重写并改用**两重独立验证**——Nayuki 参考实现 **27 组黄金向量逐格一致** + ZXing 3.5.3 **端到端解码 5/5 通过**，三层负向对照均能变红。新增 `domain/` 7 个文件（`QrCode.kt` 552 / `QrSegment.kt` 210 / `QrTables.kt` 180 / `EmergencyQr.kt` 106 / `QrReedSolomon.kt` 89 / `QrBitBuffer.kt` 85 / `QrEcc.kt` 36）+ `ui/report/QrPngWriter.kt` 80；三处接入（导出页卡片 / 紧急卡 PDF / 系统分享）。门禁 `E:\ASHKB\c2-qr-gate2.log` **1154 条 / 138 文件全绿**、detekt 0、lint 171 = 0 Error。**无库结构变更、无版本号改动**。⚠️ 原定的 segno 1.6.6 验证手段在本机不可用（无 Python 运行时）。详见 `HANDOFF-STATUS.md` 文末「C2」一节。
@@ -140,6 +140,27 @@ v1.2.11（带库结构 19 → 20 迁移）已 `adb install -r` 覆盖安装（`v
 README「数据与隐私」节新增「已知的边界与取舍（知情披露）」五条（维护者裁决 2026-11-01：S-2 / S-4 只披露不改代码）。
 
 门禁 `E:\ASHKB\s6-gate1.log` 全绿 **146 文件 / 1215 条**（detekt 0、lint 171 = 0 Error、verifySpecSync 过）。**未 bump 版本号**。
+---
+
+## 一·补二 · v1.2.13 + S-6 真机复验（2026-11-02，Xiaomi 2410DPN6CC / Android 16）
+
+被测制品 = `43043d1` 本地构建的 release APK（125 / 1.2.13，证书 `38ca80a6…d7d`），从 v1.2.12（124）覆盖安装。**七项通过**：
+
+| 项目 | 结论 |
+|---|---|
+| 装机 + 库迁移 | v19/v20 **双跳到 v21**，档案 / 补剂 / 化验 172 项 / 体重 6 条全在 |
+| S-6 备份规则 | 解 **APK 里编译后的 XML** 确认：`allowBackup=false`、full-backup 五域 `path="."`、data-extraction 的 `cloud-backup` 与 `device-transfer` 两段都覆盖 |
+| B2 MedEdit 保存 | 新建药品 → 药单「在用药品（1）+ 核对待办」→ 首页 `计划 09:00 · 尚未记录` |
+| B3 Wellness 下半屏 | `KeyValueRow` 三行标签左/值右，无错位 |
+| B6 WebDAV 20MB 附件 | 待传 1 → **已同步 1**；校验远端回读「上传 1 / 待传 1」 |
+| 级联删除附件 | 确认框写明「1 个附件（连磁盘文件一起删除）」→ 待清理 1（墓碑）→ 同步后「远端清理 1」 |
+| DateProvider 广播 | 改时区推到 11-03 → 首页变「11月3日 星期二」+「昨天还有 1 剂未记录（补记写入 2026-11-02）」 |
+
+附带：恢复演练「30 表 448 行，生产库零写入」；§6.7 顺延键在停用原因列表里确实不存在；备份页截屏全黑（`FLAG_SECURE` 生效）。
+
+**两项未定论**：① B5 `restoreMutex` 真机验不到——`doRestore()` 首行 `if (_busy.value) return` 先挡住了双击，仓库层 Mutex 应改用并发单测（当前零覆盖）；② 「执行恢复演练」首次点击无反应、连点 3 次无效、进程未崩，第 4 次成功。
+
+测试数据已回滚（`TestDrugB2` 永久删除、`CascadeFileTest` 随级联清空、`big20.pdf` 已删），设备设置已还原（输入法 / `screen_off_timeout` 30000 / 时区 `Asia/Hong_Kong` + `auto_time_zone=1`）。遗留两份备份文件（本机 + WebDAV）——应用没有「删除单份备份」的 UI 入口。
 ## 二、三处"我没能验证"的地方（维护者若碰到，优先看）
 
 | # | 未验项 | 为什么没验 | 怎么验 |
