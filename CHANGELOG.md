@@ -38,6 +38,67 @@ viewModelScope.launch {
 - 本版 bump 后重跑：见 `E:\ASHKB\v1214-gate1.log`。
 - **无库结构变更**，`ASHKB_DB_VERSION` 仍 **21**，可覆盖安装。
 
+## [未发布] — 2026-11-04 · HIGH-4 的恢复互斥补上真测试（此前零覆盖）
+
+**行为零变更的测试补强**：`restore()` 的串行化从「注释里写着有锁」变成「机器守着这条性质」。无库结构变更、无版本号 bump。
+
+### 缺陷形态（不是代码 bug，是证据缺口）
+
+HIGH-4 早在 v1.1.1 就修了——`BackupRepository.restore()` 是全应用唯一「清表 + 重写全部医疗记录」的路径，并发两次会互相拍到对方写到一半的库，于是加了一把 `Mutex`。**但这把锁一条测试都没有**，原因很实在：
+
+```
+KeyStoreException: AndroidKeyStore not found
+```
+
+`restore()` 起手就是 `VaultKeyStore.getOrCreate()`（走 `AndroidKeyStore`），外加真实 Room 库与 `filesDir/backups` 下要落盘的加密快照。本机 JVM 上实测直接抛上面那句，一行都进不去。于是「并发两次恢复会不会把库写坏」这件事，只能靠人读代码相信——而这恰好是本项目最不该靠相信的一条路径。
+
+### 修法：把锁本身抽出来，业务一行不动
+
+新增 `app/src/main/java/com/ashkb/app/domain/RestoreGate.kt`：
+
+```kotlin
+internal class RestoreGate {
+    private val mutex = Mutex()
+    suspend fun <T> run(block: suspend () -> T): T = mutex.withLock { block() }
+}
+```
+
+`BackupRepository` 的 `private val restoreMutex = Mutex()` 换成 `private val restoreGate = RestoreGate()`，调用点 `restoreMutex.withLock { … }` 换成 `restoreGate.run { … }`。**五步业务（pre-restore 快照 → 覆盖写入 → 双校验 → 台账登记）一个字没改**，锁的顺序与范围也没变。
+
+为什么抽出的只是锁、不是整个恢复流程：可测的那部分是「任意时刻至多一个临界区」，不可测的那部分是「五步业务是否全对」——后者要真机，抽多少层都变不出来。抽锁把前者从注释变成断言，这是能在 JVM 上拿到的全部收益。
+
+### 新增 `RestoreGateTest`（6 条）
+
+- **并发不重叠**：16 个任务用 `Dispatchers.Default` 真实线程同时冲闸门，临界区内自旋 50 次 `yield()`（交线程但**不释放锁**，让重叠有机会发生），断言并发峰值恰为 1、16 个任务全部跑完、退出计数归零。
+- **不丢事**：8 次调用必须执行 8 次——后到者排队而非被丢弃（对应 `restore()` KDoc 里的明确取舍：用户点了「恢复」，就该恢复完）。
+- **异常不粘锁**：临界区抛 `IllegalStateException` 后，异常原样抛出，且第二次进得去（`withTimeout(5s)` 兜底，避免挂死整个套件）。这是用户最想重试的时刻。
+- **取消不粘锁**：`CancellationException` 路径下锁同样释放——钉住 `withLock` 的 `finally` 语义，防止将来被「优化」成手写 `lock()/unlock()`。
+- **返回值原样透传**：闸门是纯包装，不吞值、不改类型。
+- **负向对照**：用**完全相同**的测量方法跑一遍无锁版本，峰值必须 > 1。没有这一段，前面那条 `assertEquals(1, peak)` 可能只是因为「测试没能让任务重叠」而恒真。
+
+### 新增 `RestoreCallSiteGuardTest`（3 条）
+
+行为测试证明不了「恢复用了闸门」——两者差一次误删的距离：有人为「简化嵌套层级」把 `restoreGate.run { … }` 拆掉，`RestoreGateTest` 依旧全绿，而线上那条路径重新变回无互斥。故补源码级守卫（本项目已有先例：`BackupPasswordRulesTest` 对恢复路径的负向断言）：
+
+- `restore()` 的函数体必须开口在 `= restoreGate.run {` 上；
+- `restore()` 内不得再出现 `Mutex(`（避免两把锁各锁一半，「快照在内侧还是外侧」变得难以推理）；
+- `RestoreGate.run` 必须真的含 `mutex.withLock`（防止被改成直通后所有行为测试假绿）。
+
+### 负向对照（三条，均实测变红后恢复）
+
+| 变异 | 变红的测试 |
+|---|---|
+| 删掉 `mutex.withLock`，`run` 直通 | `并发任务在临界区内绝不重叠` |
+| 改成手写 `mutex.lock()` / `mutex.unlock()`（不在 `finally`） | `临界区抛异常后闸门必须可再次进入` + `临界区被取消后闸门必须可再次进入`（2 条同时红） |
+| 把调用点 `restoreGate.run` 拆成 `run` | `恢复入口必须经由 RestoreGate` |
+
+第三条尤其说明为什么两类测试都要：锁的实现是对的、锁的测试是全绿的，**只要调用点不用它，保护就是零**。
+
+### 门禁与状态
+
+- 全门禁见 `E:\ASHKB\v1215-gate1.log`。
+- `restore()` 的五步业务本身**仍无 JVM 测试**（受 AndroidKeyStore 限制），真机路径依旧未验；本条只补上互斥这一层。
+
 ## [未发布] — 2026-11-03 · 真机反馈：补记卡不随药单变化刷新
 
 **v1.2.13 真机复验顺带查出的缺陷**（维护者当场发现：「我今日页怎么有个未记录的，你没删除，TestDrugB2」）。

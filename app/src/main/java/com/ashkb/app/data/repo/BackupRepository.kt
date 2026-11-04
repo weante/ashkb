@@ -18,13 +18,12 @@ import com.ashkb.app.data.entity.LedgerStatus
 import com.ashkb.app.data.entity.LedgerType
 import com.ashkb.app.domain.AttachmentPath
 import com.ashkb.app.domain.RecoveryCode
+import com.ashkb.app.domain.RestoreGate
 import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.domain.VaultKeyDomain
 import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
@@ -49,13 +48,18 @@ class BackupRepository(private val context: Context) {
         context.getSharedPreferences("webdav_config", Context.MODE_PRIVATE)
 
     /**
-     * v1.1.1（HIGH-4）：恢复的**串行化锁**——见 [restore] 的 KDoc。
+     * v1.1.1（HIGH-4）：恢复的**串行化闸门**——见 [restore] 的 KDoc。
      *
      * 全应用只有这一条路径会「清表 + 重写全部医疗记录」，它此前没有任何互斥：
-     * 并发的两次恢复会互相拍到对方写到一半的库。锁只覆盖 [restore]（上传/下载/演练不需要，
+     * 并发的两次恢复会互相拍到对方写到一半的库。闸门只覆盖 [restore]（上传/下载/演练不需要，
      * 它们不动生产库）。
+     *
+     * v1.2.15：锁的**实现**挪到 [RestoreGate]（`domain/`，纯 Kotlin），因为 `restore()` 在 JVM 上
+     * 跑不起来（要 AndroidKeyStore + 真实 Room + filesDir），导致这条互斥零测试覆盖。
+     * 抽出去之后 [RestoreGateTest] 能真的断言「互斥 / 不丢事 / 异常与取消都不粘锁」。
+     * 这里保留字段而不是直接内联 `Mutex()`，是为了让「恢复有闸门」这件事在调用点仍然一眼可见。
      */
-    private val restoreMutex = Mutex()
+    private val restoreGate = RestoreGate()
 
     /**
      * v1.2.11（缺陷工单 A04）：档案 JSON 的格式版本。
@@ -324,7 +328,7 @@ class BackupRepository(private val context: Context) {
      * @param snapshotPassword pre-restore 快照口令——与主备份口令一致（审查 P0：
      *   不再硬编码，退路文件用户自己可解，反编译 APK 也拿不到口令）。
      *
-     * v1.1.1（本批次修的 HIGH-4）：**整个恢复过程串行化**（[restoreMutex]）。
+     * v1.1.1（本批次修的 HIGH-4）：**整个恢复过程串行化**（见 [restoreGate]）。
      *
      * 这是全应用后果最重的一条写入路径（清表 + 重写全部医疗记录），而它此前没有任何互斥：
      * 两个恢复并发跑同一条「pre-restore 快照 → DELETE 全表 → 重插 → 双校验」时，快照可能拍到
@@ -336,7 +340,7 @@ class BackupRepository(private val context: Context) {
     suspend fun restore(
         decrypted: DecryptedFile, snapshotPassword: CharArray,
         mode: BackupEngine.RestoreMode = BackupEngine.RestoreMode.FULL_ROLLBACK,
-    ): BackupEngine.VerifyResult = restoreMutex.withLock {
+    ): BackupEngine.VerifyResult = restoreGate.run {
         withContext(Dispatchers.IO) {
             // v1.2.7（批次 14 / R5）：**在这里才采纳备份携带的 vault key**（旧位置在 decryptAndSelfCheck，
             // 即"校验一下看看"那一步）。这个位置有两个硬约束，顺序不能动：
