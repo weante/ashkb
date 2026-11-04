@@ -210,21 +210,42 @@ class ReportViewModel(
         }
     }
 
-    /** B6（v1.2.13）：钥匙扣二维码 PNG。内容为空（档案四项全缺）时走 [onUnavailable]。 */
-    fun generateEmergencyQrPng(onReady: (Intent) -> Unit, onError: (String) -> Unit, onUnavailable: () -> Unit) {
+    /**
+     * B6（v1.2.13）：钥匙扣二维码 PNG。内容为空（档案四项全缺）时走 [onUnavailable]。
+     *
+     * v1.2.15（外部 UI 审查 P0-3）：过敏条目超过 [EmergencyQr.MAX_ALLERGIES] 时走 [onPartial]，
+     * 把「省略了几条」明确告诉用户。旧实现静默截断，生成出来的贴纸看起来完整、实际缺项。
+     *
+     * [onPartial] 与 [onReady] **同时**调用（不是二选一）：二维码本身仍然可用、值得贴出去，
+     * 只是必须连带一句「清单不完整」。分享面板照常弹出，提示走 Snackbar。
+     */
+    fun generateEmergencyQrPng(
+        onReady: (Intent) -> Unit,
+        onError: (String) -> Unit,
+        onUnavailable: () -> Unit,
+        onPartial: (omitted: Int, limit: Int) -> Unit,
+    ) {
         viewModelScope.launch {
             _busy.value = true
             try {
                 val card = repo.emergencyCard()
-                val text = EmergencyQr.payload(emergencyQrLabels(), emergencyQrFields(card), card.profile?.allergies)
-                if (text == null) {
+                val payload = EmergencyQr.payloadWithMeta(
+                    emergencyQrLabels(),
+                    emergencyQrFields(card),
+                    card.profile?.allergies,
+                )
+                if (payload == null) {
                     onUnavailable()
                     return@launch
                 }
                 // 与 PDF 同理：编码 + 位图渲染 + 文件写入都在 IO 线程
                 val png = withContext(Dispatchers.IO) {
-                    val qr = QrCode.encodeText(text, QrEcc.HIGH)
+                    val qr = QrCode.encodeText(payload.text, QrEcc.HIGH)
                     QrPngWriter.writePng(app, qr, QR_FILE_NAME)
+                }
+                // 先发提示再弹分享面板：分享面板是系统界面，盖住之后 Snackbar 就看不到了。
+                if (payload.omittedAllergies > 0) {
+                    onPartial(payload.omittedAllergies, EmergencyQr.MAX_ALLERGIES)
                 }
                 onReady(shareIntent(png, "image/png"))
             } catch (e: Exception) {

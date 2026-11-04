@@ -462,9 +462,30 @@ object ReportPdfWriter {
             d.line(kb.summary, warn = kb.severityLevel == "high")
         }
 
-        // v1.2.13（B6 重做）：把钥匙扣二维码并进打印版——打印一张纸就同时得到
-        // 「给人读的文字」与「给扫码器读的同一份信息」。内容为空时整节不出。
-        EmergencyQr.payload(
+        writeEmergencyQr(context, d, c)
+
+        d.gap(12f)
+        d.line(context.getString(R.string.pdf_emergency_call), warn = true)
+
+        val f = File(File(context.filesDir, "exports"), "ashkb-emergency-card-$today.pdf")
+        d.close(f)
+        return f
+    }
+
+    // v1.2.13（B6 重做）：把钥匙扣二维码并进打印版——打印一张纸就同时得到
+    // 「给人读的文字」与「给扫码器读的同一份信息」。内容为空时整节不出。
+    //
+    // v1.2.15（外部 UI 审查 P0-3）：过敏超过上限时**必须印出省略说明**。
+    // 旧写法用 payload()（只回正文），被丢掉的那几条在纸面上没有任何痕迹——
+    // 而这张纸的用途恰恰是让人放心地依赖它。注意本页上方印的是完整过敏原文，
+    // 所以省略说明的落点是「看上面那行」，而不是「看另一份文件」。
+    private fun writeEmergencyQr(
+        context: Context,
+        d: Doc,
+        c: ReportRepository.EmergencyCard,
+    ) {
+        val p = c.profile
+        val payload = EmergencyQr.payloadWithMeta(
             labels = EmergencyQr.Labels(
                 blood = context.getString(R.string.emergency_qr_label_blood),
                 diagnosis = context.getString(R.string.emergency_qr_label_diagnosis),
@@ -479,20 +500,22 @@ object ReportPdfWriter {
                 emergencyPhone = c.contacts.firstOrNull { it.isEmergency && !it.isDoctor }?.phone,
             ),
             allergiesJson = p?.allergies,
-        )?.let { text ->
-            d.h2(context.getString(R.string.emergency_qr_png_title))
-            val qr = QrCode.encodeText(text, QrEcc.HIGH)
-            val bitmap = QrPngWriter.render(qr)
-            d.image(bitmap, QR_PRINT_SIDE_PT)
-            bitmap.recycle()
+        ) ?: return
+
+        d.h2(context.getString(R.string.emergency_qr_png_title))
+        val bitmap = QrPngWriter.render(QrCode.encodeText(payload.text, QrEcc.HIGH))
+        d.image(bitmap, QR_PRINT_SIDE_PT)
+        bitmap.recycle()
+        if (payload.omittedAllergies > 0) {
+            d.line(
+                context.getString(
+                    R.string.emergency_qr_partial_note,
+                    payload.omittedAllergies,
+                    EmergencyQr.MAX_ALLERGIES,
+                ),
+                warn = true,
+            )
         }
-
-        d.gap(12f)
-        d.line(context.getString(R.string.pdf_emergency_call), warn = true)
-
-        val f = File(File(context.filesDir, "exports"), "ashkb-emergency-card-$today.pdf")
-        d.close(f)
-        return f
     }
 
     /** 紧急卡单行药条字符上限（line() 折行阈值 ≈ (PW - 2M) / 10.5 ≈ 47，留余量给免疫抑制标签）。 */

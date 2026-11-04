@@ -91,6 +91,45 @@ class EmergencyQrTest {
     }
 
     @Test
+    fun `超出上限时把省略条数报给调用方，而不是静默丢弃`() {
+        // v1.2.15（外部 UI 审查 P0-3）：只返回正文的话，「截断了 2 条」在类型上无法表达，
+        // PNG 与打印版 PDF 就都没法提示——那正是一张看起来完整的贴纸最危险的地方。
+        val many = (1..EmergencyQr.MAX_ALLERGIES + 2).map { "药$it" }
+        val payload = EmergencyQr.payloadWithMeta(zh, fields(allergies = many), null)!!
+        assertEquals(2, payload.omittedAllergies)
+        assertEquals(
+            "正文本身不该出现省略数——扫码的是急救人员，不是来对账的",
+            listOf("ASHKB", "过敏:" + many.take(EmergencyQr.MAX_ALLERGIES).joinToString("、")),
+            payload.text.split("\n"),
+        )
+    }
+
+    @Test
+    fun `没超上限时省略数为零`() {
+        val exact = (1..EmergencyQr.MAX_ALLERGIES).map { "药$it" }
+        assertEquals(0, EmergencyQr.payloadWithMeta(zh, fields(allergies = exact), null)!!.omittedAllergies)
+        assertEquals(0, EmergencyQr.payloadWithMeta(zh, fields(bloodType = "B"), null)!!.omittedAllergies)
+    }
+
+    @Test
+    fun `重复条目先去掉再算上限，不占用名额`() {
+        // 「青霉素」写两遍不该白白挤掉一条真过敏；省略数必须按去重后的人数算。
+        val many = listOf("青霉素", "青霉素", "磺胺", "阿司匹林", "碘", "乳胶")
+        val payload = EmergencyQr.payloadWithMeta(zh, fields(allergies = many), null)!!
+        assertEquals("去重后 5 条，上限 4 ⇒ 省略 1 条", 1, payload.omittedAllergies)
+        assertEquals(
+            "正文仍只放 4 条",
+            4,
+            payload.text.split("\n").first { it.startsWith("过敏:") }.removePrefix("过敏:").split("、").size,
+        )
+    }
+
+    @Test
+    fun `四项全缺时 payloadWithMeta 也返回 null`() {
+        assertNull(EmergencyQr.payloadWithMeta(zh, fields(), null))
+    }
+
+    @Test
     fun `只有过敏也能生成二维码`() {
         val text = EmergencyQr.payload(zh, fields(allergies = listOf("青霉素")), null)!!
         assertTrue(text.contains("过敏:青霉素"))

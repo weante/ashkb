@@ -123,12 +123,16 @@ private fun QrCard(vm: ReportViewModel, busy: Boolean, context: android.content.
         Spacer(Modifier.height(10.dp))
         val shareTitle = stringResource(R.string.emergency_qr_png_share)
         val unavailable = stringResource(R.string.emergency_qr_unavailable)
+        val partial = stringResource(R.string.emergency_qr_partial_note)
         OutlinedButton(
             onClick = {
                 vm.generateEmergencyQrPng(
                     onReady = { intent -> shareOrReport(context, intent, shareTitle) },
                     onError = { vm.reportError(it) },
                     onUnavailable = { vm.reportError(unavailable) },
+                    // v1.2.15（外部 UI 审查 P0-3）：过敏超上限时二维码本身照发，
+                    // 但必须同时说清「少了哪几条、完整清单在哪」。
+                    onPartial = { omitted, limit -> vm.reportError(partial.format(omitted, limit)) },
                 )
             },
             enabled = !busy,

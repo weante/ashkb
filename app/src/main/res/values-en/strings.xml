@@ -204,6 +204,7 @@
     <string name="emergency_qr_png_action">Generate keychain QR</string>
     <string name="emergency_qr_png_failed">Could not generate the QR code: %1$s</string>
     <string name="emergency_qr_png_note">Packs blood type, diagnosis, allergies and the emergency phone number into one QR code that can be printed and stuck on a keychain or wallet. Paramedics scan it directly — no app install, no phone unlock needed. If you need the full medication list, use the printout PDF above instead.</string>
+    <string name="emergency_qr_partial_note">The QR code only fits the first %2$d allergies; %1$d more were left out. The full allergy list is printed above on this page.</string>
     <string name="emergency_qr_png_share">Share keychain QR</string>
     <string name="emergency_qr_png_title">Keychain QR code</string>
     <string name="emergency_qr_unavailable">The profile still has no blood type, diagnosis, allergies or emergency phone number — fill at least one in first. A QR code that only says the app name is of no use in an emergency.</string>
@@ -255,6 +256,7 @@
     <string name="imaging_ai_import_title">Import imaging report with AI</string>
     <string name="imaging_ai_import_done">Imaging report imported</string>
     <string name="imaging_ai_import_duplicate">This report was imported before. Nothing new was added this time.</string>
+    <string name="imaging_ai_import_failed">Could not import the imaging report: %1$s. Your pasted text is still in the draft, so you can try again or copy it out first.</string>
     <string name="imaging_conclusion">Diagnosis / doctor\'s opinion</string>
     <string name="imaging_empty">No imaging records</string>
     <string name="imaging_findings">Findings</string>
@@ -292,6 +294,7 @@
     <string name="lab_ai_import_title">Import lab report with AI</string>
     <string name="lab_ai_import_done">Imported %1$d lab results</string>
     <string name="lab_ai_import_duplicate">This report was imported before. Nothing new was added this time.</string>
+    <string name="lab_ai_import_failed">Could not import the lab report: %1$s. Your pasted text is still in the draft, so you can try again or copy it out first.</string>
     <string name="lab_collapse_normal">Collapse normal results</string>
     <string name="lab_detail_title">Lab details</string>
     <string name="lab_indicator_name">Marker name</string>

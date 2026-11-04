@@ -38,6 +38,79 @@ viewModelScope.launch {
 - 本版 bump 后重跑：见 `E:\ASHKB\v1214-gate1.log`。
 - **无库结构变更**，`ASHKB_DB_VERSION` 仍 **21**，可覆盖安装。
 
+## [未发布] — 2026-11-04 · 外部 UI 审查批次 1（P0-1 / P0-2 / P0-3）
+
+**三个「会让人看到错的数、丢数据、或者放心地依赖一张不完整的纸」的缺陷。** 无库结构变更（`ASHKB_DB_VERSION` 仍 **21**）、无版本号 bump。
+
+来源是一份外部审查报告（`ASHKB-UI修改建议-v1.2.14.md`，基线 `ab0b622` = v1.2.14），作者环境无 JDK / Gradle / ADB，未构建也未真机。所以本轮**先把报告 18 项逐条对源码核实**，再只落地经核实成立的；报告里 V-2 与 V-4 经核实**不成立**（详见「核实结论」），一律不改。
+
+### 核实结论（18 项）
+
+- **成立**：P0-1、P0-2、P0-3、P1-4、P1-5、P1-6、U-1、U-2、U-3、U-4、V-3。
+- **不成立**：**V-2**——报告引的 `ExerciseScreen.kt:360-422` 是 `PrescriptionHero` **内部**（warmup → lifestyleNotes → posture），而当日处方 hero 本身在 `:116-118`，位于这些内容**之前**，「首要任务被辅助信息后置」不成立。**V-4**——全项目 `BackHandler` 零匹配属实，但报告要求的「药品多步编辑 step 2 返回时先回 step 1」**已经实现**（`MeEditScreen.kt:104` `rememberSaveable` 的 `step` + `:316-318` `goBackStep()`，返回键与顶栏都走它），缺的只是「有未保存改动时确认」这一层，且报告把它描述成完全没做。
+- **描述有偏差**：**U-5**——`LabToleranceScreen.kt:195-206` 的「清空输入」是有条件的（`if (parsed != null)`），并非「只要百分比能解析就清空」；真实缺陷是 `onAdd(name, parsed)` 无校验，外加 `name`/`percent` 用了 `remember` 而非 `rememberSaveable`（旋转丢稿属实）。
+- **需实测才能定**：**V-1**——`AppShell.kt:216-223` 确实没给 `Scaffold` 传 `contentColor`，但是否真导致深色下文字过暗要截图比对，报告自己也说「需先验证」。
+
+### P0-1：AI 导入的两个预览会互相污染（`CheckupLabImaging.kt`）
+
+`AiImportDraftStore` 里 `labParsed` / `imagingParsed` 是**两个互相独立**的常驻标志（`AiImportDraft.kt:67-127`，`setDraft`/`clearDraft` 都只碰本 kind）。而 sheet 里的 `pasted` 是「**当前 kind 的**草稿」：
+
+```kotlin
+val pasted = if (kind == ImportKind.LAB) labDraft else imagingDraft
+val labImport = remember(pasted, labParsed) { if (labParsed) parseLab(pasted) … else null }
+```
+
+旧写法只判自己的标志、不看 kind。于是「先在化验入口解析过一份化验单 → 关掉 → 再打开影像入口」时，`pasted` 已经是影像文本，`labParsed` 却仍是 true，这段 remember 会**把影像文本当化验单解析**。后果不只是「预览驴唇不对马嘴」：`SheetSaveButton` 的 `enabled = labImport != null || imagingImport != null` 因此变可用，点下去 `labImport?.let { importLabReport(it) }` 与 `imagingImport?.let { … }` **两个 import 一起落库**。
+
+修法：两个 `remember` 的键都加上 `kind`，体内各加一个 `kind == ImportKind.X` 判断。收窄后只有当前 kind 自己的标志能唤起它自己的预览。
+
+### P0-2：AI 导入失败会掀翻进程，且顺手删掉用户原文（`CheckupViewModel.kt`）
+
+`CheckupLabImaging.kt:872-882` 起协程后立刻 `onDismiss()`，而 `importLabReport` / `importImagingReport` 的 `viewModelScope.launch` **没有 try/catch** —— 仓库层任何异常都走默认处理器，直接终止进程。用户看到的是「点保存，App 没了」。
+
+更糟的是草稿：旧代码无论成败都 `clearDraft(kind)`，一旦失败，那份几十行、用户刚从别处粘过来的原文就没了。
+
+修法：两个入口的 `launch` 体整体包 `try`，先 `catch (e: CancellationException) { throw e }`（取消不是失败，与 `AlarmRegister.kt:109-111` 同口径），再 `catch (expected: Exception)` 发一条 Snackbar。**失败分支不清草稿**——那是用户唯一还能拿回原文的地方；成功路径仍清，且只清本 kind。
+
+`onDismiss()` 抢在异步完成之前执行是既有设计，不改：改成「等结果再关」会让 sheet 在网络或大量写入时卡住，而 Snackbar 本来就能回显。
+
+### P0-3：急救二维码静默丢掉超出上限的过敏（`EmergencyQr.kt` / `ReportViewModel.kt` / `ReportPdfWriter.kt`）
+
+`EmergencyQr.MAX_ALLERGIES = 4`，`allergiesOf` 末尾 `.take(MAX_ALLERGIES)` **静默截断**，而 `payload()` 返回 `String?` ——「截掉了几条」在类型上根本无法表达。于是 PNG 与打印版 PDF 都毫无提示，用户拿到的是一张**看起来完整**的贴纸。
+
+（报告没提的一点：`ReportPdfWriter.kt` 的打印版嵌的是**同一个**被截断的二维码，所以报告建议的「完整信息见 PDF」那句文案在事实上是错的——PDF 里并没有完整的二维码。）
+
+修法：
+- 新增 `data class Payload(val text: String, val omittedAllergies: Int)` 与 `payloadWithMeta(...)`；`payload(...)` 保留为薄包装，既有 11 条测试与其它调用点零改动。
+- `allergiesOf` 改为**先去重再截断**（「青霉素」写两遍不该白挤掉一条真过敏），返回 `AllergySelection(kept, omitted)`。正文里**不出现**省略数——扫码的是急救人员，不是来对账的。
+- PNG 侧：`generateEmergencyQrPng` 加第四个回调 `onPartial(omitted, limit)`，**先于 `onReady` 调用**（分享面板是系统界面，会盖住 Snackbar）。
+- PDF 侧：二维码下方印一行 `emergency_qr_partial_note`（`warn = true`），文案指向「本页上方印的是完整过敏清单」——那行 `:425` 确实是完整原文。
+
+### 新增测试（11 条）
+
+- `EmergencyQrTest` +4：省略数如实上报（且正文不出现省略数）/ 未超上限时为 0 / **重复条目先去掉再算上限** / 全缺时 `payloadWithMeta` 也返回 null。
+- `AiImportKindGuardTest`（新建，3 条，源码静态断言）：两个 `remember` **键里必须有 kind**、**体内必须有 kind 判断**、**两条收窄条件互斥**（否则保存按钮会同时触发两个 import）。
+- `AiImportFailureGuardTest`（新建，4 条，源码静态断言）：两个入口必须捕获异常、必须有用户可见回显、取消要原样抛出、**失败分支不许出现 `clearDraft` 且成功路径仍要有**。
+
+两处写成静态断言的理由相同，且与 HIGH-4 那条一脉相承：`CheckupViewModel` 的构造要 `AshkbApplication` / `HealthRepository` / `AttachmentRepository` / `BackupRepository` / `DateProvider`，JVM 里搭不出来；而真正会退化的不是「异常会不会抛」，是「catch 里多了或少了一句 `clearDraft`」。其中 `AiImportFailureGuardTest` 第 4 条正是钉住「有人图省事把清理挪进 `finally`」这种看起来更整洁的改法。
+
+### 负向对照（六条，均实测变红后恢复）
+
+| 变异 | 变红的测试 |
+|---|---|
+| 去掉 `kind == ImportKind.LAB` 判断（回到旧写法） | `化验预览必须同时按 kind 与 labParsed 收窄` + `两个预览的收窄条件互斥`（2 条） |
+| 从 `remember` 的键里去掉 `kind` | `化验预览必须同时按 kind 与 labParsed 收窄`（`AiImportKindGuardTest.kt:30`） |
+| 删掉影像导入的 `catch (expected: Exception)` | `影像导入失败时必须捕获异常` + `失败分支不许清草稿`（2 条） |
+| 在失败分支里补回 `clearDraft(ImportKind.IMAGING)` | `失败分支不许清草稿——那是用户唯一还能拿回原文的地方`（`AiImportFailureGuardTest.kt:74`） |
+| `omitted = 0`（截断重新静默） | `超出上限时把省略条数报给调用方` + `重复条目先去掉再算上限`（2 条） |
+| 去掉 `.distinct()`（重复条目占用名额） | 同上（2 条） |
+
+### 门禁与状态
+
+- 全门禁见 `E:\ASHKB\v1215-p0-gate1.log`：BUILD SUCCESSFUL，**151 文件 / 1240 条单测，0 失败 0 错误 1 跳过**；detekt 0（`detekt.xml` 仅空 checkstyle 根）；lint **0 errors, 128 warnings**（既有 127 + 新增 1 条 `PluralsCandidate`：`emergency_qr_partial_note` 里的 `%d ... allergies` 在英文里需要复数形式，属**既有口径**——全项目 81 条同类警告都用 `%d` 单串，本轮不单开先例）；`verifySpecSync` 通过。
+- 中途 detekt 报过一次 `writeEmergencyCard is too long (88). The maximum length is 80`（把二维码那段内联进去后超了）。修法是把二维码那一段抽成 `private fun writeEmergencyQr(context, d, c)` —— 与「新问题改代码，不进基线」的口径一致。
+- 剩余批次（P1-4～P1-6、U-1～U-5、V-1、V-3）尚未开始。
+
 ## [未发布] — 2026-11-04 · HIGH-4 的恢复互斥补上真测试（此前零覆盖）
 
 **行为零变更的测试补强**：`restore()` 的串行化从「注释里写着有锁」变成「机器守着这条性质」。无库结构变更、无版本号 bump。

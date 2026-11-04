@@ -199,6 +199,7 @@
     <string name="emergency_qr_png_action">生成钥匙扣二维码</string>
     <string name="emergency_qr_png_failed">二维码生成失败：%1$s</string>
     <string name="emergency_qr_png_note">把血型、诊断、过敏与急救电话压进一张二维码，打印后贴在钥匙扣或钱包上。急救人员扫码即可读到，无需安装本应用、也无需解锁手机。内容较多时请改用上面的打印版 PDF。</string>
+    <string name="emergency_qr_partial_note">二维码只放得下前 %2$d 项过敏，本次省略了 %1$d 项。本页上方印的是完整过敏清单。</string>
     <string name="emergency_qr_png_share">分享钥匙扣二维码</string>
     <string name="emergency_qr_png_title">钥匙扣二维码</string>
     <string name="emergency_qr_unavailable">档案里还没有血型、诊断、过敏或急救电话——先补全再生成。只有品牌名的二维码对急救没有帮助。</string>
@@ -250,6 +251,7 @@
     <string name="imaging_ai_import_title">AI 导入影像报告</string>
     <string name="imaging_ai_import_done">影像报告已导入</string>
     <string name="imaging_ai_import_duplicate">这份报告此前已导入过，本次没有新增任何记录</string>
+    <string name="imaging_ai_import_failed">影像报告导入失败：%1$s。原文还留在草稿里，可以再试一次或先复制出来。</string>
     <string name="imaging_conclusion">诊断结论 / 医生意见</string>
     <string name="imaging_empty">暂无影像记录</string>
     <string name="imaging_findings">检查所见</string>
@@ -287,6 +289,7 @@
     <string name="lab_ai_import_title">AI 导入化验单</string>
     <string name="lab_ai_import_done">已导入 %1$d 项化验结果</string>
     <string name="lab_ai_import_duplicate">这份报告此前已导入过，本次没有新增任何记录</string>
+    <string name="lab_ai_import_failed">化验单导入失败：%1$s。原文还留在草稿里，可以再试一次或先复制出来。</string>
     <string name="lab_collapse_normal">收起正常项</string>
     <string name="lab_detail_title">化验详情</string>
     <string name="lab_indicator_name">指标名称</string>

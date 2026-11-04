@@ -24,6 +24,7 @@ import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.ui.ReminderNotice
 import java.time.LocalDate
 import java.time.LocalDateTime
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -230,21 +231,35 @@ class CheckupViewModel(
      * 旧实现导入后弹「已导入 N 项」，用户把同一张报告粘两次会看到两条一模一样的成功提示，
      * 无从判断第二次是否重复；而真实情况是重复写了、数据翻倍。
      * 现在按 [ImportResult] 分两支回显，重复时明确说「此前已导入」。
+     *
+     * v1.2.15（外部 UI 审查 P0-2）：**必须兜住异常**。
+     * 调用点（`CheckupLabImaging.kt` 的 `SheetSaveButton`）在起协程后立刻 `onDismiss()`，
+     * 这里抛出去就是 `viewModelScope` 的默认处理器，Android 上等于进程终止——
+     * 用户看到的是「点保存，App 直接没了」。而丢的正是他刚粘贴的报告原文。
+     * 因此失败分支**不清草稿**：原文还在，重开 sheet 就能再来一次。
+     * [CancellationException] 原样抛出（协程取消不是导入失败，和 `AlarmRegister` 同一口径）。
      */
     fun importLabReport(import: LabImport) {
         viewModelScope.launch {
-            when (val result = repo.importLabReport(import)) {
-                is ImportResult.Imported -> GlobalMessages.post(
-                    app.getString(R.string.lab_ai_import_done, result.count),
-                )
-                ImportResult.AlreadyImported -> GlobalMessages.post(
-                    app.getString(R.string.lab_ai_import_duplicate),
-                )
+            try {
+                when (val result = repo.importLabReport(import)) {
+                    is ImportResult.Imported -> GlobalMessages.post(
+                        app.getString(R.string.lab_ai_import_done, result.count),
+                    )
+                    ImportResult.AlreadyImported -> GlobalMessages.post(
+                        app.getString(R.string.lab_ai_import_duplicate),
+                    )
+                }
+                // v1.2.11（缺陷工单 B08）：已入库就清草稿。两种结果都清——
+                // 重复导入同样意味着「这份报告已经在库里了」，留着草稿只会让用户下次打开
+                // sheet 又看到上次那份原文，误以为还有没保存的内容。
+                clearDraft(ImportKind.LAB)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (expected: Exception) {
+                // 不清草稿：这是用户唯一还能拿回原文的地方。
+                GlobalMessages.post(app.getString(R.string.lab_ai_import_failed, expected.message ?: ""))
             }
-            // v1.2.11（缺陷工单 B08）：已入库就清草稿。两种结果都清——
-            // 重复导入同样意味着「这份报告已经在库里了」，留着草稿只会让用户下次打开
-            // sheet 又看到上次那份原文，误以为还有没保存的内容。
-            clearDraft(ImportKind.LAB)
         }
     }
 
@@ -261,16 +276,23 @@ class CheckupViewModel(
     /** v1.2.11（缺陷工单 B01）：同 [importLabReport]，影像导入也要把「此前已导入」说清楚。 */
     fun importImagingReport(import: ImagingImport) {
         viewModelScope.launch {
-            when (repo.importImagingReport(import)) {
-                is ImportResult.Imported -> GlobalMessages.post(
-                    app.getString(R.string.imaging_ai_import_done),
-                )
-                ImportResult.AlreadyImported -> GlobalMessages.post(
-                    app.getString(R.string.imaging_ai_import_duplicate),
-                )
+            try {
+                when (repo.importImagingReport(import)) {
+                    is ImportResult.Imported -> GlobalMessages.post(
+                        app.getString(R.string.imaging_ai_import_done),
+                    )
+                    ImportResult.AlreadyImported -> GlobalMessages.post(
+                        app.getString(R.string.imaging_ai_import_duplicate),
+                    )
+                }
+                // v1.2.11（缺陷工单 B08）：同 [importLabReport]，已入库即清草稿。
+                clearDraft(ImportKind.IMAGING)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (expected: Exception) {
+                // v1.2.15（外部 UI 审查 P0-2）：同 [importLabReport]——抛出去就是进程终止。
+                GlobalMessages.post(app.getString(R.string.imaging_ai_import_failed, expected.message ?: ""))
             }
-            // v1.2.11（缺陷工单 B08）：同 [importLabReport]，已入库即清草稿。
-            clearDraft(ImportKind.IMAGING)
         }
     }
 

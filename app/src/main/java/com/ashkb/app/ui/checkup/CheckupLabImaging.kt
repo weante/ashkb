@@ -783,11 +783,28 @@ internal fun AiImportSheet(kind: ImportKind, vm: CheckupViewModel, onDismiss: ()
     // 确认预览**从草稿重算**，而不是另存一份解析结果：LabImport / ImagingImport 不是
     // Parcelable，塞 Bundle 既不合规也没有必要——解析是纯函数，文本还在就能原样重建。
     // 「点过解析」这个事实由 VM 的 *_parsed 标志承载，于是转屏后预览照旧在。
-    val labImport: LabImport? = remember(pasted, labParsed) {
-        if (labParsed) ReportImportParser.parseLab(pasted)?.takeIf { it.rows.isNotEmpty() } else null
+    //
+    // v1.2.15（外部 UI 审查 P0-1）：**必须再按 kind 收窄一次**。
+    // 上面 `pasted` 是「当前 kind 的草稿」，而 `labParsed` / `imagingParsed` 是**两个互相独立**的
+    // 常驻标志（AiImportDraftStore 里各存一份，谁都不会清对方）。旧写法只判自己的标志、
+    // 不看 kind，于是：先在化验入口解析过一份化验单（labParsed = true），关掉 sheet，
+    // 再打开影像入口——`pasted` 已经是影像草稿，但 `labParsed` 仍是 true，
+    // 这段 remember 会把**影像文本当化验单解析**，产出一个驴唇不对马嘴的 labImport，
+    // 保存按钮因此变可用，点下去要么写出错误数据、要么两个 import 一起落库。
+    // 收窄后：只有当前 kind 自己的标志能唤起它自己的预览，另一类型的旧状态永远不参与。
+    val labImport: LabImport? = remember(pasted, labParsed, kind) {
+        if (kind == ImportKind.LAB && labParsed) {
+            ReportImportParser.parseLab(pasted)?.takeIf { it.rows.isNotEmpty() }
+        } else {
+            null
+        }
     }
-    val imagingImport: ImagingImport? = remember(pasted, imagingParsed) {
-        if (imagingParsed) ReportImportParser.parseImaging(pasted, imagingBodyPartUnset, listSeparator) else null
+    val imagingImport: ImagingImport? = remember(pasted, imagingParsed, kind) {
+        if (kind == ImportKind.IMAGING && imagingParsed) {
+            ReportImportParser.parseImaging(pasted, imagingBodyPartUnset, listSeparator)
+        } else {
+            null
+        }
     }
 
     fun tryParse() {

@@ -24,7 +24,12 @@ object EmergencyQr {
     /** 品牌行——扫码结果的第一行，让急救人员知道这张卡来自哪个应用、要往哪找更多信息。 */
     const val BRAND = "ASHKB"
 
-    /** 过敏条目上限：急救现场只需知道「对什么过敏」，药学清单不在这一格二维码里。 */
+    /**
+     * 过敏条目上限：急救现场只需知道「对什么过敏」，药学清单不在这一格二维码里。
+     *
+     * v1.2.15（外部 UI 审查 P0-3）：超限时**不再静默丢弃**——[payloadWithMeta] 会把省略条数
+     * 交给调用方，PNG 分享与打印版 PDF 各自提示「完整清单在哪」。
+     */
     const val MAX_ALLERGIES = 4
 
     /**
@@ -50,7 +55,22 @@ object EmergencyQr {
     )
 
     /**
-     * 组装二维码正文。
+     * 组装结果：正文 + **被容量上限省略掉的过敏条目数**。
+     *
+     * v1.2.15（外部 UI 审查 P0-3）：此前 [payload] 只返回 `String?`，「截断了 2 条过敏」
+     * 这件事在类型上无法表达，调用方（PNG 分享 / 打印版 PDF）也就无从提示——
+     * 一张看起来完整、实际缺了两条过敏的急救贴纸，比没有贴纸更危险。
+     *
+     * @property omittedAllergies 0 = 完整；> 0 = 还有这么多条没进二维码（正文里**不会**
+     *   出现省略数，扫码是给急救人员看的，不是给患者看的对账信息）。
+     */
+    data class Payload(
+        val text: String,
+        val omittedAllergies: Int,
+    )
+
+    /**
+     * 组装二维码正文（含容量信息）。
      *
      * 返回 `null` 表示**没有任何可用信息**——此时不应生成二维码：
      * 一张只有「ASHKB」五个字母的贴纸对急救毫无价值，还会让患者误以为自己已经准备好了。
@@ -58,14 +78,15 @@ object EmergencyQr {
      * @param allergiesJson `profile.allergies` 的原始 JSON 数组字符串；解析口径复用
      *   [ProfileLists]（与该字段在编辑页的读写同一口径，避免两处对同一列有两种理解）。
      */
-    fun payload(labels: Labels, fields: Fields, allergiesJson: String?): String? {
+    fun payloadWithMeta(labels: Labels, fields: Fields, allergiesJson: String?): Payload? {
         val blood = fields.bloodType?.trim()?.takeIf { it.isNotBlank() }
         val diagnosis = fields.diagnosis?.trim()?.takeIf { it.isNotBlank() }
         val phone = fields.emergencyPhone?.trim()?.takeIf { it.isNotBlank() }
-        val allergies = allergiesOf(allergiesJson, fields.allergies)
+        val selection = allergiesOf(allergiesJson, fields.allergies)
+        val allergies = selection.kept
         if (isEmpty(blood, diagnosis, phone, allergies)) return null
 
-        return buildList {
+        val text = buildList {
             add(BRAND)
             blood?.let { add(keyValue(labels.blood, it)) }
             diagnosis?.let { add(keyValue(labels.diagnosis, it)) }
@@ -74,7 +95,12 @@ object EmergencyQr {
             }
             phone?.let { add(keyValue(labels.call, it)) }
         }.joinToString(LINE_SEPARATOR)
+        return Payload(text = text, omittedAllergies = selection.omitted)
     }
+
+    /** 只要正文、不关心容量信息的调用方用它（含全部既有测试）。 */
+    fun payload(labels: Labels, fields: Fields, allergiesJson: String?): String? =
+        payloadWithMeta(labels, fields, allergiesJson)?.text
 
     /** 四项全空 —— 此时不该生成二维码（一张只有品牌名的贴纸对急救毫无价值）。 */
     private fun isEmpty(
@@ -84,10 +110,18 @@ object EmergencyQr {
         allergies: List<String>,
     ): Boolean = blood == null && diagnosis == null && phone == null && allergies.isEmpty()
 
-    /** 过敏条目：优先用调用方已解析好的列表，否则从 JSON 列解析。 */
-    private fun allergiesOf(allergiesJson: String?, allergies: List<String>): List<String> {
+    /** 截断结果：进二维码的条目 + 被省略的条数（去重与过滤空白已在内部完成）。 */
+    private data class AllergySelection(val kept: List<String>, val omitted: Int)
+
+    /**
+     * 过敏条目：优先用调用方已解析好的列表，否则从 JSON 列解析。
+     *
+     * 去重 / 过滤空白之后再截断——先截断再去重的话，「青霉素」写两遍就会白白挤掉一条真过敏。
+     */
+    private fun allergiesOf(allergiesJson: String?, allergies: List<String>): AllergySelection {
         val raw = if (allergies.isEmpty()) parseAllergiesJson(allergiesJson) else allergies
-        return raw.filter { it.isNotBlank() }.distinct().take(MAX_ALLERGIES)
+        val all = raw.filter { it.isNotBlank() }.distinct()
+        return AllergySelection(kept = all.take(MAX_ALLERGIES), omitted = (all.size - MAX_ALLERGIES).coerceAtLeast(0))
     }
 
     private fun parseAllergiesJson(allergiesJson: String?): List<String> =
