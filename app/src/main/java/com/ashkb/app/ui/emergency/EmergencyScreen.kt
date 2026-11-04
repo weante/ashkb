@@ -771,7 +771,12 @@ private fun ContactFormDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            // v1.2.15（外部审查 §U-2）：四个输入框 + 两个开关，在矮屏上键盘弹出后下半截
+            // 连同「保存」一起被顶出可视区；原先既没有滚动也没有键盘避让。
+            Column(
+                Modifier.verticalScroll(rememberScrollState()).imePadding(),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
                 AshkbTextField(
                     name, { name = it }, label = { Text(stringResource(R.string.profile_name)) }, singleLine = true,
                     isError = attempted && name.isBlank(),
@@ -790,28 +795,16 @@ private fun ContactFormDialog(
                     hospital, { hospital = it }, label = { Text(stringResource(R.string.imaging_hospital_label)) },
                     singleLine = true,
                 )
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = Size.touchMin)
-                        .toggleable(value = isEmergency, role = Role.Checkbox, onValueChange = { isEmergency = it }),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(checked = isEmergency, onCheckedChange = null)
-                    Spacer(Modifier.width(Spacing.xs))
-                    Text(stringResource(R.string.emergency_contact_title), style = MaterialTheme.typography.bodyMedium)
-                }
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = Size.touchMin)
-                        .toggleable(value = isDoctor, role = Role.Checkbox, onValueChange = { isDoctor = it }),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(checked = isDoctor, onCheckedChange = null)
-                    Spacer(Modifier.width(Spacing.xs))
-                    Text(stringResource(R.string.profile_primary_doctor), style = MaterialTheme.typography.bodyMedium)
-                }
+                ContactToggleRow(
+                    label = stringResource(R.string.emergency_contact_title),
+                    checked = isEmergency,
+                    onCheckedChange = { isEmergency = it },
+                )
+                ContactToggleRow(
+                    label = stringResource(R.string.profile_primary_doctor),
+                    checked = isDoctor,
+                    onCheckedChange = { isDoctor = it },
+                )
             }
         },
         confirmButton = {
@@ -830,6 +823,27 @@ private fun ContactFormDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
     )
+}
+
+/**
+ * 联系人表单里的一个复选项（整行可点）。
+ *
+ * 抽出来只为让 [ContactFormDialog] 不被两个同形状的 11 行 Row 撑过 detekt 的 80 行上限；
+ * 触摸下限与 `role = Checkbox` 的口径与表单其它行一致。
+ */
+@Composable
+private fun ContactToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = Size.touchMin)
+            .toggleable(value = checked, role = Role.Checkbox, onValueChange = onCheckedChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null)
+        Spacer(Modifier.width(Spacing.xs))
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+    }
 }
 
 /**

@@ -54,6 +54,22 @@ class ReportViewModel(
     val message: StateFlow<String?> = _message
 
     /**
+     * 概览数据**加载失败**的持久状态（null = 本次没失败）。
+     *
+     * 为什么不能只靠 [_message]：[message] 是一次性提示，UI 侧 `LaunchedEffect` 把它转给全局
+     * Snackbar 后立刻 `clearMessage()`——Snackbar 一消失，"这次加载失败了"这件事就在界面上
+     * 不留任何痕迹。而 `_overview` 仍是 null，概览页于是**永远停在「统计加载中…」**：
+     * 用户看到的是一条 3 秒后消失的提示 + 一个永不结束的转圈。
+     *
+     * 区分两种失败（报告 §U-3 的口径）：
+     *   · **首次加载失败**（`_overview == null`）→ 概览页显示内联错误 + 重试按钮；
+     *   · **刷新失败但手上有旧数据**（`_overview != null`）→ 保留旧数据，顶部标一句「可能不是最新的」。
+     * 所以这里只存"错误文本"，页面自己按 `overview == null` 决定用哪种形态。
+     */
+    private val _loadFailed = MutableStateFlow<String?>(null)
+    val loadFailed: StateFlow<String?> = _loadFailed
+
+    /**
      * v1.0.86（批次 11）：**进入报表页时才首次取数**（此前是 `init { refresh() }`，而 `AppShell`
      * 在应用启动时就创建本 VM → 哪怕从不看报表，冷启动也要查一次库）。
      *
@@ -86,11 +102,17 @@ class ReportViewModel(
     fun refresh() {
         viewModelScope.launch {
             _busy.value = true
+            _loadFailed.value = null
             try {
                 _overview.value = repo.overview()
                 _trends.value = repo.trends(_trendDays.value)
+                _loadFailed.value = null
             } catch (e: Exception) {
-                _message.value = app.getString(R.string.vm_report_stats_failed, e.message)
+                val text = app.getString(R.string.vm_report_stats_failed, e.message)
+                // 两条都写：[_message] 走全局 Snackbar（老路径，用户当场就能看到），
+                // [_loadFailed] 留在页面上（Snackbar 消失后仍然说明"为什么还在转圈"）。
+                _message.value = text
+                _loadFailed.value = text
             } finally {
                 _busy.value = false
             }

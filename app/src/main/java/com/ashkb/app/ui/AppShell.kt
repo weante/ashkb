@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -122,7 +123,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Row
@@ -324,7 +325,16 @@ fun AppShell() {
                                                 Color.Transparent
                                             },
                                         )
-                                        .clickable(enabled = !selected) {
+                                        // v1.2.15（外部审查 §U-1）：`clickable` 只告诉读屏
+                                        // 「这是一个可点击元素」，不告诉它「这是一组页签里的
+                                        // 第几个、当前选中的是哪个」。改用 `selectable(role
+                                        // = Role.Tab)`：TalkBack 会读「已选中 / 未选中」，
+                                        // 并且在页签组里上下滑动可以逐项跳。视觉零变化。
+                                        .selectable(
+                                            selected = selected,
+                                            enabled = !selected,
+                                            role = Role.Tab,
+                                        ) {
                                             nav.navigate(t.route) {
                                                 popUpTo(nav.graph.findStartDestination().id) { saveState = true }
                                                 launchSingleTop = true

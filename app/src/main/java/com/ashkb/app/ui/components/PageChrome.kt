@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -143,7 +145,10 @@ fun SegmentedTabs(
                             Modifier
                         },
                     )
-                    .clickable { onSelect(i) }
+                    // v1.2.15（外部审查 §U-1）：与 AppShell 底部 dock 同一类缺陷 ——
+                    // `clickable` 不带「组内选中」语义，读屏只读得到一个可点区域。
+                    // 选中态本是由底色 + 描边 + 字重三重编码的，读屏一样也拿不到。
+                    .selectable(selected = on, role = Role.Tab) { onSelect(i) }
                     .heightIn(min = Size.touchMin)
                     .padding(horizontal = Spacing.sm),
                 contentAlignment = Alignment.Center,

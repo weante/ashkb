@@ -38,6 +38,113 @@ viewModelScope.launch {
 - 本版 bump 后重跑：见 `E:\ASHKB\v1214-gate1.log`。
 - **无库结构变更**，`ASHKB_DB_VERSION` 仍 **21**，可覆盖安装。
 
+## [未发布] — 2026-11-04 · 外部 UI 审查批次 3（U-1～U-5）
+
+**无障碍与大字号：读屏拿不到的表单语义、被硬编码列数挤坏的图表、失败后就永久转圈的统计页、两处用错单位/颜色的序列、以及一处「校验没过也把用户输入擦掉」。** 无库结构变更（`ASHKB_DB_VERSION` 仍 **21**）、无版本号 bump。
+
+本批是同一份外部审查报告（`ASHKB-UI修改建议-v1.2.14.md`）的第三批。与前两批一样：先逐条对源码核实。U-1～U-5 **五项全部成立**，但 U-5 的机制与报告描述不同（见下）。
+
+### U-4：疼痛评分用了「分钟」作单位，血压整条序列是报错色（`ReportScreen.kt`）
+
+两处都是真错，且都在趋势页的迷你图上：
+
+- 疼痛是 0–10 分的自评，`unit` 却传了 `R.string.exercise_minute_suffix`（`" 分"`）——读出来是「疼痛评分 6 分」还是「6 分钟」，取决于用户自己猜。概览页同一个数字写的是 `"%.1f/10"`，两处口径本来就不一致。改为 `unit = "/10"`。
+- 收缩压整条序列传 `accent = cs.error`——**正常血压也画成红色**，于是「红色 = 出问题」这个约定在血压卡上彻底失效。更糟的是 `threshold = null`，即连阈值虚线都没有，用户没有任何参照能判断这条红线到底红在哪。改为 `accent = cs.tertiary`（与心率同类的中性序列色）+ `threshold = ClinicalThresholds.BP_HIGH_SYS.toFloat()`。
+
+顺带给疼痛也补了 `threshold = ClinicalThresholds.PAIN_SEVERE.toFloat()`（7 分，医学上有据）。
+
+**为什么没做成「只有超阈值的点用危险色」**：那需要改 `TrendChart` 的绘制逻辑（按点着色，而不是整条线一个 `accent`），改动面比调用点大得多，且这一批的定位是「先消掉主要误导」。整条中性色 + 阈值虚线已经让「哪一点越线」可读。
+
+副作用：`exercise_minute_suffix` 从此全项目无引用，lint 报 `UnusedResources`，已从 `values` / `values-en` 两个 `strings.xml` 删掉。`exercise_minute_space_suffix`（晨僵在用）保留。
+
+### U-3：统计加载失败后，页面永远停在「统计加载中…」（`ReportViewModel.kt` / `ReportScreen.kt`）
+
+`refresh()` 失败时只往 `_message` 塞一条一次性 Snackbar，**没有任何状态位记录「这次失败了」**。而 `OverviewPage` / `TrendsPage` 的唯一判据是「数据是否为 null」，于是加载失败和「还没加载完」在界面上完全一样——用户等到的是一个永不结束的转圈。
+
+修法是给 ViewModel 增加一条独立的状态：
+
+```kotlin
+private val _loadFailed = MutableStateFlow<String?>(null)
+val loadFailed: StateFlow<String?> = _loadFailed
+```
+
+`refresh()` 开头清空、成功清空、失败写入。界面按「有没有旧数据」分两种：
+
+- **首次失败**（`o == null` 且 `loadFailed != null`）→ 内联错误块 `StatsErrorBlock`（警示图标 + 原因 + 「重试」按钮），不再是加载骨架。
+- **有旧数据时刷新失败** → 保留旧数据（清空更糟），但列表顶部钉一条 `StatsStaleNote`：「这次刷新失败了，下面的数字可能不是最新的。」+ 重试入口。
+
+`StatsStaleNote` 特意放在 `LazyColumn` **外面**（`Column` 的第一行）而不是作为第一个 item：它是「这些数字现在能不能信」的依据，随列表滚走之后，用户只会看到一串毫无标记的旧数字。
+
+### U-2：窄屏/大字号下被挤坏的三处（`ReportScreen.kt` / `TodayScreen.kt` / `WellnessScreen.kt`）
+
+- **趋势小多图**：`GridCells.Fixed(2)` 硬编码两列。320dp 屏上每格只剩 ~138dp，标题与数值互相压。改为 `GridCells.Adaptive(minSize = trendGridMinCell(fontScale))`，跨列 item 用的 `GridItemSpan(maxLineSpan)` 语义不受影响。
+- **体征三连格**（体温 / 血压 / 心率）：一行三个 `Box(weight(1f))`，字号放大后数值被压成竖排。改为按可用宽度与 `fontScale` 判据决定「一行三格」还是「上下排三行」。
+- **服药操作按钮**（服用 / 跳过 / 顺延）：`Row` 里三个按钮，窄屏 + 大字号下会被挤出屏幕。改为 `FlowRow` 折行。
+
+前两处共用新文件 `ui/components/AdaptiveLayout.kt` 里的两个**纯函数**：
+
+```kotlin
+internal fun trendGridMinCell(fontScale: Float): Dp   // 150.dp × fontScale.coerceIn(1.0f, 1.5f)
+internal fun stackThreeStats(availableWidth: Dp, fontScale: Float): Boolean
+```
+
+写成纯函数而不是直接写进 composable，是为了能单测——判据本身（阈值、上下限）才是容易改错的地方，版式不是。上限 1.5× / 2.0× 的理由写在 KDoc 里：再往上抬，宽屏也会退成一列，留白没有任何收益。
+
+**FlowRow 的坑（重要）**：`TodayScreen.kt:1046` 早就有一条注释记着「FlowRow 不能放进 `Row(Modifier.height(IntrinsicSize.Min))`」——foundation 1.7.3 下 `FlowRow` 不参与 `minIntrinsicHeight`，整行会量出 0 高、卡片被 `Surface` 裁掉。所以这次不是就地替换，而是把动作按钮**整块搬出**那个 `Row`，靠 `Spacer(Modifier.width(Size.doseRailWidth + Size.doseSpineWidth + Spacing.md * 2))` 缩进对齐。先试过直接替换，编译能过但违反了那条已知约束，已自行撤回重做。
+
+另外按报告要求补齐了四个弹层的正文滚动（`ReminderSettingsSheet` / `LabDetailDialog` / 紧急联系人 `AlertDialog` / 运动打卡 `AlertDialog`），其中两个带输入框的同时加 `.imePadding()`。已核查 `BackupSheets` / `EmergencyEventSheet` / `AttachmentSheet` / `RecipesScreen` / `SupplementDetailSheet` **本来就有**（前两个还带 `imePadding`），未动。
+
+### U-1：读屏拿不到「这是什么字段」和「我选中了哪个页签」（`Forms.kt` / `AppShell.kt` / `PageChrome.kt`）
+
+- **`AshkbTextField`**：label 是一个独立兄弟节点，`BasicTextField` 自己没有 `semantics`，`isError` 只改边框与文字颜色。对读屏来说，聚焦到输入框听到的是一段没有名字的「编辑框」，字段错了也不知道错在哪。修法：给内层 `Column` 加 `.semantics(mergeDescendants = true) { if (isError) error(invalidText) }`，把 label + 输入框 + 尾部图标并成一个节点；`supportingText` 那一层加 `liveRegion = LiveRegionMode.Polite`，错误原因出现时会被朗读而不是静默。组件里**不重复**错误文案——`supportingText` 仍是唯一来源。
+- **底部 dock**：每一项是 `.clickable(enabled = !selected)`，告诉读屏「这是可点击元素」，但不告诉它「这是一组页签里的第几个、当前选中哪个」。改为 `.selectable(selected = selected, enabled = !selected, role = Role.Tab)`。视觉零变化。
+- **`SegmentedTabs`**：同一类缺陷（报告只点了 dock，但这是同一件事），一并改为 `.selectable(selected = on, role = Role.Tab)`。
+
+### U-5：容差页「校验没过也把用户刚填的两格擦掉」（`LabToleranceScreen.kt`）
+
+报告的结论对，但描述的机制不对——它说「只要百分比能解析就清空」。实际代码是 `if (parsed != null) { name = ""; percent = "" }`，而 `parsed` 只表示「这串能不能转成数字」，与校验是否通过无关。所以**名称为空、百分比越界这两种情况同样会清空**：用户正对着化验单慢慢录入，填错一次，两格就没了。
+
+修法：`ToleranceAddCard` 的 `onAdd` 改成返回 `Boolean`（是否真的加进去了），`ToleranceAddRow` 内改为 `if (onAdd(name, parsed)) { name = ""; percent = "" }`。另一个缺陷是两格用的是 `remember` 而非 `rememberSaveable`——转屏 / 分屏 / 系统回收进程就丢稿，而这一页正好是「慢慢对照化验单一项项录入」的场景，改为 `rememberSaveable`。
+
+### 新增测试（27 条）
+
+`app/src/test/java/com/ashkb/app/ui/components/AdaptiveLayoutTest.kt`（12 条）：两个纯函数的边界（150dp 基准 / 360dp 两列 / 320dp 一列 / 1.3× 时 360dp 也降一列 / 上下限钳制 / 阈值处严格小于 / 2.0× 与 2.5× 同结果）。浮点比较用 `assertNear`（容差 0.01），并附 `cellWidth(available) = (available - 12f) / 2f` 把「可用宽 → 单格宽」的换算写死在一处。
+
+`app/src/test/java/com/ashkb/app/ui/UiUxBatch3GuardTest.kt`（15 条）：源码静态断言，一次钉住 U-1～U-5 五项。理由同前两批（这些界面组件的依赖在 JVM 里搭不出来）。两个文本助手值得留意：
+
+```kotlin
+private fun norm(text: String): String = text.replace("\r\n", "\n").replace(Regex("[ \t]+"), " ")
+private fun code(text: String): String =
+    norm(text).lines().filterNot { it.trimStart().startsWith("//") }.joinToString("\n")
+```
+
+`code()` 不是洁癖：本轮每处改动都在注释里引用了**旧写法**（「原来 `GridCells.Fixed(2)` 会…」），`assertFalse(contains(...))` 会命中注释而不是代码。**负向断言必须先去掉注释。**
+
+### 负向对照（十一条，均实测变红后恢复）
+
+| 变异 | 变红的测试 |
+|---|---|
+| U-4 疼痛单位改回运动分钟 | `疼痛评分的单位不能是运动分钟` |
+| U-4 血压 `accent` 改回 `cs.error` | `血压整条序列不能用错误色` |
+| U-4 血压 `threshold` 改回 `null` | `血压整条序列不能用错误色` |
+| U-3 删掉 `_loadFailed.value = text` | `统计刷新失败必须单独建模，不能只发一条一次性提示` |
+| U-1 dock 退回 `clickable(enabled = !selected)`（同时改 import） | `底部 dock 与分段控件要声明自己是 Tab 且带选中态` |
+| U-1 把 `if (isError) error(...)` 改成 `if (false) error(...)` | `输入框要把 label 与错误并成一个读屏节点` |
+| U-2 趋势小多图退回 `GridCells.Fixed(2)` | `趋势小多图不能硬编码两列` |
+| U-2 服药按钮退回 `Row` | `服药操作按钮要能折行` |
+| U-2 提醒设置去掉 `.verticalScroll(...)` | `已知会溢出屏幕的弹层正文必须可滚` |
+| U-5 清空条件退回 `parsed != null` | `清空输入的条件必须是「父级接收了」，不是「百分比能解析」` |
+| U-5 `rememberSaveable` 退回 `remember` | `容差页两格要用 rememberSaveable` |
+
+负向对照脚本本身也踩了三个坑，记在这里免得下次重犯：① 锚点换行类型不匹配（`ReportScreen.kt` / `EmergencyScreen.kt` 是 CRLF，手写 `\r\n` 锚点在不同文件里命中 0 次）——加 `match_eol(data, s)` 按目标文件实际换行归一；② `accent = cs.tertiary,` 在文件里命中 2 次（血压与心率），必须带上 `threshold` 那一行才唯一；③ **判「是否被捕获」不能靠 stdout 里的 `FAILED` 行**（格式会变、中文名在 GBK 控制台是乱码），要解析 `app/build/test-results/testDebugUnitTest/*.xml` 里 `testcase` 下有没有 `failure` / `error` 子节点，且每轮跑前先删旧 xml。
+
+### 门禁与状态
+
+- 全门禁见 `E:\ASHKB\v1215-u-gate3.log`：BUILD SUCCESSFUL，**155 文件 / 1275 条单测，0 失败 0 错误 1 跳过**（1248 → 1275，新增 27 条）；detekt 0（`detekt.xml` 仅空 checkstyle 根）；lint **0 errors, 128 warnings, 8 information**；`verifySpecSync` 通过。
+- 首跑 `v1215-u-gate1.log` 因 detekt 4 条失败：`OverviewPage` 加形参后**签名变化使基线两条 ID 失配**（`config/detekt/baseline.xml` 的 ID 写死完整签名），`VitalsHero` 涨到 86 行、`ContactFormDialog` 涨到 82 行。按「改代码、不新增基线」处理：三态上移到 `OverviewTab`（`OverviewPage` 签名恢复原样）、三格摆放抽成 `VitalsStatGrid`、两个复选行抽成 `ContactToggleRow`。
+- 中途还撞到一个 Kotlin 约束：`val x by flow.collectAsStateWithLifecycle()` 是**委派属性**，`if (x != null)` 之后**不能智能转型**（`Smart cast to 'kotlin.String' is impossible`），得先 `.value` 取成局部值再用。
+- 剩余批次：V-1（深色模式 `Scaffold` 未传 `contentColor`，**需截图才能定**）/ V-3（图表只有拖动手势，没有逐日数值文本列表）。V-2 / V-4 经核实不成立，不改。
+
 ## [未发布] — 2026-11-04 · 外部 UI 审查批次 2（P1-4 / P1-5 / P1-6）
 
 **三处「按下去像没反应」的交互缺陷。** 无库结构变更（`ASHKB_DB_VERSION` 仍 **21**）、无版本号 bump、无新增字符串（全部复用既有文案）。

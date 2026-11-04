@@ -136,6 +136,7 @@
     <string name="common_expand">展开</string>
     <string name="common_extra_notes">补充说明</string>
     <string name="common_failed">失败</string>
+    <string name="common_field_invalid">此项填写有误</string>
     <string name="common_got_it">知道了</string>
     <string name="common_hospital">医院</string>
     <string name="common_input_action">录入</string>
@@ -159,6 +160,7 @@
     <string name="common_record">记录</string>
     <string name="common_record_date">记录日期</string>
     <string name="common_refresh">刷新</string>
+    <string name="common_retry">重试</string>
     <string name="common_required">必填</string>
     <string name="common_save">保存</string>
     <string name="common_submit">提交</string>
@@ -230,7 +232,6 @@
     <string name="exercise_flare_rule_note">发作期：仅保留 L1 轻柔项，L2/L3 暂停，黑榜拦截。</string>
     <string name="exercise_intensity_self_test">强度自测（说话试验：能自如说话=中等，有点费力=高）</string>
     <string name="exercise_minute_space_suffix">" 分钟"</string>
-    <string name="exercise_minute_suffix">" 分"</string>
     <string name="exercise_minutes">分钟</string>
     <string name="exercise_next_day_stiffness">次日晨僵</string>
     <string name="exercise_no_recommendation">今日暂无推荐运动</string>
@@ -552,8 +553,10 @@
     <string name="report_share_action">分享复诊报告</string>
     <string name="report_shared_axis">各图共用同一时间轴：%1$s → %2$s</string>
     <string name="report_small_chart_a11y">%1$s，最近 %2$s，共 %3$d 次记录</string>
+    <string name="report_stats_failed_title">统计没能加载出来</string>
     <string name="report_stats_loading">统计加载中…</string>
     <string name="report_stats_loading_dots">正在统计…</string>
+    <string name="report_stats_stale">这次刷新失败了，下面的数字可能不是最新的。</string>
     <string name="report_subtitle">统计 · 趋势 · 复诊报告</string>
     <string name="report_supplement_tag">（补）</string>
     <string name="report_tab">报表</string>

@@ -141,6 +141,7 @@
     <string name="common_expand">Expand</string>
     <string name="common_extra_notes">Additional notes</string>
     <string name="common_failed">Failed</string>
+    <string name="common_field_invalid">This field is invalid</string>
     <string name="common_got_it">Got it</string>
     <string name="common_hospital">Hospital</string>
     <string name="common_input_action">Enter</string>
@@ -164,6 +165,7 @@
     <string name="common_record">Record</string>
     <string name="common_record_date">Record date</string>
     <string name="common_refresh">Refresh</string>
+    <string name="common_retry">Retry</string>
     <string name="common_required">Required</string>
     <string name="common_save">Save</string>
     <string name="common_submit">Submit</string>
@@ -235,7 +237,6 @@
     <string name="exercise_flare_rule_note">Flare phase: only gentle L1 items are kept, L2/L3 are paused, blacklisted items are blocked.</string>
     <string name="exercise_intensity_self_test">Intensity self-check (talk test: can talk easily = moderate, slightly breathless = high)</string>
     <string name="exercise_minute_space_suffix">" min"</string>
-    <string name="exercise_minute_suffix">" min"</string>
     <string name="exercise_minutes">minutes</string>
     <string name="exercise_next_day_stiffness">Next-day morning stiffness</string>
     <string name="exercise_no_recommendation">No recommended exercise for today</string>
@@ -557,8 +558,10 @@
     <string name="report_share_action">Share follow-up report</string>
     <string name="report_shared_axis">All charts share the same timeline: %1$s → %2$s</string>
     <string name="report_small_chart_a11y">%1$s, latest %2$s, %3$d records in total</string>
+    <string name="report_stats_failed_title">Could not load statistics</string>
     <string name="report_stats_loading">Loading statistics…</string>
     <string name="report_stats_loading_dots">Calculating…</string>
+    <string name="report_stats_stale">This refresh failed, so the numbers below may be out of date.</string>
     <string name="report_subtitle">Statistics · Trends · Follow-up report</string>
     <string name="report_supplement_tag">(supplement)</string>
     <string name="report_tab">Reports</string>

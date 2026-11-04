@@ -49,7 +49,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.VisualTransformation
@@ -384,6 +387,14 @@ fun AshkbTextField(
     // 四种视觉状态的优先级集中在 [fieldVisuals] 一处（错误 > 聚焦 > 常态，禁用压过全部）。
     val visuals = fieldVisuals(cs = cs, enabled = enabled, focused = focused, isError = isError)
     val shape = MaterialTheme.shapes.medium
+    // v1.2.15（外部审查 §U-1）：TalkBack 之前只会读出编辑框里的值 —— label 是**兄弟节点**、
+    // 错误只有颜色，读屏用户既不知道这个框要填什么，也不知道填错了。
+    // 这里做三件事：
+    //  1. `mergeDescendants = true` 把「label + 输入框 + 尾部图标」并成一个可读节点，
+    //     于是焦点落到输入框时先读 label 再读值（label 不必非得提取成字符串）；
+    //  2. `error(...)` 标出无效态 —— 值为空时只改颜色，读屏完全察觉不到；
+    //  3. 文案本身不在这里重复：调用点的 `supportingText` 仍是错误原因的**唯一**来源。
+    val invalidText = stringResource(R.string.common_field_invalid)
 
     Column(modifier = modifier) {
         Column(
@@ -397,7 +408,10 @@ fun AshkbTextField(
                 // 西文行高松（CJK 1.5–1.7 倍行高，见 Type.kt），因此浅色长表单里会比
                 // 设计稿的 56 略高几 dp —— 这是下限不是上限，不为凑数去压行高。
                 .heightIn(min = Size.touchComfort)
-                .padding(start = Spacing.lg, end = Spacing.lg, top = 10.dp, bottom = Spacing.md),
+                .padding(start = Spacing.lg, end = Spacing.lg, top = 10.dp, bottom = Spacing.md)
+                .semantics(mergeDescendants = true) {
+                    if (isError) error(invalidText)
+                },
         ) {
             if (label != null) {
                 // label 常驻顶部：这里**不使用** BasicTextField 的 label 槽（那个槽的语义就是
@@ -448,7 +462,13 @@ fun AshkbTextField(
             CompositionLocalProvider(
                 LocalTextStyle provides MaterialTheme.typography.bodySmall,
                 LocalContentColor provides if (isError) cs.error else cs.onSurfaceVariant,
-            ) { supportingText() }
+            ) {
+                // 错误文案在**出现的那一刻**播报（polite：不打断用户正在听的内容）。
+                // 否则读屏用户填错后必须自己再滑到这一行才发现哪里不对。
+                Box(
+                    Modifier.semantics { if (isError) liveRegion = LiveRegionMode.Polite },
+                ) { supportingText() }
+            }
         }
     }
 }

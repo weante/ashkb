@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -75,8 +77,14 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
     var sedentaryInterval by remember { mutableStateOf(cfg.sedentaryIntervalMin()) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        // v1.2.15（外部审查 §U-2）：原先没有滚动。这一页在小屏 + 大字号下会把最底下的
+        // 「关闭」按钮挤出弹层外——而弹层里没有别的出口（不能点外部关闭会丢未确认的改动感）。
+        // 这里本来就不该有输入框：起止时间是系统 TimePickerDialog，所以只加滚动、不加 IME 避让。
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Text(

@@ -487,7 +487,11 @@ private fun CheckInDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.exercise_checkin_title, excName)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            // v1.2.15（外部审查 §U-2）：打卡弹窗里有输入框，矮屏上键盘会把强度选项和保存顶出去。
+            Column(
+                Modifier.verticalScroll(rememberScrollState()).imePadding(),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
                 AshkbTextField(
                     value = duration,
                     onValueChange = { duration = it.filter { c -> c.isDigit() }.take(3) },

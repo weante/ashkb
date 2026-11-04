@@ -319,7 +319,9 @@ internal fun LabDetailDialog(record: CheckupRecord, vm: CheckupViewModel, onDism
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.lab_dialog_title, record.itemName)) },
         text = {
-            Column {
+            // v1.2.15（外部审查 §U-2）：一次抽血的化验项十几条很常见，原先这个 Column 不滚，
+            // 超出 AlertDialog 高度的那些行直接被裁掉——用户看到的是"明细少了"，不是"可以往下滚"。
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 if (labs.isEmpty()) {
                     Text(stringResource(R.string.lab_indicators_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {

@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -117,6 +118,11 @@ private fun ToleranceWhatCard() {
  *
  * 这样 [LabToleranceScreen] 不必自己持有错误文案状态——错误是这张卡的局部现象，
  * 用户在别的卡片操作时它不该还挂着。
+ *
+ * v1.2.15（外部审查 §U-5）：内层回调改为**返回是否接收**。原来「清空输入」的判断在
+ * [ToleranceAddRow] 里，只看百分比能不能解析成数字，于是名称留空（或百分比越界）这种
+ * 「校验没过」的情况也会把用户填的两格一起擦掉——报错和丢稿同时发生，最坏的一种组合。
+ * 现在清空的条件是这条路径**真的把条目加进去了**（返回值由本卡的 `else` 分支给出）。
  */
 @Composable
 private fun ToleranceAddCard(onAdd: (String, Float) -> Unit) {
@@ -127,12 +133,18 @@ private fun ToleranceAddCard(onAdd: (String, Float) -> Unit) {
             onAdd = { rawName, percent ->
                 val name = rawName.trim()
                 when {
-                    name.isEmpty() -> error = context.getString(R.string.lab_tolerance_err_name)
-                    LabBoundaryTolerance.ratioOfPercent(percent) == null ->
+                    name.isEmpty() -> {
+                        error = context.getString(R.string.lab_tolerance_err_name)
+                        false
+                    }
+                    LabBoundaryTolerance.ratioOfPercent(percent) == null -> {
                         error = context.getString(R.string.lab_tolerance_err_range)
+                        false
+                    }
                     else -> {
                         error = null
                         onAdd(name, percent ?: LabBoundaryTolerance.percentOf(LabBoundaryTolerance.DEFAULT_RATIO))
+                        true
                     }
                 }
             },
@@ -174,10 +186,19 @@ private fun Map<String, Float>.toPercentRows(): List<Pair<String, Float>> =
         .map { (name, ratio) -> name to LabBoundaryTolerance.percentOf(ratio) }
         .sortedBy { it.first.lowercase() }
 
+/**
+ * 名称 + 百分比两格和「添加」按钮。
+ *
+ * `onAdd` 返回**是否接收**：只有真的加进去了才清空两格。这个返回值不能省成
+ * 「在父级清空」——父级拿不到这两个 `rememberSaveable` 状态的写入口。
+ *
+ * 两格用 `rememberSaveable`（v1.2.15，外部审查 §U-5）：原来用 `remember`，转屏 /
+ * 分屏 / 系统回收进程后就丢稿，而这一页正好是要「慢慢对照化验单一项项录入」的场景。
+ */
 @Composable
-private fun ToleranceAddRow(onAdd: (String, Float?) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var percent by remember { mutableStateOf("") }
+private fun ToleranceAddRow(onAdd: (String, Float?) -> Boolean) {
+    var name by rememberSaveable { mutableStateOf("") }
+    var percent by rememberSaveable { mutableStateOf("") }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         AshkbTextField(
             value = name,
@@ -195,8 +216,9 @@ private fun ToleranceAddRow(onAdd: (String, Float?) -> Unit) {
         TextButton(
             onClick = {
                 val parsed = percent.trim().toFloatOrNull()
-                onAdd(name, parsed)
-                if (parsed != null) {
+                // 清空的条件是**父级接收了**，不是「百分比能解析」——后者在名称留空、
+                // 百分比越界这两种校验失败的情况下同样成立，会把用户刚填的两格擦掉。
+                if (onAdd(name, parsed)) {
                     name = ""
                     percent = ""
                 }

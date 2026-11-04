@@ -1112,22 +1112,6 @@ private fun MedCheckCard(
                         ) { Text(stringResource(R.string.missed_dose_title)) }
                     }
 
-                    if (st.actionable && !item.isPrn) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                            Button(onClick = onCheckIn, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                                Text(stringResource(R.string.med_take_action))
-                            }
-                            OutlinedButton(onClick = onSkip, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                                Text(stringResource(R.string.med_skip))
-                            }
-                            if (med.route == "injection") {
-                                OutlinedButton(onClick = onPostpone, modifier = Modifier.heightIn(min = Size.touchMin)) {
-                                    Text(stringResource(R.string.med_postpone))
-                                }
-                            }
-                        }
-                    }
-
                     if (item.isPrn) {
                         // v1.2.10（维护者指令）：按需药常驻首页、每天只记一次。
                         // 记过之后把「不设提醒」的说明换成「今天已记录，明天可再记」——
@@ -1140,6 +1124,34 @@ private fun MedCheckCard(
                         if (!item.done) {
                             Button(onClick = onPrnTaken, modifier = Modifier.heightIn(min = Size.touchMin)) {
                                 Text(stringResource(R.string.med_record_prn_use))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // v1.2.15（外部审查 §U-2）：动作按钮从正文列里搬到这里。
+            // 两个原因：
+            //   1. 原来三个按钮挤在一个 `Row` 里，320dp 屏 + 2× 字号时总宽超过正文列，
+            //      最右边那个被挤出屏幕（或前面两个被压到文字截断）。这是本卡唯一的
+            //      可执行操作，不能有任何一个跑到屏幕外 —— 改 `FlowRow` 放不下就折行。
+            //   2. `FlowRow` **不能**待在下面那个 `Row(Modifier.height(IntrinsicSize.Min))`
+            //      里（见 `:1046` 的教训：foundation 1.7.3 下 FlowRow 不参与
+            //      `minIntrinsicHeight`，会让整行量出 0 高、卡片被裁掉）。所以它只能像
+            //      chip 行一样待在外层，靠 Spacer 缩进对齐正文列。
+            if (st.actionable && !item.isPrn) {
+                Row {
+                    Spacer(Modifier.width(Size.doseRailWidth + Size.doseSpineWidth + Spacing.md * 2))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        Button(onClick = onCheckIn, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                            Text(stringResource(R.string.med_take_action))
+                        }
+                        OutlinedButton(onClick = onSkip, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                            Text(stringResource(R.string.med_skip))
+                        }
+                        if (med.route == "injection") {
+                            OutlinedButton(onClick = onPostpone, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                                Text(stringResource(R.string.med_postpone))
                             }
                         }
                     }

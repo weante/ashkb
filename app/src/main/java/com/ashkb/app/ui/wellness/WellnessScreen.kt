@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.util.Locale
@@ -79,6 +81,7 @@ import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.StatTile
 import com.ashkb.app.ui.components.StatusChip
+import com.ashkb.app.ui.components.stackThreeStats
 import com.ashkb.app.ui.theme.Size
 import com.ashkb.app.ui.theme.Spacing
 import com.ashkb.app.ui.theme.StatusTone
@@ -335,37 +338,77 @@ private fun VitalsHero(vitals: Vitals?, onEdit: () -> Unit) {
                     Text(if (vitals != null) stringResource(R.string.common_edit) else stringResource(R.string.common_record))
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                Box(Modifier.weight(1f)) {
-                    StatTile(
-                        label = stringResource(R.string.vitals_temperature_short),
-                        value = temp?.let { String.format(Locale.US, "%.1f", it) } ?: stringResource(R.string.common_not_recorded),
-                        unit = temp?.let { "℃" },
-                        tone = tempTone,
-                    )
-                }
-                Box(Modifier.weight(1f)) {
-                    StatTile(
-                        label = stringResource(R.string.vitals_bp),
-                        value = if (sys != null && dia != null) "$sys/$dia" else stringResource(R.string.common_not_recorded),
-                        tone = bpTone,
-                    )
-                }
-                Box(Modifier.weight(1f)) {
-                    StatTile(
-                        label = stringResource(R.string.vitals_heart_rate),
-                        value = hr?.toString() ?: stringResource(R.string.common_not_recorded),
-                        unit = hr?.let { stringResource(R.string.vitals_bpm_unit) },
-                        tone = hrTone,
-                    )
-                }
-            }
+            // v1.2.15（外部审查 §U-2）：原来三个 `weight(1f)` 硬挤一行，320dp 屏每格只剩
+            // 约 77dp —— 2× 字号时「未记录」要折成两行、数值被压到读不出来。这三个数字是
+            // 本页的主要信息，不能靠缩字号解决。判据在 [stackThreeStats]（纯函数，有单测）：
+            // 按卡片**可用宽度**（不是屏幕宽度）决定一行还是上下排。
+            val specs = listOf(
+                StatSpec(
+                    label = stringResource(R.string.vitals_temperature_short),
+                    value = temp?.let { String.format(Locale.US, "%.1f", it) } ?: stringResource(R.string.common_not_recorded),
+                    unit = temp?.let { "℃" },
+                    tone = tempTone,
+                ),
+                StatSpec(
+                    label = stringResource(R.string.vitals_bp),
+                    value = if (sys != null && dia != null) "$sys/$dia" else stringResource(R.string.common_not_recorded),
+                    tone = bpTone,
+                ),
+                StatSpec(
+                    label = stringResource(R.string.vitals_heart_rate),
+                    value = hr?.toString() ?: stringResource(R.string.common_not_recorded),
+                    unit = hr?.let { stringResource(R.string.vitals_bpm_unit) },
+                    tone = hrTone,
+                ),
+            )
+            VitalsStatGrid(specs)
             vitals?.notes?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 }
+
+/**
+ * 体征三连格的**摆放**：按卡片可用宽度与字号决定一行还是上下排。
+ *
+ * 抽成独立 composable 只因 [VitalsHero] 已经顶到 detekt 的 80 行上限；
+ * 判据仍是纯函数 [stackThreeStats]，版式与内容都不在这里做第二份。
+ */
+@Composable
+private fun VitalsStatGrid(specs: List<StatSpec>) {
+    val fontScale = LocalDensity.current.fontScale
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (stackThreeStats(availableWidth = maxWidth, fontScale = fontScale)) {
+            // 上下排：每格占满一行，数值不再被挤窄，2× 字号也读得全。
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                specs.forEach { s -> StatTile(label = s.label, value = s.value, unit = s.unit, tone = s.tone) }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                specs.forEach { s ->
+                    Box(Modifier.weight(1f)) {
+                        StatTile(label = s.label, value = s.value, unit = s.unit, tone = s.tone)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 体征三连格的一项（标签 / 数值 / 单位 / 状态色）。
+ *
+ * 抽出来的理由只有一个：三格在「一行」与「上下排」两种版式下**内容必须完全一致**，
+ * 区别只在容器。若两处各写一遍 `StatTile(...)`，日后改一个格的取值口径时极容易只改一处
+ * ——那正是「同一份数据在两种版式下显示不同」的来源。
+ */
+private data class StatSpec(
+    val label: String,
+    val value: String,
+    val unit: String? = null,
+    val tone: StatusTone = StatusTone.Neutral,
+)
 
 /**
  * 营养分组的**两张内容卡**的槽位登记：补剂档案卡 + 今日服药 / 补剂合并时间表。

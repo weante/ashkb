@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -26,6 +27,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -44,7 +46,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.util.Locale
@@ -68,6 +72,7 @@ import com.ashkb.app.ui.components.StatTile
 import com.ashkb.app.ui.components.Trend
 import com.ashkb.app.ui.components.TrendChart
 import com.ashkb.app.ui.components.TrendPoint
+import com.ashkb.app.ui.components.trendGridMinCell
 import com.ashkb.app.ui.components.WeightedTrailingRow
 import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.ui.theme.accent
@@ -158,7 +163,31 @@ fun ReportScreen(vm: ReportViewModel, onOpenBackup: () -> Unit) {
 @Composable
 private fun OverviewTab(vm: ReportViewModel) {
     val overview by vm.overview.collectAsStateWithLifecycle()
-    OverviewPage(overview)
+    // 委派属性无法智能转型（`loadFailed != null` 之后仍不可用），先取成局部值。
+    val failure = vm.loadFailed.collectAsStateWithLifecycle().value
+
+    // 首次加载还没有任何数据可显示：失败就明说失败并给重试入口。
+    // 旧写法不分成功/失败，一律显示「统计加载中…」——于是加载失败后这句会永远停在那里，
+    // 用户等到的不是错误，是一个永不结束的转圈（外部审查 §U-3）。
+    if (overview == null) {
+        if (failure != null) {
+            StatsErrorBlock(message = failure, onRetry = vm::refresh, modifier = Modifier.fillMaxSize())
+        } else {
+            Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(Modifier.height(48.dp))
+                Text(stringResource(R.string.report_stats_loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        return
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        // 手上有旧数据时刷新失败：保留数据（清空更糟），但要说明它们可能已经过期。
+        // 提示钉在列表上方、不随滚动消失——它是「这些数字现在能不能信」的依据，
+        // 滚走之后用户只会看到一串毫无标记的旧数字。
+        if (failure != null) StatsStaleNote(onRetry = vm::refresh)
+        Box(Modifier.weight(1f)) { OverviewPage(overview) }
+    }
 }
 
 /** 趋势页签的包装组合件：只收趋势数据与时间窗。 */
@@ -166,7 +195,8 @@ private fun OverviewTab(vm: ReportViewModel) {
 private fun TrendsTab(vm: ReportViewModel) {
     val trends by vm.trends.collectAsStateWithLifecycle()
     val trendDays by vm.trendDays.collectAsStateWithLifecycle()
-    TrendsPage(trends, trendDays, vm::setTrendDays)
+    val loadFailed by vm.loadFailed.collectAsStateWithLifecycle()
+    TrendsPage(trends, trendDays, vm::setTrendDays, loadFailed, onRetry = vm::refresh)
 }
 
 /** 周月报页签的包装组合件：只收周月报数据与时间窗。 */
@@ -194,13 +224,11 @@ private fun ExportTab(vm: ReportViewModel, onOpenBackup: () -> Unit) {
 
 @Composable
 private fun OverviewPage(o: ReportRepository.Overview?) {
-    if (o == null) {
-        Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.height(48.dp))
-            Text(stringResource(R.string.report_stats_loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        return
-    }
+    // 形参保持可空：`config/detekt/baseline.xml` 把「文件 + 完整签名」写死在 ID 里
+    // （`@Composable private fun OverviewPage(o: ReportRepository.Overview?)`），
+    // 改类型 / 加形参都会让 LongMethod 与 CyclomaticComplex 两条基线失配、重新报错，
+    // 而本批的约束是不新增基线。三态（无数据/失败/过期）已上移到 [OverviewTab] 处理。
+    if (o == null) return
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -441,6 +469,77 @@ private fun trendOf(delta: Double?): Trend = when {
     else -> Trend.Flat
 }
 
+/**
+ * 统计**加载失败**时的整页形态：说清失败原因 + 给重试入口。
+ *
+ * 为什么不是一句 Snackbar 就够了：`ReportViewModel.refresh()` 同时写 [ReportViewModel.message]
+ * （转给全局 Snackbar，几秒后消失）与 `loadFailed`；只靠前者时，用户看到的是一条一闪而过的
+ * 提示，加上一页**永远停在「统计加载中…」**的界面——两者叠加起来像"卡住了"，而不是"失败了"。
+ * 失败必须留在页面上，且必须能就地重试（外部审查 §U-3）。
+ *
+ * 图标用 `WarningAmber` 而不是红色叉：统计失败是"这次没拿到"，不是数据被破坏，
+ * 用 danger 色会把功能性问题说得像数据事故（与红线 2「danger 专色专用」同源考虑）。
+ */
+@Composable
+private fun StatsErrorBlock(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    val cs = MaterialTheme.colorScheme
+    Column(
+        modifier = modifier.padding(horizontal = Spacing.xxl, vertical = Spacing.huge),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.WarningAmber,
+            contentDescription = null,
+            tint = cs.onSurfaceVariant,
+            modifier = Modifier.size(Size.iconLg),
+        )
+        Text(
+            text = stringResource(R.string.report_stats_failed_title),
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = cs.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Button(onClick = onRetry, modifier = Modifier.heightIn(min = Size.touchMin)) {
+            Text(stringResource(R.string.common_retry))
+        }
+    }
+}
+
+/**
+ * 手上有旧数据、但**这一次**刷新失败了：保留旧数据，只在上方标一句「可能不是最新的」。
+ *
+ * 为什么不清空重来：同一份统计背后是几秒级的聚合查询，清空会让用户在一次网络/IO 抖动里
+ * 失去整页可看的数据；而完全不提示则会让旧数字被当成新的（外部审查 §U-3 的第二种情形）。
+ * 故取中间态：数据留着、状态标明、重试就在原地。
+ */
+@Composable
+private fun StatsStaleNote(onRetry: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Surface(shape = MaterialTheme.shapes.medium, color = cs.secondaryContainer) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(
+                text = stringResource(R.string.report_stats_stale),
+                style = MaterialTheme.typography.bodySmall,
+                color = cs.onSecondaryContainer,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onRetry, modifier = Modifier.heightIn(min = Size.touchMin)) {
+                Text(stringResource(R.string.common_retry))
+            }
+        }
+    }
+}
+
 // ======================= 趋势 =======================
 
 @Composable
@@ -448,6 +547,8 @@ private fun TrendsPage(
     t: ReportRepository.Trends?,
     days: Int,
     onDays: (Int) -> Unit,
+    loadFailed: String?,
+    onRetry: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
         // v1.0.45：时间范围切换**钉在顶部**，不随 6 张图滚走
@@ -463,8 +564,15 @@ private fun TrendsPage(
         }
         Box(Modifier.weight(1f)) {
             if (t == null) {
-                LoadingBlock(minHeight = 240.dp, label = stringResource(R.string.report_stats_loading_dots))
+                if (loadFailed != null) {
+                    // 与概览页同口径：首次就没拿到数据时不能继续摆骨架屏，否则"失败"看起来像"正在算"。
+                    StatsErrorBlock(message = loadFailed, onRetry = onRetry)
+                } else {
+                    LoadingBlock(minHeight = 240.dp, label = stringResource(R.string.report_stats_loading_dots))
+                }
             } else {
+                // 旧数据 + 本次刷新失败：顶部标一句，数据照旧展示。
+                if (loadFailed != null) StatsStaleNote(onRetry = onRetry)
                 TrendCharts(t)
             }
         }
@@ -528,10 +636,35 @@ private fun TrendCharts(t: ReportRepository.Trends) {
             accent = cs.primary,
             emptyText = noDataText,
         ),
-        MiniSeries("pain", stringResource(R.string.symptom_pain_score), stringResource(R.string.exercise_minute_suffix), painPoints, null, cs.secondary, noDataText),
+        // 疼痛是 0-10 分自评，不是时长：旧写法借了 exercise_minute_suffix（" 分"），
+        // 迷你图读数因此显示成「7 分」——与概览页的 "%.1f/10" 两套口径，且"分"在此处
+        // 读作"分钟"（晨僵就在下一格用" 分钟"）。这里改用 "/10"，与概览页同义。
+        // threshold 用 PAIN_SEVERE（7/10，临床中重度分界）：有了阈值线，"超阈值次数"
+        // 才有落点，否则这条序列在图上永远只是"看起来还行"。
+        MiniSeries(
+            key = "pain",
+            title = stringResource(R.string.symptom_pain_score),
+            unit = "/10",
+            points = painPoints,
+            threshold = ClinicalThresholds.PAIN_SEVERE.toFloat(),
+            accent = cs.secondary,
+            emptyText = noDataText,
+        ),
         MiniSeries("stiff", stringResource(R.string.symptom_morning_stiffness), stringResource(R.string.exercise_minute_space_suffix), stiffPoints, null, cs.secondary, noDataText),
         MiniSeries("weight", stringResource(R.string.vitals_weight), " kg", weightPoints, null, cs.primary, noDataText),
-        MiniSeries("bp", stringResource(R.string.vitals_bp_systolic), " mmHg", bpPoints, null, cs.error, noDataText),
+        // 收缩压旧写法用 cs.error 当 accent —— 那是"整条线/末点/读数"都染成报错色，
+        // 于是血压 118/76 这种正常值看着也像警报；同时 threshold 传的是 null，
+        // 真正该被看见的「哪几天超过 140」反而没有任何标记。两处对调回来：
+        // accent 用中性序列色（与同表的心率同为 tertiary），超阈值交给 danger 阈值虚线。
+        MiniSeries(
+            key = "bp",
+            title = stringResource(R.string.vitals_bp_systolic),
+            unit = " mmHg",
+            points = bpPoints,
+            threshold = ClinicalThresholds.BP_HIGH_SYS.toFloat(),
+            accent = cs.tertiary,
+            emptyText = noDataText,
+        ),
         MiniSeries("hr", stringResource(R.string.vitals_heart_rate), " bpm", hrPoints, null, cs.tertiary, noDataText),
     )
 
@@ -568,8 +701,14 @@ private fun TrendCharts(t: ReportRepository.Trends) {
 
     var expanded by remember { mutableStateOf<MiniSeries?>(null) }
 
+    // v1.2.15（外部审查 §U-2）：`GridCells.Fixed(2)` 在 320dp 窄屏 / 大字号下会把每格压到
+    // 约 138dp 甚至更窄，格子里的标题、末值、读数行互相挤兑（真机上表现为标题被省略号截断）。
+    // 改成 Adaptive 后「放不下就降一列」，最小宽度随系统字号整倍放大——判据在
+    // [trendGridMinCell]（纯函数，有单测）：360dp 屏仍是两列（保持原有观感），
+    // 320dp 屏与 1.3× 字号降为一列。
+    val minCell = trendGridMinCell(LocalDensity.current.fontScale)
     LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+        columns = GridCells.Adaptive(minSize = minCell),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.md),
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
