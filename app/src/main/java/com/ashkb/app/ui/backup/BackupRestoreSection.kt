@@ -47,10 +47,13 @@ import com.ashkb.app.ui.theme.Spacing
 /**
  * 恢复区（协议 §6 五步；v1.0.85 批次 10：从根级抽为 section）。
  *
- * 内部收集 `pendingRestore` / `pendingFileName` / `restoreResult` / `restoreMode` / `davUrl` 五条 Flow，
- * 并把**恢复口令**的输入状态收进来：口令同属逐字输入状态，留在根部等于每敲一个字重组整屏。
+ * 内部收集 `pendingRestore` / `pendingFileName` / `restoreResult` / `restoreMode` / `restoreOrigin` /
+ * `davUrl` 六条 Flow，并把**恢复口令**的输入状态收进来：口令同属逐字输入状态，留在根部等于每敲一个字重组整屏。
  * 入参只保留父级自己也要用的值（busy / 选好的文件）与两个"打开别处 UI"的回调
  * （文件选择器与远程列表 sheet 都在根级注册，见 [BackupScreen]）。
+ *
+ * v1.2.15（外部 UI 审查 P1-5）：待确认块与结果行只在 `restoreOrigin == PICKED_FILE` 时渲染——
+ * 从快照撤销发起的那些内容归 [UndoSnapshotBlock] 显示（谁发起、谁显示），见 [RestoreOrigin]。
  */
 @Composable
 internal fun RestoreSection(
@@ -65,6 +68,7 @@ internal fun RestoreSection(
     val pendingName by vm.pendingFileName.collectAsStateWithLifecycle()
     val restoreResult by vm.restoreResult.collectAsStateWithLifecycle()
     val restoreMode by vm.restoreMode.collectAsStateWithLifecycle()
+    val restoreOrigin by vm.restoreOrigin.collectAsStateWithLifecycle()
     val davUrl by vm.davUrl.collectAsStateWithLifecycle()
     var restorePass by remember { mutableStateOf("") }
 
@@ -113,7 +117,9 @@ internal fun RestoreSection(
             enabled = !busy && pickedBytes != null && restorePass.isNotBlank(),
         ) { Text(stringResource(R.string.backup_bypass_decrypt)) }
 
-        if (pending != null) {
+        // v1.2.15（P1-5）：只在本次恢复由本卡发起时才显示待确认块与结果行。
+        // 从快照撤销发起的那一份由 UndoSnapshotBlock 自己显示——同一时刻两者只能有一个非空。
+        if (pending != null && restoreOrigin == RestoreOrigin.PICKED_FILE) {
             RestorePendingBlock(
                 pending = pending!!,
                 pendingName = pendingName,
@@ -125,7 +131,9 @@ internal fun RestoreSection(
             )
         }
 
-        restoreResult?.let { r -> RestoreResultBlock(result = r) }
+        if (restoreOrigin == RestoreOrigin.PICKED_FILE) {
+            restoreResult?.let { r -> RestoreResultBlock(result = r) }
+        }
     }
 }
 
@@ -142,13 +150,23 @@ internal fun RestoreSection(
  *     本块的 `remember` 里，离开即丢。
  *  5. 快照缺失/损坏/超限 ⇒ VM 报错，入口置灰或提示（`available` 为 false 时不给按钮）。
  *  6. 没有快照时**整块不渲染**（调用处 `if (snapshot != null)`），不留空入口。
+ *
+ * v1.2.15（外部 UI 审查 P1-5）：**谁发起、谁显示**。本块原先只把口令交给 VM，待确认块却渲染在
+ * 上方恢复卡的内部——点完撤销，附近毫无变化，用户会以为没反应并重复点。现在本块自己渲染
+ * 待确认块与结果行（`restoreOrigin == SNAPSHOT_UNDO` 时），恢复卡那边同步让位（见 [RestoreSection]）。
+ * 为此本块改为直接收 [BackupViewModel]，与同文件其它 section 同一口径。
  */
 @Composable
 internal fun UndoSnapshotBlock(
     snapshot: PreRestoreSnapshot,
     busy: Boolean,
-    onUndo: (String) -> Unit,
+    vm: BackupViewModel,
 ) {
+    val pending by vm.pendingRestore.collectAsStateWithLifecycle()
+    val pendingName by vm.pendingFileName.collectAsStateWithLifecycle()
+    val restoreMode by vm.restoreMode.collectAsStateWithLifecycle()
+    val restoreResult by vm.restoreResult.collectAsStateWithLifecycle()
+    val restoreOrigin by vm.restoreOrigin.collectAsStateWithLifecycle()
     var pass by remember { mutableStateOf("") }
     SectionCard(title = stringResource(R.string.backup_snapshot_title)) {
         // 先说清「撤销也是一次恢复」——这是工单第 3 条要求对用户明示的语义，
@@ -189,10 +207,27 @@ internal fun UndoSnapshotBlock(
         )
         Spacer(Modifier.height(Spacing.sm))
         OutlinedButton(
-            onClick = { onUndo(pass) },
+            onClick = { vm.undoFromPreRestoreSnapshot(pass) },
             enabled = !busy && pass.isNotBlank(),
             modifier = Modifier.heightIn(min = Size.touchMin),
         ) { Text(stringResource(R.string.backup_snapshot_undo)) }
+
+        // v1.2.15（P1-5）：确认与结果就落在按钮**下面**——发起处即下一步，不用向上滚去另一张卡。
+        // 只认自己的来源：从恢复卡发起的那份由 RestoreSection 显示。
+        if (restoreOrigin == RestoreOrigin.SNAPSHOT_UNDO) {
+            if (pending != null) {
+                RestorePendingBlock(
+                    pending = pending!!,
+                    pendingName = pendingName,
+                    restoreMode = restoreMode,
+                    busy = busy,
+                    onSetMode = { vm.setRestoreMode(it) },
+                    onRestore = { vm.doRestore() },
+                    onCancel = { vm.cancelRestore() },
+                )
+            }
+            restoreResult?.let { r -> RestoreResultBlock(result = r) }
+        }
     }
 }
 

@@ -252,7 +252,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                 UndoSnapshotBlock(
                     snapshot = snap,
                     busy = busy,
-                    onUndo = { pass -> vm.undoFromPreRestoreSnapshot(pass) },
+                    vm = vm,
                 )
             }
 

@@ -61,10 +61,10 @@ internal fun WebDavSection(vm: BackupViewModel, busy: Boolean, onOpenSheet: () -
  * 于是每个 tick 都让整屏重组——正在输备份口令的用户会被进度刷新打断。现在读点搬进本
  * section，tick 的失效范围收窄到本 section 自己。
  *
- * 本 section 在内部收集（共 7 条，全部只被本区渲染）：
+ * 本 section 在内部收集（共 8 条，全部只被本区渲染）：
  * `attachSyncEnabled` / `attachCounts` / `attachSyncStage` / `attachSyncMsg` / `attachBytes` /
- * `attachVerifyMsg` / `davUrl`（davUrl 只用来判断"按钮能不能点"与给缺配置提示）。
- * 入参只给 vm：这 7 条 Flow 与 3 个动作若逐条透传会超出 detekt 的 LongParameterList 阈值（8），
+ * `attachVerifyMsg` / `attachOperationRunning` / `davUrl`（davUrl 只用来判断"按钮能不能点"与给缺配置提示）。
+ * 入参只给 vm：这 8 条 Flow 与 3 个动作若逐条透传会超出 detekt 的 LongParameterList 阈值（8），
  * 而"状态一律在本 section 内读"这点由上面的清单与本函数的 collect 语句共同保证——
  * **往下加东西时请只读这里列出的状态**。
  */
@@ -76,6 +76,7 @@ internal fun AttachSyncSection(vm: BackupViewModel) {
     val attachSyncMsg by vm.attachSyncMsg.collectAsStateWithLifecycle()
     val attachBytes by vm.attachBytes.collectAsStateWithLifecycle()
     val attachVerifyMsg by vm.attachVerifyMsg.collectAsStateWithLifecycle()
+    val attachRunning by vm.attachOperationRunning.collectAsStateWithLifecycle()
     val davUrl by vm.davUrl.collectAsStateWithLifecycle()
 
     SectionCard(title = stringResource(R.string.attach_sync_section)) {
@@ -89,8 +90,10 @@ internal fun AttachSyncSection(vm: BackupViewModel) {
         AttachSyncActions(
             enabled = attachSyncEnabled,
             davUrl = davUrl,
-            // 附件同步是一趟独立长任务（几百 MB），所以只看自身状态，不占用全局 busy
-            running = attachSyncStage != null,
+            // 附件同步是一趟独立长任务（几百 MB），所以只看自身状态，不占用全局 busy。
+            // v1.2.15（P1-4）：running 改由 VM 里**同步翻转**的闸派生——此前是 attachSyncStage != null，
+            // 而它要等协程真正跑到第一句才置位，中间那段空窗足够双击再进一次。
+            running = attachRunning,
             onSync = { vm.syncAttachments() },
             onVerify = { vm.verifyAttachments() },
         )
@@ -149,8 +152,10 @@ private fun AttachSyncStats(counts: AttachmentSyncCounts, bytes: Long) {
 /**
  * 同步 / 校验两个按钮 + 校验说明。
  *
- * `running` 由父级从 `attachSyncStage != null` 派生后传值：进度字符串每 tick 都在变，
- * 但"是否在跑"只在开始/结束时翻转，本块因此不会跟着 tick 重组。
+ * `running` 由父级从 VM 的 `attachOperationRunning`（同步翻转的闸）派生后传值：进度字符串每 tick
+ * 都在变，但"是否在跑"只在开始/结束时翻转，本块因此不会跟着 tick 重组。
+ * v1.2.15（P1-4）：早先这里派生自 `attachSyncStage != null`，而后者要等协程执行到第一句才置位，
+ * 从点击到那一刻的空窗足以让第二次点击也穿过 —— 闸改了，这里的 `enabled` 才真正跟得上点击。
  */
 @Composable
 private fun AttachSyncActions(

@@ -103,6 +103,19 @@ class BackupViewModel(
     val restoreMode: StateFlow<BackupEngine.RestoreMode> = _restoreMode
     fun setRestoreMode(mode: BackupEngine.RestoreMode) { _restoreMode.value = mode }
 
+    /**
+     * v1.2.15（外部 UI 审查 P1-5）：这次待确认的恢复**是从哪个入口发起的**。
+     *
+     * 缺陷原状：待确认块固定渲染在恢复卡内部，而撤销入口在恢复卡**下方**——用户点完「用该快照
+     * 撤销」后，下一步出现在屏幕上方的另一张卡里，附近毫无变化，看起来像没反应，于是重复点。
+     *
+     * 修法不是把块挪到某处（挪到哪都会坑另一条路径），而是**谁发起、谁显示**：本字段决定
+     * 待确认块与恢复结果行落在哪张卡里。同一时刻只可能有一个入口在推进（两个入口都走
+     * [verifyBytes]，它会原子地覆盖这三个字段），所以两处永远只有一个渲染。
+     */
+    private val _restoreOrigin = MutableStateFlow(RestoreOrigin.PICKED_FILE)
+    val restoreOrigin: StateFlow<RestoreOrigin> = _restoreOrigin
+
     // ---- v1.2.11（缺陷工单 B07）：pre-restore 快照的应用内撤销 ----
     /**
      * 最近一次恢复前的自动快照。null = 没有可用快照 ⇒ UI **不渲染**撤销入口
@@ -315,7 +328,7 @@ class BackupViewModel(
         viewModelScope.launch {
             _busy.value = true
             try {
-                verifyBytes(fileName, bytes, password)
+                verifyBytes(fileName, bytes, password, RestoreOrigin.PICKED_FILE)
             } catch (e: Exception) {
                 fail(errText(e).ifEmpty { app.getString(R.string.vm_restore_verify_failed) })
             } finally { _busy.value = false }
@@ -328,11 +341,19 @@ class BackupViewModel(
      * 抽出来是为了让**撤销快照**走完全同一条路径（工单第 2 条「复用 `verifyBackup` 的
      * 解密、自校验和 A05 密钥域检查」）：撤销与普通恢复的差别只在「字节从哪来」，
      * 后面的解密、自校验、口令暂存、待确认块都必须逐字一致，否则就出现了第二条恢复链。
+     *
+     * v1.2.15（P1-5）：`origin` 只回答「待确认块该显示在发起它的那张卡里」，不参与任何校验。
      */
-    private suspend fun verifyBytes(fileName: String, bytes: ByteArray, password: String) {
+    private suspend fun verifyBytes(
+        fileName: String,
+        bytes: ByteArray,
+        password: String,
+        origin: RestoreOrigin,
+    ) {
         val d = repo.decryptAndSelfCheck(bytes, password.toCharArray())
         _pendingRestore.value = d
         _pendingFileName.value = fileName
+        _restoreOrigin.value = origin
         _restoreResult.value = null
         wipeRestorePassword()
         restorePassword = password.toCharArray()
@@ -379,7 +400,7 @@ class BackupViewModel(
             _busy.value = true
             try {
                 val bytes = withContext(Dispatchers.IO) { preRestoreStore.read(snapshot) }
-                verifyBytes(snapshot.name, bytes, password)
+                verifyBytes(snapshot.name, bytes, password, RestoreOrigin.SNAPSHOT_UNDO)
             } catch (e: Exception) {
                 fail(errText(e).ifEmpty { app.getString(R.string.vm_restore_verify_failed) })
             } finally { _busy.value = false }
@@ -465,6 +486,9 @@ class BackupViewModel(
         _pendingFileName.value = null
         _restoreResult.value = null
         _restoreMode.value = BackupEngine.RestoreMode.FULL_ROLLBACK
+        // v1.2.15（P1-5）：来源一并复位，否则下一次「选了文件、还没解密」的那段时间里，
+        // 待确认块的归属会停留在上一次的撤销入口。
+        _restoreOrigin.value = RestoreOrigin.PICKED_FILE
     }
 
     /** 一键恢复演练（协议 §7 首次恢复演练）。 */
@@ -612,6 +636,20 @@ class BackupViewModel(
     val attachSyncStage: StateFlow<String?> = _attachSyncStage.asStateFlow()
 
     /**
+     * v1.2.15（外部 UI 审查 P1-4）：同步 / 校验的**互斥闸**，在启动协程**之前**置位。
+     *
+     * 为什么不能复用 [attachSyncStage]：它是 `launch` 体内的第一句才置 null 的，而
+     * `viewModelScope.launch` 只是把协程排进队列——从点击到协程真正开始执行之间有一段空窗，
+     * 期间按钮读到的 `running` 仍是 false。双击、或「点完同步在首个进度回调前再点校验」，
+     * 就会两次都穿过 UI 的门，同时跑上传/删除与校验，进度与结果互相覆盖。
+     *
+     * 本闸在**调用线程**上同步翻转，不依赖 Compose 的重组时机；两个入口共用，`finally` 复位，
+     * 失败后仍可重试。`attachSyncStage` 继续只负责进度文案。
+     */
+    private val _attachOperationRunning = MutableStateFlow(false)
+    val attachOperationRunning: StateFlow<Boolean> = _attachOperationRunning.asStateFlow()
+
+    /**
      * 结果文案：(是否成功, 明细)；null = 尚无结果。
      *
      * 与 message 不同，这里刻意不 getString 成型：成功/失败是两条不同模板，
@@ -634,6 +672,9 @@ class BackupViewModel(
 
     /** 批量补传 + 清理待删远端。UI 侧应在开启开关且已配置 WebDAV 时才可点。 */
     fun syncAttachments() {
+        // v1.2.15（P1-4）：闸在调用线程上同步翻转，先占位再起协程（理由见 _attachOperationRunning）
+        if (_attachOperationRunning.value) return
+        _attachOperationRunning.value = true
         viewModelScope.launch {
             _attachSyncMsg.value = null
             _attachSyncStage.value = null
@@ -647,6 +688,7 @@ class BackupViewModel(
                 _attachSyncMsg.value = false to errText(e)
             } finally {
                 _attachSyncStage.value = null
+                _attachOperationRunning.value = false
                 refreshAttachStats()
             }
         }
@@ -657,6 +699,10 @@ class BackupViewModel(
      * 远端缺失的补传、远端多余的清理（本地已无记录）。与同步共用进度流，两者互斥。
      */
     fun verifyAttachments() {
+        // v1.2.15（P1-4）：与 syncAttachments 共用同一道闸——「同步跑着时不能起校验」由它保证，
+        // 而不是靠按钮的 enabled（那要等重组才生效）。
+        if (_attachOperationRunning.value) return
+        _attachOperationRunning.value = true
         viewModelScope.launch {
             _attachVerifyMsg.value = null
             _attachSyncStage.value = null
@@ -669,6 +715,7 @@ class BackupViewModel(
                 _attachVerifyMsg.value = false to errText(e)
             } finally {
                 _attachSyncStage.value = null
+                _attachOperationRunning.value = false
                 refreshAttachStats()
             }
         }

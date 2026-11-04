@@ -223,10 +223,13 @@ internal fun FlareHistoryList(
                     onClick = { onEdit(f) },
                     modifier = Modifier.heightIn(min = Size.touchMin),
                 ) { Text(stringResource(R.string.common_edit)) }
-                TextButton(
-                    onClick = { onDelete(f) },
-                    modifier = Modifier.heightIn(min = Size.touchMin),
-                ) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
+                DestructiveAction(
+                    label = stringResource(R.string.common_delete),
+                    confirmTitle = stringResource(R.string.flare_delete_confirm, f.startDate),
+                    confirmBody = stringResource(R.string.flare_delete_note) + "\n" +
+                        stringResource(R.string.common_delete_irreversible),
+                    onConfirm = { onDelete(f) },
+                )
             }
         }
         StatusChip(

@@ -38,6 +38,58 @@ viewModelScope.launch {
 - 本版 bump 后重跑：见 `E:\ASHKB\v1214-gate1.log`。
 - **无库结构变更**，`ASHKB_DB_VERSION` 仍 **21**，可覆盖安装。
 
+## [未发布] — 2026-11-04 · 外部 UI 审查批次 2（P1-4 / P1-5 / P1-6）
+
+**三处「按下去像没反应」的交互缺陷。** 无库结构变更（`ASHKB_DB_VERSION` 仍 **21**）、无版本号 bump、无新增字符串（全部复用既有文案）。
+
+### P1-4：附件同步与校验没有互斥，双击会跑两遍（`BackupViewModel.kt` / `BackupSyncSection.kt`）
+
+`syncAttachments()` 与 `verifyAttachments()` 都是「`viewModelScope.launch { … }` 里第一句才把进度态置空」。而 `viewModelScope.launch` 只把协程**排队**，从点击到协程真正执行之间有一段空窗——这段时间里按钮读到的 `running`（由 `attachSyncStage != null` 派生）仍是旧值。于是快速双击、或「点完同步在首个进度回调前再点校验」，两次都能穿过界面上的门。附件同步是逐字节上传，跑两遍不只是浪费流量，日志与计数也会对不上。
+
+修法：新增独立的 `_attachOperationRunning: MutableStateFlow<Boolean>`，两个入口在**调用线程上同步**（即在 `viewModelScope.launch` 之前）`if (_attachOperationRunning.value) return` + 置 true，两处 `finally` 复位。按钮的 `running` 改由它派生，`attachSyncStage` 退回只负责进度文案。
+
+这样闸落在 ViewModel 层，不依赖 Compose 的重组时序——**能测的也正是这一层**。
+
+### P1-5：从「用该快照撤销」发起的恢复，确认步骤在屏幕外（`BackupViewModel.kt` / `BackupRestoreSection.kt`）
+
+恢复是两步：先解密校验，再在**待确认块**里选模式并点「执行恢复」。这个待确认块过去固定渲染在恢复卡内部末尾，而「用该快照撤销」按钮所在的快照卡片排在恢复卡**下方**。从下方点撤销，待确认块出现在**上方那张卡里**——用户视角是「点了没反应」，然后重复点。
+
+报告给了两种改法：把按钮改名成「校验快照…」，或把待确认块挪到页面顶层。前者与 `backup_snapshot_note`「撤销本身也是一次恢复」的口径打架；后者挪到哪都会坑到另一条路径。采用的第三条：**谁发起、谁显示**——新增 `enum class RestoreOrigin { PICKED_FILE, SNAPSHOT_UNDO }`，`verifyBytes` 多一个 `origin` 参数并写入 VM（两入口都经过它，三者一次性覆盖，所以不存在「两个入口同时推进」），恢复卡只在 `PICKED_FILE` 时渲染待确认块与结果行，`UndoSnapshotBlock` 自己渲染 `SNAPSHOT_UNDO` 的那一份。`cancelRestore()` 一并复位来源，否则下一次「选了文件、还没解密」的空窗里归属会停在上一次的撤销入口。
+
+顺带把 `UndoSnapshotBlock` 的入参从 `onUndo: (String) -> Unit` 改成 `vm: BackupViewModel`——它现在要读五条 flow，再让父级转发反而更绕。
+
+### P1-6：发作历史的删除按钮不问就删（`SymptomCards.kt`）
+
+`FlareHistoryList` 的删除是一颗裸 `TextButton(onClick = { onDelete(f) })`，点下去 `vm.deleteFlare(it.id)` 立即落库。而同一屏的 `BasdaiList` 早就在用 `DestructiveAction`——两个删除按钮一个问一个不问，纯属历史遗留。
+
+改为复用 `DestructiveAction`，文案全部沿用既有串：`flare_delete_confirm`（说清删的是哪一次发作）、`flare_delete_note`（连带撤销「已第 7 天」提醒）、`common_delete_irreversible`。**无需新增字符串。**
+
+### 新增测试（8 条，均为源码静态断言）
+
+`BackupBatch2GuardTest`（新建，6 条）：闸必须在起协程**之前**翻转、闸必须在 `finally` 里复位、按钮运行态必须由闸派生（不许退回 `attachSyncStage != null`）、待确认块只在发起它的那张卡里渲染、两处入口各自把来源写进 VM、取消恢复要把来源一并复位。
+
+`FlareDeleteConfirmGuardTest`（新建，2 条）：删除必须走确认弹窗而不是直接回调落库、确认文案必须说清删的是哪一次发作以及连带后果。
+
+静态断言的理由与批次 1 相同：`BackupViewModel` 的构造要 `AshkbApplication` / 仓库三件套 / `DateProvider`，JVM 里搭不出来；而真正会退化的是「闸的位置挪了一行」「`finally` 里漏了复位」这种一句话级别的改动。
+
+其中 P1-5 那两条**最初写成 `contains` 断言，实测抓不住变异**——把条件改成 `if (false && restoreOrigin == …)` 时守卫仍然绿：子串意义上它确实「含有」该条件，但渲染被短路了。改成**整行相等**断言（`linesOf(...).contains("if (restoreOrigin == RestoreOrigin.SNAPSHOT_UNDO) {")`）后才真正变红。这条教训值得记住：`contains` 只能证明「字还在」，不能证明「它管用」。
+
+### 负向对照（六条，均实测变红后恢复）
+
+| 变异 | 变红的测试 |
+|---|---|
+| 把闸挪进 `launch` 体内（回到缺陷原状） | `互斥闸必须在起协程之前翻转，否则双击仍会一起穿过` |
+| verify 的 `finally` 不复位闸 | `闸必须在 finally 里复位，否则一次失败就把按钮永久锁死` |
+| `running` 退回 `attachSyncStage != null` | `按钮的运行态必须由闸派生，不能退回进度文案` |
+| 撤销块不渲染待确认块（`if (false && …)`） | `待确认块只在发起它的那张卡里渲染` |
+| 恢复卡不再按来源收窄（`if (pending != null)`） | 同上 |
+| 删除退回裸 `TextButton(onClick = { onDelete(f) })` | `发作删除必须走确认弹窗` + `确认文案必须说清删的是哪一次发作`（2 条） |
+
+### 门禁与状态
+
+- 全门禁见 `E:\ASHKB\v1215-p1-gate1.log`：BUILD SUCCESSFUL，**153 文件 / 1248 条单测，0 失败 0 错误 1 跳过**（1240 → 1248，新增 8 条）；detekt 0（`detekt.xml` 仅空 checkstyle 根）；lint **0 errors, 128 warnings, 8 information**（136 issues，与批次 1 完全一致，无新增）；`verifySpecSync` 通过。
+- 剩余批次：U-1～U-5（无障碍与大字体）、V-1 / V-3（视觉，V-1 需截图才能定）。
+
 ## [未发布] — 2026-11-04 · 外部 UI 审查批次 1（P0-1 / P0-2 / P0-3）
 
 **三个「会让人看到错的数、丢数据、或者放心地依赖一张不完整的纸」的缺陷。** 无库结构变更（`ASHKB_DB_VERSION` 仍 **21**）、无版本号 bump。
