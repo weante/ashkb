@@ -221,6 +221,13 @@ fun AppShell() {
         // y≈3087..3200，高 113px ≈ 41dp，正是手势区高度）就是它。
         // 透明之后，页面背景由各页面自己提供，dock 下方露出的就是页面本色。
         containerColor = Color.Transparent,
+        // V-1（外部 UI 审查）：显式声明内容前景色。
+        // 不写 `contentColor` 时 `Scaffold` 吃的是 `LocalContentColor`（由主题 surface 派生），
+        // 而这里 `containerColor` 传的是 `Color.Transparent` —— 底色被页面自己接管了，
+        // 前景色却仍按 surface 走，两者不同源。绝大多数页面都显式写了 `color = …`，
+        // 但「没写」的地方会吃到这条隐式色，与页面自绘的 background 底色对不齐。
+        // 写成 onBackground，让「默认前景」与「默认底色」同源。
+        contentColor = MaterialTheme.colorScheme.onBackground,
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             AnimatedVisibility(

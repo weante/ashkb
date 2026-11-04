@@ -662,6 +662,8 @@
     <string name="today_supplement_undo">Undo</string>
     <string name="today_supplement_no_reminder">No reminder</string>
     <string name="today_tab">Today</string>
+    <string name="trend_daily_hide">Hide daily values (%1$d days)</string>
+    <string name="trend_daily_values">Daily values (%1$d days)</string>
     <string name="trend_down_to">Down to</string>
     <string name="trend_flat">Unchanged at</string>
     <string name="trend_flat_short">No change</string>

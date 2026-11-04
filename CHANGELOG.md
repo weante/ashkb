@@ -38,6 +38,86 @@ viewModelScope.launch {
 - 本版 bump 后重跑：见 `E:\ASHKB\v1214-gate1.log`。
 - **无库结构变更**，`ASHKB_DB_VERSION` 仍 **21**，可覆盖安装。
 
+## [未发布] — 2026-11-04 · 外部 UI 审查批次 4（V-1 / V-3）
+
+**这是外部审查报告的最后一批。** 报告 §三 的 V-1～V-4 四条「视觉」项里，V-2 与 V-4 经核实**不成立**（见批次 1 的核实记录：V-2 引的 `ExerciseScreen.kt:360-422` 本来就在 `PrescriptionHero` 内部，处方的确是首屏第一个块；V-4 要的「step 2 返回先去 step 1」在 `MedEditScreen.goBackStep()` 里早已实现），所以真正落地的是两条。
+
+### V-1：根 `Scaffold` 显式声明内容前景色（`AppShell.kt`）
+
+**缺陷形态**：`AppShell.kt:217` 的根 `Scaffold` 只传了 `containerColor = Color.Transparent`，没传 `contentColor`。不传时 `Scaffold` 从 `LocalContentColor`（由主题 `surface` 派生）取默认前景，而这个容器的**底色已经被页面自己接管**（透明的意义就在这里，见该处 v1.1.6 的注释）。前景按 surface 走、底色按页面走，两者不同源。绝大多数页面都显式写了 `color = …`，所以肉眼几乎看不出；真正受影响的是「没写」的地方——那里会吃到这条隐式前景色。
+
+**修法**：补 `contentColor = MaterialTheme.colorScheme.onBackground`，让「默认前景」与「默认底色」同源。改动 7 行（1 行代码 + 6 行注释写清为什么）。
+
+**必须说明的边界**：报告要求改后用 v1.2.14 的**深色截图**验证导航文字、报表原始标题、分隔线，并强调「未复验前不得写成当前版本的确定回归」。本环境**没有设备、没有截图**，因此：
+- 这条改动是**显式化**，不是「修好了一个可见的对比度缺陷」——`onBackgroundDark = 0xFFE7EEF3` 与 `onSurface` 的明度差很小，视觉风险在代码层面无法证伪；
+- 深色下是否真有文字过暗，**仍然待真机截图确认**，本条不做结论。
+
+### V-3：图表补「逐日数值」文本列表（新组件 `DailyValuesList.kt`）
+
+**缺陷形态**：完整趋势图（`ui/components/TrendChart.kt`）只有**拖动手势**能读到单个点——`.pointerInput { detectHorizontalDragGestures(...) }` 在 `:250-261`，`.semantics { contentDescription = a11y }` 只给一句整段摘要。读屏用户听不到逐日值；手指粗或抖的人也停不住。图上方那行 `ReadoutRow` 只有「当前 / 较首次 / 均值 / 超阈值次数」，不含任何一天的具体数值。
+
+**修法**：新增 `app/src/main/java/com/ashkb/app/ui/components/DailyValuesList.kt`（141 行，全 LF）：
+
+- 一个 `TextButton`（`heightIn(min = 48.dp)`，文案自带天数：`逐日数值（%1$d 天）` / `收起逐日数值（%1$d 天）`），默认**收起**；
+- 展开后按行列出 `MM-dd` + 数值 + 单位，行高 ≥ 40dp，整行 `.semantics(mergeDescendants = true) { contentDescription = "$fullDate $text" }` —— 读屏一次读完「完整日期 + 数值 + 单位」；
+- 展开态列表自身 `.heightIn(max = LIST_MAX_HEIGHT /* 220.dp */).verticalScroll(...)`：外面是 `ModalBottomSheet` 的普通不可滚 `Column`，三十天以上的数据不设上限会把整张 sheet 顶出屏幕、连收起按钮都够不到；
+- 折叠状态用 `rememberSaveable`：展开到一半转屏又收起来，等于白点。
+
+两处调用点（同数据源、同单位，不做二次取数）：
+- `ui/report/ReportScreen.kt` 的展开 sheet，紧跟 `TrendChart(...)` 之后：`DailyValuesList(points = s.points, unit = s.unit)`；
+- `ui/wellness/WellnessVitalsSections.kt` 的体重卡：`DailyValuesList(points = points, unit = "kg")`。
+
+**为什么不塞进 `TrendChart`**（本批次唯一的架构约束）：`config/detekt/baseline.xml` 里 `TrendChart` 的 `LongMethod` / `CyclomaticComplexMethod` 是按**完整签名**登记的，加一个形参就会让基线失配、旧问题重新冒出来——批次 3 在 `OverviewPage` 上已经踩过一次。所以 `TrendChart.kt` 本轮**一个字都没改**（`git diff` 为空），新组件由调用点各取所需。
+
+**数值/单位排版**（`internal fun dailyValueText`）：整数不补 `.0`（`7` 而非 `7.0`）、小数保留一位、`/10` 这类后缀式单位直接贴（`7/10`）、`kg` 这类词式单位留一个空格（`65.2 kg`）、`" mmHg"` 这种自带前导空格的先 `trim()` 再拼，避免双空格。日期口径 `dailyDateText` 与坐标轴刻度一致取 `MM-dd`（完整年份在语义描述里）。
+
+### 新增字符串（按字节插入、CRLF 保留）
+
+`values/strings.xml`（现 CRLF=1549 / LF=1552）与 `values-en/strings.xml`（现 CRLF=1475 / LF=1478）各 2 条，按 name 字母序插在 `trend_down_to` 之前：`trend_daily_hide`（zh「收起逐日数值（%1$d 天）」/ en「Hide daily values (%1$d days)」）、`trend_daily_values`（zh「逐日数值（%1$d 天）」/ en「Daily values (%1$d days)」）。
+
+### 新增测试（13 条）
+
+`app/src/test/java/com/ashkb/app/ui/components/DailyValuesListTest.kt`（70 行，全 LF，**8 条**）——测两个纯函数：整数不补小数点 / 小数保留一位 / 后缀式单位粘贴 / 词式单位留空格 / 空与空白单位退化 / 完整日期取月日 / 跨年取月日 / 非标准长度原样返回不崩。
+
+`app/src/test/java/com/ashkb/app/ui/UiUxBatch4GuardTest.kt`（120 行，全 LF，**5 条**）——源码静态断言（V-1 与 V-3 都要真机渲染才能观测，但退化能在源码层面钉住）：
+1. 根 `Scaffold` 必须含 `contentColor = MaterialTheme.colorScheme.onBackground`，且 `containerColor = Color.Transparent` 这条前提仍在（前提变了要重新评估）；
+2. 报告页展开 sheet 里 `TrendChart` 之后必须有 `DailyValuesList(points = s.points, unit = s.unit)`；
+3. 体重卡必须有 `DailyValuesList(points = points, unit = "kg")`；
+4. **不许把逐日列表塞进 `TrendChart`**（不含 `dailyValues: Boolean` 形参、不含 `DailyValuesList(` 调用）；
+5. 默认必须收起（`mutableStateOf(false)`）、必须用 `rememberSaveable`、展开后必须限高滚动。
+
+辅助函数说明：`body()` 把**换行也压成单空格**再找锚点——Compose 的调用点几乎都是多行写的，用带 `\n` 的字面锚点在不同文件里必然 0 命中（这个坑在批次 3 的负向脚本里踩过）；`code()` 剥掉纯注释行，因为改动的注释里会引用旧写法。
+
+### 七条负向对照（全部实测变红，日志 `E:\ASHKB\v1215-v-negctl.log`）
+
+| 变异 | 变红的测试 |
+|---|---|
+| V-1 删掉 `contentColor` | `根 Scaffold 必须显式声明内容前景色…` |
+| V-3 报告页摘掉 `DailyValuesList` | `报告页展开图必须有逐日数值列表，且与图表同数据源同单位` |
+| V-3 体重卡摘掉 `DailyValuesList` | `体重卡也必须有逐日数值列表` |
+| V-3 默认展开（`mutableStateOf(true)`） | `逐日列表必须默认收起…` |
+| V-3 展开列表去掉 `.heightIn(max = …)` | `逐日列表必须默认收起…` |
+| V-3 把 `DailyValuesList` 塞进 `TrendChart` | `不许把逐日列表塞进 TrendChart，那会让 detekt 基线失配` |
+| 数值排版退回 `value.toString()` | `后缀式单位直接贴上去` |
+
+脚本 `E:\ASHKB\.tmp-negctl-b4.py`：备份到 `.tmp-negctl-b4-bak\`，`finally` 里 `shutil.copy2` 全量还原；判「是否捕获」**解析 `app/build/test-results/testDebugUnitTest/*.xml` 的 `failure`/`error` 子节点**，不靠 stdout 的 `FAILED` 行（中文用例名在 GBK 控制台是乱码）；每轮跑前先删该目录避免上一轮残留误判。跑完 `git status` 复核：七个锚点原状全部 `True`。
+
+### 门禁 `E:\ASHKB\v1215-v-gate1.log`
+
+`gradle testDebugUnitTest detekt lint verifySpecSync` → **BUILD SUCCESSFUL in 1m 51s**。单测 **157 文件 / 1288 条 / 0 失败 / 0 错误 / 1 跳过**（1275 → 1288，新增 13）；`detekt.xml` 仅空 `<checkstyle version="4.3"></checkstyle>`（0 issues，**未动基线**）；lint **138 issues / 0 errors / 130 warnings / 8 information**（128 → 130，新增 2 条都是 `PluralsCandidate`，落在 `trend_daily_values`/`trend_daily_hide` 的 `%1$d 天` 上——全项目 81 条同类警告都用 `%d` 单串，属既有口径，本轮不单开先例）；`verifySpecSync` 通过。版本号**未 bump**（仍 `versionCode = 126` / `versionName = "1.2.14"`，无功能新增、无库结构变更）。
+
+### 外部审查报告至此全部处理完毕
+
+| 批次 | 项 | 结果 |
+|---|---|---|
+| 1 | P0-1 / P0-2 / P0-3 | 已落地 |
+| 2 | P1-4 / P1-5 / P1-6 | 已落地 |
+| 3 | U-1 / U-2 / U-3 / U-4 / U-5 | 已落地（U-5 报告机制写错但缺陷真实） |
+| 4 | V-1 / V-3 | 本轮落地（V-1 需真机深色截图复验） |
+| — | V-2 / V-4 | 经核实**不成立**，不改 |
+
+仍未做（与前几批一致，属真机欠账）：`restore()` 五步真机路径、`webdav_config` 明文凭据迁移的测试、恢复演练首次点击无反应（待办 ⑦）、WebDAV 20MB 附件真实下载（待办 ⑧）。
+
 ## [未发布] — 2026-11-04 · 外部 UI 审查批次 3（U-1～U-5）
 
 **无障碍与大字号：读屏拿不到的表单语义、被硬编码列数挤坏的图表、失败后就永久转圈的统计页、两处用错单位/颜色的序列、以及一处「校验没过也把用户输入擦掉」。** 无库结构变更（`ASHKB_DB_VERSION` 仍 **21**）、无版本号 bump。

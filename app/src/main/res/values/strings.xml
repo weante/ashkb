@@ -657,6 +657,8 @@
     <string name="today_supplement_undo">撤销</string>
     <string name="today_supplement_no_reminder">不提醒</string>
     <string name="today_tab">今日</string>
+    <string name="trend_daily_hide">收起逐日数值（%1$d 天）</string>
+    <string name="trend_daily_values">逐日数值（%1$d 天）</string>
     <string name="trend_down_to">降至</string>
     <string name="trend_flat">持平于</string>
     <string name="trend_flat_short">不变</string>

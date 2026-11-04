@@ -61,6 +61,7 @@ import com.ashkb.app.R
 import com.ashkb.app.ui.components.KeyValueRow
 import com.ashkb.app.ui.components.LoadingBlock
 import com.ashkb.app.ui.components.NavRow
+import com.ashkb.app.ui.components.DailyValuesList
 import com.ashkb.app.ui.components.DoseCompletionBlock
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.PageHeader
@@ -770,6 +771,9 @@ private fun TrendCharts(t: ReportRepository.Trends) {
                     threshold = s.threshold,
                     accent = s.accent,
                 )
+                // V-3（外部 UI 审查）：图上只有拖动手势能读到单个点，读屏用户听不到、
+                // 手指抖的人也停不住。补一份同数据源同单位的逐日文本列表，默认收起。
+                DailyValuesList(points = s.points, unit = s.unit)
                 s.caveat?.let {
                     Text(it, style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
                 }

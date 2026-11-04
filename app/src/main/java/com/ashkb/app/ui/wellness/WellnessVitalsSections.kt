@@ -35,6 +35,7 @@ import com.ashkb.app.data.entity.Profile
 import com.ashkb.app.data.entity.Vitals
 import com.ashkb.app.domain.ClinicalThresholds
 import com.ashkb.app.domain.WeightTarget
+import com.ashkb.app.ui.components.DailyValuesList
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.KeyValueRow
 import com.ashkb.app.ui.components.SectionCard
@@ -125,6 +126,8 @@ private fun WeightCard(vm: WellnessViewModel, sheets: MutableState<WellnessSheet
         }
         if (points.isNotEmpty()) {
             TrendChart(points = points, unit = "kg", label = stringResource(R.string.vitals_weight))
+            // V-3（外部 UI 审查）：补齐逐日数值文本列表，读屏与不便精细拖动的人也能读到每一天。
+            DailyValuesList(points = points, unit = "kg")
             Spacer(Modifier.height(Spacing.md))
         }
         StatTile(
