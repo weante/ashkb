@@ -1,3 +1,43 @@
+## [v1.2.14] — 2026-11-04
+
+**两个已经写完、过了门禁、但漏在 v1.2.13 发布提交之外的补丁，本版补发。** 无功能新增、无库结构变更（`ASHKB_DB_VERSION` 仍 21）。
+
+### 为什么要发这一版
+
+`git log` 的实际形状是：v1.2.13 的发布提交 `373f4a9` 之后，`main` 上又落了 `43043d1`（S-6）与 `86579d4`（补记卡）两个补丁——两个都在文档里被记作「未发版」，但**都已经提交并推送**，于是 `HEAD` 与 `v1.2.13` 之间隔了两个从未对外交付的修复。
+
+逐条核对 `373f4a9` 时点后确认：**线上 v1.2.13 拿到的是旧的备份规则**（`backup_rules.xml` 里仍然只有 `<exclude domain="database" path="ashkb.db" />`），S-6 指出的数据外流面在已发布版本里是真实存在的。所以这一版的主项是一个**安全修复**，而不是常规迭代。
+
+### S-6：系统云备份改为整域排除（提交 `43043d1`）
+
+`res/xml/backup_rules.xml` 与 `res/xml/data_extraction_rules.xml` 都改为对 `database` / `sharedpref` / `file` / `root` / `external` **五域整域** `path="."` 排除，且 `data_extraction_rules.xml` 的 `cloud-backup` 与 `device-transfer` **两段都覆盖**（换机整包搬迁同样会搬走明文附件）。
+
+原来那条 `<exclude domain="database" path="ashkb.db" />` 的含义是「除 `ashkb.db` 外其余全随系统备份走」，实际落在范围内的高敏内容至少还包括：`shared_prefs/vault_config`（恢复码的 Keystore 密文）、`shared_prefs/webdav_config`（WebDAV 地址与账号）、`files/checkup_attachments/`（**明文**化验与影像附件）、`files/exports/`（**明文**报告 PDF 与钥匙扣二维码 PNG）、崩溃日志与 `-wal` / `-shm` 旁文件。
+
+守卫：`BackupRulesCoverageTest` 5 条纯静态解析（全域覆盖 / 两段都覆盖 / 禁 `<include>` / 清单仍 `allowBackup="false"` 且仍引用两文件 / 域名取值合法），两次负向对照均命中。README 同步补「已知的边界与取舍（知情披露）」五条（Argon2id 反向不兼容、S-2 单一 vault key、S-4 活动库明文、S-6 云备份关闭、恢复码需设备凭证 + 剪贴板 60 秒清除）。
+
+### 补记卡不随药单变化刷新（提交 `86579d4`）
+
+在「我的 → 药单管理」停用并永久删除某支药后，今日页「昨天还有 1 剂未记录」补记卡仍挂着那支药，要 `force-stop` 重启才消失。根因是 `TodayViewModel._yesterdayPending` 只在构造 / 跨日广播 / 本页打卡跳过时重算，「在别的页面改了药单」不在其中；而 `refreshYesterdayPending()` 读的正是 `listActive()`。
+
+修法是在 `init` 里订阅活跃药单：
+
+```kotlin
+viewModelScope.launch {
+    repo.observeMedications().collect { refreshYesterdayPending() }
+}
+```
+
+选「观察活跃药单」而不是「删药后通知一次」的理由：停用（`UPDATE medications SET is_archived = 1`）与删除（`DELETE FROM medications`）写的是同一张表，Room 的 `InvalidationTracker` 都会让 `observeActive()` 重发新值，一处订阅盖住两条路径。
+
+守卫：`TodayYesterdayPendingRefreshTest` 5 条（init 订阅 + collect 重算 / 重算读 `listActive()` / 停用与删除都会发新值 / 补记卡仍走 `PendingDoses.unsettledOn` 唯一口径 + 空药单空卡），负向对照命中。
+
+### 门禁
+
+- 两个补丁各自的门禁：`E:\ASHKB\s6-gate1.log` 全绿 146 文件 / 1215 条；`E:\ASHKB\stale-pending-gate1.log` 全绿 147 文件 / 1220 条（detekt 0、lint 171 = 0 Error、verifySpecSync 过）。
+- 本版 bump 后重跑：见 `E:\ASHKB\v1214-gate1.log`。
+- **无库结构变更**，`ASHKB_DB_VERSION` 仍 **21**，可覆盖安装。
+
 ## [未发布] — 2026-11-03 · 真机反馈：补记卡不随药单变化刷新
 
 **v1.2.13 真机复验顺带查出的缺陷**（维护者当场发现：「我今日页怎么有个未记录的，你没删除，TestDrugB2」）。
