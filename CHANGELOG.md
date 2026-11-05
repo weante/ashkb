@@ -1,3 +1,26 @@
+## [未发布] — 2026-11-05 · 真机验收清单与 ⑦ 复现手册入库
+
+**没有改一行代码，入库的是两份「怎么验」的文档。** 加 `docs/` 目录（仓库此前没有这个目录）。
+
+### 为什么现在写这两份
+
+`HANDOFF-STATUS.md` §2 与 §7-B 里堆着一批「需要真机」的待办，但它们长期是一句话（「WebDAV 真实网络 20 MB 附件往返」），没有判据，于是每轮真机走查都能得出「装上、点两下、说不清」的结果。更具体的教训是 `⑦ 恢复演练首次点击无反应`：`BackupRepository.kt` 与 `BackupViewModel.kt` 的 `Log.*` 调用数**是 0**（全项目只有 4 个文件用 `Log`），所以当年「logcat 里没看到异常」是**空证据**——这条缺陷记了这么久，其实从来没有过判定依据。
+
+### 新增文件
+
+- **`docs/v1215-device-acceptance.md`**（415 行）：9 个真机用例，按「失败代价从高到低」编号，但给出实际执行顺序 **4 → 1 → 3 → 5 → 2 → 6 → 7 → 8 → 9**（升级兼容必须先做；#3 会真覆盖库、#5 会改档案；#1 与 #3 同页）。每条都带**可判定判据**而不是「看看有没有问题」：⑦ 的判定表是「`_busy` 是否翻转 × 台账演练条数」，四格各自对应「通过 / 真缺陷（无守卫）/ 真缺陷（没进函数）/ 无法判定」；⑧ 给了超时与截断各自的失败签名；⑥ 明确写了**报表统计全是本地 Room 查询，飞行模式造不出失败**，所以 Error 态建议记「无法判定」而不是为它去动数据库。
+- **`docs/v1215-repro-⑦-drill-first-click.md`**（145 行）：⑦ 的静态排查记录 + 五个可证伪假设（H1 已进入但无反馈 / H2 无守卫导致重复演练 / H3 注入坐标假象 / H4 被前一操作占住 / H5 `wal_checkpoint(TRUNCATE)` 同步阻塞），每个给判据与 PowerShell 取数步骤。**故意没改代码**——改了会改变 H1/H2 的观测结果，得先取基线。
+
+### 入库前做了脱敏
+
+仓库是 **PUBLIC**，而验收清单里原本写着本机 WebDAV 靶机的临时隧道地址与测试口令，已替换成 `<TUNNEL_URL>` / `<TEST_PASSWORD>` 两个占位符，并在 0.3 节加了「这是占位符，不是漏填」的说明与现取命令（隧道每次重启都换地址，口令在 `dav-harness/wsgidav.yaml` 的 `simple_dc.user_mapping` 里）。真实值只留在本地 `E:\ASHKB\release-tooling\dav-harness\`（不入库）。
+
+### 顺带记下的三条环境事实
+
+1. **项目没有 gradle wrapper**——必须 `. E:\ASHKB\build-env\env.ps1` 后 `gradle -p E:\ASHKB\patient-health-app …`。
+2. **备份页截图必然全黑**：`BackupScreen.kt:72` / `BackupRecoverySection.kt:155` / `BackupSheets.kt:57` 调了 `SecureWindow()`（FLAG_SECURE）。这不是 bug，`uiautomator dump` 不受影响——清单里的两个助手函数 `Get-UiDump` / `Find-UiNode` 就是为此写的。
+3. **自签名证书这条路走不通**：app 用默认 `SSLContext` 且 `targetSdk=34`，Android 7+ 不信任用户安装的 CA ⇒ 必然 `SSLHandshakeException`。靶机改成本机明文 HTTP + cloudflared quick tunnel 在前面终止 TLS，对外是 `*.trycloudflare.com` 的真证书，**不改一行 app 代码**。
+
 ## [v1.2.15] — 2026-11-05
 
 **一份外部 UI 审查报告的完整落地，外加一个此前只补了测试没进发布产物的诚实说明。** 无库结构变更（`ASHKB_DB_VERSION` 仍 21），可覆盖安装。

@@ -280,6 +280,8 @@ gh release edit v1.0.70 --prerelease=false --latest
 
 **B. 需要真机（设备开无线调试即可，代码侧已就绪）**
 
+> 📋 **这一节的操作步骤已整理成可执行清单**：`docs/v1215-device-acceptance.md`（9 个用例、每条带可判定判据、实际执行顺序 4→1→3→5→2→6→7→8→9）。下面 B-1～B-7 是「验什么」的索引，那份文件是「怎么验、怎么判」。其中 ⑦ 恢复演练有单独的排查记录 `docs/v1215-repro-⑦-drill-first-click.md`（含五个可证伪假设与取数命令——注意 `BackupRepository.kt` / `BackupViewModel.kt` 的 `Log.*` 调用数是 **0**，所以「logcat 里没异常」从来不是证据）。另注意：备份页调了 `SecureWindow()`（FLAG_SECURE），截图必然全黑，只能靠 `uiautomator dump`。
+
 1. **裁决项 5「临界」的真机观感**——功能已验（化验摘要 `56 项 · 10 项异常 · 5 项临界` 已见），但仍缺一条**距参考边界 ≤5%** 的真实化验值来目视第四态胶囊。
 2. `MedEditScreen` 保存路径、`WellnessScreen` 下半屏、`KeyValueRow` 新对齐（UI 2.0 批次 B–E 的三处未验点）。
 3. `restoreMutex` 真机双击（并发恢复互斥）。
