@@ -271,13 +271,26 @@ interface KbEntryDao {
     @Query("SELECT * FROM kb_entries WHERE id = :id")
     suspend fun byId(id: String): KbEntry?
 
-    @Query("SELECT * FROM kb_entries WHERE category = :category ORDER BY id")
+    @Query(
+        "SELECT * FROM kb_entries WHERE category = :category " +
+            "ORDER BY CASE WHEN id LIKE 'usr-%' THEN 0 ELSE 1 END, id",
+    )
     fun observeByCategory(category: String): Flow<List<KbEntry>>
 
-    @Query("SELECT * FROM kb_entries WHERE category = :category ORDER BY id")
+    @Query(
+        "SELECT * FROM kb_entries WHERE category = :category " +
+            "ORDER BY CASE WHEN id LIKE 'usr-%' THEN 0 ELSE 1 END, id",
+    )
     suspend fun listByCategory(category: String): List<KbEntry>
 
-    @Query("SELECT * FROM kb_entries ORDER BY id")
+    /**
+     * v1.2.16：**个人条目（`usr-` 前缀）排在最前**——自己写的内容，要找时通常最先要找。
+     * 只改排序不改可见性：分类视图 / 检索照旧能看到它们。
+     */
+    @Query(
+        "SELECT * FROM kb_entries " +
+            "ORDER BY CASE WHEN id LIKE 'usr-%' THEN 0 ELSE 1 END, id",
+    )
     fun observeAll(): Flow<List<KbEntry>>
 
     /**
@@ -287,14 +300,24 @@ interface KbEntryDao {
      * （未回填的行 search_text 为 NULL，LIKE 结果为 NULL，不参与匹配）。
      * 不迁 FTS4 的原因见 domain/KbSearch 注释（FTS4 分词器对中文子串零命中）。
      */
-    @Query("SELECT * FROM kb_entries WHERE `search_text` LIKE '%' || :q || '%' ORDER BY id LIMIT :limit")
+    @Query(
+        "SELECT * FROM kb_entries WHERE `search_text` LIKE '%' || :q || '%' " +
+            "ORDER BY CASE WHEN id LIKE 'usr-%' THEN 0 ELSE 1 END, id LIMIT :limit",
+    )
     fun search(q: String, limit: Int): Flow<List<KbEntry>>
 
     @Query("SELECT * FROM kb_entries WHERE review_due < :today ORDER BY review_due")
     suspend fun overdueReview(today: String): List<KbEntry>
 
-    /** R27 矩阵输入：取运动类条目按 grade_matrix / block_rule 过滤 */
-    @Query("SELECT * FROM kb_entries WHERE category = 'exercise' ORDER BY id")
+    /**
+     * R27 矩阵输入：取运动类条目按 grade_matrix / block_rule 过滤。
+     *
+     * v1.2.16：排除个人条目——运动库每张卡都按 payload 里的 grade_matrix / block_rule 渲染，
+     * 个人条目没有这些字段，混进来只会得到一张点开就空的卡。
+     */
+    @Query(
+        "SELECT * FROM kb_entries WHERE category = 'exercise' AND id NOT LIKE 'usr-%' ORDER BY id",
+    )
     suspend fun exercises(): List<KbEntry>
 
     @Query("SELECT * FROM kb_entries WHERE category = 'emergency' ORDER BY id")
@@ -311,6 +334,31 @@ interface KbEntryDao {
     /** v10：有个人备注的条目数（知识库页提示用） */
     @Query("SELECT COUNT(*) FROM kb_entries WHERE user_note IS NOT NULL AND user_note != ''")
     fun observeNoteCount(): Flow<Int>
+
+    // ---- v1.2.16：个人条目（id 前缀 usr-）的单条读写 ----
+    //
+    // 不需要新表 / 新列：条目形状完全相同，区别只在「谁写的」——用 id 前缀表达
+    // （理由见 domain/KbUserEntry 类注释）。种子刷新只遍历种子清单，天然不碰这些行。
+
+    /** 新建一条个人条目（主键由调用方按 `Ids.new("usr")` 生成）。 */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertUserEntry(entry: KbEntry)
+
+    /** 整行更新个人条目（编辑保存）。调用方须把 `user_note` 从旧行拷回。 */
+    @Update
+    suspend fun updateUserEntry(entry: KbEntry)
+
+    /** 删除一条条目，返回受影响行数（0 = 该 id 不存在）。 */
+    @Query("DELETE FROM kb_entries WHERE id = :id")
+    suspend fun deleteById(id: String): Int
+
+    /** 全部个人条目（导出与「我的条目」计数用）。 */
+    @Query("SELECT * FROM kb_entries WHERE id LIKE 'usr-%' ORDER BY id")
+    suspend fun listUserEntries(): List<KbEntry>
+
+    /** 个人条目数（知识库页提示用）。 */
+    @Query("SELECT COUNT(*) FROM kb_entries WHERE id LIKE 'usr-%'")
+    fun observeUserCount(): Flow<Int>
 }
 
 @Dao

@@ -119,7 +119,7 @@ gh release edit v1.0.70 --prerelease=false --latest
 | **趋势页方案 B「总览 + 展开」** | 未做 | 顶部「指标总览」卡（每指标一行：名称 + 当前值 + 变化 + sparkline），点行进详情大图。方案 A 已落 v1.0.45、C 已落 v1.0.54；若继续做 B，**必须基于 C 已实现的「点格展开大图」收敛**，否则两套详情入口重复 |
 | **Compose 性能审查剩余结构性重构** | **7 项中 4 项已完成 / 1 项判定不做 / 剩 2 项未做**（2026-10-31 逐项实测更新；旧版把这 7 项一概写成「未做」是错的，旧计数口径也有误） | ① ✅ **已完成**（2026-10-31，C1-①，见文末小节）：MedEdit 早已拆（`ui/me/MedEditSections.kt` 739 行 / `ui/me/MedEditScreen.kt` 425 行）；Backup 也已拆——`ui/backup/BackupScreen.kt` **1325 → 332 行**，按分区新增 7 个文件（`BackupRestoreSection.kt` 306 / `BackupSyncSection.kt` 246 / `BackupSheets.kt` 181 / `BackupRecoverySection.kt` 179 / `BackupLocalSection.kt` 153 / `BackupLedgerSection.kt` 124 / `BackupFormat.kt` 26）。② **未做**：各 root `Screen` 里 `collectAsState` 实测 `CheckupScreen` 10 / `SymptomScreen` 6 / `ExerciseScreen` 5 / `BackupScreen` 4（拆分后这 4 条就在根函数 `BackupScreen` 自己身上，已达标）/ `KnowledgeScreen` 3 / `TodayScreen` 3（`EmergencyScreen` / `MedEditScreen` / `ProfileEditScreen` / `ReminderCheckScreen` / `WellnessScreen` 的 root 函数为 0，已由子 Composable 各自收集）。③ **未做**：`BackupViewModel.kt` **20 个** `MutableStateFlow`、`ReportViewModel.kt` **7 个**，均未合并成单一 `UiState`。④ ✅ **已完成**（v1.0.40 + 批次 11）：`AppShell.kt` 只剩 `meVm` / `wellnessVm` / `checkupVm` / `emergencyVm` 四个在 shell 里创建，且每个都有**多路由共用**的硬理由（`AppShell.kt:189-212` 的注释逐条写了三条下沉判据）；其余 8 个 VM 全部在各自的 `composable<X>` 里 `viewModel(factory = ...)` 取，返回栈语义不变。⑤ ❌ **已判定不做**：项目既有先例一律是「默认截断 5 条 + 显式展开」，改成进父 `LazyListScope` 的 `LazyColumn` 会破坏 `DividerList` 现用的 `RowScope` 契约。⑥ **未做**：14 个文件共 20 处 `verticalScroll` **真实调用**（`CheckupLabImaging.kt` 5、`BackupSheets.kt` 2、`SymptomDialogs.kt` 2，其余各 1：`BackupScreen.kt` / `DisclaimerScreen` / `AttachmentSheet` / `EmergencyEventSheet` / `ExerciseScreen` / `KbDetailDialog` / `MedEditScreen` / `ProfileEditScreen` / `ReminderCheckScreen` / `RecipesScreen` / `WellnessScreen`）。⚠️ 旧版写「37 处」是**关键字计数口径**（把注释与 `import` 一起数了，全仓关键字出现 40 次）；拆分后 backup 目录只剩 3 处真实调用（`BackupScreen.kt:209`、`BackupSheets.kt:61` / `:117`），与拆分前 `.orig` 逐处对应，零丢失。⑦ ✅ **已完成**（v1.0.86 / 批次 11）：`domain/DateProvider.kt` 已是进程级单例，改监听 `ACTION_DATE_CHANGED` / `ACTION_TIME_CHANGED` / `ACTION_TIMEZONE_CHANGED` 三条系统广播（**不再用 `delay` 推算零点**——`postDelayed` 按 `uptimeMillis` 计时，深睡不计时，夜里会漏跨日），注册 `RECEIVER_NOT_EXPORTED`（API 33+），并保留 `refreshIfStale()` 供各页 `ON_RESUME` 兜底；7 个 VM 已全部改用它 |
 | **S1b 滑杆手势回归测试** | ❌ **已实测证伪，不落地** | Robolectric 能注入触摸，但**裸 M3 `Slider` 也拖不动**——环境能力边界，不是应用缺陷。**勿再起这个坑** |
-| **知识库完整编辑器 / 内容导入导出** | 后移 | 明确「后移阶段 2 之后」 |
+| **知识库完整编辑器 / 内容导入导出** | ✅ **已实现（2026-11-15 · 未发版）** | 原先记「后移阶段 2 之后」，2026-11-15 已落地：个人条目（`usr-` 前缀 / `USR` 证据层级）新建·编辑·删除 + 个人条目 JSON 导入导出。**不动库结构**（仍 `ASHKB_DB_VERSION=21`，无迁移、无 schema 导出），条目与种子共表、以 id 前缀区分；种子刷新只遍历种子清单，永不触碰 `usr-` 行。细节见 `CHANGELOG.md` 顶部「知识库个人条目」节 |
 | **文档不一致** | 已修（本次） | 见本文件末尾「本次复验修正」 |
 
 ---
@@ -276,7 +276,7 @@ gh release edit v1.0.70 --prerelease=false --latest
 1. ✅ **审查报告 §十 的 5 条医学规则澄清**——**2026-11-01 维护者已作答**（原件 `C:\Users\weant\Documents\Qoder\2026-09-28\a6159f90\ASHKB-代码审查报告.md:260-266`）。裁决：①审查目的权重 = 自用可靠性优先；②医疗规则处置权 = 允许把安全默认值改保守；③备份威胁模型 = **不信任 WebDAV 服务商**（⇒ S-1 Argon2id 升 P1、S-3 恢复码保护升 P1）；④锁屏急救卡 = **只公开标题、详情需解锁**；⑤改造预算 = 第 3 批医学规则可以动。**其中 3、4 与三条医学缺口已落地（见文末「审查 §十 落地」节）；这条闸门已解除。** 仍留维护者裁决的只剩下面 2~4 项。
 2. **R16 批量导入**是否纳入 v3（见 §3.2；v3 需求表未继承 R14 / R15 / R16）。
 3. **趋势页方案 B** 是否要做——若做，**必须基于方案 C 已实现的「点格展开大图」收敛**，否则两套详情入口重复。
-4. **知识库完整编辑器**（§3.2 记为「后移阶段 2 之后」，需确认是否已到时机）。
+4. ~~**知识库完整编辑器**~~ —— **2026-11-15 已实现（未发版）**，不再是裁决项：个人条目新建 / 编辑 / 删除 + JSON 导入导出，见 §3.2 与 `CHANGELOG.md` 顶部「知识库个人条目」节。
 
 **B. 需要真机（设备开无线调试即可，代码侧已就绪）**
 

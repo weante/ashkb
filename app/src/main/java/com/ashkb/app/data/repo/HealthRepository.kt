@@ -37,6 +37,7 @@ import com.ashkb.app.domain.ExerciseLogStatus
 import com.ashkb.app.domain.ImagingImport
 import com.ashkb.app.domain.ImportResult
 import com.ashkb.app.domain.KbSearch
+import com.ashkb.app.domain.KbUserEntry
 import com.ashkb.app.domain.LabImport
 import com.ashkb.app.domain.MinimalMode
 import com.ashkb.app.domain.ScreeningSeeds
@@ -550,6 +551,59 @@ class HealthRepository(private val context: Context) {
                 kbRef = e.id,
             )
         }
+    }
+
+    // ---- v1.2.16：个人条目（知识库编辑器 / 导入导出） ----
+
+    /** 个人条目：全部（导出用） */
+    suspend fun listKbUserEntries(): List<KbEntry> = kbDao.listUserEntries()
+
+    /** 个人条目数（知识库页提示用） */
+    fun observeKbUserCount(): Flow<Int> = kbDao.observeUserCount()
+
+    /** 新建个人条目：主键按 `Ids.new("usr")` 生成，与种子前缀不冲突 */
+    suspend fun createKbUserEntry(draft: KbUserEntry.Draft, today: String): KbEntry {
+        val row = KbUserEntry.toEntry(draft, existing = null, id = Ids.new("usr"), today = today)
+        kbDao.insertUserEntry(row)
+        return row
+    }
+
+    /**
+     * 编辑个人条目。**只允许 `usr-` 前缀的行**——种子条目的内容归 App 版本所有，
+     * 就地改会被下一次种子刷新按字段比对覆盖（`KbSeedRefresh.isRevised`），
+     * 用户会看到「改了又变回去」。种子条目只有个人备注层可写。
+     *
+     * @return false = id 缺失 / 不是个人条目 / 行已不存在
+     */
+    suspend fun updateKbUserEntry(draft: KbUserEntry.Draft, today: String): Boolean {
+        val id = draft.id ?: return false
+        if (!KbUserEntry.isUserEntry(id)) return false
+        val existing = kbDao.byId(id) ?: return false
+        kbDao.updateUserEntry(KbUserEntry.toEntry(draft, existing = existing, id = id, today = today))
+        return true
+    }
+
+    /** 删除个人条目；种子条目一律拒绝（返回 false） */
+    suspend fun deleteKbUserEntry(id: String): Boolean {
+        if (!KbUserEntry.isUserEntry(id)) return false
+        return kbDao.deleteById(id) > 0
+    }
+
+    /** 导出个人条目 JSON（无条目时也是合法的空结构） */
+    suspend fun exportKbUserJson(): String = KbUserEntry.exportJson(kbDao.listUserEntries(), nowIso())
+
+    /**
+     * 导入个人条目：解析 → 单事务整批写入。
+     *
+     * 整批一个事务：导入要么全进、要么全不进——半批落库后失败，用户看到的条数与
+     * 文件对不上，还会在下一次导入时产生重复条目。
+     */
+    suspend fun importKbUserJson(text: String, today: String): KbUserEntry.ImportPlan {
+        val plan = KbUserEntry.parseExport(text)
+        if (plan !is KbUserEntry.ImportPlan.Ready) return plan
+        val rows = plan.drafts.map { KbUserEntry.toEntry(it, existing = null, id = Ids.new("usr"), today = today) }
+        db.withTransaction { rows.forEach { kbDao.insertUserEntry(it) } }
+        return plan
     }
 
     // ---- alerts ----

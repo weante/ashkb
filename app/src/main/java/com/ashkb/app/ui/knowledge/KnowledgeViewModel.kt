@@ -1,5 +1,8 @@
 package com.ashkb.app.ui.knowledge
 
+import android.content.Context
+import android.content.Intent
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -11,7 +14,10 @@ import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.data.repo.HealthRepository
 import com.ashkb.app.domain.DateProvider
 import com.ashkb.app.domain.KbSearch
+import com.ashkb.app.domain.KbUserEntry
 import com.ashkb.app.domain.Lifestyle
+import com.ashkb.app.ui.GlobalMessages
+import java.io.File
 import java.time.LocalDate
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -45,6 +51,8 @@ data class KnowledgeUiState(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class KnowledgeViewModel(
+    /** v1.2.16：导出物要落到 app 私有目录并走 FileProvider 分享，故需要 Context。 */
+    private val app: Context,
     private val repo: HealthRepository,
     /** v1.0.86（批次 11）：全应用唯一的「今天」来源，取代此前的跨零点 ticker。 */
     private val dateProvider: DateProvider,
@@ -126,11 +134,127 @@ class KnowledgeViewModel(
         viewModelScope.launch { repo.checkReviewDue(today) }
     }
 
+    // ---- v1.2.16：个人条目（知识库编辑器 / 导入导出） ----
+
+    /** 个人条目数（列表页「我的 N 条」提示） */
+    val userCount: StateFlow<Int> = repo.observeKbUserCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    fun createUserEntry(draft: KbUserEntry.Draft, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = runCatching { repo.createKbUserEntry(draft, date.value.toString()) }
+            if (result.isSuccess) {
+                GlobalMessages.post(app.getString(R.string.kb_user_saved))
+            } else {
+                GlobalMessages.post(
+                    app.getString(R.string.kb_user_save_failed, result.exceptionOrNull()?.message.orEmpty()),
+                )
+            }
+            onDone(result.isSuccess)
+        }
+    }
+
+    fun updateUserEntry(draft: KbUserEntry.Draft, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = runCatching { repo.updateKbUserEntry(draft, date.value.toString()) }
+            val ok = result.getOrDefault(false)
+            if (ok) {
+                GlobalMessages.post(app.getString(R.string.kb_user_saved))
+            } else {
+                GlobalMessages.post(
+                    app.getString(R.string.kb_user_save_failed, result.exceptionOrNull()?.message.orEmpty()),
+                )
+            }
+            onDone(ok)
+        }
+    }
+
+    fun deleteUserEntry(id: String, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val ok = runCatching { repo.deleteKbUserEntry(id) }.getOrDefault(false)
+            GlobalMessages.post(
+                app.getString(if (ok) R.string.kb_user_deleted else R.string.kb_user_delete_failed),
+            )
+            onDone(ok)
+        }
+    }
+
+    /**
+     * 导出全部个人条目为 JSON，写到 `files/exports/` 后交给系统的分享面板。
+     *
+     * 与档案导出（[com.ashkb.app.ui.backup.BackupViewModel.exportProfileJson]）同一套机制：
+     * exports 目录启动时清空、`file_paths.xml` 已声明，分享用 FileProvider + ACTION_SEND。
+     */
+    fun exportUserEntries(onShare: (Intent) -> Unit) {
+        viewModelScope.launch {
+            runCatching {
+                val json = repo.exportKbUserJson()
+                val count = repo.listKbUserEntries().size
+                val file = File(File(app.filesDir, "exports"), "ashkb-kb-user-${LocalDate.now()}.json")
+                file.parentFile?.mkdirs()
+                file.writeText(json)
+                count to file
+            }.onSuccess { (count, file) ->
+                if (count == 0) {
+                    GlobalMessages.post(app.getString(R.string.kb_user_export_empty))
+                } else {
+                    GlobalMessages.post(
+                        app.getString(R.string.kb_user_export_done, count, file.length()),
+                    )
+                    onShare(shareFile(file))
+                }
+            }.onFailure {
+                GlobalMessages.post(app.getString(R.string.kb_user_export_failed, it.message.orEmpty()))
+            }
+        }
+    }
+
+    /** 从文件导入个人条目（整批一个事务，见 [HealthRepository.importKbUserJson]）。 */
+    fun importUserEntries(bytes: ByteArray, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val text = String(bytes, Charsets.UTF_8)
+            when (val plan = runCatching { repo.importKbUserJson(text, date.value.toString()) }.getOrNull()) {
+                null -> {
+                    GlobalMessages.post(app.getString(R.string.kb_user_import_failed))
+                    onDone(false)
+                }
+                is KbUserEntry.ImportPlan.Ready -> {
+                    GlobalMessages.post(
+                        app.getString(R.string.kb_user_import_done, plan.drafts.size, plan.skipped),
+                    )
+                    onDone(true)
+                }
+                is KbUserEntry.ImportPlan.Rejected -> {
+                    GlobalMessages.post(importErrorMessage(plan.error))
+                    onDone(false)
+                }
+            }
+        }
+    }
+
+    private fun importErrorMessage(error: KbUserEntry.ImportError): String = app.getString(
+        when (error) {
+            KbUserEntry.ImportError.TOO_LARGE -> R.string.kb_user_import_err_too_large
+            KbUserEntry.ImportError.BAD_JSON -> R.string.kb_user_import_err_bad_json
+            KbUserEntry.ImportError.NO_ENTRIES -> R.string.kb_user_import_err_no_entries
+            KbUserEntry.ImportError.TOO_MANY -> R.string.kb_user_import_err_too_many
+        },
+    )
+
+    private fun shareFile(file: File): Intent {
+        val uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", file)
+        return Intent(Intent.ACTION_SEND).apply {
+            type = "application/json"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AshkbApplication
-                KnowledgeViewModel(app.healthRepository, app.dateProvider)
+                KnowledgeViewModel(app, app.healthRepository, app.dateProvider)
             }
         }
     }

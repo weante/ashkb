@@ -1,5 +1,9 @@
 package com.ashkb.app.ui.knowledge
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,12 +17,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material.icons.rounded.FileUpload
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.WarningAmber
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import com.ashkb.app.ui.components.AshkbTextField
 import androidx.compose.material3.Surface
@@ -33,14 +46,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.ashkb.app.R
+import com.ashkb.app.data.backup.BackupEngine
 import com.ashkb.app.data.entity.KbEntry
 import com.ashkb.app.domain.KbSearch
+import com.ashkb.app.domain.KbUserEntry
+import com.ashkb.app.ui.GlobalMessages
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.EmptyState
 import com.ashkb.app.ui.components.FilterChips
@@ -52,7 +69,10 @@ import com.ashkb.app.ui.theme.StatusTone
 import com.ashkb.app.ui.theme.colors
 import kotlinx.coroutines.delay
 
-/** K 知识库：47 条种子的浏览 / 搜索 / 详情 + 复核到期提示 */
+/** 导入个人条目时的文件大小上限（字节）。真正的条数/字符上限在 [KbUserEntry.parseExport] 里。 */
+private const val KB_IMPORT_PICK_LIMIT = 8L * 1024 * 1024
+
+/** K 知识库：种子条目 + 个人条目的浏览 / 搜索 / 详情 / 编辑 / 导入导出 + 复核到期提示 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KnowledgeScreen(vm: KnowledgeViewModel) {
@@ -61,6 +81,12 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
     val todayDate by vm.date.collectAsStateWithLifecycle()
     val today = remember(todayDate) { todayDate.toString() }
     val noteCount by vm.noteCount.collectAsStateWithLifecycle()
+    val userCount by vm.userCount.collectAsStateWithLifecycle()
+
+    // ---- v1.2.16：个人条目的编辑 / 导入导出 ----
+    val context = LocalContext.current
+    var creating by remember { mutableStateOf(false) }
+    var editTarget by remember { mutableStateOf<KbEntry?>(null) }
 
     // 搜索框本地态 + 防抖：避免每敲一键就重算 uiState 导致整屏重组（VM 内防抖只护住了 DAO 查询）
     var queryText by rememberSaveable { mutableStateOf(ui.query) }
@@ -72,6 +98,17 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
 
     LaunchedEffect(Unit) { vm.refreshReviewCheck() }
 
+    /** 保存个人条目成功后清空搜索词与分类筛选，让新条目一定能出现在列表里。 */
+    val resetFilters: () -> Unit = {
+        queryText = ""
+        vm.setQuery("")
+        vm.setCategory(null)
+    }
+
+    // 导入：系统文件选择器 → 有界读取 → 解析（校验与事务都在下层）。
+    // 读取失败与解析失败给的是同一句「导入失败」+ 具体原因各自一句话，见 VM.importUserEntries。
+    val importLauncher = rememberKbImportLauncher(vm, onImported = resetFilters)
+
     Column(Modifier.fillMaxSize()) {
         // v1.2.10（UI 2.0 批次 C「换件」）：标题卡片退役，改**直排页头**（设计稿 §5.13 的 L1）。
         // v1.2.3 把标题装进卡片是为了让它与下方白卡片"同一套视觉语言"，真机用下来出现了新问题：
@@ -80,6 +117,21 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
         PageHeader(
             title = stringResource(R.string.knowledge_title_count, ui.entries.size),
             overline = stringResource(R.string.kb_overline),
+            // v1.2.16：新建 + 导入/导出。都放页头 actions——知识库是「查」的页面，
+            // 这两个是低频「写」的入口，不该占列表的版面。
+            actions = {
+                KnowledgeHeaderActions(
+                    onNew = { creating = true },
+                    onImport = { importLauncher.launch(arrayOf("application/json", "text/plain")) },
+                    onExport = {
+                        vm.exportUserEntries { intent ->
+                            context.startActivity(
+                                Intent.createChooser(intent, context.getString(R.string.kb_user_export_action)),
+                            )
+                        }
+                    },
+                )
+            },
         )
         Spacer(Modifier.height(Spacing.sm))
 
@@ -101,66 +153,219 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
                 selectedIndex = KB_CATEGORIES.indexOfFirst { it.first == ui.category }.coerceAtLeast(0),
                 onSelect = { i -> vm.setCategory(KB_CATEGORIES[i].first) },
             )
-            // B2：把「有备注」的条数放在筛选之后、到期告警之前——先看到自己积累的内容，再看到需要处理的异常
-            if (noteCount > 0) {
-                Spacer(Modifier.height(Spacing.xs))
-                Text(
-                    stringResource(R.string.kb_note_count, noteCount),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (ui.overdueCount > 0) {
-                Spacer(Modifier.height(Spacing.sm))
-                AlertBanner(
-                    tone = StatusTone.Warning,
-                    icon = Icons.Rounded.Schedule,
-                    title = stringResource(R.string.knowledge_overdue_count, ui.overdueCount),
-                    body = stringResource(R.string.common_doctor_final_note),
-                )
-            }
+            KnowledgeFilterMeta(noteCount = noteCount, userCount = userCount, overdueCount = ui.overdueCount)
             Spacer(Modifier.height(Spacing.xs))
         }
 
-        LazyColumn(
-            Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
-            contentPadding = PaddingValues(bottom = Spacing.xxl),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            if (ui.entries.isEmpty() && ui.query.isNotBlank()) {
-                item {
-                    EmptyState(
-                        icon = Icons.Rounded.SearchOff,
-                        title = stringResource(R.string.knowledge_no_match),
-                        body = stringResource(R.string.knowledge_search_empty),
-                    )
-                }
-            }
-            ui.entries.forEach { entry ->
-                item(key = entry.id) {
-                    KbListCard(
-                        entry = entry,
-                        overdue = entry.reviewDue < today,
-                        hasNote = !entry.userNote.isNullOrBlank(),
-                        onClick = { detail = entry },
-                    )
-                }
-            }
-        }
+        KbList(entries = ui.entries, query = ui.query, today = today, onOpen = { detail = it })
     }
 
     // 用列表里的最新 entry 渲染弹窗：备注保存后 Room 会推新实例，若沿用点开那一刻的旧对象，
     // 弹窗内的 userNote 永远停在旧值，保存看起来「没生效」。
     detail?.let { opened ->
-        val live = ui.entries.firstOrNull { it.id == opened.id } ?: opened
-        KbDetailDialog(
-            entry = live,
-            // v1.2.7（批次 14 / R8）：把本屏已经算好的 `today` 传进去，弹窗不再自己读时钟
+        KnowledgeDetailHost(
+            entries = ui.entries,
+            opened = opened,
             today = today,
-            onSaveNote = { vm.saveNote(live.id, it) },
+            onSaveNote = { id, note -> vm.saveNote(id, note) },
+            onEdit = { live -> editTarget = live; detail = null },
+            onDelete = { id -> vm.deleteUserEntry(id); detail = null },
             onDismiss = { detail = null },
         )
     }
+
+    // 新建 / 编辑弹层：保存成功才关闭（失败时留在表单里，用户不用重打一遍）。
+    // 保存成功后把搜索与分类筛选清掉——否则新条目可能落在别的分类/被当前关键词筛掉，
+    // 用户刚点完保存却看不见它，会以为没存上。
+    KnowledgeEditHost(
+        creating = creating,
+        editTarget = editTarget,
+        onCreate = { draft, done ->
+            vm.createUserEntry(draft) { ok ->
+                if (ok) resetFilters()
+                done(ok)
+            }
+        },
+        onUpdate = { draft, done ->
+            vm.updateUserEntry(draft) { ok ->
+                if (ok) resetFilters()
+                done(ok)
+            }
+        },
+        onClosed = { creating = false; editTarget = null },
+    )
+}
+
+/** 导入用的系统文件选择器：只做「有界读取 + 交给 VM」，解析与校验都在领域层。 */
+@Composable
+private fun rememberKbImportLauncher(
+    vm: KnowledgeViewModel,
+    onImported: () -> Unit,
+): ActivityResultLauncher<Array<String>> {
+    val context = LocalContext.current
+    return rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val bytes = uri?.let {
+            runCatching {
+                context.contentResolver.openInputStream(it)?.use { stream ->
+                    BackupEngine.readBounded(stream, KB_IMPORT_PICK_LIMIT, "ashkb-kb-user.json")
+                }
+            }.getOrNull()
+        }
+        if (bytes == null) {
+            if (uri != null) GlobalMessages.post(context.getString(R.string.kb_user_import_failed))
+        } else {
+            vm.importUserEntries(bytes) { ok -> if (ok) onImported() }
+        }
+    }
+}
+
+/** 列表区：空结果提示 + 卡片行。抽出来是为了让主函数只负责组装，不承担列表分支。 */
+@Composable
+private fun KbList(entries: List<KbEntry>, query: String, today: String, onOpen: (KbEntry) -> Unit) {
+    LazyColumn(
+        Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
+        contentPadding = PaddingValues(bottom = Spacing.xxl),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        if (entries.isEmpty() && query.isNotBlank()) {
+            item {
+                EmptyState(
+                    icon = Icons.Rounded.SearchOff,
+                    title = stringResource(R.string.knowledge_no_match),
+                    body = stringResource(R.string.knowledge_search_empty),
+                )
+            }
+        }
+        entries.forEach { entry ->
+            item(key = entry.id) {
+                KbListCard(
+                    entry = entry,
+                    overdue = entry.reviewDue < today,
+                    hasNote = !entry.userNote.isNullOrBlank(),
+                    onClick = { onOpen(entry) },
+                )
+            }
+        }
+    }
+}
+
+/** 新建 / 编辑弹层的宿主：保存回调带「是否成功」，成功才关，失败留在表单里。 */
+@Composable
+private fun KnowledgeEditHost(
+    creating: Boolean,
+    editTarget: KbEntry?,
+    onCreate: (KbUserEntry.Draft, (Boolean) -> Unit) -> Unit,
+    onUpdate: (KbUserEntry.Draft, (Boolean) -> Unit) -> Unit,
+    onClosed: () -> Unit,
+) {
+    if (!creating && editTarget == null) return
+    KbEditSheet(
+        initial = editTarget,
+        onDismiss = onClosed,
+        onSave = { draft ->
+            if (draft.id == null) onCreate(draft) { if (it) onClosed() } else onUpdate(draft) { if (it) onClosed() }
+        },
+    )
+}
+
+/** 页头两个写入口：新建；`⋮` 里是导入 / 导出。抽出来是为了不把重组菜单的开关塞进主函数的分支复杂度。 */
+@Composable
+private fun KnowledgeHeaderActions(
+    onNew: () -> Unit,
+    onImport: () -> Unit,
+    onExport: () -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    IconButton(onClick = onNew, modifier = Modifier.size(Size.touchMin)) {
+        Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.kb_user_new_title))
+    }
+    Box {
+        IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(Size.touchMin)) {
+            Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.kb_user_import_action))
+        }
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.kb_user_import_action)) },
+                leadingIcon = { Icon(Icons.Rounded.FileDownload, contentDescription = null) },
+                onClick = {
+                    menuOpen = false
+                    onImport()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.kb_user_export_action)) },
+                leadingIcon = { Icon(Icons.Rounded.FileUpload, contentDescription = null) },
+                onClick = {
+                    menuOpen = false
+                    onExport()
+                },
+            )
+        }
+    }
+}
+
+/**
+ * 筛选行下面的元信息带：先「有备注 N 条」（B2），再「我的条目 N 条」（v1.2.16），
+ * 最后是复核到期告警。
+ *
+ * 两行计数都是**只在自己积累过之后才出现**——不给空知识库加噪音。
+ */
+@Composable
+private fun KnowledgeFilterMeta(noteCount: Int, userCount: Int, overdueCount: Int) {
+    if (noteCount > 0) {
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            stringResource(R.string.kb_note_count, noteCount),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    if (userCount > 0) {
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            stringResource(R.string.kb_user_count, userCount),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    if (overdueCount > 0) {
+        Spacer(Modifier.height(Spacing.sm))
+        AlertBanner(
+            tone = StatusTone.Warning,
+            icon = Icons.Rounded.Schedule,
+            title = stringResource(R.string.knowledge_overdue_count, overdueCount),
+            body = stringResource(R.string.common_doctor_final_note),
+        )
+    }
+}
+
+/**
+ * 详情弹窗的宿主：负责把「点开那一刻的 entry」换成列表里的最新实例，并按来源决定是否给「编辑 / 删除」。
+ *
+ * v1.2.16：只有自己写的条目才有这两个动作——种子条目的内容归 App 版本所有，
+ * 就地改会被下一次种子刷新（`KbSeedRefresh`）按字段比对覆盖回去。
+ */
+@Composable
+private fun KnowledgeDetailHost(
+    entries: List<KbEntry>,
+    opened: KbEntry,
+    today: String,
+    onSaveNote: (String, String?) -> Unit,
+    onEdit: (KbEntry) -> Unit,
+    onDelete: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val live = entries.firstOrNull { it.id == opened.id } ?: opened
+    val mine = KbUserEntry.isUserEntry(live.id)
+    KbDetailDialog(
+        entry = live,
+        // v1.2.7（批次 14 / R8）：把本屏已经算好的 `today` 传进去，弹窗不再自己读时钟
+        today = today,
+        onSaveNote = { onSaveNote(live.id, it) },
+        onDismiss = onDismiss,
+        onEdit = if (mine) {{ onEdit(live) }} else null,
+        onDelete = if (mine) {{ onDelete(live.id) }} else null,
+    )
 }
 
 @Composable
@@ -249,6 +454,11 @@ private fun KbListCard(
             ) {
                 if (entry.severityLevel == "high") {
                     StatusChip(text = stringResource(R.string.knowledge_high_risk), tone = StatusTone.Danger, icon = Icons.Rounded.WarningAmber)
+                }
+                // v1.2.16：自己写的条目带一枚中性徽章——它没有证据层级可讲，
+                // 混在种子里不加标注，翻到时很容易被当成官方内容。
+                if (KbUserEntry.isUserEntry(entry.id)) {
+                    StatusChip(text = stringResource(R.string.kb_user_badge), tone = StatusTone.Brand)
                 }
                 // B2：有备注的条目给个中性标签，方便在长列表里找回自己做过批注的那几条
                 if (hasNote) {

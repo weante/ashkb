@@ -36,6 +36,11 @@ import com.ashkb.app.R
  *
  * ⚠️ 未知层级（脏数据 / 将来新增 `S5`）一律**原样显示原值**，绝不显示空白——
  * 这里回落到空等于凭空抹掉一条「这条内容来自哪」的信息。
+ *
+ * ### `USR`：v1.2.16 用户自建条目
+ * 知识库编辑器允许患者自己写条目（`id` 前缀 `usr-`）。这些条目**没有任何外部来源**，
+ * 与 `SYS` 一样标不实，故单列 `USR`（user）。释义里明确写「你自己写的，可靠性自行判断」，
+ * 免得日后自己翻到时误当成有出处的资料。
  */
 @Composable
 fun tierShortLabel(tier: String): String {
@@ -59,6 +64,7 @@ private fun tierShortRes(tier: String): Int? = when (tier) {
     "S3" -> R.string.kb_tier_s3_short
     "S4" -> R.string.kb_tier_s4_short
     "SYS" -> R.string.kb_tier_sys_short
+    "USR" -> R.string.kb_tier_usr_short
     else -> null
 }
 
@@ -70,5 +76,6 @@ private fun tierFullRes(tier: String): Int? = when (tier) {
     "S3" -> R.string.kb_tier_s3_full
     "S4" -> R.string.kb_tier_s4_full
     "SYS" -> R.string.kb_tier_sys_full
+    "USR" -> R.string.kb_tier_usr_full
     else -> null
 }

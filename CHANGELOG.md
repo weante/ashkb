@@ -1,3 +1,45 @@
+## [未发布] — 2026-11-15 · 知识库个人条目：编辑器 + 导入导出
+
+**知识库从「只读的 48 条种子」变成「种子 + 我自己写的条目」。** 这是 `HANDOFF-STATUS.md` §3.2 里挂了很久的「知识库完整编辑器 / 内容导入导出（后移阶段 2 之后）」，本次落地。**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**，无新迁移、无 schema 导出、四份文档版本行不动），可覆盖安装。
+
+### 三个不动库结构的设计决定（以及各自的理由）
+
+1. **用户条目用 `id` 前缀 `usr-` 区分，不加 `is_user` 列。** 加列要付：`ASHKB_DB_VERSION` 21 → 22、`MIGRATION_21_22`、导出 schema、`ALL_MIGRATIONS`、备份按名回填、四份文档同步（`verifySpecSync` 会红）。而 `id` 命名空间本来就是这个库表达「这一类行是什么」的既有手段（`itx-` / `exc-` / `fdg-` / `emr-` / `edu-` 五个种子前缀），`usr-` 与之天然不冲突。由此得到一条**结构性保证**（不靠任何调用方自觉）：`KbSeedRefresh.plan` 只遍历种子清单，**`usr-` 条目永远不会被种子刷新新增 / 覆盖 / 删除**。
+2. **层级记新档 `USR`，不借用 `S1–S4` 或 `SYS`。** 层级表达的是「内容可信度来源」，用户自建内容没有外部来源，借用任何一档都是不实陈述（与 v1.1.3 给无来源的系统内置单列 `SYS` 同一个理由）。`USR` 只在 `KbSourceTiers` 里有释义，`KbTierLabelGuardTest` 的正则不受影响。
+3. **`review_due` 记 `9999-12-31`。** 复核到期是**种子**的维护机制（外部来源会过期）。个人条目没有可复核的外部来源，若给近期日期，会在知识库顶部顶出一条「N 条待复核」的假告警并写进 `alerts` 表。用一个永不到期的日期，让既有的 `reviewDue < today` 判定自然为 false，**读取侧一行特判都不用加**。
+
+### 这一版里有什么
+
+| 层 | 文件 | 内容 |
+|---|---|---|
+| domain | **新增** `domain/KbUserEntry.kt`（287 行） | `Draft`（UI ↔ 领域唯一传参形状）、`Error` 12 项校验、`ImportError` 4 项、`ImportPlan`（`Ready`/`Rejected`）、`normalize` / `validate` / `payloadOf` / `draftOf` / `toEntry` / `exportJson` / `parseExport`，全是纯函数，不持 Context |
+| data | `data/db/Daos.kt` | 新增 `insertUserEntry`（`@Insert(REPLACE)`）/ `updateUserEntry` / `deleteById` / `listUserEntries` / `observeUserCount`；`observeAll` / `search` / `observeByCategory` / `listByCategory` 排序统一加 `CASE WHEN id LIKE 'usr-%' THEN 0 ELSE 1 END`（个人条目排前面）；`exercises()` 排除 `usr-`（运动库按 `grade_matrix` 渲染，个人条目没有这个字段，混进去会渲染成空卡） |
+| data | `data/repo/HealthRepository.kt` | `createKbUserEntry` / `updateKbUserEntry` / `deleteKbUserEntry` / `listKbUserEntries` / `observeKbUserCount` / `exportKbUserJson` / `importKbUserJson`（导入**整批一个事务**，一条不留就全不写） |
+| ui | `ui/knowledge/KnowledgeViewModel.kt` | 类签名加 `app: Context`（导出要写 `files/exports/`、分享要 `FileProvider`）；`userCount`；四个 CRUD + `exportUserEntries` + `importUserEntries`，结果一律走 `GlobalMessages` |
+| ui | **新增** `ui/knowledge/KbEditSheet.kt` | `ModalBottomSheet` 表单：标题 / 摘要 / 分类 / 风险 / 正文 / 要点（逐行）/ 依据（逐行）/ 来源名 / 来源链接；**校验两段式**——点保存后才标红，不在打字过程中骂人 |
+| ui | `ui/knowledge/KnowledgeScreen.kt` | 页头 `actions`：`+` 新建、`⋮` 菜单（导入条目 / 导出我的条目）；个人条目在列表胶囊区显示「我的」徽章；计数行显示「我的条目 N 条」 |
+| ui | `ui/knowledge/KbDetailDialog.kt` | 对个人条目显示「编辑 / 删除」（删除走既有的 `DestructiveAction` 二次确认）；个人条目不显示证据元信息（`reviewDue` 是 `9999-12-31` 占位，显示出来是假数据） |
+| ui | `ui/knowledge/KbSourceTiers.kt` | 增 `USR` 一档的中英释义 |
+| res | `values/strings.xml` + `values-en/strings.xml` | 成对同序新增 48 条（含 4 条导入失败原因 + 9 条编辑校验错误），英文无 CJK、无全角 |
+| test | **新增** `domain/KbUserEntryTest.kt` | 15 组用例：身份前缀、normalize、长度边界（恰好上限通过 / +1 报错）、要点+依据共用 20 条预算、URL 必须 http(s)、payload 往返、坏 payload 不抛、`toEntry` 的版本自增与 `userNote` 保留、导出只导 `usr-`、导出→导入往返、裸数组、坏 JSON / 空 / 超量三种拒绝、脏条目只跳过 |
+
+### 导入文件的宽容度是刻意的
+
+顶层**既接受** `{"format":"ashkb-kb-user","entries":[...]}`（导出的形状）**也接受裸数组**（方便用户拿文本编辑器手写几条）；但**单条必须过 `validate`**，不合规的条目只计入 `skipped`，不阻断其余条目——一次导入因为一条脏数据整份失败，对批量搬运是灾难性体验。整份文件级的拒绝只有四种：体积 > 2M 字符、不是 JSON、没有任何条目、条目 > 200 条。
+
+`payload` 只写详情页**已经会渲染**的三个键（`content` / `action` / `evidence`），不发明新键——这样加这一类条目**不需要改详情页渲染路径**，也不会出现「存了但看不见」的字段。
+
+### 边界（必须说清）
+
+- **只在 JVM 层验证过，未上真机。** 编译、单测、detekt、lint 全绿（见下）；但 `ModalBottomSheet` 的软键盘遮挡、SAF 选/存文件的系统面板跳转、`FileProvider` 分享到微信/文件管理器，这三处 JVM 观测不到，**真机走查未做**。
+- **导入不做去重。** 同一份文件连导两次 = 两批条目（id 每次新生成）。「按标题去重」看着合理，但用户完全可能想要两条同名不同内容的条目，静默合并比重复更坏；若真需要，是后续显式加「查重预览」的事。
+- **备份/恢复不区分来源。** 整库回填照旧会带上 `usr-` 条目——恢复=整机状态，这是既有语义，不是本次改动。
+- **未 bump 版本号**（仍 127 / "1.2.15"），尚未发版。
+
+### 门禁
+
+`gradle testDebugUnitTest` → **BUILD SUCCESSFUL**（含新增 `KbUserEntryTest`，以及既有 `EnglishStringsParityTest` / `KbTierLabelGuardTest` 全绿——后两者正是这次最容易被新字符串与新层级档撞坏的两条）。`detekt` / `lintDebug` / `verifySpecSync` 结果见 `E:\ASHKB\v1216-kbuser-gate1.log`。
+
 ## [未发布] — 2026-11-05 · 真机验收清单与 ⑦ 复现手册入库
 
 **没有改一行代码，入库的是两份「怎么验」的文档。** 加 `docs/` 目录（仓库此前没有这个目录）。
