@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +13,10 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -185,14 +187,21 @@ fun FilterChips(
 ) {
     val cs = MaterialTheme.colorScheme
     val shape = MaterialTheme.shapes.extraSmall
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
+    val listState = rememberLazyListState()
+
+    // 选中项永远滚进可视区。分类一多（知识库 6 个 + 弹层 5 个）时，屏幕右缘外的
+    // 选中 chip 会让用户看不出当前选的是哪一类——这正是真机走查抓到的问题。
+    LaunchedEffect(selectedIndex, labels.size) {
+        if (selectedIndex in labels.indices) listState.animateScrollToItem(selectedIndex)
+    }
+
+    LazyRow(
+        state = listState,
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        labels.forEachIndexed { i, label ->
+        itemsIndexed(labels) { i, label ->
             val on = i == selectedIndex
             Box(
                 modifier = Modifier

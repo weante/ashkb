@@ -20,6 +20,7 @@
 | ui | `ui/knowledge/KnowledgeScreen.kt` | 页头 `actions`：`+` 新建、`⋮` 菜单（导入条目 / 导出我的条目）；个人条目在列表胶囊区显示「我的」徽章；计数行显示「我的条目 N 条」 |
 | ui | `ui/knowledge/KbDetailDialog.kt` | 对个人条目显示「编辑 / 删除」（删除走既有的 `DestructiveAction` 二次确认）；个人条目不显示证据元信息（`reviewDue` 是 `9999-12-31` 占位，显示出来是假数据） |
 | ui | `ui/knowledge/KbSourceTiers.kt` | 增 `USR` 一档的中英释义 |
+| ui | `ui/components/PageChrome.kt` | `FilterChips` 改 `LazyRow` + 选中项自动滚动（真机走查发现「选中的分类 chip 停在屏幕外」） |
 | res | `values/strings.xml` + `values-en/strings.xml` | 成对同序新增 48 条（含 4 条导入失败原因 + 9 条编辑校验错误），英文无 CJK、无全角 |
 | test | **新增** `domain/KbUserEntryTest.kt` | 15 组用例：身份前缀、normalize、长度边界（恰好上限通过 / +1 报错）、要点+依据共用 20 条预算、URL 必须 http(s)、payload 往返、坏 payload 不抛、`toEntry` 的版本自增与 `userNote` 保留、导出只导 `usr-`、导出→导入往返、裸数组、坏 JSON / 空 / 超量三种拒绝、脏条目只跳过 |
 
@@ -42,7 +43,7 @@
 
 - **通过**：导入（SAF 选 `Downloads/*.json`，文件里 2 条有效 + 1 条缺正文 → 落地 2 条、跳过 1 条，列表 48 → 50）；列表「我写的」徽章与「USR 我自己写的条目 · 来源」行；详情弹层（我的备注 / 处置与建议 / 证据原文 / 要点 / USR 来源块 / 编辑-删除-关闭）；编辑保存（横幅「已保存到我的知识库」）；删除二次确认与删除（50 → 49 → 48）；种子条目详情仍只有「关闭」，没有编辑/删除入口。
 - **对比度**：主按钮「保存」在深色下是深字浅底（`#8DC6EA` 底 / `#153248` 字），实测 **7.21:1**（AAA），不是截图缩略看起来的「白字浅底」。
-- **发现 1 处观感问题（未修，待定）**：编辑一条「教育」分类的条目时，分类 chip 行不会自动滚到选中项，选中 chip 停在屏幕右缘外，用户看不出当前分类。修法方向：`CategoryPicker` 用 `LazyRow` + 记住选中项 `animateScrollToItem`，或分类改下拉。
+- **修掉 1 处观感问题**：编辑一条「教育」分类的条目时，分类 chip 行不会自动滚到选中项，选中 chip 停在屏幕右缘外，用户看不出当前分类。修法落在**共享组件** `ui/components/PageChrome.kt`：`FilterChips` 从 `Row + horizontalScroll` 换成 `LazyRow` + `LaunchedEffect(selectedIndex)` → `animateScrollToItem(selectedIndex)`，于是**所有用它的筛选行一并受益**（知识库列表的分类筛选、编辑弹层的分类与风险级别）。改后真机复验：点「应急」→ 整行自动滚动、点「教育」→ 选中 chip 完整停在可视区内。
 - **未覆盖**：软键盘遮挡、`FileProvider` 分享到微信/文件管理器、大字 2.0× 窄屏；校验错误态的红色提示文字也没能在真机上截到（自动输入法干扰）。
 
 ### 门禁
