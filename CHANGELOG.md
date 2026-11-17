@@ -1,4 +1,4 @@
-## [未发布] — 2026-11-15 · 知识库个人条目：编辑器 + 导入导出
+## [v1.2.16] — 2026-11-17 · 知识库个人条目：编辑器 + 导入导出
 
 **知识库从「只读的 48 条种子」变成「种子 + 我自己写的条目」。** 这是 `HANDOFF-STATUS.md` §3.2 里挂了很久的「知识库完整编辑器 / 内容导入导出（后移阶段 2 之后）」，本次落地。**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**，无新迁移、无 schema 导出、四份文档版本行不动），可覆盖安装。
 
@@ -35,7 +35,7 @@
 - **真机走查只做了深色模式这一条线**（结果见下节）。编译、单测、detekt、lint 全绿（见「门禁」）；真机上已实测导入 SAF 选文件、新建/编辑表单渲染、编辑保存、删除二次确认、列表「我写的」徽章、详情弹层。**仍未实测**：软键盘遮挡（自动注入的中文会走输入法拼音组合，只能绕开）、大字 2.0× 窄屏。
 - **导入不做去重。** 同一份文件连导两次 = 两批条目（id 每次新生成）。「按标题去重」看着合理，但用户完全可能想要两条同名不同内容的条目，静默合并比重复更坏；若真需要，是后续显式加「查重预览」的事。
 - **备份/恢复不区分来源。** 整库回填照旧会带上 `usr-` 条目——恢复=整机状态，这是既有语义，不是本次改动。
-- **未 bump 版本号**（仍 127 / "1.2.15"），尚未发版。
+- **本版是 v1.2.16（versionCode 128）**，库结构不变（仍 21），覆盖安装不需要跑迁移。
 
 ### 真机冒烟（2026-11-16 · Xiaomi 2410DPN6CC / Android 16 / 深色模式）
 
@@ -49,9 +49,9 @@
 
 ### 门禁
 
-`gradle testDebugUnitTest` → **BUILD SUCCESSFUL**（含新增 `KbUserEntryTest`，以及既有 `EnglishStringsParityTest` / `KbTierLabelGuardTest` 全绿——后两者正是这次最容易被新字符串与新层级档撞坏的两条）。`detekt` / `lintDebug` / `verifySpecSync` 结果见 `E:\ASHKB\v1216-kbuser-gate1.log`。
+`gradle testDebugUnitTest lintDebug detekt verifySpecSync` → **BUILD SUCCESSFUL**：单测 **158 个类 / 1306 条 / 0 失败 / 0 错误 / 1 跳过**（含新增 `KbUserEntryTest`，以及既有 `EnglishStringsParityTest` / `KbTierLabelGuardTest` 全绿——后两者正是这次最容易被新字符串与新层级档撞坏的两条）；lint **0 error** / 169 warning（与改前同一批既有告警，无新增）；detekt **0 issues**；`verifySpecSync` 通过（四份文档的版本锚点与 schema 一致）。原始日志见 `E:\ASHKB\v1216-kbuser-gate1.log`。
 
-## [未发布] — 2026-11-05 · 真机验收清单与 ⑦ 复现手册入库
+## [v1.2.16] 附 · 真机验收清单与 ⑦ 复现手册入库（2026-11-05）
 
 **没有改一行代码，入库的是两份「怎么验」的文档。** 加 `docs/` 目录（仓库此前没有这个目录）。
 
