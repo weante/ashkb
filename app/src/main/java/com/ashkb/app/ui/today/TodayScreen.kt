@@ -160,6 +160,11 @@ import java.time.LocalTime
 fun TodayScreen(
     vm: TodayViewModel,
     onMedListNeeded: () -> Unit,
+    /**
+     * v1.2.19：空态卡第三种情形（有药、今天不排）的出口——去**药单管理**看整体方案。
+     * 与 [onMedListNeeded]（直达新增药品表单）分开：这时用户并不缺药，不该被推到空白表单。
+     */
+    onOpenMeds: () -> Unit = {},
     onOpenSymptom: () -> Unit = {},
     onOpenExercise: () -> Unit = {},
     /** v1.2.9：首页补剂卡的「管理」入口——跳营养与骨健康（补剂档案的增删改在那里）。 */
@@ -234,6 +239,7 @@ fun TodayScreen(
             todayDate = todayDate,
             profileMissing = profile == null,
             onMedListNeeded = onMedListNeeded,
+            onOpenMeds = onOpenMeds,
             callbacks = MedCardCallbacks(
                 onCheckIn = { item ->
                     // 注射剂（且非按需）要先选部位，其余直接打卡——旧实现在 onCheckIn 里的同一个分支
@@ -542,6 +548,7 @@ private fun LazyListScope.medCardItems(
     todayDate: LocalDate,
     profileMissing: Boolean,
     onMedListNeeded: () -> Unit,
+    onOpenMeds: () -> Unit,
     callbacks: MedCardCallbacks,
 ) {
     if (items.isEmpty()) {
@@ -551,6 +558,7 @@ private fun LazyListScope.medCardItems(
             MedsEmptyCard(
                 kind = TodayMedsEmpty.kindOf(profileMissing = profileMissing, activeMedCount = activeMedCount),
                 onMedListNeeded = onMedListNeeded,
+                onOpenMeds = onOpenMeds,
             )
         }
         return
@@ -582,7 +590,11 @@ private fun LazyListScope.medCardItems(
  *  · 有药但今天不排 → 明确「今天不用吃」，出口改成「查看用药方案」，不再劝加药。
  */
 @Composable
-private fun MedsEmptyCard(kind: TodayMedsEmpty.Kind, onMedListNeeded: () -> Unit) {
+private fun MedsEmptyCard(
+    kind: TodayMedsEmpty.Kind,
+    onMedListNeeded: () -> Unit,
+    onOpenMeds: () -> Unit,
+) {
     val nothingToday = kind == TodayMedsEmpty.Kind.NOTHING_SCHEDULED_TODAY
     SectionCard(title = stringResource(R.string.today_meds_section)) {
         EmptyState(
@@ -598,7 +610,7 @@ private fun MedsEmptyCard(kind: TodayMedsEmpty.Kind, onMedListNeeded: () -> Unit
             actionLabel = stringResource(
                 if (nothingToday) R.string.med_view_regimen else R.string.med_add_medication,
             ),
-            onAction = onMedListNeeded,
+            onAction = if (nothingToday) onOpenMeds else onMedListNeeded,
         )
     }
 }

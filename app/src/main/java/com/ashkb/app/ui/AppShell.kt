@@ -396,6 +396,8 @@ fun AppShell() {
                 TodayScreen(
                     vm = viewModel(factory = TodayViewModel.Factory),
                     onMedListNeeded = { nav.navigate(MedEdit()) },   // 修：直达表单，不再只切 tab
+                    // v1.2.19：「有药但今天不排」的空态出口去药单管理，而不是新增表单
+                    onOpenMeds = { nav.navigate(Meds) },
                     onOpenSymptom = { nav.navigate(Symptom) },
                     onOpenExercise = { nav.navigate(Exercise) },
                     // v1.2.9：首页补剂卡的「管理」入口 → 补剂档案（增删改都在营养页）

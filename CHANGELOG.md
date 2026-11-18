@@ -1,4 +1,4 @@
-## [未发布] — 2026-11-18 · 首页「今日用药」空态文案：今天不排药 ≠ 没有药品
+## [v1.2.19] — 2026-11-18 · 首页「今日用药」空态文案：今天不排药 ≠ 没有药品
 
 真机走查 v1.2.18 时发现的**既有文案缺陷**（非本版引入）：非用药日（依那西普 BIW 的周三）首页「今日用药」卡写「当前没有在用药品」，而「我的 → 药单管理」显示「在用 1 种 · 依那西普」，两句话自相矛盾。**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）。
 
@@ -14,6 +14,7 @@
 | 无在用药品 | 当前没有在用药品 | 添加后这里会显示今天该服用的药（不变） | 添加药品 |
 | 有药但今天不排 | **今天没有需要服用的药** | **按当前用药方案，今天不是用药日（如隔日给药），不需要打卡。** | **查看用药方案** |
 
+- 「今天不排药」那一态的出口单独走 `TodayScreen` 的新回调 `onOpenMeds`（`AppShell` 接到 `Meds` 路由）——旧的 `onMedListNeeded` 是直达 `MedEdit()` 新增表单，对「有药只是今天不排」的人是错的落点；
 - 判据抽成纯函数 `domain/TodayMedsEmpty.kt`（`kindOf(profileMissing, activeMedCount)`，三种 `Kind`），文案与图标留在 UI 层；
 - `TodayViewModel` 新增 `activeMedCount`（订阅 `observeMedications()`，与 `refreshYesterdayPending` 同一条流，不会出现两个口径）；该流只在空态卡的 `item { }` 内收集，药单变化只重组这一张卡；
 - 中英 strings 成对新增 3 条：`med_empty_nothing_today` / `med_empty_nothing_today_body` / `med_view_regimen`。
@@ -22,7 +23,8 @@
 
 - 新增 `app/src/test/java/com/ashkb/app/domain/TodayMedsEmptyTest.kt`（5 条：缺档案优先、无药、今天不排药、负数防御）；
 - 门禁（`testDebugUnitTest detekt lintDebug verifySpecSync`）**BUILD SUCCESSFUL**：单测 **160 类 / 1321 条 / 0 失败 / 0 错误 / 1 跳过**，lint **0 error**（169 warning），detekt **0**，verifySpecSync 通过；
-- **真机未验**（文案改动，非用药日/用药日两种状态各需看一眼）；未 bump 版本号、未发版。
+- **真机验证（Xiaomi 2410DPN6CC / Android 16，覆盖安装 131）**：周三（依那西普 BIW 非用药日）首页「今日用药」卡显示「今天没有需要服用的药 / 按当前用药方案，今天不是用药日（如隔日给药），不需要打卡。」；按钮「查看用药方案」落到**药单管理**（在用药品 1 · 依那西普 25 mg · 每周两次 · 注射），不再落到新增药品表单。截图 `E:\ASHKB\.shots\v1219\home-1.2.19.png` / `meds-list.png`；
+- 发布：versionCode **131** / versionName **1.2.19**，APK **5,432,552 B**，sha256 `F84955F8890C13C98A5C1186D99B9C0170547EB33494624A4861E177585B5D58`；覆盖安装后数据无损（药单「在用 1 种 · 依那西普」、提醒自检 5/5）。
 
 ## [v1.2.18] — 2026-11-18 · Compose 性能收尾（三屏 Flow 下沉 + verticalScroll 清点）+ 知识库导入去重
 
