@@ -68,6 +68,7 @@
     <string name="backup_restore_title">Restore (five steps with an undo path)</string>
     <string name="backup_return_modify">Back to edit</string>
     <string name="backup_run_drill">Run restore drill</string>
+    <string name="backup_drill_running">Running drill…</string>
     <string name="backup_save_share">Save / share backup</string>
     <string name="backup_section_subtitle">Full encrypted backup · restore self-proof · WebDAV remote backup · profile JSON export/import</string>
     <string name="backup_section_title">Data backup (R20)</string>
@@ -306,7 +307,7 @@
     <string name="lab_ref_upper">Reference high</string>
     <!-- v1.2.11 (defect ticket A07): form validation. Illegal numbers used to be stored as null silently, and reversed ranges could be saved and then produce a phantom abnormal flag. -->
     <string name="lab_field_number_invalid">Enter a number (leave empty if not filled)</string>
-    <string name="lab_ref_range_reversed">Reference low cannot be greater than reference high</string>
+    <string name="lab_ref_range_reversed">Reference low cannot be greater than reference high</string>
     <!-- v1.2.13 (medical gap 3): per-test near-boundary tolerance -->
     <string name="lab_tolerance_title">Near-boundary tolerance</string>
     <string name="lab_tolerance_entry_subtitle">Adjust the near-boundary range per lab test (default 5%)</string>
@@ -928,6 +929,7 @@
     <string name="vm_restore_failed">Restore failed: %1$s</string>
     <string name="vm_drill_pass">Restore drill passed: %1$s. The full chain — backup → encrypt → decrypt → restore → both checks — works.</string>
     <string name="vm_drill_incomplete">The drill did not fully pass: %1$s</string>
+    <string name="vm_drill_stage">Running drill: verifying the snapshot roundtrip, please wait…</string>
     <string name="vm_drill_failed">Restore drill failed: %1$s</string>
     <string name="vm_profile_export_done">Profile JSON exported (%1$d bytes, plain text) — for setting up a new phone; check-in logs are not included.</string>
     <string name="vm_profile_export_failed">Export failed: %1$s</string>

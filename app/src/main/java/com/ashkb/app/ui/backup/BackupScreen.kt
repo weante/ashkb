@@ -35,10 +35,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ashkb.app.data.backup.BackupEngine
 import com.ashkb.app.data.repo.PreRestoreSnapshot
 import com.ashkb.app.R
+import com.ashkb.app.ui.components.LoadingBlock
 import com.ashkb.app.ui.components.ScreenTopBar
 import com.ashkb.app.ui.components.SectionCard
 import com.ashkb.app.ui.components.SecureWindow
@@ -257,16 +259,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
             }
 
             // ---- 恢复演练 ----
-            SectionCard(title = stringResource(R.string.backup_drill_title)) {
-                Text(
-                    stringResource(R.string.backup_drill_flow_note) +
-                        stringResource(R.string.backup_drill_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(Spacing.sm))
-                Button(onClick = { vm.drill() }, enabled = !busy) { Text(stringResource(R.string.backup_run_drill)) }
-            }
+            DrillSection(vm = vm, busy = busy)
 
             // ---- 档案 JSON ----
             SectionCard(title = stringResource(R.string.backup_profile_json_title)) {
@@ -306,6 +299,36 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
 
     if (showDavPickSheet) {
         DavBackupPickerSheet(vm = vm, busy = busy, onDismiss = { showDavPickSheet = false })
+    }
+}
+
+/**
+ * v1.2.17（v1.2.15 真机验收 用例① ⑦）：恢复演练卡。
+ *
+ * 为什么把进度放进卡里：真机走查确认页面尾部的 [BusyFooter] 在滚动容器最末、视口外，
+ * 点完演练后用户看不到任何变化——这正是历史记录「首次点击无反应」的成因（反馈不可见，
+ * 不是功能失效）。现在「演练中」既体现在按钮文案，也体现在卡内进度块。
+ *
+ * `drillStage` 只在本卡内收集：演练期间只有这张卡出进度，备份卡的 BusyFooter 不跟着亮。
+ */
+@Composable
+internal fun DrillSection(vm: BackupViewModel, busy: Boolean) {
+    val drillStage by vm.drillStage.collectAsStateWithLifecycle()
+    SectionCard(title = stringResource(R.string.backup_drill_title)) {
+        Text(
+            stringResource(R.string.backup_drill_flow_note) +
+                stringResource(R.string.backup_drill_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        Button(onClick = { vm.drill() }, enabled = !busy) {
+            Text(stringResource(if (drillStage != null) R.string.backup_drill_running else R.string.backup_run_drill))
+        }
+        drillStage?.let { label ->
+            Spacer(Modifier.height(Spacing.sm))
+            LoadingBlock(minHeight = 88.dp, label = label, bars = 2)
+        }
     }
 }
 

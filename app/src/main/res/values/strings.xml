@@ -63,6 +63,7 @@
     <string name="backup_restore_title">恢复（五步含退路）</string>
     <string name="backup_return_modify">返回修改</string>
     <string name="backup_run_drill">执行恢复演练</string>
+    <string name="backup_drill_running">演练中…</string>
     <string name="backup_save_share">保存 / 分享备份</string>
     <string name="backup_section_subtitle">全量加密备份 · 恢复自证 · WebDAV 远程备份 · 档案 JSON 导出导入</string>
     <string name="backup_section_title">数据备份（R20）</string>
@@ -301,7 +302,7 @@
     <string name="lab_ref_upper">参考上限</string>
     <!-- v1.2.11（缺陷工单 A07）：表单校验。此前非法数字静默变 null 落库、反向区间能存进去并生成伪异常。 -->
     <string name="lab_field_number_invalid">请输入数字（留空表示未填）</string>
-    <string name="lab_ref_range_reversed">参考下限不能大于参考上限</string>
+    <string name="lab_ref_range_reversed">参考下限不能大于参考上限</string>
     <!-- v1.2.13（医学缺口③）：按化验项配置「临界」容差 -->
     <string name="lab_tolerance_title">临界容差</string>
     <string name="lab_tolerance_entry_subtitle">按化验项调整「临界」的判定范围（默认 5%）</string>
@@ -948,6 +949,7 @@
     <string name="vm_restore_failed">恢复失败：%1$s</string>
     <string name="vm_drill_pass">恢复演练通过：%1$s。备份→加密→解密→恢复→双校验全链路可用。</string>
     <string name="vm_drill_incomplete">演练未完全通过：%1$s</string>
+    <string name="vm_drill_stage">演练中：正在做快照往返校验，请稍候…</string>
     <string name="vm_drill_failed">恢复演练失败：%1$s</string>
     <string name="vm_profile_export_done">档案 JSON 已导出（%1$d 字节，明文）——用于换机建档，不含打卡日志。</string>
     <string name="vm_profile_export_failed">导出失败：%1$s</string>

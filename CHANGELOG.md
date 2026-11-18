@@ -1,9 +1,25 @@
-## [未发布] — 2026-11-18 · v1.2.15 九条真机验收清单执行结果（仅文档，未改代码）
+## [v1.2.17] — 2026-11-18 · 恢复演练：重入闸 + 卡内进度反馈
+
+修的是 `v1.2.15` 九条真机验收里**唯一的真缺陷**（用例 ① / ⑦「恢复演练首次点击无反应」）。**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**），覆盖安装。
+
+### 改了什么
+
+1. **`drill()` 补重入闸，且闸位同步翻转在 `viewModelScope.launch` 之前**（`app/src/main/java/com/ashkb/app/ui/backup/BackupViewModel.kt`）。缺陷原状是 `_busy.value = true` 写在协程体内，而 `launch` 只是排队——从点击到协程真正执行之间有一段空窗，期间的第二次点击同样能穿过（UI 的 `enabled = !busy` 也在组合期读取、重组异步）。真机实测：连点两次「执行恢复演练」→ 台账出现**两条**演练记录（两次并发跑完）。与 `doRestore` 的差别在于恢复在仓库层有 `RestoreGate` 的 Mutex 兜底，`drill()` 没有，所以这里的闸必须同步占位。
+2. **补可见的执行中反馈**：新增 `_drillStage`（`String?`）与 `DrillSection` 组合（`app/src/main/java/com/ashkb/app/ui/backup/BackupScreen.kt`）。演练期间进度块渲染**在演练卡内部**、按钮文案变「演练中…」。此前进度块只在页尾 `BusyFooter`，而它在滚动容器最末、视口外——这正是历史记录「首次点击无反应」的真实成因：**反馈不可见，不是功能失效**。
+3. **新增 3 条静态守卫**（`app/src/test/java/com/ashkb/app/ui/backup/BackupBatch2GuardTest.kt`）：闸必须在 `launch` 之前、`finally` 必须复位 `_busy` 与 `_drillStage`、进度必须渲染在演练卡内。`BackupViewModel` 的构造要 `AshkbApplication` + 真 `BackupRepository`，JVM 上搭不出来，故沿用该项目既有的静态断言做法。
+4. **中英 strings 各 +2 条**（`backup_drill_running`、`vm_drill_stage`），同名同序同占位符。
+
+### 真机验证（用例 ① 复跑）
+
+同一台设备（Xiaomi 2410DPN6CC / Android 16，v1.2.17 / 129 覆盖安装）：在**一次 `adb shell` 里连发 4 次 tap（间隔约 0.1 s）→ 台账只新增 1 条**（`演练 · drill / 成功 / 2026-11-18 22:27:35　568 行`），重入闸生效。此前用两次独立的 `adb shell input tap` 得到 2 条，是每次 adb 调用的进程开销把真实间隔拉到了 1.5–2 s、演练已在中间跑完，属先后两次而非并发。
+未取证项：单次演练 1–3 s 即结束，而 `uiautomator dump` 一轮约 2.5 s、备份页又是 FLAG_SECURE（截图全黑），所以「演练中…」文案与卡内进度块**没能截到图**；该切换由 3 条静态守卫测试覆盖。复验在真机台账里留下 3 条演练记录（22:26:29 / 22:26:30 / 22:27:35），台账无删除入口。
+
+## [v1.2.17] 附 · v1.2.15 九条真机验收清单执行结果（2026-11-17/18）
 
 在 `v1.2.16（versionCode 128）` 上按 `docs/v1215-device-acceptance.md` 原判据跑完九条（设备 Xiaomi 2410DPN6CC / Android 16）。明细见 `ui2-shots/v1215-device/results.md`，汇总见 `ui2-shots/v1215-device/SUMMARY.md`。
 
 - **通过 5 条**：④升级兼容、③restoreMutex 三连点（3 击 → 台账仅 1 条）、⑤紧急二维码不完整提示（6 项过敏时 Snackbar + PDF 同句提示、PDF 印全 6 项；3 项时无提示）、⑨逐日数值列表（默认收起、展开 6 行、220 dp 内内部滚动）、⑧深色观感取证（无肉眼可辨的对比不足）。
-- **真缺陷 1 条（未修，待排期）**：**恢复演练缺重入守卫**。连点两次「执行恢复演练」→ 台账出现 **2 条**演练记录（两次并发跑完）。根因 `app/src/main/java/com/ashkb/app/ui/backup/BackupViewModel.kt:495-507` 的 `drill()` 首行即 `viewModelScope.launch { _busy.value = true … }`，没有 `if (_busy.value) return`。观感侧同时缺反馈：演练全程按钮 `enabled=true`、进度块（BusyFooter）位于滚动容器最末、视口外——这正是历史记录「首次点击无反应」的真实成因（反馈不可见，而非功能失效）。建议修法：`drill()` 首行加互斥判断，演练期间写 `_stage`、进度块移入演练卡片、按钮文案改「演练中…」。
+- **真缺陷 1 条（已在 v1.2.17 修复）**：**恢复演练缺重入守卫**。连点两次「执行恢复演练」→ 台账出现 **2 条**演练记录（两次并发跑完）。根因 `app/src/main/java/com/ashkb/app/ui/backup/BackupViewModel.kt:495-507` 的 `drill()` 首行即 `viewModelScope.launch { _busy.value = true … }`，没有 `if (_busy.value) return`。观感侧同时缺反馈：演练全程按钮 `enabled=true`、进度块（BusyFooter）位于滚动容器最末、视口外——这正是历史记录「首次点击无反应」的真实成因（反馈不可见，而非功能失效）。修法见上方 `[v1.2.17]` 节。
 - **部分通过 3 条**：⑥报表三态（Content 正常；Loading 窗口 <2 s 未捕到；Error 为本地 Room 查询、无法构造，记「无法判定」）、⑦320 dp + 2.0×（体征 2×2 与三格上下排、dock、自检页均正常；报表页签变每字一行竖排，记观察项；趋势小多图无数据、待服药卡片当天无用药计划、带键盘输入弹层均无法构造）、②WebDAV 20 MB 附件往返（上传侧通过：20 MB 附件上传后「已同步 3 · 待传 0」、远端校验「远端 3 个文件；缺 0」，删除后「清理多余 1 / 共 1」；**取回侧未验证**——release 包 `run-as`/`su` 均不可用，无法读私有目录做 sha256 比对）。
 - 测试数据已全部清理：健康档案「过敏史」还原「未填」、big20.pdf 附件与 `/sdcard/Download/big20.*` 已删、`wm size/density/font_scale/uimode` 已恢复默认。
 

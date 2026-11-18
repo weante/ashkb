@@ -9,7 +9,7 @@
 - 数据核对：药单管理「在用 1 种 · 依那西普」；复诊记录「下次复诊：2026-11-28 · 距下次复诊还有 11 天 · 门诊复诊 · 结论：补充计量疗程完毕，半个月后复诊减量」；我的页 `v1.2.16 (128)`。
 - 备注：release 包 `run-as` 不可用（package not debuggable），无法直接 `ls` 数据库目录，改用界面数据核对。
 
-## 用例 1 —— ⑦「恢复演练首次点击无反应」｜**失败（真缺陷：无重入守卫）**
+## 用例 1 —— ⑦「恢复演练首次点击无反应」｜**失败（真缺陷：无重入守卫）** → **已修复并复验（v1.2.17）**
 - 路径：我的 → 备份与数据 → 滚到底 → 「执行恢复演练」（bounds [210,444][549,519]）。
 - 观测手段：`uiautomator dump` 轮询（备份页 FLAG_SECURE，截图全黑）；每次 dump 约 2.5–3 s。
 - 单次点击：产生 1 条台账 `演练 · drill / 成功 / 2026-11-17 23:37:30　558 行　双校验通过` → **点击确实进入了 drill()，功能上没有「没反应」**。
@@ -17,6 +17,10 @@
 - 判定表对应行：「是 / 2 条」→ **失败（真缺陷）—— 无守卫导致重复演练**。与代码事实一致：`drill()`（`app/src/main/java/com/ashkb/app/ui/backup/BackupViewModel.kt:495-507`）首行即 `viewModelScope.launch { _busy.value = true … }`，无 `if (_busy.value) return`。
 - 观感侧：dump 里「执行恢复演练」文本节点在整个演练期间（含 14 s 的运行窗口）始终 `enabled=true`，用户看不到禁用态；演练进度块（BusyFooter）在滚动容器最末，视口外。→ 旧记录「首次点击无反应」的成因是**反馈不可见**，不是功能失效。
 - 建议修法（未改代码）：`drill()` 首行加 `if (_busy.value) return`；drill 期间写 `_stage` 并把进度块移入演练卡内、按钮文案改「演练中…」。
+- **修复（v1.2.17，2026-11-18）**：`drill()` 改为「先 `if (_busy.value) return`，再同步 `_busy.value = true` / `_drillStage.value = …`，最后才 `viewModelScope.launch { try … finally 复位 }`」；演练卡抽成 `DrillSection`，按钮文案随 `drillStage` 切「演练中…」，卡内加 `LoadingBlock`。
+- **复验（v1.2.17 / versionCode 129 装机后）**：在**一次 `adb shell` 里连发 4 次 tap（间隔约 0.1 s）→ 台账只新增 1 条** `演练 · drill / 成功 / 2026-11-18 22:27:35　568 行`；此前用两次独立 `adb shell input tap`（各自进程开销把真实间隔拉到 1.5–2 s）得到 2 条，属先后两次而非并发。→ **重入闸生效**。
+- 未取证：「演练中…」文案与卡内进度块未能截到——单次演练 1–3 s 结束，`uiautomator dump` 一轮约 2.5 s，且备份页 FLAG_SECURE 截图全黑；该文案切换由 `BackupBatch2GuardTest` 的 3 条静态守卫覆盖。
+- 副作用：复验在真机台账里留下 3 条演练记录（22:26:29 / 22:26:30 / 22:27:35），台账无删除入口。
 - 证据：`drill-00-before.xml`、`drill-01..08.xml`、`drill2-01.xml`、`drill2-final.xml`
 
 ## 用例 3 —— restoreMutex 真机三连点｜**通过**

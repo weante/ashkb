@@ -51,6 +51,16 @@ class BackupViewModel(
     private val _stage = MutableStateFlow("")
     val stage: StateFlow<String> = _stage
 
+    /**
+     * v1.2.17（v1.2.15 真机验收 用例①）：恢复演练的**专属**进度文案。
+     *
+     * 为什么不复用 [stage]：`stage` 是 WebDAV 备份/下载的阶段串，而演练卡要的是
+     * 「这张卡正在跑」这件事——两者若共用一条流，演练期间备份卡的 BusyFooter 也会跟着亮，
+     * 用户会以为备份在跑。独立一条流，谁发起谁显示（与 P1-5 的修法同一条思路）。
+     */
+    private val _drillStage = MutableStateFlow<String?>(null)
+    val drillStage: StateFlow<String?> = _drillStage
+
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
 
@@ -491,10 +501,26 @@ class BackupViewModel(
         _restoreOrigin.value = RestoreOrigin.PICKED_FILE
     }
 
-    /** 一键恢复演练（协议 §7 首次恢复演练）。 */
+    /**
+     * 一键恢复演练（协议 §7 首次恢复演练）。
+     *
+     * v1.2.17（v1.2.15 真机验收 用例① ⑦「恢复演练首次点击无反应」）：两处修正。
+     *
+     * 1. **重入守卫，且必须在起协程之前同步占位。** 缺陷原状：`_busy.value = true` 写在
+     *    `viewModelScope.launch` **体内**，而 `launch` 只是把协程排进队列——从点击到协程
+     *    真正执行之间有一段空窗，期间的第二次点击同样能穿过（UI 的 `enabled = !busy`
+     *    也在组合期读取、重组异步）。真机实测就是这么出现**两条**演练台账的。
+     *    与 `doRestore` 的区别：恢复在仓库层有 `RestoreGate` 的 Mutex 兜底，`drill()` 没有，
+     *    所以这里的闸必须**同步**翻，不能等协程跑到第一句。
+     * 2. **补可见的执行中反馈。** 此前演练全程按钮仍 `enabled=true`、进度块（BusyFooter）
+     *    又挂在滚动容器最末（视口外），用户点完看到的唯一变化是「没反应」。现在演练卡
+     *    自己渲染进度、按钮文案变「演练中…」——这也是「首次点击无反应」的真实成因。
+     */
     fun drill() {
+        if (_busy.value) return
+        _busy.value = true
+        _drillStage.value = app.getString(R.string.vm_drill_stage)
         viewModelScope.launch {
-            _busy.value = true
             try {
                 val r = repo.drill()
                 info(if (r.roundtripOk)
@@ -502,7 +528,10 @@ class BackupViewModel(
                 else app.getString(R.string.vm_drill_incomplete, r.detail))
             } catch (e: Exception) {
                 fail(app.getString(R.string.vm_drill_failed, errText(e)))
-            } finally { _busy.value = false }
+            } finally {
+                _drillStage.value = null
+                _busy.value = false
+            }
         }
     }
 

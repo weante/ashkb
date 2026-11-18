@@ -137,8 +137,55 @@ class BackupBatch2GuardTest {
         )
     }
 
-    /** 从签名起到下一个成员声明（KDoc / @Composable / fun）为止的函数体。 */
-    private fun body(src: String, signature: String): String {
+    // ---------------- v1.2.17：恢复演练的重入闸与卡内进度（真机验收 用例① ⑦） ----------------
+
+    @Test
+    fun `演练的闸必须在起协程之前同步翻转`() {
+        val body = body(vmSrc, "fun drill()")
+        val guardAt = body.indexOf("if (_busy.value) return")
+        val setAt = body.indexOf("_busy.value = true")
+        val launchAt = body.indexOf("viewModelScope.launch")
+        assertTrue("drill() 缺少重入闸（_busy 检查）", guardAt >= 0)
+        assertTrue("drill() 缺少闸位翻转（_busy = true）", setAt >= 0)
+        assertTrue("drill() 找不到 viewModelScope.launch —— 函数结构变了？", launchAt >= 0)
+        // 真机实测缺陷原状：闸位翻转在 launch 体内，两次快速点击都穿过，台账出现两条演练。
+        assertTrue(
+            "drill() 的闸位翻转必须发生在 viewModelScope.launch 之前（同步占位）" +
+                "（guard=$guardAt / set=$setAt / launch=$launchAt）",
+            guardAt < launchAt && setAt < launchAt,
+        )
+    }
+
+    @Test
+    fun `演练必须在 finally 复位闸与进度文案`() {
+        val body = body(vmSrc, "fun drill()")
+        val finallyAt = body.indexOf("finally {")
+        assertTrue("drill() 缺少 finally 块", finallyAt >= 0)
+        val tail = body.substring(finallyAt)
+        assertTrue("drill() 的 finally 必须复位 _busy", tail.contains("_busy.value = false"))
+        assertTrue(
+            "drill() 的 finally 必须清掉 _drillStage，否则按钮文案永远停在「演练中…」",
+            tail.contains("_drillStage.value = null"),
+        )
+    }
+
+    @Test
+    fun `演练进度必须渲染在演练卡内`() {
+        val screenSrc = readSource("app/src/main/java/com/ashkb/app/ui/backup/BackupScreen.kt")
+        val drillCard = body(screenSrc, "internal fun DrillSection(")
+        assertTrue(
+            "DrillSection 必须自己收集 drillStage",
+            drillCard.contains("vm.drillStage.collectAsStateWithLifecycle()"),
+        )
+        // 页尾 BusyFooter 在滚动容器最末、视口外 —— 只靠它等于没有反馈。
+        assertTrue("演练卡内必须渲染 LoadingBlock", drillCard.contains("LoadingBlock("))
+        assertTrue(
+            "按钮文案必须随演练态切换",
+            drillCard.contains("R.string.backup_drill_running"),
+        )
+    }
+
+    /** 从签名起到下一个成员声明（KDoc / @Composable / fun）为止的函数体。 */    private fun body(src: String, signature: String): String {
         val start = src.indexOf(signature)
         assertTrue("找不到 $signature —— 被改名了？本守卫需要同步更新", start >= 0)
         val from = start + signature.length
