@@ -300,7 +300,7 @@ gh release edit v1.0.70 --prerelease=false --latest
 
 1. `E:\ASHKB` 根目录清理（已于 2026-10-31 归档，见根 `NEXT-SESSION.md`）。
 2. 本文件 §7 与 §3.2 的口径同步（**本次已完成**）。
-3. 首页「今日用药」卡的空态文案（**既有问题，非 v1.2.18 引入**）：非用药日（如 BIW 的周三）没有当日剂量时，卡片显示「当前没有在用药品」，与「我的 → 药单管理 · 在用 1 种」自相矛盾。应区分两种空态——「今天没有需要服用的药」与「没有任何在用药品」。涉及 `ui/today/TodayScreen.kt:568 MedsEmptyCard` 与 `res/values/strings.xml` 的 `med_empty_hint`。
+3. ~~首页「今日用药」卡的空态文案~~ —— **2026-11-18 已修（未发版）**：非用药日（如 BIW 的周三）没有当日剂量时，卡片不再说「当前没有在用药品」，改为「今天没有需要服用的药」并说明「按当前用药方案，今天不是用药日」，出口从「添加药品」换成「查看用药方案」。判据抽成 `domain/TodayMedsEmpty.kt`（`kindOf(profileMissing, activeMedCount)` 三态）并加 5 条 JVM 单测（`TodayMedsEmptyTest`）；涉及 `ui/today/TodayScreen.kt` 的 `MedsEmptyCard`、`TodayViewModel.activeMedCount` 与 `res/values/strings.xml` 新增 3 条（中英成对）。**真机未验**。
 ---
 
 ## v1.0.73 批次 1「看不见的失效」——待真机人工验证的 7 项

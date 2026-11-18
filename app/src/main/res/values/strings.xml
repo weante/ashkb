@@ -358,6 +358,9 @@
     <string name="med_edit_time">修改时刻</string>
     <string name="med_remove_time">删除该时刻</string>
     <string name="med_empty_hint">当前没有在用药品</string>
+    <string name="med_empty_nothing_today">今天没有需要服用的药</string>
+    <string name="med_empty_nothing_today_body">按当前用药方案，今天不是用药日（如隔日给药），不需要打卡。</string>
+    <string name="med_view_regimen">查看用药方案</string>
     <string name="med_fasting">空腹</string>
     <string name="med_freq_fixed_weekday">每周固定星期（如甲氨蝶呤）</string>
     <string name="med_freq_weekly">每周</string>

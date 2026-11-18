@@ -138,6 +138,18 @@ class TodayViewModel(
         todayDate.flatMapLatest { healthRepo.observeExerciseLogs(it.toString()) }.map { it.size }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    /**
+     * 在用药品数量（v1.2.19）。
+     *
+     * 只喂「今日用药」的空态卡：`today` 为空时区分「今天没有该服的药」（有药、今天不排）
+     * 与「没有任何在用药品」。判据见 [com.ashkb.app.domain.TodayMedsEmpty]。
+     * 订阅的是**活跃**药单（`observeActive()`），归档 / 删除都会发新值，与 `refreshYesterdayPending`
+     * 用的是同一条流，不会出现两个口径。
+     */
+    val activeMedCount: StateFlow<Int> =
+        repo.observeMedications().map { it.size }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
     // ---- v1.0.65 B12：极简模式状态机 ----
 
     /**

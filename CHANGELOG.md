@@ -1,3 +1,29 @@
+## [未发布] — 2026-11-18 · 首页「今日用药」空态文案：今天不排药 ≠ 没有药品
+
+真机走查 v1.2.18 时发现的**既有文案缺陷**（非本版引入）：非用药日（依那西普 BIW 的周三）首页「今日用药」卡写「当前没有在用药品」，而「我的 → 药单管理」显示「在用 1 种 · 依那西普」，两句话自相矛盾。**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）。
+
+### 1. 根因
+
+`ui/today/TodayScreen.kt` 的 `medCardItems` 在 `items.isEmpty()` 时只有一条路径：`MedsEmptyCard(profileMissing = …)`。它只按「有没有档案」分叉，于是「今天没有该服的药」（有药、今天不排）被说成了「没有任何在用药品」。
+
+### 2. 修法（三态）
+
+| 情形 | 标题 | 正文 | 出口 |
+|---|---|---|---|
+| 档案缺失 | 当前没有在用药品 | 建档后添加药品…（不变） | 添加药品 |
+| 无在用药品 | 当前没有在用药品 | 添加后这里会显示今天该服用的药（不变） | 添加药品 |
+| 有药但今天不排 | **今天没有需要服用的药** | **按当前用药方案，今天不是用药日（如隔日给药），不需要打卡。** | **查看用药方案** |
+
+- 判据抽成纯函数 `domain/TodayMedsEmpty.kt`（`kindOf(profileMissing, activeMedCount)`，三种 `Kind`），文案与图标留在 UI 层；
+- `TodayViewModel` 新增 `activeMedCount`（订阅 `observeMedications()`，与 `refreshYesterdayPending` 同一条流，不会出现两个口径）；该流只在空态卡的 `item { }` 内收集，药单变化只重组这一张卡；
+- 中英 strings 成对新增 3 条：`med_empty_nothing_today` / `med_empty_nothing_today_body` / `med_view_regimen`。
+
+### 3. 验证
+
+- 新增 `app/src/test/java/com/ashkb/app/domain/TodayMedsEmptyTest.kt`（5 条：缺档案优先、无药、今天不排药、负数防御）；
+- 门禁（`testDebugUnitTest detekt lintDebug verifySpecSync`）**BUILD SUCCESSFUL**：单测 **160 类 / 1321 条 / 0 失败 / 0 错误 / 1 跳过**，lint **0 error**（169 warning），detekt **0**，verifySpecSync 通过；
+- **真机未验**（文案改动，非用药日/用药日两种状态各需看一眼）；未 bump 版本号、未发版。
+
 ## [v1.2.18] — 2026-11-18 · Compose 性能收尾（三屏 Flow 下沉 + verticalScroll 清点）+ 知识库导入去重
 
 `HANDOFF-STATUS.md` §3.2「Compose 性能审查剩余结构性重构」里剩下的两项与「20 处 verticalScroll 未整理」这一次一并结清，另收掉知识库个人条目两个小尾巴里的一个。**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）、**无新增 strings**、可覆盖安装。论证与分类表见 `docs/v1218-perf-audit.md`。

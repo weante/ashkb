@@ -83,6 +83,7 @@ import com.ashkb.app.domain.PendingDoses
 import com.ashkb.app.domain.ResText
 import com.ashkb.app.domain.ScheduleCalc
 import com.ashkb.app.domain.SupplementLogStatus
+import com.ashkb.app.domain.TodayMedsEmpty
 import com.ashkb.app.reminder.SupplementReminderScheduler
 import com.ashkb.app.ui.components.AlertBanner
 import com.ashkb.app.ui.components.DisclaimerNote
@@ -228,6 +229,7 @@ fun TodayScreen(
 
         // 药品列表 + 四态卡片（四个弹层的状态与渲染都在根级，理由见类注释）
         medCardItems(
+            vm = vm,
             items = items,
             todayDate = todayDate,
             profileMissing = profile == null,
@@ -535,6 +537,7 @@ private data class MedCardCallbacks(
  * 卡片必须作为宿主列表的 item 发出去，虚拟化与 `key` 都由宿主统一管理。
  */
 private fun LazyListScope.medCardItems(
+    vm: TodayViewModel,
     items: List<TodayItem>,
     todayDate: LocalDate,
     profileMissing: Boolean,
@@ -542,7 +545,14 @@ private fun LazyListScope.medCardItems(
     callbacks: MedCardCallbacks,
 ) {
     if (items.isEmpty()) {
-        item { MedsEmptyCard(profileMissing = profileMissing, onMedListNeeded = onMedListNeeded) }
+        item {
+            // v1.2.19：只有空态卡需要「在用药品数」，收在这里而不是根部——药单变化就只重组这一张卡。
+            val activeMedCount by vm.activeMedCount.collectAsStateWithLifecycle()
+            MedsEmptyCard(
+                kind = TodayMedsEmpty.kindOf(profileMissing = profileMissing, activeMedCount = activeMedCount),
+                onMedListNeeded = onMedListNeeded,
+            )
+        }
         return
     }
     items(items, key = { it.med.id to it.slotKey }) { item ->
@@ -559,23 +569,35 @@ private fun LazyListScope.medCardItems(
 }
 
 /**
- * 药品列表的空态卡（没有任何在用药品时）。
+ * 药品列表的空态卡。
  *
  * v1.0.87（批次 12）抽成独立函数：让 [todayMedsSection] 同时容纳四个弹层的状态而不超
  * detekt 的 `LongMethod` 阈值，并把「空态文案随是否有档案分叉」这条口径收在一处。
+ *
+ * v1.2.19：空态从两态扩成三态（判据见 [TodayMedsEmpty.kindOf]）。旧实现把「今天不排药」
+ * 也说成「当前没有在用药品」，与药单页自相矛盾——真机走查（2026-11-18，依那西普 BIW 的周三）
+ * 复现。三态的文案 / 跳转出口都不同：
+ *  · 缺档案 → 引导建档（旧文案 `today_build_then_add_note`）；
+ *  · 无在用药品 → 引导添加（旧文案 `med_add_hint_today` + 「添加药品」）；
+ *  · 有药但今天不排 → 明确「今天不用吃」，出口改成「查看用药方案」，不再劝加药。
  */
 @Composable
-private fun MedsEmptyCard(profileMissing: Boolean, onMedListNeeded: () -> Unit) {
+private fun MedsEmptyCard(kind: TodayMedsEmpty.Kind, onMedListNeeded: () -> Unit) {
+    val nothingToday = kind == TodayMedsEmpty.Kind.NOTHING_SCHEDULED_TODAY
     SectionCard(title = stringResource(R.string.today_meds_section)) {
         EmptyState(
             icon = Icons.Rounded.Medication,
-            title = stringResource(R.string.med_empty_hint),
-            body = if (profileMissing) {
-                stringResource(R.string.today_build_then_add_note)
-            } else {
-                stringResource(R.string.med_add_hint_today)
+            title = stringResource(
+                if (nothingToday) R.string.med_empty_nothing_today else R.string.med_empty_hint,
+            ),
+            body = when (kind) {
+                TodayMedsEmpty.Kind.PROFILE_MISSING -> stringResource(R.string.today_build_then_add_note)
+                TodayMedsEmpty.Kind.NO_ACTIVE_MEDS -> stringResource(R.string.med_add_hint_today)
+                TodayMedsEmpty.Kind.NOTHING_SCHEDULED_TODAY -> stringResource(R.string.med_empty_nothing_today_body)
             },
-            actionLabel = stringResource(R.string.med_add_medication),
+            actionLabel = stringResource(
+                if (nothingToday) R.string.med_view_regimen else R.string.med_add_medication,
+            ),
             onAction = onMedListNeeded,
         )
     }

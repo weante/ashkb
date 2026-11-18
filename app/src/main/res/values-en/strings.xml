@@ -363,6 +363,9 @@
     <string name="med_edit_time">Edit time</string>
     <string name="med_remove_time">Remove this time</string>
     <string name="med_empty_hint">No medications in use right now</string>
+    <string name="med_empty_nothing_today">No doses due today</string>
+    <string name="med_empty_nothing_today_body">Your current regimen has no dose scheduled today, so there is nothing to check in.</string>
+    <string name="med_view_regimen">View regimen</string>
     <string name="med_fasting">Fasting</string>
     <string name="med_freq_fixed_weekday">Fixed weekday each week (e.g. methotrexate)</string>
     <string name="med_freq_weekly">Weekly</string>
