@@ -264,6 +264,39 @@ object KbUserEntry {
         return ImportPlan.Ready(drafts, skipped)
     }
 
+    /**
+     * 去重键：同分类 + 同标题 + 同正文 = 同一条。
+     *
+     * 为什么不做「同标题就算重复」：知识库里同一个标题下分不同场景各写一条是正常用法
+     * （比如「运动前热身」在稳定期和活动期各一份），只按标题去重会把它们吃掉。
+     * 为什么不做内容模糊比对：宁可留下两条几乎一样的，也不要静默丢掉一条用户写的东西。
+     */
+    fun dedupeKey(draft: Draft): String = draft.category + "\u0000" + draft.title + "\u0000" + draft.content
+
+    /**
+     * 与存量个人条目比对去重（v1.2.18）。
+     *
+     * 场景：用户把同一份导出文件导入两次、或从两台设备互导——此前每次都整批新增，
+     * 列表里就会出现成对的重复条目，且没有批量删除入口，只能一条条删。
+     *
+     * 只与**存量个人条目**比对（种子条目的正文在 payload 的 `content` 字段，`draftOf` 同样能还原，
+     * 但种子条目 id 不是 `usr-`，用户不会把它当作「自己的条目」，所以这里不参与比对）。
+     *
+     * @return 保留下来的草稿 与 被判为重复而跳过的条数
+     */
+    fun dropDuplicates(drafts: List<Draft>, existing: List<KbEntry>): Pair<List<Draft>, Int> {
+        val seen = existing
+            .filter { isUserEntry(it.id) }
+            .map { dedupeKey(draftOf(it)) }
+            .toMutableSet()
+        var duplicates = 0
+        val kept = ArrayList<Draft>(drafts.size)
+        drafts.forEach { draft ->
+            if (seen.add(dedupeKey(draft))) kept += draft else duplicates++
+        }
+        return kept to duplicates
+    }
+
     /** 单条 JSON（导入用）：缺分类 / 风险级别时给默认值，其余交给 [validate] 裁决 */
     private fun draftOfJson(o: JSONObject): Draft = Draft(
         id = null,

@@ -45,12 +45,14 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
-    val symptom by vm.symptom.collectAsStateWithLifecycle()
+    // v1.2.18（性能 · 深层 Flow 下沉）：根部只收集 selectedDate 与 alerts。
+    // · selectedDate 决定「今天 / 昨天」两个 Chip 与各区块的日期键；
+    // · alerts 决定「警报区」这个 LazyColumn item 是否存在——下沉到区块内部就无法在根部决定是否生成 item，
+    //   空列表时会留下一个 0 高的 item 并被 spacedBy 撑出一段多余间距。
+    // 其余四路（symptom / activeFlare / basdaiHistory / flareHistory）已下沉到各自区块内部收集：
+    // 保存一条 BASDAI 只会重组 BASDAI 卡，不再连带整页（含 LazyColumn 全部 item）重组。
     val selectedDate by vm.selectedDate.collectAsStateWithLifecycle()
     val alerts by vm.alerts.collectAsStateWithLifecycle()
-    val activeFlare by vm.activeFlare.collectAsStateWithLifecycle()
-    val basdaiHistory by vm.basdaiHistory.collectAsStateWithLifecycle()
-    val flareHistory by vm.flareHistory.collectAsStateWithLifecycle()
     val isToday = selectedDate == vm.today
 
     var showFlareStart by remember { mutableStateOf(false) }
@@ -97,10 +99,10 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
 
             // ---- 发作状态 ----
             item {
-                FlareStatusCard(
-                    activeFlare, vm.flareDays(),
-                    onResolve = { showResolve = true },
+                FlareSection(
+                    vm,
                     onStart = { showFlareStart = true },
+                    onResolve = { showResolve = true },
                     onEdit = { editFlare = it },
                 )
             }
@@ -135,70 +137,22 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
 
             // ---- 每日症状 ----
             item {
-                SymptomFormCard(
-                    existing = symptom,
-                    dateLabel = if (isToday) stringResource(R.string.today_tab) else stringResource(R.string.common_yesterday),
-                    dateKey = selectedDate,
-                    onSave = { f -> vm.saveSymptom(f.morningStiffnessMin, f.nightPain, f.painScore, f.feverish, f.feverTemp, f.eyeSymptom, f.neuroRedFlag, f.mood, f.sleep, f.fatigue, f.notes) },
-                    // v1.0.80（批次 6）：删除该日症状记录（连带撤销它派生出来的红旗警报）
-                    onDelete = if (symptom != null) ({ vm.deleteSymptom() }) else null,
-                )
+                DailySymptomSection(vm, selectedDate = selectedDate, isToday = isToday)
             }
 
             // ---- BASDAI ----
             item {
-                SectionCard(title = stringResource(R.string.basdai_title)) {
-                    Text(
-                        stringResource(R.string.basdai_intro_note),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(Spacing.sm))
-                    val basdaiExisting = basdaiHistory.firstOrNull { it.date == selectedDate.toString() }
-                    if (basdaiExisting != null) {
-                        Text(
-                            stringResource(
-                                R.string.ui_symptom_basdai_recorded,
-                                selectedDate.toString(),
-                                // v1.2.10 审查 HIGH-2：BASDAI 总分先按 Locale.US 收敛再交给资源，
-                                // 否则德语/法语等系统语言下小数点会变成逗号。
-                                String.format(Locale.US, "%.1f", basdaiExisting.total),
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(Modifier.height(Spacing.sm))
-                    }
-                    Button(onClick = { showBasdai = true }) {
-                        Text(
-                            when {
-                                isToday && basdaiExisting == null -> stringResource(R.string.symptom_start_today_eval)
-                                isToday -> stringResource(R.string.symptom_edit_today_self)
-                                basdaiExisting == null -> stringResource(R.string.symptom_fill_yesterday_eval)
-                                else -> stringResource(R.string.symptom_edit_yesterday_eval)
-                            }
-                        )
-                    }
-                    Spacer(Modifier.height(Spacing.sm))
-                    if (basdaiHistory.isEmpty()) {
-                        Text(stringResource(R.string.common_no_records_yet), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else {
-                        BasdaiList(basdaiHistory.take(8), onDelete = { vm.deleteBasdai(it.id) })
-                    }
-                }
+                BasdaiSection(
+                    vm,
+                    selectedDate = selectedDate,
+                    isToday = isToday,
+                    onOpenDialog = { showBasdai = true },
+                )
             }
 
             // ---- 发作历史 ----
-            if (flareHistory.isNotEmpty()) {
-                item {
-                    SectionCard(title = stringResource(R.string.symptom_flare_history)) {
-                        FlareHistoryList(
-                            flareHistory.take(10),
-                            onEdit = { editFlare = it },
-                            onDelete = { vm.deleteFlare(it.id) },
-                        )
-                    }
-                }
+            item {
+                FlareHistorySection(vm, onEdit = { editFlare = it })
             }
             item { Spacer(Modifier.height(Spacing.xxl)) }
         }
@@ -223,13 +177,9 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
         )
     }
     if (showBasdai) {
-        BasdaiDialog(
-            date = selectedDate,
-            existing = basdaiHistory.firstOrNull { it.date == selectedDate.toString() },
-            onConfirm = { q1, q2, q3, q4, q5, q6, note ->
-                vm.saveBasdai(q1, q2, q3, q4, q5, q6, note)
-                showBasdai = false
-            },
+        BasdaiDialogHost(
+            vm = vm,
+            selectedDate = selectedDate,
             onDismiss = { showBasdai = false },
         )
     }
@@ -250,4 +200,135 @@ fun SymptomScreen(vm: SymptomViewModel, onBack: () -> Unit) {
             onDismiss = { kbDetail = null },
         )
     }
+}
+
+// ---------------------------------------------------------------------------
+// v1.2.18（性能 · 深层 Flow 下沉）
+// 每个区块在最靠近使用点的地方收集自己那一路 StateFlow。此前六路都在 SymptomScreen 根部收集，
+// 于是保存一条 BASDAI（basdaiHistory 变）会把整页连同 LazyColumn 的所有 item 一起重组；
+// 下沉后只有 BASDAI 卡重组。区块内 `return` 的 0 高 item 只在页面末尾多出 spacedBy 的 12dp，
+// 与末尾 Spacer(xxl) 相邻，视觉上不可见。
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun FlareSection(
+    vm: SymptomViewModel,
+    onStart: () -> Unit,
+    onResolve: () -> Unit,
+    onEdit: (FlareEvent) -> Unit,
+) {
+    val activeFlare by vm.activeFlare.collectAsStateWithLifecycle()
+    FlareStatusCard(
+        activeFlare,
+        vm.flareDays(),
+        onResolve = onResolve,
+        onStart = onStart,
+        onEdit = onEdit,
+    )
+}
+
+@Composable
+private fun DailySymptomSection(
+    vm: SymptomViewModel,
+    selectedDate: LocalDate,
+    isToday: Boolean,
+) {
+    val symptom by vm.symptom.collectAsStateWithLifecycle()
+    SymptomFormCard(
+        existing = symptom,
+        dateLabel = if (isToday) stringResource(R.string.today_tab) else stringResource(R.string.common_yesterday),
+        dateKey = selectedDate,
+        onSave = { f ->
+            vm.saveSymptom(
+                f.morningStiffnessMin, f.nightPain, f.painScore, f.feverish, f.feverTemp,
+                f.eyeSymptom, f.neuroRedFlag, f.mood, f.sleep, f.fatigue, f.notes,
+            )
+        },
+        // v1.0.80（批次 6）：删除该日症状记录（连带撤销它派生出来的红旗警报）
+        onDelete = if (symptom != null) ({ vm.deleteSymptom() }) else null,
+    )
+}
+
+@Composable
+private fun BasdaiSection(
+    vm: SymptomViewModel,
+    selectedDate: LocalDate,
+    isToday: Boolean,
+    onOpenDialog: () -> Unit,
+) {
+    val basdaiHistory by vm.basdaiHistory.collectAsStateWithLifecycle()
+    val basdaiExisting = basdaiHistory.firstOrNull { it.date == selectedDate.toString() }
+    SectionCard(title = stringResource(R.string.basdai_title)) {
+        Text(
+            stringResource(R.string.basdai_intro_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        if (basdaiExisting != null) {
+            Text(
+                stringResource(
+                    R.string.ui_symptom_basdai_recorded,
+                    selectedDate.toString(),
+                    // v1.2.10 审查 HIGH-2：BASDAI 总分先按 Locale.US 收敛再交给资源，
+                    // 否则德语/法语等系统语言下小数点会变成逗号。
+                    String.format(Locale.US, "%.1f", basdaiExisting.total),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.height(Spacing.sm))
+        }
+        Button(onClick = onOpenDialog) {
+            Text(
+                when {
+                    isToday && basdaiExisting == null -> stringResource(R.string.symptom_start_today_eval)
+                    isToday -> stringResource(R.string.symptom_edit_today_self)
+                    basdaiExisting == null -> stringResource(R.string.symptom_fill_yesterday_eval)
+                    else -> stringResource(R.string.symptom_edit_yesterday_eval)
+                }
+            )
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        if (basdaiHistory.isEmpty()) {
+            Text(
+                stringResource(R.string.common_no_records_yet),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            BasdaiList(basdaiHistory.take(8), onDelete = { vm.deleteBasdai(it.id) })
+        }
+    }
+}
+
+@Composable
+private fun FlareHistorySection(vm: SymptomViewModel, onEdit: (FlareEvent) -> Unit) {
+    val flareHistory by vm.flareHistory.collectAsStateWithLifecycle()
+    if (flareHistory.isEmpty()) return
+    SectionCard(title = stringResource(R.string.symptom_flare_history)) {
+        FlareHistoryList(
+            flareHistory.take(10),
+            onEdit = onEdit,
+            onDelete = { vm.deleteFlare(it.id) },
+        )
+    }
+}
+
+@Composable
+private fun BasdaiDialogHost(
+    vm: SymptomViewModel,
+    selectedDate: LocalDate,
+    onDismiss: () -> Unit,
+) {
+    val basdaiHistory by vm.basdaiHistory.collectAsStateWithLifecycle()
+    BasdaiDialog(
+        date = selectedDate,
+        existing = basdaiHistory.firstOrNull { it.date == selectedDate.toString() },
+        onConfirm = { q1, q2, q3, q4, q5, q6, note ->
+            vm.saveBasdai(q1, q2, q3, q4, q5, q6, note)
+            onDismiss()
+        },
+        onDismiss = onDismiss,
+    )
 }

@@ -1,3 +1,51 @@
+## [v1.2.18] — 2026-11-18 · Compose 性能收尾（三屏 Flow 下沉 + verticalScroll 清点）+ 知识库导入去重
+
+`HANDOFF-STATUS.md` §3.2「Compose 性能审查剩余结构性重构」里剩下的两项与「20 处 verticalScroll 未整理」这一次一并结清，另收掉知识库个人条目两个小尾巴里的一个。**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）、**无新增 strings**、可覆盖安装。论证与分类表见 `docs/v1218-perf-audit.md`。
+
+### 1. 深层 Flow 下沉（代码 · 三屏）
+
+页根 `collectAsStateWithLifecycle` 的每一路只要出一个新值，整个页面重组——LazyColumn 的 `content` lambda 重新执行、每个 item 重新求 key。
+
+| 页面 | 改前 | 改后 | 留在根部的（原因） |
+|---|---|---|---|
+| `ui/checkup/CheckupScreen.kt` | 8 | **1** | `items`（记录 tab 的 `filterItem` 解析、记录表单项目预填都要它） |
+| `ui/symptom/SymptomScreen.kt` | 6 | **2** | `selectedDate`、`alerts`（决定警报区那个 item 是否存在） |
+| `ui/exercise/ExerciseScreen.kt` | 5 | **1** | `ui`（`ExerciseUiState`，黑榜与处方列表都由它驱动） |
+
+- Checkup 新增 `CheckupItemsTab` / `CheckupRecordsTab` / `CheckupLabsTab` / `CheckupImagingTab` / `CheckupVaccinesTab` + `LabAttachSheetHost` / `LabsLinkPickerHost` / `ImagingLinkPickerHost`；「记录」tab 的 6 个回调收进 `private class RecordsTabActions`（避开 `detekt.yml` 的 `LongParameterList.functionThreshold = 8`）。`itemRecordsFlow`（记录按项目筛选的冷 Flow）随之下沉到 `CheckupRecordsTab`。
+- Symptom 新增 `FlareSection` / `DailySymptomSection` / `BasdaiSection` / `FlareHistorySection` / `BasdaiDialogHost`。
+- Exercise 新增 `PrescriptionHeroHost`（收 `yesterdaySymptom` + `warmup`）/ `PendingFeedbackSection` / `TodayLogsSection`。
+- 收益形态：打卡一次只重组「今日已打卡」那一块，不再连带动黑榜、处方 hero、次日反馈；化验「加载更多」只影响化验 tab。
+- **已知取舍**：两处条件区块由 `if (list.isNotEmpty()) { item { … } }` 改为 `item { Section() }` + 区块内 `if (isEmpty) return`。空列表时 LazyColumn 留一个 0 高 item、多出 12dp（与卡片块间距同宽）。保留 `if` 就必须把 list 收集回根部，等于放弃下沉——两者只能选一个，这里选了后者并留注释。
+
+### 2. `verticalScroll` 清点（只加测试与文档 · 不改代码）
+
+backlog 写「14 文件 20 处」，**实际 26 处 / 18 文件**。逐处看过，**没有一处该换成 `LazyColumn`**：对话框正文 7、`ModalBottomSheet` 正文与骨架 10、条目数固定的整页单列 5、刻意限高内滚 3（`DailyValuesList` 的 `heightIn(max = 220dp)`、AI 导入模板预览的 `heightIn(max = 160.dp)`）、导入预览兜底 1。真正的长列表（知识库 48 条、化验 50 条、复诊记录、运动库）早已是 `LazyColumn`。
+
+新增 `app/src/test/java/com/ashkb/app/ui/VerticalScrollInventoryTest.kt`：记录「文件 → 处数」清单并断言与源码一致（共 2 条测试）。以后往页面级容器上加 `verticalScroll`、或把某处悄悄换成 `LazyColumn`，测试会红，必须回来更新清单并写理由。
+
+### 3. 「多路 `MutableStateFlow` 合并成单一 `UiState`」判定不做（只写文档）
+
+三条理由（详见 `docs/v1218-perf-audit.md` §三）：① 实测数量与 backlog 不符——`BackupViewModel` 是 **30 个** `StateFlow`（backlog 写 20）、`ReportViewModel` 是 **8 个**（写 7）；② `ReportScreen.kt:145` 是 `HorizontalPager`，四个 tab **已经各自收集**（`OverviewTab:166` / `TrendsTab:197` / `PeriodicTab:206` / `ExportTab:219`），合并后任何一次加载都会让根部重组、四个 tab 全重走，**比现在更差**；③ `ui/backup/*.kt` 34 处消费，`stage`/`attachSyncStage` 每秒在变，合并后会把备份页 + 5 个 sheet 拉着一起重组，而这条路径刚在 v1.2.15 / v1.2.17 做过真机验收——纯结构改写属只增风险、无收益。
+
+### 4. 知识库导入去重（代码）
+
+同一份导出文件导入两次、或两台设备互导，此前每次都整批新增，列表出现成对重复条目且没有批量删除入口。新增 `KbUserEntry.dedupeKey` / `dropDuplicates`（去重键 = 分类 + 标题 + 正文；**只按标题去重会吃掉「同名不同场景」的正常用法，所以不做**），`HealthRepository.importKbUserJson` 在写入前与存量个人条目比对，重复条数计入 `skipped`（与「不合规被跳过」共用同一个计数与同一句提示，未新增文案）。新增 5 条单测（批内重复、与存量重复、种子行不参与、同名不同正文保留、同正文不同分类保留）。
+
+### 5. 「备份不区分 `usr-` 来源」保持现状（明确不做）
+
+整机备份走的是整库快照，恢复即整库覆盖，这是 `.ashkb` 格式自 v1.0 以来的语义；要让「恢复时保留备份之后新建的个人条目」等于给恢复加一层合并规则，会破坏「恢复 = 回到那个时间点」的可预期性，且与 `RestoreGate` / 演练 / 撤销快照的现有假设纠缠。**维护者 2026-11-18 拍板：保持现状**，不擅自改。
+
+### 真机验证（三屏视觉复核 · 2026-11-18）
+
+同一台设备（Xiaomi 2410DPN6CC / Android 16）覆盖安装后逐屏看过：**症状与自评**（发作登记卡 → 记录日期 → 今日症状卡，间距均匀、无缺失区块）、**今日运动**（红榜卡 → 今日推荐处方卡，卡片间距一致）、**复诊管理五个 tab**（项目/记录/化验 228 项/影像/疫苗全部正常渲染，记录 tab 的「复诊准备」卡与记录卡都在）、**健康 Hub**（今日体征 2×2 + 三张入口卡）均正常。改动引入的唯一观感变化是「条件区块为空时留一个 0 高 item、多 12dp 留白」，真机上看不出差别。截图见 `E:\ASHKB\.shots\v1218\`。
+
+顺带发现一处**既有**文案问题（非本版引入，未改）：非用药日的首页「今日用药」卡在没有当日剂量时显示「当前没有在用药品」，与「我的 → 药单管理 · 在用 1 种」矛盾——真实的空态应是「今天没有需要服用的药」。已记入 `HANDOFF-STATUS.md` §7-D 第 3 条待办，待下一轮连同文案一起处理。
+
+### 门禁（2026-11-18）
+
+`testDebugUnitTest detekt lintDebug verifySpecSync assembleRelease` → **BUILD SUCCESSFUL**；单测 **159 个类 / 1316 条 / 0 失败 / 0 错误 / 1 跳过**（较 v1.2.17 的 1309 条 +7：去重 5 条 + `verticalScroll` 清单 2 条）；lint **0 error / 169 warning / 8 info**（177 issues）；detekt **0 issues**（`reports/detekt/detekt.xml` 79 字节）；`verifySpecSync` 通过（版本 `1.2.18 / 130` 已同步到 `README.md` 与 `HANDOFF-STATUS.md`，`ASHKB_DB_VERSION` 仍 **21**）。`assembleRelease` 产出 `app-release.apk` **5,431,024 B**，sha256 `088BB99C…A14FE`，`aapt dump badging` = versionCode **130** / versionName **1.2.18**。
+
 ## [v1.2.17] — 2026-11-18 · 恢复演练：重入闸 + 卡内进度反馈
 
 修的是 `v1.2.15` 九条真机验收里**唯一的真缺陷**（用例 ① / ⑦「恢复演练首次点击无反应」）。**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**），覆盖安装。

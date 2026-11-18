@@ -593,17 +593,23 @@ class HealthRepository(private val context: Context) {
     suspend fun exportKbUserJson(): String = KbUserEntry.exportJson(kbDao.listUserEntries(), nowIso())
 
     /**
-     * 导入个人条目：解析 → 单事务整批写入。
+     * 导入个人条目：解析 → 去重 → 单事务整批写入。
      *
      * 整批一个事务：导入要么全进、要么全不进——半批落库后失败，用户看到的条数与
      * 文件对不上，还会在下一次导入时产生重复条目。
+     *
+     * v1.2.18：与存量个人条目去重（同分类 + 同标题 + 同正文）。同一份文件导两次不再翻倍；
+     * 被判为重复的条数计入 `skipped`，与「不合规被跳过」共用同一个计数与同一句提示。
      */
     suspend fun importKbUserJson(text: String, today: String): KbUserEntry.ImportPlan {
         val plan = KbUserEntry.parseExport(text)
         if (plan !is KbUserEntry.ImportPlan.Ready) return plan
-        val rows = plan.drafts.map { KbUserEntry.toEntry(it, existing = null, id = Ids.new("usr"), today = today) }
+        val (fresh, duplicates) = KbUserEntry.dropDuplicates(plan.drafts, kbDao.listUserEntries())
+        val skipped = plan.skipped + duplicates
+        if (fresh.isEmpty()) return KbUserEntry.ImportPlan.Ready(emptyList(), skipped)
+        val rows = fresh.map { KbUserEntry.toEntry(it, existing = null, id = Ids.new("usr"), today = today) }
         db.withTransaction { rows.forEach { kbDao.insertUserEntry(it) } }
-        return plan
+        return KbUserEntry.ImportPlan.Ready(fresh, skipped)
     }
 
     // ---- alerts ----

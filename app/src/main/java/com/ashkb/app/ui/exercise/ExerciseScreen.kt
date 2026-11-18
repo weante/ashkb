@@ -73,12 +73,11 @@ import com.ashkb.app.ui.theme.container
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -> Unit, onBack: () -> Unit) {
+    // v1.2.18（性能 · 深层 Flow 下沉）：根部只留当日处方 UiState 这一路——
+    // 黑榜拦截区与处方列表都由它驱动，且它本身是 combine(library, profile) 的结果。
+    // yesterdaySymptom / warmup 下沉进 PrescriptionHeroHost；todayLogs / feedbackPending
+    // 下沉进各自的区块。此前任一路变化（例如打一次卡）都会让整页五个区块一起重组。
     val ui by vm.uiState.collectAsStateWithLifecycle()
-    val todayLogs by vm.todayLogs.collectAsStateWithLifecycle()
-    val pending by vm.feedbackPending.collectAsStateWithLifecycle()
-    val yesterday by vm.yesterdaySymptom.collectAsStateWithLifecycle()
-    // v1.0.69 C8b：晨僵驱动的起床热身序列
-    val warmup by vm.warmup.collectAsStateWithLifecycle()
 
     var checkInTarget by remember { mutableStateOf<ExerciseEngine.ExerciseCard?>(null) }
     var feedbackTarget by remember { mutableStateOf<ExerciseLog?>(null) }
@@ -114,7 +113,7 @@ fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -> Unit, onBack: () ->
 
             // ---- 当日处方 hero：大号结论 + 分期色带 + 判读依据 ----
             item {
-                PrescriptionHero(ui = ui, yesterday = yesterday, warmup = warmup)
+                PrescriptionHeroHost(vm = vm, ui = ui)
             }
 
             // ---- B7 入口：周期康复计划（4–12 周按周递进的模板与完成度） ----
@@ -128,55 +127,13 @@ fun ExerciseScreen(vm: ExerciseViewModel, onOpenPlans: () -> Unit, onBack: () ->
             }
 
             // ---- R21 次日反馈待填 ----
-            if (pending.isNotEmpty()) {
-                item {
-                    SectionCard(
-                        title = stringResource(R.string.exercise_feedback_pending),
-                        subtitle = stringResource(R.string.exercise_pain_rule_note),
-                        container = StatusTone.Warning.container(),
-                    ) {
-                        DividerList(pending, key = { it.id }) { log ->
-                            Text(
-                                log.excName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f),
-                            )
-                            OutlinedButton(onClick = { feedbackTarget = log }) { Text(stringResource(R.string.exercise_fill_feedback)) }
-                        }
-                    }
-                }
+            item {
+                PendingFeedbackSection(vm = vm, onFill = { feedbackTarget = it })
             }
 
             // ---- 今日已打卡 ----
-            if (todayLogs.isNotEmpty()) {
-                item {
-                    SectionCard(title = stringResource(R.string.exercise_today_done, todayLogs.size)) {
-                        DividerList(todayLogs, key = { it.id }) { log ->
-                            Text(
-                                buildString {
-                                    append(log.excName)
-                                    log.durationMin?.let { append(stringResource(R.string.exercise_minutes_suffix, it)) }
-                                    if (log.fbPainChange != null) append(stringResource(R.string.exercise_feedback_done_suffix))
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.weight(1f),
-                            )
-                            // v1.0.80（批次 6）：误录的打卡要能改 / 能删（表单内删除）。
-                            // 放在打卡行内而不是别处：用户看到错的那一条时，改它的入口就在这里。
-                            TextButton(
-                                onClick = { logEdit = log },
-                                modifier = Modifier.heightIn(min = Size.touchMin),
-                            ) { Text(stringResource(R.string.common_edit)) }
-                            Icon(
-                                imageVector = Icons.Rounded.CheckCircle,
-                                contentDescription = stringResource(R.string.common_completed),
-                                modifier = Modifier.size(Size.iconSm),
-                                tint = StatusTone.Success.accent(),
-                            )
-                        }
-                    }
-                }
+            item {
+                TodayLogsSection(vm = vm, onEdit = { logEdit = it })
             }
 
             // ---- 今日处方（红榜） ----
@@ -634,3 +591,72 @@ private fun ExerciseEngine.ExerciseCard.hintText(): String =
 @Composable
 private fun textPartOf(part: ExerciseEngine.TextPart): String =
     if (part.args.isEmpty()) stringResource(part.res) else stringResource(part.res, part.args.first())
+
+// ---------------------------------------------------------------------------
+// v1.2.18（性能 · 深层 Flow 下沉）
+// 三个区块各自在最靠近使用点收集自己那一路 StateFlow。空列表时区块自身 return，
+// LazyColumn 里会留一个 0 高 item、多出 spacedBy 的 12dp 留白——与相邻 Card 的块间距同宽，
+// 视觉上只表现为「这里少了一段」，不再整页因一次打卡而重组。
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun PrescriptionHeroHost(vm: ExerciseViewModel, ui: ExerciseUiState) {
+    val yesterday by vm.yesterdaySymptom.collectAsStateWithLifecycle()
+    // v1.0.69 C8b：晨僵驱动的起床热身序列
+    val warmup by vm.warmup.collectAsStateWithLifecycle()
+    PrescriptionHero(ui = ui, yesterday = yesterday, warmup = warmup)
+}
+
+@Composable
+private fun PendingFeedbackSection(vm: ExerciseViewModel, onFill: (ExerciseLog) -> Unit) {
+    val pending by vm.feedbackPending.collectAsStateWithLifecycle()
+    if (pending.isEmpty()) return
+    SectionCard(
+        title = stringResource(R.string.exercise_feedback_pending),
+        subtitle = stringResource(R.string.exercise_pain_rule_note),
+        container = StatusTone.Warning.container(),
+    ) {
+        DividerList(pending, key = { it.id }) { log ->
+            Text(
+                log.excName,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedButton(onClick = { onFill(log) }) {
+                Text(stringResource(R.string.exercise_fill_feedback))
+            }
+        }
+    }
+}
+
+@Composable
+private fun TodayLogsSection(vm: ExerciseViewModel, onEdit: (ExerciseLog) -> Unit) {
+    val todayLogs by vm.todayLogs.collectAsStateWithLifecycle()
+    if (todayLogs.isEmpty()) return
+    SectionCard(title = stringResource(R.string.exercise_today_done, todayLogs.size)) {
+        DividerList(todayLogs, key = { it.id }) { log ->
+            Text(
+                buildString {
+                    append(log.excName)
+                    log.durationMin?.let { append(stringResource(R.string.exercise_minutes_suffix, it)) }
+                    if (log.fbPainChange != null) append(stringResource(R.string.exercise_feedback_done_suffix))
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            // v1.0.80（批次 6）：误录的打卡要能改 / 能删（表单内删除）。
+            // 放在打卡行内而不是别处：用户看到错的那一条时，改它的入口就在这里。
+            TextButton(
+                onClick = { onEdit(log) },
+                modifier = Modifier.heightIn(min = Size.touchMin),
+            ) { Text(stringResource(R.string.common_edit)) }
+            Icon(
+                imageVector = Icons.Rounded.CheckCircle,
+                contentDescription = stringResource(R.string.common_completed),
+                modifier = Modifier.size(Size.iconSm),
+                tint = StatusTone.Success.accent(),
+            )
+        }
+    }
+}

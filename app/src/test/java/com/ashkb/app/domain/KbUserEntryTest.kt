@@ -347,4 +347,52 @@ class KbUserEntryTest {
         assertNotNull(first.optString("created_at"))
         assertFalse(first.optString("created_at").isBlank())
     }
+
+    // ---- v1.2.18：导入去重 ----
+
+    private fun draftOf(title: String, content: String = "正文", category: String = "food_drug") =
+        KbUserEntry.Draft(category = category, title = title, content = content)
+
+    @Test
+    fun `dropDuplicates keeps the first of a repeated batch`() {
+        val drafts = listOf(draftOf("同一条"), draftOf("同一条"), draftOf("另一条", "别的正文"))
+        val (kept, duplicates) = KbUserEntry.dropDuplicates(drafts, existing = emptyList())
+        assertEquals(2, kept.size)
+        assertEquals(1, duplicates)
+        assertEquals("另一条", kept.last().title)
+    }
+
+    @Test
+    fun `dropDuplicates skips drafts already in the library`() {
+        val existing = listOf(entryRow("usr-1", "我写的"))
+        val drafts = listOf(draftOf("我写的"), draftOf("新写的", "新正文"))
+        val (kept, duplicates) = KbUserEntry.dropDuplicates(drafts, existing)
+        assertEquals(listOf("新写的"), kept.map { it.title })
+        assertEquals(1, duplicates)
+    }
+
+    @Test
+    fun `dropDuplicates ignores seed rows`() {
+        // 种子条目的 id 不是 usr-：用户导入一条与种子正文相同的个人条目，应当被保留
+        val existing = listOf(entryRow("itx-001", "我写的"))
+        val (kept, duplicates) = KbUserEntry.dropDuplicates(listOf(draftOf("我写的")), existing)
+        assertEquals(1, kept.size)
+        assertEquals(0, duplicates)
+    }
+
+    @Test
+    fun `same title with different content is not a duplicate`() {
+        val drafts = listOf(draftOf("热身", "活动期版本"), draftOf("热身", "稳定期版本"))
+        val (kept, duplicates) = KbUserEntry.dropDuplicates(drafts, existing = emptyList())
+        assertEquals(2, kept.size)
+        assertEquals(0, duplicates)
+    }
+
+    @Test
+    fun `same content in another category is not a duplicate`() {
+        val drafts = listOf(draftOf("同名", "同正文", "food_drug"), draftOf("同名", "同正文", "exercise"))
+        val (kept, duplicates) = KbUserEntry.dropDuplicates(drafts, existing = emptyList())
+        assertEquals(2, kept.size)
+        assertEquals(0, duplicates)
+    }
 }
