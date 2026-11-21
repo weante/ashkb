@@ -1,3 +1,41 @@
+## [未发布] — 2026-11-21 · CI 提速：一条串行流水线拆成三条并行 job
+
+原 `.github/workflows/ci.yml` 只有一条 `build-and-test`，把 `assembleDebug`、`assembleRelease`、`testDebugUnitTest`、`detekt`、`lint` 全塞进同一个 job 串行跑，**单线程排队**是主要成本。本轮按依赖关系拆成三条互不依赖的并行 job，并去掉两处重复劳动。**无产品代码变更**、**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）、**无版本号变更**。
+
+### 1. 瓶颈与处置
+
+| 观察 | 处置 |
+|---|---|
+| 一个 job 串行跑五项任务 | 拆成 `unit-tests`（单测 + detekt + `verifySpecSync` + schema 漂移门）、`lint`（`lintDebug`）、`package`（`assembleRelease` + 验签冒烟）三条并行 job |
+| `lint`（不带变体）会把 release 变体也分析一遍 | 改 `lintDebug`：issue 集完全相同，少分析一整个变体 |
+| `assembleRelease` 内嵌 `lintVitalRelease` 与 `lintDebug` 重复 | `android { lint { checkReleaseBuilds = false } }`，全量 issue 仍由 `lintDebug` 把守 |
+| `assembleDebug` 在 CI 从未被使用 | 删除（单测只需编译 debug 类，不需要打 debug 包） |
+| Robolectric 首次下载约 140 MB 的 `android-all-instrumented` jar | `actions/cache@v4` 缓存 `~/.m2/repository/org/robolectric`（key 含 Robolectric 版本与 instrumentation 版本） |
+| 单测单进程跑满一核 | `testOptions.unitTests.all { it.maxParallelForks = 2 }`（fork 是独立 JVM，Room/DateProvider 单例不受影响） |
+| Gradle 未开构建缓存与并行 | `org.gradle.caching=true`、`org.gradle.parallel=true`，CI 命令统一加 `--build-cache` |
+
+### 2. 实测（GitHub Actions 记录的真实秒数）
+
+| 形态 | 关键路径 | 说明 |
+|---|---|---|
+| 改前 `build-and-test` 单 job（热缓存） | **288 s** | run 44907506938，gradle 步 252 s |
+| 改前（冷缓存，全新 runner 重下 140 MB） | **380 s** | run 44564676217，gradle 步 338 s |
+| 改前（含 lint 全量重跑） | **461 s** | run 44910211994，gradle 步 408 s |
+| 拆两条 job（`unit-tests` / `lint-and-package`） | **420 s** | run 44911766870 —— lint 与打包仍串在一条 job 里，尾巴没剪掉 |
+| **拆三条 job（最终）** | **137 s（2 分 17 秒）** | run 44912505838：lint 66 s、package 49 s、unit-tests 134 s（其中单测步 89 s），三条并行 |
+
+### 3. 纪律没有让步
+
+- **六道门全保留**：`testDebugUnitTest`、`detekt`、`lintDebug`、`verifySpecSync`、`git diff --exit-code -- app/schemas`、`apksigner verify`。
+- **tag 发布流水线一字未动**（`release` job 仍强制正式签名 + 必需 `ASHKB_EXPECTED_CERT_SHA256`）。
+- `ReleaseSigningWorkflowTest` 相应改了两处并**加了一条新守卫**：`CI 拆分后仍覆盖全部六道门`（job 拆分是结构变化，不能顺手把某道门弄丢）；签名放行断言从「写死 `build-and-test`」改成「凡产出 APK 的非 tag job 必须带 `ASHKB_ALLOW_DEBUG_SIGNING`」，并仍逐条校验每个非 tag job 的 `if:` 取反、tag job 不得带该变量。
+- 本地全量门禁 `testDebugUnitTest detekt lintDebug verifySpecSync --build-cache`：**BUILD SUCCESSFUL 1m50s**；单测 **163 类 / 1342 条 / 0 失败 / 0 错误 / 1 跳过**（新增 1 条 CI 守卫 `CI 拆分后仍覆盖全部六道门`）；lint 0 issue、detekt 0。
+
+### 4. 未做与后续
+
+- 未引入远程构建缓存（Gradle Develocity 之类）：三条 job 各自下载依赖仍有约 20 s 固定开销，若以后要压到 1 分半再考虑。
+- 首跑仍慢于热跑（要建立 `setup-gradle` 与 Robolectric 缓存）；对 PR 首次触发，预计 3~4 分钟。
+
 ## [未发布] — 2026-11-21 · Lint 全清零：169 warning → 0（57 条改代码，7 类写明理由豁免）
 
 `app/build/reports/lint-results-debug.xml` 原有 **169 warning + 8 information**，本轮全部结清：**57 条真改代码**，**7 类共 151 条**写进新建的 `lint.xml` 并逐条注明理由。**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）、**无版本号变更**、**无用户可见行为变更**。
