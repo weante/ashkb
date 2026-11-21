@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.repo.MedicationRepository
 import java.time.LocalDate
@@ -101,9 +100,7 @@ class BootReceiver : BroadcastReceiver() {
                 }
 
                 // 权限回授场景顺手把 sys 通道告知一声（通道存在才发，免打扰用户）
-                if (action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED &&
-                    Build.VERSION.SDK_INT >= 31
-                ) {
+                if (action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) {
                     val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
                     if (am.canScheduleExactAlarms()) {
                         NotificationHelper.ensureChannels(context)

@@ -26,9 +26,13 @@ import java.io.File
  * 清除 `as MutableStateFlow` 强转（审查报告 P2，运行时非受检向下转型）。
  */
 class ReportViewModel(
-    private val app: Context,
+    context: Context,
     private val repo: ReportRepository,
 ) : ViewModel() {
+
+    /** 只保留 Application Context，避免 ViewModel 长期持有 Activity。 */
+    @android.annotation.SuppressLint("StaticFieldLeak") // Factory 恒传 Application/applicationContext
+    private val app: Context = context.applicationContext
 
     private val _overview = MutableStateFlow<ReportRepository.Overview?>(null)
     val overview: StateFlow<ReportRepository.Overview?> = _overview

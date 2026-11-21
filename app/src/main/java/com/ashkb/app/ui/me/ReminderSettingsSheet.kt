@@ -23,6 +23,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -67,14 +69,14 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
 
     var checkup by remember { mutableStateOf(cfg.checkupEnabled()) }
     var exercise by remember { mutableStateOf(cfg.exerciseEnabled()) }
-    var basdaiCycle by remember { mutableStateOf(cfg.basdaiCycleDays()) }
+    var basdaiCycle by remember { mutableLongStateOf(cfg.basdaiCycleDays()) }
     // v1.0.60 B8：免打扰时段
     var dndEnabled by remember { mutableStateOf(cfg.dndEnabled()) }
     var dndStart by remember { mutableStateOf(cfg.dndStart()) }
     var dndEnd by remember { mutableStateOf(cfg.dndEnd()) }
     // v1.0.68 C8a：久坐起身提醒
     var sedentary by remember { mutableStateOf(cfg.sedentaryEnabled()) }
-    var sedentaryInterval by remember { mutableStateOf(cfg.sedentaryIntervalMin()) }
+    var sedentaryInterval by remember { mutableIntStateOf(cfg.sedentaryIntervalMin()) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         // v1.2.15（外部审查 §U-2）：原先没有滚动。这一页在小屏 + 大字号下会把最底下的

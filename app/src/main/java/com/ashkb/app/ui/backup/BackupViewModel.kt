@@ -40,9 +40,13 @@ import java.time.LocalDateTime
  * 清除 `as MutableStateFlow` 强转（审查报告 P2，运行时非受检向下转型）。
  */
 class BackupViewModel(
-    private val app: Context,
+    context: Context,
     private val repo: BackupRepository,
 ) : ViewModel() {
+
+    /** 只保留 Application Context，避免 ViewModel 长期持有 Activity。 */
+    @android.annotation.SuppressLint("StaticFieldLeak") // Factory 恒传 Application/applicationContext
+    private val app: Context = context.applicationContext
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy

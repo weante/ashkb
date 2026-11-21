@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import com.ashkb.app.data.entity.Supplement
 import com.ashkb.app.domain.ScheduleCalc
 import java.time.LocalDate
@@ -188,18 +187,12 @@ object SupplementReminderScheduler {
     }
 
     /**
-     * `canScheduleExactAlarms()` 的起始 API（Android 12 / S）。
-     *
-     * 低于此版本**没有这个方法**，调它会抛 `NoSuchMethodError`——必须先判版本再调，
-     * 而不是把它当成"老版本返回 false"。与本项目 `DateProvider.API_REGISTER_RECEIVER_FLAGS`
-     * 同一处理方式：写成具名常量，而不是在表达式里留一个字面量 31。
+     * 排一个提醒：`canScheduleExactAlarms()` 在 minSdk 31 上恒可用，直接调用。
      */
-    private const val API_S = 31
-
     private fun schedule(context: Context, am: AlarmManager, slot: Slot) {
         val pi = pending(context, slot.supId, slot.date, slot.time)
         val at = slot.fire.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val exact = if (Build.VERSION.SDK_INT >= API_S) am.canScheduleExactAlarms() else true
+        val exact = am.canScheduleExactAlarms()
         // v1.0.73（P0-1）：统一走 AlarmRegister——失败留档 + 计数，绝不静默
         AlarmRegister.set(context, am, at, pi, exact, "supplement")
     }

@@ -92,7 +92,7 @@ internal fun CheckupPrepCard(
             }
             // 免责声明**不进折叠区**：C12 的约定是自动生成的健康提示必须与声明同时在场，
             // 而"需空腹"这条提示在折叠态就露在外面——把它藏起来等于让提示失去限定语
-            DisclaimerNote(R.string.checkup_prep_disclaimer)
+            DisclaimerNote(detailRes = R.string.checkup_prep_disclaimer)
         }
     }
 }

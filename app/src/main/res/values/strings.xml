@@ -233,7 +233,6 @@
     <string name="exercise_flare_rule_note">发作期：仅保留 L1 轻柔项，L2/L3 暂停，黑榜拦截。</string>
     <string name="exercise_intensity_self_test">强度自测（说话试验：能自如说话=中等，有点费力=高）</string>
     <string name="exercise_minute_space_suffix">" 分钟"</string>
-    <string name="exercise_minutes">分钟</string>
     <string name="exercise_next_day_stiffness">次日晨僵</string>
     <string name="exercise_no_recommendation">今日暂无推荐运动</string>
     <string name="exercise_no_stage_hint">完善健康档案中的病情分期后，会按 R27 矩阵生成当日处方</string>
@@ -783,7 +782,6 @@
     <string name="lab_mark_normal">正常</string>
     <string name="lab_mark_abnormal">异常</string>
     <string name="lab_mark_unknown">未标注</string>
-    <string name="lab_mark_near">临界</string>
     <string name="lab_window_hint">共 %1$d 项 · 当前显示最近 %2$d 项</string>
     <string name="me_in_use_prefix">"在用 %1$s 种 · "</string>
     <string name="me_med_disable">停用 %1$s</string>
@@ -1153,7 +1151,6 @@
 
     <!-- ===== v10（v1.0.33）：B10 复诊附件归档 ===== -->
     <string name="attach_title">附件归档</string>
-    <string name="attach_add">添加附件</string>
     <string name="attach_take_photo">拍照</string>
     <string name="attach_pick_image">从相册选</string>
     <string name="attach_pick_pdf">选 PDF</string>

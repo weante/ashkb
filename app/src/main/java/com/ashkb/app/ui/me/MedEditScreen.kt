@@ -19,6 +19,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -101,7 +102,7 @@ fun MedEditScreen(
 
     // ---- 根级 state（24 个槽位，读点全在 section / 子作用域里；声明顺序与拆分前逐字一致，
     //      `rememberSaveable` 的位置键因此不变）----
-    val step = rememberSaveable { mutableStateOf(1) }
+    val step = rememberSaveable { mutableIntStateOf(1) }
 
     // ---- 第一步字段 ----
     val name = rememberSaveable { mutableStateOf("") }
@@ -112,8 +113,8 @@ fun MedEditScreen(
     val dose = rememberSaveable { mutableStateOf("") }
     val frequency = rememberSaveable { mutableStateOf(MedFrequency.DAILY) }
     val times = rememberSaveable { mutableStateOf(listOf(ScheduleCalc.DEFAULT_PLAN_TIME)) }
-    val weekday = rememberSaveable { mutableStateOf(1) }
-    val weekday2 = rememberSaveable { mutableStateOf(4) }
+    val weekday = rememberSaveable { mutableIntStateOf(1) }
+    val weekday2 = rememberSaveable { mutableIntStateOf(4) }
     val biwError = rememberSaveable { mutableStateOf(false) }
     // v1.1.2（批次 18）：甲氨蝶呤选到非每周频次时的强提示（与 biwError 同款「提交时才亮」的错误位）
     val mtxFrequencyError = rememberSaveable { mutableStateOf(false) }
@@ -180,8 +181,8 @@ fun MedEditScreen(
         dose.value = med.dose
         frequency.value = MedFrequency.fromKey(med.frequency)
         times.value = ScheduleCalc.takeTimesOf(med).ifEmpty { listOf(ScheduleCalc.DEFAULT_PLAN_TIME) }
-        weekday.value = med.weeklyWeekday ?: 1
-        weekday2.value = med.weeklyWeekday2 ?: 4
+        weekday.intValue = med.weeklyWeekday ?: 1
+        weekday2.intValue = med.weeklyWeekday2 ?: 4
         cycleDays.value = med.injCycleDays?.toString() ?: "14"
         food.value = med.takeWithFood ?: "any"
         prnReason.value = med.prnReason ?: ""
@@ -211,11 +212,11 @@ fun MedEditScreen(
             JSONArray(times.value).toString()
         },
         weeklyWeekday = if (frequency.value == MedFrequency.WEEKLY || frequency.value == MedFrequency.BIW) {
-            weekday.value
+            weekday.intValue
         } else {
             null
         },
-        weeklyWeekday2 = if (frequency.value == MedFrequency.BIW) weekday2.value else null,
+        weeklyWeekday2 = if (frequency.value == MedFrequency.BIW) weekday2.intValue else null,
         startDate = DateFieldRules.toIsoOrNull(startDate.value) ?: startDate.value,
         // v1.2.4：落库范围 == 可见范围（`cycleAnchorVisible`）。原先只看 `route`，
         // 于是口服的「自定义周期」永远存 null → `isInjectionDay` 直接 false，
@@ -238,7 +239,7 @@ fun MedEditScreen(
         checkDoctorTold = doctorTold.value,
         checkLeafletRead = leafletRead.value,
         interactionCheckDate = original.value?.interactionCheckDate
-            ?: if (step.value >= 2) LocalDate.now().toString() else null,
+            ?: if (step.intValue >= 2) LocalDate.now().toString() else null,
         createdAt = original.value?.createdAt ?: nowIso(),
         updatedAt = nowIso(),
         // v1.0.43：编辑模式必须保留归档态——buildMed 未列出该字段时取实体默认值 false，
@@ -263,7 +264,7 @@ fun MedEditScreen(
         // v1.0.78（批次 4 收尾）：锚点日期非法时不许进入核对步骤（按钮已同步置灰）
         cycleAnchorVisible(route.value, frequency.value) &&
             !DateFieldRules.requiredOk(startDate.value) -> true
-        frequency.value == MedFrequency.BIW && weekday.value == weekday2.value -> {
+        frequency.value == MedFrequency.BIW && weekday.intValue == weekday2.intValue -> {
             biwError.value = true
             true
         }
@@ -300,12 +301,12 @@ fun MedEditScreen(
     fun onPrimary() {
         // v1.0.43：编辑目标查不到时禁止保存——否则会静默新建一条重复药
         if (editMissing.value) return
-        if (step.value == 1) {
+        if (step.intValue == 1) {
             if (stepOneBlocked()) return
             val draft = buildMed()
             scope.launch {
                 hits.value = vm.interactionsFor(draft)
-                step.value = 2
+                step.intValue = 2
             }
         } else {
             vm.saveMedication(context, buildMed())
@@ -314,7 +315,7 @@ fun MedEditScreen(
     }
 
     fun goBackStep() {
-        if (step.value == 1) onBack() else step.value = 1
+        if (step.intValue == 1) onBack() else step.intValue = 1
     }
 
     Scaffold(
@@ -322,8 +323,8 @@ fun MedEditScreen(
         topBar = {
             ScreenTopBar(
                 title = when {
-                    editId != null && step.value == 1 -> stringResource(R.string.med_edit_medication)
-                    step.value == 1 -> stringResource(R.string.med_add_medication)
+                    editId != null && step.intValue == 1 -> stringResource(R.string.med_edit_medication)
+                    step.intValue == 1 -> stringResource(R.string.med_add_medication)
                     else -> stringResource(R.string.med_verify_checklist)
                 },
                 onBack = ::goBackStep,
@@ -353,7 +354,7 @@ fun MedEditScreen(
                         modifier = Modifier.weight(1f).heightIn(min = Size.touchMin),
                     ) {
                         Text(
-                            if (step.value == 1) stringResource(R.string.common_cancel)
+                            if (step.intValue == 1) stringResource(R.string.common_cancel)
                             else stringResource(R.string.backup_return_modify)
                         )
                     }
@@ -364,7 +365,7 @@ fun MedEditScreen(
                         modifier = Modifier.weight(1f).heightIn(min = Size.touchMin),
                     ) {
                         Text(
-                            if (step.value == 1) stringResource(R.string.med_next_verify)
+                            if (step.intValue == 1) stringResource(R.string.med_next_verify)
                             else stringResource(R.string.checkup_save_record)
                         )
                     }
@@ -380,7 +381,7 @@ fun MedEditScreen(
                 .padding(horizontal = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            if (step.value == 1) {
+            if (step.intValue == 1) {
                 // v1.0.43：编辑目标不存在（已删除 / id 失效）时明确告知，不静默新建
                 if (editMissing.value) {
                     Surface(

@@ -56,7 +56,7 @@ class TopTab(
 )
 
 @Composable
-fun TABS(): List<TopTab> = listOf(
+fun topTabs(): List<TopTab> = listOf(
     TopTab(Today, stringResource(R.string.today_tab), Icons.Outlined.CheckCircle, Icons.Rounded.CheckCircle),
     TopTab(Health, stringResource(R.string.me_health_section), Icons.Outlined.MonitorHeart, Icons.Rounded.MonitorHeart),
     TopTab(Report, stringResource(R.string.report_tab), Icons.Outlined.Insights, Icons.Rounded.Insights),

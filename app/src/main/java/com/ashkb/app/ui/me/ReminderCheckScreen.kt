@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -122,7 +123,7 @@ fun ReminderCheckScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
-                    if (!state.exactOk && Build.VERSION.SDK_INT >= 31) {
+                    if (!state.exactOk) {
                         OutlinedButton(
                             // v1.0.71：带 package 数据直达**本应用**专属页（原实现不带 data → 只跳到
                             // 「全部应用」的闹钟列表，用户还得自己找 ASHKB）；跳不动时给文字提示，不静默
@@ -276,7 +277,7 @@ internal data class ReminderCheckState(
 internal fun rememberReminderCheckState(): ReminderCheckState {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    var refreshTick by remember { mutableStateOf(0) }
+    var refreshTick by remember { mutableIntStateOf(0) }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) refreshTick++
@@ -290,12 +291,15 @@ internal fun rememberReminderCheckState(): ReminderCheckState {
     return remember(refreshTick, health) { readReminderCheckState(context, health) }
 }
 
+// POST_NOTIFICATIONS 是 API 33 的编译期常量字符串，运行时不会解析字段；minSdk 31 下读该常量安全。
+@android.annotation.SuppressLint("InlinedApi")
 private fun readReminderCheckState(context: Context, health: ReminderHealth.Snapshot): ReminderCheckState {
     val notifOk = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
         PackageManager.PERMISSION_GRANTED
     val exactOk = run {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        if (Build.VERSION.SDK_INT >= 31) am.canScheduleExactAlarms() else true
+        // minSdk 31 ⇒ canScheduleExactAlarms（API 31+）恒可用
+        am.canScheduleExactAlarms()
     }
     // v1.0.61 B9：Android 14+ 全屏 Intent 需用户显式授予；14 以下默认可用
     val fullScreenOk = run {

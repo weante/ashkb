@@ -21,8 +21,8 @@ import com.ashkb.app.ui.theme.Spacing
  */
 @Composable
 fun DisclaimerNote(
-    detailRes: Int? = null,
     modifier: Modifier = Modifier,
+    detailRes: Int? = null,
 ) {
     val prefix = stringResource(Disclaimer.PREFIX)
     val text = if (detailRes == null) {

@@ -94,7 +94,7 @@ import com.ashkb.app.ui.navigation.ReminderCheck
 import com.ashkb.app.ui.navigation.Recipes
 import com.ashkb.app.ui.navigation.Report
 import com.ashkb.app.ui.navigation.Symptom
-import com.ashkb.app.ui.navigation.TABS
+import com.ashkb.app.ui.navigation.topTabs
 import com.ashkb.app.ui.navigation.Today
 import com.ashkb.app.ui.navigation.Wellness
 import com.ashkb.app.ui.report.ReportScreen
@@ -164,7 +164,7 @@ fun AppShell() {
 
     val backStackEntry by nav.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
-    val tabs = TABS()
+    val tabs = topTabs()
     val topTab = tabs.firstOrNull { t ->
         destination?.hierarchy?.any { it.hasRoute(t.route::class) } == true
     }

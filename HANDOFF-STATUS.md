@@ -301,6 +301,7 @@ gh release edit v1.0.70 --prerelease=false --latest
 1. `E:\ASHKB` 根目录清理（已于 2026-10-31 归档，见根 `NEXT-SESSION.md`）。
 2. 本文件 §7 与 §3.2 的口径同步（**本次已完成**）。
 3. ~~首页「今日用药」卡的空态文案~~ —— **2026-11-18 已修并随 v1.2.19 发布**：非用药日（如 BIW 的周三）没有当日剂量时，卡片不再说「当前没有在用药品」，改为「今天没有需要服用的药」并说明「按当前用药方案，今天不是用药日」，出口从「添加药品」换成「查看用药方案」。判据抽成 `domain/TodayMedsEmpty.kt`（`kindOf(profileMissing, activeMedCount)` 三态）并加 5 条 JVM 单测（`TodayMedsEmptyTest`）；涉及 `ui/today/TodayScreen.kt` 的 `MedsEmptyCard`、`TodayViewModel.activeMedCount` 与 `res/values/strings.xml` 新增 3 条（中英成对）。真机已验证（周三非用药日 → 「今天没有需要服用的药」，出口落到药单管理）。
+4. **Android Lint 清零（2026-11-21）** —— 169 warning + 8 information 全部结清：57 条改代码（`ObsoleteSdkInt` 14 / `AutoboxingStateCreation` 8 / `StaticFieldLeak` 4 / `UnusedResources` 4 / `InlinedApi` 3 / `ModifierParameter` 2 / `ComposableNaming` 1 / `MonochromeLauncherIcon` 1 / `UnusedAttribute` 1），7 类 151 条写进新建的仓库根 `lint.xml` 并逐条注明理由（`PluralsCandidate` 85 与中英逐条对齐冲突、依赖/AGP 升级需单独排期、日期与范围里的连字符是正文语义、Play 政策类不上架）。门禁 `lintDebug` 现为 **0 issue**；详见 CHANGELOG 顶部 `[未发布]` 节。⚠️ 未 bump 版本号、未上真机。
 ---
 
 ## v1.0.73 批次 1「看不见的失效」——待真机人工验证的 7 项

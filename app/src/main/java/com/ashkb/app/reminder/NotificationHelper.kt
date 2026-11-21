@@ -162,6 +162,7 @@ object NotificationHelper {
         }
     }
 
+    @android.annotation.SuppressLint("InlinedApi") // 见下：编译期常量字符串，运行时不会解析字段
     fun canPost(context: Context): Boolean =
         androidx.core.content.ContextCompat.checkSelfPermission(
             context, Manifest.permission.POST_NOTIFICATIONS

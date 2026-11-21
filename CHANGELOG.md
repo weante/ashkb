@@ -1,3 +1,38 @@
+## [未发布] — 2026-11-21 · Lint 全清零：169 warning → 0（57 条改代码，7 类写明理由豁免）
+
+`app/build/reports/lint-results-debug.xml` 原有 **169 warning + 8 information**，本轮全部结清：**57 条真改代码**，**7 类共 151 条**写进新建的 `lint.xml` 并逐条注明理由。**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）、**无版本号变更**、**无用户可见行为变更**。
+
+### 1. 改代码的 57 条
+
+| 检查项 | 条数 | 处理 |
+|---|---|---|
+| `ObsoleteSdkInt` | 14 | minSdk 31 ⇒ 删掉 13 处恒真守卫（`SDK_INT >= 31` 共 11 处：7 个 Reminder*Scheduler + BootReceiver + ReminderCheckScreen 两处；`>= 28` 的 `longVersionCode` 分支；`>= 27` 的 `setShowWhenLocked/setTurnScreenOn`）；`res/mipmap-anydpi-v26/` 合并进 `res/mipmap-anydpi/`（API 26 限定符已多余） |
+| `AutoboxingStateCreation` | 8 | `mutableStateOf(0/1/…)` → `mutableIntStateOf`：MedEditScreen 的 `step`/`weekday`/`weekday2`、ReminderCheckScreen 的 `refreshTick`、ReminderSettingsSheet 的 `basdaiCycle`(Long)/`sedentaryInterval`、TodayScreen 的 `offset`、TrendChart 的 `playedKey`；随之把 16 处 `x.value` 改成 `x.intValue`（否则触发 `AutoboxingStateValueProperty`） |
+| `StaticFieldLeak` | 4 | Backup / Emergency / Knowledge / Report 四个 ViewModel：构造参数改为 `context`，内部 `private val app: Context = context.applicationContext`，并加 `@SuppressLint("StaticFieldLeak")` 注明「Factory 恒传 Application/applicationContext」 |
+| `UnusedResources` | 4 | 删除 `exercise_minutes`、`lab_mark_near`、`attach_add`、`dom_lock_unspecified`（中英各一条，`R.string` 引用数为 0，中英顺序同步） |
+| `InlinedApi` | 3 | `POST_NOTIFICATIONS`(33)、`ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`(34) 都是**编译期常量字符串**，运行时不会解析字段：加 `@SuppressLint("InlinedApi")` 并把理由写在注解旁（`NotificationHelper.canPost`、`SystemSetupGuides.openFullScreenIntentSettings`、`ReminderCheckScreen.readReminderCheckState`） |
+| `ModifierParameter` | 2 | `DisclaimerNote` / `TrendChart` 的 `modifier` 提前到首个可选参数位；`DisclaimerNote` 三处按位置传 `detailRes` 的调用点改具名；detekt baseline 里 TrendChart 两条按完整签名登记的豁免同步改写 |
+| `ComposableNaming` | 1 | `Routes.kt` 的 `TABS()` → `topTabs()`（它返回 `List<TopTab>`，本身不是 Composable） |
+| `MonochromeLauncherIcon` | 1 | 自适应图标补 `<monochrome android:drawable="@drawable/ic_launcher_foreground" />` |
+| `UnusedAttribute` | 1 | Manifest 的 `android:localeConfig` 加 `tools:ignore="UnusedAttribute"`（同时补 `xmlns:tools` 命名空间） |
+
+### 2. 写进 `lint.xml` 的 7 类（151 条）与理由
+
+| 检查项 | 条数 | 为什么不改 |
+|---|---|---|
+| `PluralsCandidate` | 85 | 检查器把 values-en 里「`%d` + 英文词」建议改成 `<plurals>`。但中英资源必须逐条同名同序（`EnglishStringsParityTest` 强制），改成 plurals 会破坏对齐；且这些句子都只有单一数量语境，不是真正的复数资源 |
+| `GradleDependency` + `AndroidGradlePluginVersion` | 39 | 只是「有新版本」提示。依赖/AGP 升级要连 compileSdk、Compose 编译器、回归验证一起排期，不属于静态清理 |
+| `TypographyDashes` | 11 | 命中的是日期（`2026-09-01`）、参考范围（`0-20`）与中文破折号（`——`），是正文语义；换 en dash 会改原意 |
+| `TypographyFractions` | 2 | 食谱里的 `1/4` 茶匙，改成 `¼` 会与中文原文口径不一致 |
+| `BatteryLife` | 1 | 本应用靠 `AlarmManager` 提醒，国产 ROM 的后台管控会直接掐掉闹钟；引导加入电池白名单是功能刚需，且不上架 Google Play |
+| `AppBundleLocaleChanges` | 1 | 应用内有语言开关，分发方式是 GitHub Release APK（非 Play App Bundle），不存在该限制 |
+
+### 3. 门禁
+
+`testDebugUnitTest detekt lintDebug verifySpecSync` → **BUILD SUCCESSFUL**；单测 **163 类 / 1341 条 / 0 失败 / 0 错误 / 1 跳过**；**lint 0 error / 0 warning / 0 information**（`lint-results-debug.xml` 从 21 条降到 0 条 issue）；detekt **0**（`detekt.xml` 79 字节）；`verifySpecSync` 通过。
+
+⚠️ 未 bump 版本号、未发版、未上真机：本轮只动版本守卫、参数顺序、状态容器与资源清理，理论上无行为变更，但仍建议装机冒烟一次——提醒可靠性自检、药单编辑器、趋势图、知识库、备份/紧急/报表四页各点一遍。
+
 ## [未发布] — 2026-11-21 · 测试补强：恢复回滚 / 迁移回填 / 三处零覆盖分支
 
 `HANDOFF-STATUS.md` 里记着的几条「有代码、无证据」这次一并补上。**只加测试与可测性注入，不改任何业务行为**；无库结构变更（`ASHKB_DB_VERSION` 仍 **21**）、无版本号变更、无新增 strings。

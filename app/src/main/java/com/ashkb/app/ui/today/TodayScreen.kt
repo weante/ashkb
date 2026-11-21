@@ -54,6 +54,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -1307,7 +1308,7 @@ private fun PostponeDialog(
     onConfirm: (LocalDate) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var offset by remember { mutableStateOf(1) }
+    var offset by remember { mutableIntStateOf(1) }
     var custom by remember { mutableStateOf("") }
     val customDate = runCatching { LocalDate.parse(custom.trim()) }.getOrNull()
     val target = customDate ?: today.plusDays(offset.toLong())
@@ -1390,7 +1391,7 @@ private fun MissedDoseDialog(item: TodayItem, onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 if (guide == null) {
                     // 理论上入口只在漏服态出现；兜底给通用提示而不是空白弹窗
-                    DisclaimerNote(R.string.missed_dose_disclaimer)
+                    DisclaimerNote(detailRes = R.string.missed_dose_disclaimer)
                 } else {
                     Text(
                         stringResource(
@@ -1421,7 +1422,7 @@ private fun MissedDoseDialog(item: TodayItem, onDismiss: () -> Unit) {
                         )
                     }
                     HorizontalDivider(Modifier.padding(vertical = Spacing.xs))
-                    DisclaimerNote(R.string.missed_dose_disclaimer)
+                    DisclaimerNote(detailRes = R.string.missed_dose_disclaimer)
                 }
             }
         },

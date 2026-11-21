@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -88,9 +89,9 @@ fun TrendChart(
     points: List<TrendPoint>,
     unit: String,
     label: String,
+    modifier: Modifier = Modifier,
     threshold: Float? = null,
     accent: Color = MaterialTheme.colorScheme.primary,
-    modifier: Modifier = Modifier,
 ) {
     if (points.isEmpty()) {
         EmptyState(
@@ -225,7 +226,7 @@ fun TrendChart(
     // 上游 Room 流重新发射的新 List 实例只要内容相同也不触发。
     val dataKey = remember(points) { points.hashCode() }
     val progress = remember { Animatable(0f) }
-    var playedKey by rememberSaveable { mutableStateOf(Int.MIN_VALUE) }
+    var playedKey by rememberSaveable { mutableIntStateOf(Int.MIN_VALUE) }
     LaunchedEffect(dataKey) {
         if (playedKey == dataKey) {
             progress.snapTo(1f)

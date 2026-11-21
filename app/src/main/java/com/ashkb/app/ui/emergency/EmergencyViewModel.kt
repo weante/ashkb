@@ -27,13 +27,17 @@ import java.io.File
 import java.time.LocalDate
 
 class EmergencyViewModel(
-    private val app: Context,
+    context: Context,
     private val repo: HealthRepository,
     private val reports: ReportRepository,
     private val medicationRepo: MedicationRepository,
     /** v1.0.86（批次 11）：全应用唯一的「今天」来源，取代此前的跨零点 ticker。 */
     private val dateProvider: DateProvider,
 ) : ViewModel() {
+
+    /** 只保留 Application Context，避免 ViewModel 长期持有 Activity。 */
+    @android.annotation.SuppressLint("StaticFieldLeak") // Factory 恒传 Application/applicationContext
+    private val app: Context = context.applicationContext
 
     /**
      * 跨零点日期流：紧急卡「当前用药」的在用判断依赖今天，不能冻结在首次组合时。

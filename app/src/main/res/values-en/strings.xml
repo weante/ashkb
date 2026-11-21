@@ -238,7 +238,6 @@
     <string name="exercise_flare_rule_note">Flare phase: only gentle L1 items are kept, L2/L3 are paused, blacklisted items are blocked.</string>
     <string name="exercise_intensity_self_test">Intensity self-check (talk test: can talk easily = moderate, slightly breathless = high)</string>
     <string name="exercise_minute_space_suffix">" min"</string>
-    <string name="exercise_minutes">minutes</string>
     <string name="exercise_next_day_stiffness">Next-day morning stiffness</string>
     <string name="exercise_no_recommendation">No recommended exercise for today</string>
     <string name="exercise_no_stage_hint">Complete the disease phase in your health profile and today\'s prescription will be generated from the R27 matrix</string>
@@ -788,7 +787,6 @@
     <string name="lab_mark_normal">Normal</string>
     <string name="lab_mark_abnormal">Abnormal</string>
     <string name="lab_mark_unknown">Not flagged</string>
-    <string name="lab_mark_near">Near boundary</string>
     <string name="lab_window_hint">%1$d total · showing the most recent %2$d</string>
     <string name="me_in_use_prefix">"Taking %1$s · "</string>
     <string name="me_med_disable">Stop %1$s</string>
@@ -1111,7 +1109,6 @@
     <string name="weight_target_incomplete">Please complete the target range (both limits are required)</string>
     <string name="weight_target_range_label">Target %1$s – %2$s kg</string>
     <string name="attach_title">Attachment archive</string>
-    <string name="attach_add">Add attachment</string>
     <string name="attach_take_photo">Take photo</string>
     <string name="attach_pick_image">Choose from gallery</string>
     <string name="attach_pick_pdf">Choose PDF</string>

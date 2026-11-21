@@ -32,7 +32,7 @@
     <ID>CyclomaticComplexMethod:SymptomScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SymptomScreen(vm: SymptomViewModel, onBack: () -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:TodayScreen.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun MedCheckCard( item: TodayItem, today: LocalDate, onCheckIn: () -&gt; Unit, onSkip: () -&gt; Unit, onPostpone: () -&gt; Unit, onPrnTaken: () -&gt; Unit, onMissedGuide: () -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:TodayScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TodayScreen( vm: TodayViewModel, onMedListNeeded: () -&gt; Unit, onOpenSymptom: () -&gt; Unit = {}, onOpenExercise: () -&gt; Unit = {}, )</ID>
-    <ID>CyclomaticComplexMethod:TrendChart.kt$@Composable fun TrendChart( points: List&lt;TrendPoint&gt;, unit: String, label: String, threshold: Float? = null, accent: Color = MaterialTheme.colorScheme.primary, modifier: Modifier = Modifier, )</ID>
+    <ID>CyclomaticComplexMethod:TrendChart.kt$@Composable fun TrendChart( points: List&lt;TrendPoint&gt;, unit: String, label: String, modifier: Modifier = Modifier, threshold: Float? = null, accent: Color = MaterialTheme.colorScheme.primary, )</ID>
     <ID>CyclomaticComplexMethod:VaultCipher.kt$VaultCipher$private fun decryptSlotted(magic: String, secret: CharArray, header: JSONObject, headerBytes: ByteArray, ct: ByteArray): Decrypted</ID>
     <ID>CyclomaticComplexMethod:WellnessScreen.kt$@Composable private fun VitalsHero(vitals: Vitals?, onEdit: () -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:WellnessScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun VitalsSheet(vm: WellnessViewModel, onDismiss: () -&gt; Unit)</ID>
@@ -78,7 +78,7 @@
     <ID>LongMethod:SymptomScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SymptomScreen(vm: SymptomViewModel, onBack: () -&gt; Unit)</ID>
     <ID>LongMethod:TodayScreen.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun MedCheckCard( item: TodayItem, today: LocalDate, onCheckIn: () -&gt; Unit, onSkip: () -&gt; Unit, onPostpone: () -&gt; Unit, onPrnTaken: () -&gt; Unit, onMissedGuide: () -&gt; Unit, )</ID>
     <ID>LongMethod:TodayScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TodayScreen( vm: TodayViewModel, onMedListNeeded: () -&gt; Unit, onOpenSymptom: () -&gt; Unit = {}, onOpenExercise: () -&gt; Unit = {}, )</ID>
-    <ID>LongMethod:TrendChart.kt$@Composable fun TrendChart( points: List&lt;TrendPoint&gt;, unit: String, label: String, threshold: Float? = null, accent: Color = MaterialTheme.colorScheme.primary, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:TrendChart.kt$@Composable fun TrendChart( points: List&lt;TrendPoint&gt;, unit: String, label: String, modifier: Modifier = Modifier, threshold: Float? = null, accent: Color = MaterialTheme.colorScheme.primary, )</ID>
     <ID>LongMethod:WellnessScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class) @Composable fun WellnessScreen(vm: WellnessViewModel, onOpenRecipes: () -&gt; Unit, onBack: () -&gt; Unit)</ID>
     <ID>LongParameterList:HealthRepository.kt$HealthRepository$( date: String, q1: Int, q2: Int, q3: Int, q4: Int, q5: Int, q6: Int, notes: String?, backfill: Boolean = false, )</ID>
     <ID>LongParameterList:NotificationHelper.kt$NotificationHelper$( context: Context, medId: String, slotKey: String?, slotTime: String?, slotDate: java.time.LocalDate?, medName: String, dose: String, escalation: Int, silent: Boolean = false, strong: Boolean = false, )</ID>

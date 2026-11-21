@@ -1,7 +1,6 @@
 package com.ashkb.app
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -68,12 +67,9 @@ class ReminderFullScreenActivity : ComponentActivity() {
     }
 
     private fun applyLockScreenFlags() {
-        // setShowWhenLocked / setTurnScreenOn 为 API 27 引入；minSdk 26 需守卫
-        // （27 以下由 Manifest 的 android:showWhenLocked / turnScreenOn 属性兜底，且仅在 27+ 生效）
-        if (Build.VERSION.SDK_INT >= 27) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        }
+        // minSdk 31 ⇒ API 27 的 setShowWhenLocked / setTurnScreenOn 恒可用，无需版本守卫
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
     }
 
     private fun renderFromIntent(intent: Intent?) {

@@ -1,7 +1,6 @@
 package com.ashkb.app.ui.me
 
 import android.content.Context
-import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -217,7 +216,8 @@ private fun AboutCard() {
     // `getPackageInfo` 走 PackageManager 的进程内缓存，逐次读取代价可忽略，故直接现取。
     val version = runCatching {
         val pi = context.packageManager.getPackageInfo(context.packageName, 0)
-        val code = if (Build.VERSION.SDK_INT >= 28) pi.longVersionCode else pi.versionCode.toLong()
+        // minSdk 31 ⇒ longVersionCode（API 28+）恒可用，versionCode 已废弃
+        val code = pi.longVersionCode
         "v${pi.versionName} ($code)"
     }.getOrDefault("")
     SectionCard(title = stringResource(R.string.me_about_title)) {

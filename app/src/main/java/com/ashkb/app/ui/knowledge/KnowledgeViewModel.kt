@@ -52,11 +52,15 @@ data class KnowledgeUiState(
 @OptIn(ExperimentalCoroutinesApi::class)
 class KnowledgeViewModel(
     /** v1.2.16：导出物要落到 app 私有目录并走 FileProvider 分享，故需要 Context。 */
-    private val app: Context,
+    context: Context,
     private val repo: HealthRepository,
     /** v1.0.86（批次 11）：全应用唯一的「今天」来源，取代此前的跨零点 ticker。 */
     private val dateProvider: DateProvider,
 ) : ViewModel() {
+
+    /** 只保留 Application Context，避免 ViewModel 长期持有 Activity。 */
+    @android.annotation.SuppressLint("StaticFieldLeak") // Factory 恒传 Application/applicationContext
+    private val app: Context = context.applicationContext
 
     private val query = MutableStateFlow("")
     private val category = MutableStateFlow<String?>(null)

@@ -5,7 +5,6 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import com.ashkb.app.data.entity.Medication
 import com.ashkb.app.domain.AdherenceCalc
 import com.ashkb.app.domain.PlanSlot
@@ -254,7 +253,7 @@ object ReminderScheduler {
         val fireAt = LocalDateTime.now().plusMinutes(minutes)
         val pi = pending(context, medId, slotKey, slotTime, slotDate, fireAt, SNOOZE_ESCALATION, snooze = true)
         val at = fireAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val exact = if (Build.VERSION.SDK_INT >= 31) am.canScheduleExactAlarms() else true
+        val exact = am.canScheduleExactAlarms()
         AlarmRegister.set(context, am, at, pi, exact, "med")
     }
 
@@ -265,7 +264,7 @@ object ReminderScheduler {
     ) {
         val pi = pending(context, medId, slotKey, slotTime, slotDate, fireAt, escalation)
         val at = fireAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val exact = if (Build.VERSION.SDK_INT >= 31) am.canScheduleExactAlarms() else true
+        val exact = am.canScheduleExactAlarms()
         // v1.0.73（P0-1）：统一走 AlarmRegister——失败留档 + 计数，绝不静默
         AlarmRegister.set(context, am, at, pi, exact, "med")
     }

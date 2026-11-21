@@ -62,6 +62,10 @@ object SystemSetupGuides {
      * （HyperOS / Android 16 真机实测；logcat 可见 `START … act=…MANAGE_APP_USE_FULL_SCREEN_INTENT`
      * 之后没有任何设置页被拉起）。
      */
+    // ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT 是 API 34 的编译期常量字符串，运行时不会解析字段；
+    // 本方法只在 API 34+ 的 UI 分支被调用（ReminderCheckScreen 里 !fullScreenOk && SDK_INT >= 34），
+    // 即便低版本误触，openAppSettings 也会因 action 不存在而兜底到应用详情页，行为安全。
+    @android.annotation.SuppressLint("InlinedApi")
     fun openFullScreenIntentSettings(context: Context): Boolean =
         openAppSettings(context, Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
 

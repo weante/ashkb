@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 
 /**
  * v1.0.62 C11：测试提醒。
@@ -32,7 +31,7 @@ object ReminderTest {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val at = nowMs + delaySeconds * 1000L
         val pi = pending(context)
-        val exact = if (Build.VERSION.SDK_INT >= 31) am.canScheduleExactAlarms() else true
+        val exact = am.canScheduleExactAlarms()
         // v1.0.73（P0-1）：统一走 AlarmRegister——失败留档 + 计数，绝不静默
         AlarmRegister.set(context, am, at, pi, exact, "test")
     }

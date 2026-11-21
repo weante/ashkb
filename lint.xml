@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!--
+      本文件只保留「检查器给出的建议与本项目约束冲突」的少数豁免，逐条写理由。
+      其余问题一律改代码（或加最小范围的 SuppressLint），不在此处兜底。
+    -->
+
+    <!--
+      PluralsCandidate：检查器把 values-en 里「%1$d + 英文单词」的普通字符串建议改成 <plurals>。
+      但本项目的中英资源必须逐条同名同序（EnglishStringsParityTest 强制），
+      改成 plurals 会破坏中英条目对齐；且这些句子只有单一数量语境，并非真正的复数资源。
+    -->
+    <issue id="PluralsCandidate" severity="ignore" />
+
+    <!--
+      GradleDependency / AndroidGradlePluginVersion：仅提示「有更新版本」。
+      依赖与 AGP 升级需要单独排期（跟随 compileSdk/Compose 编译器/回归验证），
+      不属于本次静态清理范围，避免在无回归计划时被动升级。
+    -->
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+
+    <!--
+      TypographyDashes / TypographyFractions：命中的是日期（2026-09-01）、参考范围（0-20）、
+      中文破折号（——）与食谱分数（1/4 茶匙）。这些是正文语义的一部分，
+      统一改成 en dash / ¼ 反而改变原文或影响中英对照，故不处理。
+    -->
+    <issue id="TypographyDashes" severity="ignore" />
+    <issue id="TypographyFractions" severity="ignore" />
+
+    <!--
+      BatteryLife：提示 REQUEST_IGNORE_BATTERY_OPTIMIZATIONS 可能影响电池。
+      本应用是本地提醒类工具，国产 ROM 的后台管控会直接掐掉精确闹钟（已有多起真机故障），
+      引导用户加入电池白名单是功能刚需；且本应用不上架 Google Play，不受其政策限制。
+    -->
+    <issue id="BatteryLife" severity="ignore" />
+
+    <!--
+      AppBundleLocaleChanges：提示运行时切换语言在 App Bundle 下可能被 Play 重配置。
+      本应用通过应用内语言开关切换 locales，且分发方式是 GitHub Release APK（非 Play Bundle），
+      不存在该限制。
+    -->
+    <issue id="AppBundleLocaleChanges" severity="ignore" />
+</lint>

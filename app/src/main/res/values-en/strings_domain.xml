@@ -84,7 +84,6 @@
     <string name="dom_lock_meds_immuno_more">Medication (includes immunosuppressants — infection risk): %1$s, %2$d in total</string>
     <string name="dom_lock_family">Family: %1$s %2$s</string>
     <string name="dom_lock_doctor">Doctor: %1$s %2$s</string>
-    <string name="dom_lock_unspecified">Not provided</string>
     <string name="dom_lock_list_separator">", "</string>
     <!--
       Unreleased (review report §10 Q4): the lock screen only admits that the card exists,
