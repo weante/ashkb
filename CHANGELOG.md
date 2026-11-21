@@ -1,3 +1,25 @@
+## [未发布] — 2026-11-21 · 依赖升级第 3 步：Compose BOM 2024.09.03 → 2026.06.01
+
+按四阶段排期做第 3 步：Compose 全家桶升到当前工具链能承载的最新稳定 BOM。
+
+| 项 | 旧 | 新 |
+|---|---|---|
+| Compose BOM | 2024.09.03 | **2026.06.01** |
+| Compose UI / Foundation / Runtime / Animation | 1.6.x | **1.11.4** |
+| Material3 | 1.2.1 | **1.4.0** |
+| material-icons-extended | 1.6.x | **1.7.8** |
+
+**为什么不取最新的 2026.11.01**：实测 2026.08.00 / 2026.09.00 / 2026.11.01 的 AAR 要求 `compileSdk 37` 与 AGP 9.1.0（当前是 36 / AGP 8.13.2），2026.06.01 是现工具链能编译通过的最新版。再往上必须另做一次 AGP 9.x + SDK 37 工具链升级，风险量级不同，未在本步做。
+
+**配套修复（23 条 lint error，改代码不豁免）**：新 Compose lint 增加 `LocalContextGetResourceValueCall` —— 配置变更后 `LocalContext.current.getString()` 不会失效，可能显示旧语言文案；本 App 支持应用内切语言，属真实风险。7 个文件的 23 处改为 `LocalResources.current`（回调中取字符串）或 `stringResource`（组合内），涉及备份/恢复、附件归属、紧急卡、知识库导入导出、化验耐受、提醒自检。
+
+**验证**
+- `testDebugUnitTest detekt lintDebug verifySpecSync assembleRelease assembleDebugAndroidTest` → **BUILD SUCCESSFUL**；单测 **163 类 / 1342 条 / 0 失败 / 0 错误 / 1 跳过**；lint **0 issue**；detekt **0**；`verifySpecSync` 通过（版本号仍 1.2.19 / 131，库结构仍 21）。
+- release APK **5,568,309 B**（旧 BOM 为 5,247,592 B，**+320,717 B ≈ +6.1%**，新运行时的体积成本）。
+- Kotlin 编译只剩既有 deprecation 告警（`AutoMirrored` 图标、`ScrollableTabRow`、`LocalClipboardManager`、`KeyboardOptions` 等），未处理。
+
+**未做**：真机回归（手机维修中）——Compose 1.11 的滚动、弹层与焦点行为可能有差异，建议装机走查知识库编辑弹层、备份页、提醒自检、长列表滚动；未 bump 版本号、未发版。
+
 ## [未发布] — 2026-11-21 · 依赖升级第 2 步：工具链 Gradle 8.13 + AGP 8.13.2 + compileSdk/targetSdk 36
 
 按 `docs/v1219-dependency-r8-size-audit.md` §7 的四阶段排期，第 2 步把编译工具链提到 Android 16（API 36）。

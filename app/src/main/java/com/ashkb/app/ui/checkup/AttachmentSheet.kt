@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,6 +73,7 @@ internal fun AttachmentSheet(
     onLinkSource: ((String?) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
 
     // 相机契约是"先给 URI、再由系统写入"：目标文件必须跨两次交互记住，回调时才知道该登记谁
@@ -286,9 +288,9 @@ internal fun AttachmentSheet(
                 link = picked
                 onLinkSource?.invoke(picked)
                 linkMsg = if (picked == null) {
-                    context.getString(R.string.attach_link_cleared)
+                    resources.getString(R.string.attach_link_cleared)
                 } else {
-                    context.getString(R.string.attach_link_done, labelOf(picked))
+                    resources.getString(R.string.attach_link_done, labelOf(picked))
                 }
                 picking = false
             },
@@ -303,9 +305,9 @@ internal fun AttachmentSheet(
             onPick = { picked ->
                 vm.linkAttachment(target.id, picked)
                 linkMsg = if (picked == null) {
-                    context.getString(R.string.attach_link_cleared)
+                    resources.getString(R.string.attach_link_cleared)
                 } else {
-                    context.getString(R.string.attach_link_done, labelOf(picked))
+                    resources.getString(R.string.attach_link_done, labelOf(picked))
                 }
                 linkTarget = null
             },

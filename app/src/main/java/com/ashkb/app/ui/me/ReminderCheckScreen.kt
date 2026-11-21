@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -65,6 +66,7 @@ import com.ashkb.app.ui.theme.Spacing
 @Composable
 fun ReminderCheckScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val state = rememberReminderCheckState()
     var testScheduled by remember { mutableStateOf(false) }
 
@@ -129,7 +131,7 @@ fun ReminderCheckScreen(onBack: () -> Unit) {
                             // 「全部应用」的闹钟列表，用户还得自己找 ASHKB）；跳不动时给文字提示，不静默
                             onClick = {
                                 if (!SystemSetupGuides.openExactAlarmSettings(context)) {
-                                    GlobalMessages.post(context.getString(R.string.settings_open_failed))
+                                    GlobalMessages.post(resources.getString(R.string.settings_open_failed))
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -142,7 +144,7 @@ fun ReminderCheckScreen(onBack: () -> Unit) {
                             // 又把 ActivityNotFoundException 静默吞掉 → HyperOS 上点了毫无反应。
                             onClick = {
                                 if (!SystemSetupGuides.openFullScreenIntentSettings(context)) {
-                                    GlobalMessages.post(context.getString(R.string.settings_open_failed))
+                                    GlobalMessages.post(resources.getString(R.string.settings_open_failed))
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -183,7 +185,7 @@ fun ReminderCheckScreen(onBack: () -> Unit) {
                     OutlinedButton(
                         onClick = {
                             if (!SystemSetupGuides.openMiuiPermissionEditor(context)) {
-                                GlobalMessages.post(context.getString(R.string.settings_open_failed))
+                                GlobalMessages.post(resources.getString(R.string.settings_open_failed))
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),

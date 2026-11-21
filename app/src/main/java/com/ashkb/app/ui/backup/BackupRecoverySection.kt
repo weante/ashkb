@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -56,6 +57,7 @@ internal fun RecoveryCodeSection(vm: BackupViewModel, busy: Boolean) {
     var showRecoveryDialog by remember { mutableStateOf<String?>(null) }
     var showRegenConfirm by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val resources = LocalResources.current
 
     // v1.2.13（S-3）：查看恢复码前先过一次设备凭证。
     // 生成恢复码不必验——码是这一刻刚造出来的，本来就要立刻抄下来；要防的是
@@ -94,8 +96,8 @@ internal fun RecoveryCodeSection(vm: BackupViewModel, busy: Boolean) {
                     onClick = {
                         val prompt = RecoveryRevealGuard.deviceCredentialPrompt(
                             context = context,
-                            title = context.getString(R.string.backup_recovery_verify_title),
-                            description = context.getString(R.string.backup_recovery_verify_body),
+                            title = resources.getString(R.string.backup_recovery_verify_title),
+                            description = resources.getString(R.string.backup_recovery_verify_body),
                         )
                         // 没设锁屏时 prompt 为 null ⇒ 直接放行（理由见 RecoveryRevealGuard 类注释）
                         if (prompt == null) {
@@ -105,7 +107,7 @@ internal fun RecoveryCodeSection(vm: BackupViewModel, busy: Boolean) {
                             // 可能启动失败（无对应 Activity）；失败时不能静默——否则用户
                             // 看到的是「点了没反应」，而这里恰恰是他以为能拿到后门码的时刻。
                             runCatching { verifyLauncher.launch(prompt) }.onFailure {
-                                GlobalMessages.post(context.getString(R.string.vm_recovery_view_blocked))
+                                GlobalMessages.post(resources.getString(R.string.vm_recovery_view_blocked))
                             }
                         }
                     },

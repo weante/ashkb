@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -126,7 +127,7 @@ private fun ToleranceWhatCard() {
  */
 @Composable
 private fun ToleranceAddCard(onAdd: (String, Float) -> Unit) {
-    val context = LocalContext.current
+    val resources = LocalResources.current
     var error by remember { mutableStateOf<String?>(null) }
     SectionCard(title = stringResource(R.string.lab_tolerance_section_add)) {
         ToleranceAddRow(
@@ -134,11 +135,11 @@ private fun ToleranceAddCard(onAdd: (String, Float) -> Unit) {
                 val name = rawName.trim()
                 when {
                     name.isEmpty() -> {
-                        error = context.getString(R.string.lab_tolerance_err_name)
+                        error = resources.getString(R.string.lab_tolerance_err_name)
                         false
                     }
                     LabBoundaryTolerance.ratioOfPercent(percent) == null -> {
-                        error = context.getString(R.string.lab_tolerance_err_range)
+                        error = resources.getString(R.string.lab_tolerance_err_range)
                         false
                     }
                     else -> {

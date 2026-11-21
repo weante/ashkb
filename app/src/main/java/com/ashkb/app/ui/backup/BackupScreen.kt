@@ -34,6 +34,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -81,6 +82,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
     val preRestoreSnapshot by vm.preRestoreSnapshot.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
+    val resources = LocalResources.current
     // v1.2.10（审查 CRITICAL-2）：两个文件选择器的回调都在**主线程**上，而读入是纯 IO。
     // 挪进这个 scope 后主线程只做状态赋值；上限与超限文案统一由 BackupEngine 提供。
     val pickScope = rememberCoroutineScope()
@@ -101,7 +103,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
             val declaredSize = querySize(context, uri)
             if (declaredSize != null && !BackupEngine.withinPickLimit(declaredSize)) {
                 GlobalMessages.post(
-                    context.getString(
+                    resources.getString(
                         R.string.backup_file_too_large,
                         name,
                         declaredSize / (1024L * 1024L),
@@ -120,7 +122,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                     if (bytes == null) {
                         // v1.2.10：以前是 `runCatching{}.getOrNull()` 之后静默什么都不做——
                         // 用户点了文件、界面毫无反应，分不清"没选中"和"读失败"。
-                        GlobalMessages.post(context.getString(R.string.backup_pick_read_failed))
+                        GlobalMessages.post(resources.getString(R.string.backup_pick_read_failed))
                     } else {
                         pickedBytes = bytes
                         pickedName = name
@@ -138,7 +140,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
             val declaredSize = querySize(context, uri)
             if (declaredSize != null && !BackupEngine.withinPickLimit(declaredSize)) {
                 GlobalMessages.post(
-                    context.getString(
+                    resources.getString(
                         R.string.backup_file_too_large,
                         name,
                         declaredSize / (1024L * 1024L),
@@ -155,7 +157,7 @@ fun BackupScreen(vm: BackupViewModel, onBack: () -> Unit) {
                         }.getOrNull()
                     }
                     if (bytes == null) {
-                        GlobalMessages.post(context.getString(R.string.backup_pick_read_failed))
+                        GlobalMessages.post(resources.getString(R.string.backup_pick_read_failed))
                     } else {
                         vm.importProfileJson(bytes)
                     }

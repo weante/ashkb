@@ -47,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -85,6 +86,7 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
 
     // ---- v1.2.16：个人条目的编辑 / 导入导出 ----
     val context = LocalContext.current
+    val resources = LocalResources.current
     var creating by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<KbEntry?>(null) }
 
@@ -126,7 +128,7 @@ fun KnowledgeScreen(vm: KnowledgeViewModel) {
                     onExport = {
                         vm.exportUserEntries { intent ->
                             context.startActivity(
-                                Intent.createChooser(intent, context.getString(R.string.kb_user_export_action)),
+                                Intent.createChooser(intent, resources.getString(R.string.kb_user_export_action)),
                             )
                         }
                     },
@@ -203,6 +205,7 @@ private fun rememberKbImportLauncher(
     onImported: () -> Unit,
 ): ActivityResultLauncher<Array<String>> {
     val context = LocalContext.current
+    val resources = LocalResources.current
     return rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val bytes = uri?.let {
             runCatching {
@@ -212,7 +215,7 @@ private fun rememberKbImportLauncher(
             }.getOrNull()
         }
         if (bytes == null) {
-            if (uri != null) GlobalMessages.post(context.getString(R.string.kb_user_import_failed))
+            if (uri != null) GlobalMessages.post(resources.getString(R.string.kb_user_import_failed))
         } else {
             vm.importUserEntries(bytes) { ok -> if (ok) onImported() }
         }

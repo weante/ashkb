@@ -60,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -217,6 +218,7 @@ private fun EmergencySceneCards(vm: EmergencyViewModel) {
 @Composable
 private fun EmergencyLockscreenCard() {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var enabled by remember { mutableStateOf(EmergencyLockscreenStore.enabled(context)) }
 
@@ -268,7 +270,7 @@ private fun EmergencyLockscreenCard() {
             OutlinedButton(
                 onClick = {
                     if (!SystemSetupGuides.openMiuiPermissionEditor(context)) {
-                        GlobalMessages.post(context.getString(R.string.settings_open_failed))
+                        GlobalMessages.post(resources.getString(R.string.settings_open_failed))
                     }
                 },
                 modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
@@ -351,6 +353,7 @@ private fun EmergencyProfileCard(vm: EmergencyViewModel) {
     val meds by vm.meds.collectAsStateWithLifecycle()
     val today by vm.date.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = LocalResources.current
     var exporting by remember { mutableStateOf(false) }
 
     // 档案 / 药单变了就同步锁屏卡
@@ -363,13 +366,13 @@ private fun EmergencyProfileCard(vm: EmergencyViewModel) {
         // 故注入 context::getString（急救卡按 KDoc 用 plainRes）
         EmergencyMeds.summarize(
             meds, today.toString(),
-            freqLabel = { context.getString(it.plainRes) },
+            freqLabel = { resources.getString(it.plainRes) },
             // v1.2.10（审查 §6.9）：读不出来的频次原样印出存库值（不印「每日」）
-            unknownFreqLabel = { context.getString(R.string.ui_emergency_meds_unknown_freq, it) },
+            unknownFreqLabel = { resources.getString(R.string.ui_emergency_meds_unknown_freq, it) },
             // v1.2.6（i18n）：注射周期文案同样按系统语言解析
-            injCycleLabel = { context.getString(R.string.ui_emergency_meds_inj_cycle, it) },
+            injCycleLabel = { resources.getString(R.string.ui_emergency_meds_inj_cycle, it) },
             // v1.2.6（i18n）：商品名括号随语言换全角 / 半角
-            brandParen = { context.getString(R.string.ui_brand_paren, it) },
+            brandParen = { resources.getString(R.string.ui_brand_paren, it) },
         )
     }
 
