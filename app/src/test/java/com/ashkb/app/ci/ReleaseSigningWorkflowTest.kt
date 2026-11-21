@@ -22,7 +22,7 @@ import org.junit.Test
  * 2. 该 job **不设置** `ASHKB_ALLOW_DEBUG_SIGNING`（否则 debug 签名会被放行）；
  * 3. 该 job 里 `ASHKB_EXPECTED_CERT_SHA256` 是**必需**的（缺失即失败），而不是 `if [ -n ]`；
  * 4. 每个普通 main CI job 仍设置 `ASHKB_ALLOW_DEBUG_SIGNING=1`（工单：「普通 main CI 不得因此变红」）；
- *    （2026-11-21 CI 提速后拆成 unit-tests / lint-and-package 两条并行 job，本测试按集合校验）
+ *    （2026-11-21 CI 提速后拆成 unit-tests / lint / package 三条并行 job，本测试按集合校验）
  * 5. 文档写明「CI 冒烟 APK 不得发布」。
  *
  * 静态扫文件，不依赖 GitHub API；并按本仓惯例**断言确实读到了文件**：路径写错时大声失败，
@@ -153,8 +153,8 @@ class ReleaseSigningWorkflowTest {
             )
         }
         // 可选的严格比对可以留在 main，但必须是「配了才比」而不是「没配就红」。
-        // 2026-11-21：CI 拆成 unit-tests / lint-and-package 两条并行 job 后，验签只在后者。
-        val verifyJob = job("lint-and-package")
+        // 2026-11-21：CI 拆成 unit-tests / lint / package 三条并行 job 后，验签只在 package。
+        val verifyJob = job("package")
         assertTrue(
             "main job 里的摘要比对必须保留可选语义（[ -n \"\$ASHKB_EXPECTED_CERT_SHA256\" ]）",
             verifyJob.contains("[ -n \"\$ASHKB_EXPECTED_CERT_SHA256\" ]"),
