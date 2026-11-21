@@ -1,4 +1,4 @@
-package com.ashkb.app.ci
+﻿package com.ashkb.app.ci
 
 import java.io.File
 import org.junit.Assert.assertFalse
@@ -144,12 +144,16 @@ class ReleaseSigningWorkflowTest {
         assertTrue("至少要有 1 个非 tag 的 CI job，现有：${jobs().keys}", mainJobs.isNotEmpty())
         mainJobs.forEach { (name, body) ->
             assertTrue(
-                "main CI job「$name」必须保留 ASHKB_ALLOW_DEBUG_SIGNING=1（工单：普通 main CI 不得因此变红）",
-                body.contains("ASHKB_ALLOW_DEBUG_SIGNING"),
-            )
-            assertTrue(
                 "main CI job「$name」必须显式排除 tag（if 里出现 !startsWith(...refs/tags/)），实际：${ifExpr(body).trim()}",
                 ifExpr(body).contains("!") && ifExpr(body).contains("refs/tags/"),
+            )
+        }
+        // 只有真正产出 APK 的 job 需要 debug 签名放行；不给 lint / 单测 job 也无害，
+        // 但不能反过来：产出 APK 的 job 少了它，冒烟包会因缺正式签名而红。
+        mainJobs.filter { (_, body) -> body.contains("apksigner") }.forEach { (name, body) ->
+            assertTrue(
+                "产出 APK 的 CI job「$name」必须保留 ASHKB_ALLOW_DEBUG_SIGNING=1（工单：普通 main CI 不得因此变红）",
+                body.contains("ASHKB_ALLOW_DEBUG_SIGNING"),
             )
         }
         // 可选的严格比对可以留在 main，但必须是「配了才比」而不是「没配就红」。
