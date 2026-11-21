@@ -1,6 +1,7 @@
 # CI：构建 + 单测 + 静态分析 + 三道工程门（批次 2 起）+ 发布签名门（v1.2.11 / C04）
 #
-# 本仓库没有 gradlew（本地用固定版 Gradle 8.7），故用 gradle/actions/setup-gradle 提供。
+# 本仓库没有 gradlew（本地用固定版 Gradle 8.13），故用 gradle/actions/setup-gradle 提供。
+# Gradle 8.13 是 AGP 8.13 的最低要求（依赖升级第 2 步，2026-11-21）。
 #
 # 门（gate）说明：
 #   1. `testDebugUnitTest` —— 含迁移链完整性、schema 导出一致性等新增单测
@@ -67,10 +68,10 @@ jobs:
           path: ~/.m2/repository/org/robolectric
           key: robolectric-${{ runner.os }}-4.13-i6
 
-      - name: Set up Gradle 8.7
+      - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: '8.13'
 
       - name: Unit tests + detekt + spec sync
         run: gradle testDebugUnitTest detekt verifySpecSync --console=plain --build-cache
@@ -96,10 +97,10 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Gradle 8.7
+      - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: '8.13'
 
       - name: Lint (debug variant, full issue set)
         run: gradle lintDebug --console=plain --build-cache
@@ -119,10 +120,10 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Gradle 8.7
+      - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: '8.13'
 
       - name: Assemble release (smoke build)
         run: gradle assembleRelease --console=plain --build-cache
@@ -157,10 +158,10 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Gradle 8.7
+      - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: '8.13'
 
       # ---- 先验外部依赖，缺一个就失败（绝不伪造"已配置"）----
       - name: Require release signing material

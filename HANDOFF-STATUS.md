@@ -247,7 +247,7 @@ gh release edit v1.0.70 --prerelease=false --latest
 | 坑 | 对策 |
 |---|---|
 | **测试条数有多处副本** | 改一处必须同改；**交付前用 `app\build\test-results\testDebugUnitTest\*.xml` 汇总实际条数再回填** |
-| README 里写 `./gradlew`——本仓库不存在 | 用 `build-env\gradle-8.7\bin\gradle.bat -p patient-health-app` |
+| README 里写 `./gradlew`——本仓库不存在 | 用 `build-env\gradle-8.13\bin\gradle.bat -p patient-health-app` |
 | `.kt` 是 **LF**、`strings.xml` 是 **CRLF**（批量脚本按 `\r\n` 切分会让替换静默不生效；行尾转换制造误导性 diff） | 先归一化再处理、写完还原；`strings.xml` 必须写 `\r\n`；用 `git diff --numstat` 验证（期望纯增、0 删） |
 | 一个文件可能有两段 import 块 | 按块处理会给两块各插一次 → import 重复 |
 | 用户在 TRAE 手机端看不到工作区文件、也收不到聊天附件 | **唯一可下载渠道是 GitHub Release 资产链接**；release 必须挂在已推送的 commit 上 |
@@ -303,7 +303,7 @@ gh release edit v1.0.70 --prerelease=false --latest
 3. ~~首页「今日用药」卡的空态文案~~ —— **2026-11-18 已修并随 v1.2.19 发布**：非用药日（如 BIW 的周三）没有当日剂量时，卡片不再说「当前没有在用药品」，改为「今天没有需要服用的药」并说明「按当前用药方案，今天不是用药日」，出口从「添加药品」换成「查看用药方案」。判据抽成 `domain/TodayMedsEmpty.kt`（`kindOf(profileMissing, activeMedCount)` 三态）并加 5 条 JVM 单测（`TodayMedsEmptyTest`）；涉及 `ui/today/TodayScreen.kt` 的 `MedsEmptyCard`、`TodayViewModel.activeMedCount` 与 `res/values/strings.xml` 新增 3 条（中英成对）。真机已验证（周三非用药日 → 「今天没有需要服用的药」，出口落到药单管理）。
 4. **Android Lint 清零（2026-11-21）** —— 169 warning + 8 information 全部结清：57 条改代码（`ObsoleteSdkInt` 14 / `AutoboxingStateCreation` 8 / `StaticFieldLeak` 4 / `UnusedResources` 4 / `InlinedApi` 3 / `ModifierParameter` 2 / `ComposableNaming` 1 / `MonochromeLauncherIcon` 1 / `UnusedAttribute` 1），7 类 151 条写进新建的仓库根 `lint.xml` 并逐条注明理由（`PluralsCandidate` 85 与中英逐条对齐冲突、依赖/AGP 升级需单独排期、日期与范围里的连字符是正文语义、Play 政策类不上架）。门禁 `lintDebug` 现为 **0 issue**；详见 CHANGELOG 顶部 `[未发布]` 节。⚠️ 未 bump 版本号、未上真机。
 5. **CI 提速（2026-11-21）** —— 原 `build-and-test` 单 job 串行跑五件事（关键路径 288~461 s，冷缓存 380 s），拆成三条并行 job：`unit-tests`（单测 + detekt + `verifySpecSync` + schema 漂移门）、`lint`（`lintDebug`，不再分析 release 变体）、`package`（`assembleRelease` + 验签冒烟）。另加：删掉 CI 从不使用的 `assembleDebug`、`lint { checkReleaseBuilds = false }` 去掉 `lintVitalRelease` 重复、`actions/cache` 缓存 Robolectric 约 140 MB 的 `android-all-instrumented`、`maxParallelForks = 2`、`org.gradle.caching/parallel` + `--build-cache`。**实测关键路径 137 s（2 分 17 秒）**，run 44912505838；六道门与 tag 发布流水线均未让步。`ReleaseSigningWorkflowTest` 相应改为「凡产出 APK 的非 tag job 必须带 `ASHKB_ALLOW_DEBUG_SIGNING`」，并新增守卫测试「CI 拆分后仍覆盖全部六道门」。
-6. **依赖 / R8 / APK 体积评估（2026-11-21，只读）** —— 见 `docs/v1219-dependency-r8-size-audit.md`：APK 5.18 MiB（dex 74.6% / resources.arsc 19.9% / assets 压缩后 3.4%），Compose 占 R8 保留类 50%、双语字符串池 1885×2 是 arsc 主体；实测 `-repackageclasses ''` 只省 0.6%，不建议；剪 schema/ABI/图标均 <100 KB，不建议。结论：不砍体积，改为按四阶段排期升级依赖（androidx.test → 工具链/compileSdk 36 → Compose BOM → Room 2.8 + KSP2 + Kotlin 2.2）。**第 1 步已完成（2026-11-21）**：`androidx.test.ext:junit` 1.1.5→**1.3.0**、`androidx.test:runner` 1.5.0→**1.7.0**，仅测试侧；`assembleDebugAndroidTest` 可编译，单测 1342 条全绿。另发现 `-dontwarn org.bouncycastle.**` 是死规则（classpath 0 命中），可删。
+6. **依赖 / R8 / APK 体积评估（2026-11-21，只读）** —— 见 `docs/v1219-dependency-r8-size-audit.md`：APK 5.18 MiB（dex 74.6% / resources.arsc 19.9% / assets 压缩后 3.4%），Compose 占 R8 保留类 50%、双语字符串池 1885×2 是 arsc 主体；实测 `-repackageclasses ''` 只省 0.6%，不建议；剪 schema/ABI/图标均 <100 KB，不建议。结论：不砍体积，改为按四阶段排期升级依赖（androidx.test → 工具链/compileSdk 36 → Compose BOM → Room 2.8 + KSP2 + Kotlin 2.2）。**第 1 步已完成（2026-11-21）**：`androidx.test.ext:junit` 1.1.5→**1.3.0**、`androidx.test:runner` 1.5.0→**1.7.0**，仅测试侧；`assembleDebugAndroidTest` 可编译，单测 1342 条全绿。 **第 2 步已完成（2026-11-21）**：Gradle 8.7→**8.13**、AGP 8.5.2→**8.13.2**、compileSdk/targetSdk 34→**36**、build-tools 钉 **36.0.0**；新增 `robolectric.properties`（sdk=34）与 `lint.xml` 的 UseKtx 豁免；门禁全绿，release APK 5,247,592 B（较升级前小 3.4%），16 KB 对齐与正式签名校验通过；待真机回归返回键与系统栏避让。另发现 `-dontwarn org.bouncycastle.**` 是死规则（classpath 0 命中），可删。
 ---
 
 ## v1.0.73 批次 1「看不见的失效」——待真机人工验证的 7 项
@@ -648,7 +648,7 @@ release APK = `ashkb-1.2.8-release.apk`（5220504 B，sha256 `ECE175F8CF4A3602CC
 - **2026-10-15 已重跑并全绿**：`cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug verifySpecSync` → **BUILD SUCCESSFUL in 4m 1s**（`E:\ASHKB\v1210-gate1.log`，42 actionable tasks: 27 executed, 15 up-to-date）。单测 **965 条 / 110 文件全绿**（failures=0 / errors=0）；detekt **0 条**；lint **0 error**（184 条全为 Information/Warning）；`verifySpecSync` 通过。
 - **本次修掉的门禁红项**：09:28 之后那批未过门禁的改动引入了 `ui/me/MedEditScreen.kt:256:9 Function onPrimary has 7 return statements which exceeds the limit of 6. [ReturnCount]`（`config/detekt/detekt.yml:46-47 ReturnCount: max: 6`）。按铁律**在代码里修、不进基线**：把 7 个 `return` 的校验链收成表达式体 `fun stepOneBlocked(): Boolean = when { … }`，分支次序与三处错误位副作用逐字保留，`onPrimary` 只剩 2 个 `return`。`MedRouteFrequencyGuardTest.kt:138` 钉的 `!routeVisible(frequency.value, route.value)` 字面量原样保留。
 - **历史门禁基线**：上一批最后一次完整门禁 = 2026-10-13 09:28（`E:\ASHKB\batch2-gate2.log`：`BUILD SUCCESSFUL in 2m / 42 actionable tasks: 17 executed, 25 up-to-date`）；同批 `batch1-gate2.log`（08:10，2m45s）、`adj3-gate2.log`（00:14，1m25s）、`detekt-fix.log`（08:07，13s，只跑 `compileDebugUnitTestKotlin`，无 lint）均 SUCCESSFUL。**09:30 → 21:07 那约 12 小时改动的门禁缺口，已由本次重跑补上**（含 21:06–21:07 的运动判读反馈文案与 `ExerciseEngineTest.kt`）。
-- ⚠️ **构建必须在沙箱外运行**：workspace-write 沙箱下 Gradle 无法初始化 native services（`Failed to load native library 'native-platform.dll'`，因 `%USERPROFILE%\.gradle\native\…\.dll.lock` 被拒写）。命令：`. E:\ASHKB\build-env\env.ps1; & "E:\ASHKB\build-env\gradle-8.7\bin\gradle.bat" -p E:\ASHKB\patient-health-app <tasks> --console=plain`，且**不要覆盖 `GRADLE_USER_HOME`**（AGP 8.5.2 / Robolectric 4.13 缓存与 `%USERPROFILE%\.m2` 的 android-all-instrumented(API 34) 都在默认位置，覆盖会失去离线能力）。
+- ⚠️ **构建必须在沙箱外运行**：workspace-write 沙箱下 Gradle 无法初始化 native services（`Failed to load native library 'native-platform.dll'`，因 `%USERPROFILE%\.gradle\native\…\.dll.lock` 被拒写）。命令：`. E:\ASHKB\build-env\env.ps1; & "E:\ASHKB\build-env\gradle-8.13\bin\gradle.bat" -p E:\ASHKB\patient-health-app <tasks> --console=plain`，且**不要覆盖 `GRADLE_USER_HOME`**（AGP 8.13.2 / Robolectric 4.13 缓存与 `%USERPROFILE%\.m2` 的 android-all-instrumented(API 34) 都在默认位置，覆盖会失去离线能力）。
 
 #### 六、⚠️ 未验证清单（本批）
 
@@ -1327,7 +1327,7 @@ C01 遗留，修复后随 **v1.2.12** 发布（`backup_password_field` 改占位
 
 **怎么复跑这些验证**
 
-- 全门禁：`. E:\ASHKB\build-env\env.ps1; & "E:\ASHKB\build-env\gradle-8.7\bin\gradle.bat" -p E:\ASHKB\patient-health-app cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug verifySpecSync --console=plain`
+- 全门禁：`. E:\ASHKB\build-env\env.ps1; & "E:\ASHKB\build-env\gradle-8.13\bin\gradle.bat" -p E:\ASHKB\patient-health-app cleanTestDebugUnitTest testDebugUnitTest :app:detekt :app:lintDebug verifySpecSync --console=plain`
 - Argon2id 性能那档默认跳过（`assumeTrue`），要看数字必须先 `$env:ARGON2_BENCH="1"`。
 - 剪贴板 / 设备凭证两条走 Robolectric，**不需要真机**；但「系统验证界面长什么样」只能在真机看。
 

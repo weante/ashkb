@@ -21,6 +21,13 @@
     <issue id="AndroidGradlePluginVersion" severity="ignore" />
 
     <!--
+      UseKtx：新版 lint（AGP 8.13 附带）新增的纯风格建议——把 SharedPreferences.edit().apply()
+      换成 KTX 的 edit {}。命中的 34 处集中在备份/恢复、提醒配置、免责声明等**持久化关键路径**，
+      显式 apply()/commit() 便于审计提交时机；这里统一保留显式写法，不做大规模机械改写。
+    -->
+    <issue id="UseKtx" severity="ignore" />
+
+    <!--
       TypographyDashes / TypographyFractions：命中的是日期（2026-09-01）、参考范围（0-20）、
       中文破折号（——）与食谱分数（1/4 茶匙）。这些是正文语义的一部分，
       统一改成 en dash / ¼ 反而改变原文或影响中英对照，故不处理。

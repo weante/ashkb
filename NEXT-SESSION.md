@@ -274,7 +274,7 @@ README「数据与隐私」节新增「已知的边界与取舍（知情披露�
   + `git tag -d` + `gh run delete <run-id>`，否则工作流历史里会留一堆失败探针。
 - **pwsh 两个坑**：`git rev-parse v1.2.10^{}` 的 `^{}` 会被吃掉 → **必须加引号** `'v1.2.10^{}'`；`gh api --jq .body` 含换行时会被拆成字符串数组 → **必须 `-join "`n"`**。
 - **崩溃恢复**：`Could not read workspace metadata from ...transforms-4\...\metadata.bin` = Gradle 转换缓存被写坏 → **停守护进程 + 整个删掉 `transforms-4`** 再重建（只删单个条目无效）。
-- **构建必须在沙箱外**：workspace-write 下 Gradle 无法初始化 native services（`Failed to load native library 'native-platform.dll'`）。命令：`. E:\ASHKB\build-env\env.ps1; & "E:\ASHKB\build-env\gradle-8.7\bin\gradle.bat" -p E:\ASHKB\patient-health-app <tasks> --console=plain`，且**不要覆盖 `GRADLE_USER_HOME`**。`apksigner` 前必须先 `. env.ps1` 设 `JAVA_HOME`。
+- **构建必须在沙箱外**：workspace-write 下 Gradle 无法初始化 native services（`Failed to load native library 'native-platform.dll'`）。命令：`. E:\ASHKB\build-env\env.ps1; & "E:\ASHKB\build-env\gradle-8.13\bin\gradle.bat" -p E:\ASHKB\patient-health-app <tasks> --console=plain`，且**不要覆盖 `GRADLE_USER_HOME`**。`apksigner` 前必须先 `. env.ps1` 设 `JAVA_HOME`。
 - **门禁结果看 XML，不看 HTML mtime**：`app/build/reports/lint-results-debug.html` 常 UP-TO-DATE 未重写；以 `lint-results-debug.xml`（total/Error）与 `detekt.xml`（issues）为准。凡 `--tests` 过滤运行，结论**必须读 `TEST-*.xml`（含 mtime）**，不能只看 exit code。
 - **真机读屏**：`uiautomator dump` + `adb pull`；点击要打**最近的可点击祖先**（文本节点常不可点）；⚠️ **别在含电话号码的页面上盲滑动**（已误触拨号盘两次）。
 - **无线调试**：IP 与端口每轮都变（本轮见过 `.180` → `.64`，端口 44507/40961/38435/40329/43043/44767）。`adb kill-server` → `start-server` → `adb mdns services` 取 `_adb-tls-connect._tcp` 的 `IP:port`；若只有 `_adb-tls-pairing` 则需 `adb pair <IP>:<port> <配对码>`。**手机侧 VPN 地址（如 `172.19.0.1`）宿主不可达**，用 mdns 广播的 LAN 地址。设备掉线 = 无线调试被关，**宿主侧不可修复**。

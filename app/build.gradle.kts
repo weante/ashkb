@@ -22,12 +22,16 @@ val hasReleaseKeystore = !releaseStoreFile.isNullOrBlank() &&
 
 android {
     namespace = "com.ashkb.app"
-    compileSdk = 34
+    // 依赖升级第 2 步（2026-11-21）：compileSdk/targetSdk 34 → 36（Android 16）。
+    // 新版 androidx 库（lifecycle 2.11 / core 1.19 等）以 36 编译，34 会报 AAR metadata 不满足。
+    // build-tools 显式钉到 36.0.0：本机只装了 34 与 36，不钉会去要 AGP 默认的中间版本。
+    compileSdk = 36
+    buildToolsVersion = "36.0.0"
 
     defaultConfig {
         applicationId = "com.ashkb.app"
         minSdk = 31
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 131
         versionName = "1.2.19"
         // 批次 2（测试安全网）：instrumented 测试（Room schema 漂移校验）需要 runner

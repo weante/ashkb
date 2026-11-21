@@ -1,3 +1,30 @@
+## [未发布] — 2026-11-21 · 依赖升级第 2 步：工具链 Gradle 8.13 + AGP 8.13.2 + compileSdk/targetSdk 36
+
+按 `docs/v1219-dependency-r8-size-audit.md` §7 的四阶段排期，第 2 步把编译工具链提到 Android 16（API 36）。
+
+| 项 | 旧 | 新 |
+|---|---|---|
+| Gradle | 8.7 | **8.13** |
+| AGP | 8.5.2 | **8.13.2** |
+| compileSdk / targetSdk | 34 / 34 | **36 / 36** |
+| build-tools | 34.0.0（AGP 默认） | **36.0.0（显式钉住）** |
+
+- `gradle/libs.versions.toml`：`agp` 8.5.2 → 8.13.2。
+- `app/build.gradle.kts`：`compileSdk = 36`、`targetSdk = 36`，新增 `buildToolsVersion = "36.0.0"`。
+- `.github/workflows/ci.yml`：四处 `gradle-version: '8.7'` → `'8.13'`（AGP 8.13 的最低要求）。
+- 本机 `build-env/env.ps1` 的 `GRADLE_HOME` 指向新解压的 `gradle-8.13`（脚本在仓库外，不入库）。
+
+**配套修复（都由升级直接引出）**
+- 新增 `app/src/test/resources/robolectric.properties`（`sdk=34`）：Robolectric 4.13 最高支持 SDK 35，`targetSdk` 提到 36 后 18 个没写 `@Config(sdk=[34])` 的测试类在初始化阶段抛 `IllegalArgumentException`（`DefaultSdkPicker`）。统一钉 34，与既有 35 个显式声明的测试保持一致。
+- `lint.xml` 新增 `UseKtx` 豁免：新版 lint（AGP 8.13 附带）新增的纯风格建议，命中 34 处 SharedPreferences 写入（备份/恢复、提醒配置等持久化关键路径）；保留显式 `apply()/commit()` 便于审计提交时机。
+- 本机 `local.properties` 的 `sdk.dir` 改为转义盘符（`E\:/...`），否则新 lint 报 `PropertyEscape` 错误；该文件不入库。
+
+**验证**
+- `testDebugUnitTest detekt lintDebug verifySpecSync` → **BUILD SUCCESSFUL**；单测 **163 类 / 1342 条 / 0 失败 / 0 错误 / 1 跳过**；lint **0 issue**；detekt **0**；`verifySpecSync` 通过（版本号仍 1.2.19 / 131，库结构仍 21）。
+- `assembleRelease assembleDebugAndroidTest` → **BUILD SUCCESSFUL**；APK **5,247,592 B**（比升级前的 5,431,160 B **小 183,568 B ≈ 3.4%**，新 R8 收缩更好）；`aapt` 确认 `compileSdkVersion='36'` / `targetSdkVersion='36'`；`zipalign -c -P 16` 通过（16 KB 页对齐）；`apksigner` 证书仍是 `38CA80A6…9012D7D`（正式签名）。
+
+**行为风险（未真机验证）**：targetSdk 36 意味着 Android 16 的强制 edge-to-edge（App 已在 `MainActivity` 调 `enableEdgeToEdge()`，主题已是透明系统栏）、predictive back 默认开启、16 KB 页大小支持（已通过 zipalign 校验）。需真机回归：三键/手势返回、状态栏与导航栏避让、通知权限与全屏提醒。
+
 ## [未发布] — 2026-11-21 · 依赖升级第 1 步：androidx.test 两个包（仅测试侧）
 
 按 `docs/v1219-dependency-r8-size-audit.md` §7 的四阶段排期，先做风险最低的第 1 步——只动 instrumented 测试的两个依赖，**产品代码、`compileSdk`、版本号、库结构全部不变**。

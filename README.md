@@ -57,7 +57,7 @@ Ankylosing Spondylitis Health Knowledge Base —— 一款面向强直性脊柱�
 | PDF | `android.graphics.pdf` 原生导出 |
 | 加密 | `javax.crypto` AES-256-GCM + PBKDF2（备份容器） |
 | 架构 | 单模块 MVVM（ViewModel + Repository），domain 层纯函数可测 |
-| SDK | compileSdk 34 · minSdk 31（Android 12+） · targetSdk 34 |
+| SDK | compileSdk 36 · minSdk 31（Android 12+） · targetSdk 36 |
 
 ## 构建
 
@@ -71,9 +71,9 @@ gradle testDebugUnitTest    # 单元测试
 
 > ⚠️ 本仓库**不含 Gradle wrapper 脚本**（`gradlew` / `gradlew.bat` / `gradle-wrapper.jar` 均未入库，
 > 仅保留 `gradle/wrapper/gradle-wrapper.properties` 作为版本声明），所以上面用 `gradle` 而非 `./gradlew`。
-> 请使用 **Gradle 8.7**；或直接用 Android Studio 打开（会自行接管构建）。
+> 请使用 **Gradle 8.13**（AGP 8.13 的最低要求）；或直接用 Android Studio 打开（会自行接管构建）。
 
-要求：JDK 17+、Gradle 8.7、Android SDK 34。
+要求：JDK 17+、Gradle 8.13、Android SDK 36。
 
 ## 数据与隐私
 

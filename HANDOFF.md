@@ -23,7 +23,7 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）：面向强直性脊柱�
 <工作区>/
 ├── build-env/          # 全套工具链（勿动）
 │   ├── jdk-21.0.12.1+1/
-│   ├── gradle-8.7/
+│   ├── gradle-8.13/
 │   └── android-sdk/    # build-tools 含 apksigner
 └── patient-health-app/ # 本仓库（git repo）
 ```
@@ -31,7 +31,7 @@ ASHKB（Ankylosing Spondylitis Health Knowledge Base）：面向强直性脊柱�
 **构建命令**（PowerShell，工作区根目录执行）：
 
 ```powershell
-$env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.7\bin\gradle.bat" -p patient-health-app assembleDebug assembleRelease testDebugUnitTest
+$env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.13\bin\gradle.bat" -p patient-health-app assembleDebug assembleRelease testDebugUnitTest
 ```
 
 - 全量构建约 2~3 分钟；**全量单测**必须全过才算交付（其中 31 条用 Robolectric，见 §8 S1；**条数以 CI 为准，本仓不记数**）
@@ -111,8 +111,8 @@ $env:JAVA_HOME = "$PWD\build-env\jdk-21.0.12.1+1"; & "build-env\gradle-8.7\bin\g
 > **v1.0.75 补充（批次 5 的取舍记录）**：**不引入 gradlew wrapper**。理由：
 > ① 本机到 `services.gradle.org` 不可达，`gradle wrapper` 连 distributionUrl 校验都过不去
 > （实测 `Test of distribution url … failed`），加进来的 wrapper 在这台机器上反而用不了；
-> ② CI 已用 `gradle/actions/setup-gradle@v4` 固定 Gradle 8.7（与 `gradle/wrapper/gradle-wrapper.properties`
-> 里记录的同版本），本地用 `E:\ASHKB\build-env\gradle-8.7` 固定安装；
+> ② CI 已用 `gradle/actions/setup-gradle@v4` 固定 Gradle 8.13（与 `gradle/wrapper/gradle-wrapper.properties`
+> 里记录的同版本），本地用 `E:\ASHKB\build-env\gradle-8.13` 固定安装；
 > ③ 仓库里那个 `gradle-wrapper.properties` 保留（作为版本声明），但不加 60 KB 的 wrapper jar。
 > 若将来要在别处 clone 构建，再补 wrapper 即可（届时 distributionUrl 指向可达的镜像）。
 
@@ -479,7 +479,7 @@ escheduleAll 的**三步结构** | 第 1 步＝未来槽位、第 2 步＝今日
 git -C E:\ASHKB\patient-health-app log --oneline -S 'version = 16' -- app/src/main/java/com/ashkb/app/data/db/AppDatabase.kt
 # 2) 检出该提交 → 构建一次（会自动导出 <N>.json）→ 把 app/schemas 下的文件拷回当前分支
 git -C E:\ASHKB\patient-health-app checkout <sha>
-& "E:\ASHKB\build-env\gradle-8.7\bin\gradle.bat" -p E:\ASHKB\patient-health-app :app:kspDebugKotlin
+& "E:\ASHKB\build-env\gradle-8.13\bin\gradle.bat" -p E:\ASHKB\patient-health-app :app:kspDebugKotlin
 # 3) 回到 main，把补录到的 1.json … 16.json 一并提交（此后 MigrationTestHelper 就能测全链路）
 `
 
