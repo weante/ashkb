@@ -1,3 +1,11 @@
+## [未发布] — 2026-11-21 · 文档卫生：可靠性证明归档、未取证标注与接手状态更新
+
+纯文档改动，不动代码、不改版本号与库结构。
+
+- `HANDOFF-STATUS.md`：在 §7-D 补记原 M0 两条已结清——`RestoreRollbackTest` 4 条（恢复失败必回滚、篡改 / 更高 schema / 未知表均零写入）与 `MigrationPathProofTest` 15 条（v8 旧行回填 + 源码守卫；真实变异探针删除回填后 2 fail），提交 `ceef94f`、CI [run 44564676217](https://github.com/weante/ashkb/actions/runs/44564676217) success；同时把 §0 时点快照、工作树、单测、构建、GitHub Latest 五行从 v1.2.13/v1.2.15 的旧口径更新到「发布基线 v1.2.19 / 工程 HEAD `2a2934b`（未发版）」。
+- `docs/v1215-acceptance/results.md` 与 `SUMMARY.md`：把报表 Error 态、2× 待服药折行、输入弹层键盘遮挡、20 MB 附件取回侧、演练文案取证五项逐一标注「**待手机返修后**」；设备自 2026-11-21 起送修，本机无 emulator / system image，不把「无法判定」写成「通过」。
+- `NEXT-SESSION.md`：标题、当前状态与「续作线索」重写到工程 HEAD `2a2934b`，补齐 lint 清零、CI 提速、四阶段依赖升级、可靠性测试与真机遗留项；保留旧探针 `.probe-mig.py` 与 Devin 邀约的「不要重做」提醒。
+
 ## [未发布] — 2026-11-21 · 依赖升级第 4 步：Room 2.8.5 + Kotlin 2.2.20 + KSP2
 
 四阶段依赖升级的最后一步。三处版本同时上调，只动构建配置与一处测试适配，产品代码未改。

@@ -1,4 +1,4 @@
-# 下次接手从这里开始（v1.2.19 已发布 · 2026-11-21 测试补强待提交）
+# 下次接手从这里开始（发布基线 v1.2.19 · 工程 HEAD 2a2934b · 2026-11-21）
 
 > **本文件是仓库内唯一权威的接手文档**，随仓库一起分发。
 > `E:\ASHKB\NEXT-SESSION.md`（仓库根之外、**不被 git 跟踪**）是会话工作日志，记的是过程细节与踩坑现场；两者内容会有出入，**以本文件为准**。
@@ -6,18 +6,19 @@
 
 ---
 
-**当前状态（2026-11-21）**：已发布基线是 `v1.2.19`（versionCode **131**）、提交 `eea5705`，GitHub Latest；此后已有两次测试补强提交：`ceef94f`（恢复失败必回滚 + 迁移回填负向断言）与本日最新一条（三处零覆盖分支：附件级联删除 / WebDAV 凭据迁移 / DateProvider 广播），**工作树干净、已推送**。用户手机送修，无真机 / 无 emulator，只做 JVM 验证。
+**当前状态（2026-11-21 晚）**：发布基线仍是 `v1.2.19`（versionCode **131**）、提交 `eea5705`，GitHub **Latest**；工程 HEAD 已推进到 **`2a2934b`**（四阶段依赖升级收官），**未 bump 版本号、未发版**。HEAD 与发布版之间依次有：`ceef94f`/`cb645dc`（可靠性测试补强）、`c156872`（lint 169→0）、CI 提速（拆三条并行 job，实测 62~137 s）、`5df39fd`（R8/体积只读评估）、`09a2553`→`d3d7b24`→`53e9d55`→`2a2934b`（四阶段依赖升级）。工作树在文档卫生改动前是干净的；手机自 2026-11-21 起送修，本机无 emulator / system image，**只做 JVM 与静态门禁**。
 
-### 续作线索（2026-11-21 · 先读这段）
+### 续作线索（2026-11-21 · 先看这里，旧线索仅是历史）
 
-- **已完成并跑绿**：附件级联删除磁盘分支测试 4 条（`app/src/test/java/com/ashkb/app/data/repo/AttachmentCascadeDeleteTest.kt`）、WebDAV 明文凭据迁移测试 7 条（`app/src/test/java/com/ashkb/app/data/repo/BackupWebdavConfigMigrationTest.kt`）、`DateProvider` 广播与 start/stop 测试 8 条（`app/src/test/java/com/ashkb/app/domain/DateProviderTest.kt`）。恢复回滚与迁移回填负向断言已在 `ceef94f` 提交，**不要重复实现**。
-- **生产代码只有两处可测性注入**：`AttachmentRepository(context, db = AppDatabase.get(context))`、`BackupRepository(context, encryptCredential = KeystoreCipher::encryptToB64, decryptCredential = KeystoreCipher::decryptFromB64)`；生产调用点不传参，行为不变。
-- **Robolectric / Room 教训**：legacy SQLite 影子把连接绑定线程；多线程 Room 执行器会报 `Illegal connection pointer`。附件测试使用 `Room.databaseBuilder(...).setQueryExecutor(singleThread).setTransactionExecutor(sameSingleThread).allowMainThreadQueries()`。曾试 `@SQLiteMode(NATIVE)`，全量套件会 `UnsatisfiedLinkError: SQLiteConnectionNatives.nativePrepareStatement`，**不要回退到 NATIVE**。
-- **本次提交内容（2026-11-21）**：`M CHANGELOG.md`、`M HANDOFF-STATUS.md`、`M NEXT-SESSION.md`、`M app/src/main/java/com/ashkb/app/data/repo/AttachmentRepository.kt`、`M app/src/main/java/com/ashkb/app/data/repo/BackupRepository.kt`、`M app/src/test/java/com/ashkb/app/domain/DateProviderTest.kt`；新增 `AttachmentCascadeDeleteTest.kt`、`BackupWebdavConfigMigrationTest.kt`。本地构建目录与截图不入库。
-- **门禁结果**：`testDebugUnitTest detekt lintDebug verifySpecSync` → BUILD SUCCESSFUL in 2m38s；163 类 / 1341 条 / 0 失败 / 0 错误 / 1 跳过；lint 0 error / 169 warning；detekt 0。文档已补记；**未 bump 版本号、未发版**。
-- **不要运行 `E:\ASHKB\.probe-mig.py`**：它曾是为迁移负向证明准备的探针，但会追加第二个 companion、缺 `assertNotNull` import，且并未真正删除迁移里的回填。负向证明已经通过真实变异探针完成并记录在 `CHANGELOG.md`；该脚本不是续作入口。
-- **不要重新处理 Devin 邀约**：它是背景噪声；不向第三方发送患者数据，不写第四份申诉。若用户后续只要求项目开发，直接看上面的测试补强线索。
-- **仍需真机或另行拍板的事**：真实用户 `webdav_config` 历史键取证（需 debug 包 + `run-as` 或 root）；R16 批量导入与趋势页方案 B 仍是独立需求，不因本轮测试自动开工。
+- **门禁基线（HEAD `2a2934b`）**：`testDebugUnitTest detekt verifySpecSync assembleRelease assembleDebugAndroidTest --no-parallel` BUILD SUCCESSFUL；**163 类 / 1342 条 / 0 失败 / 0 错误 / 1 跳过**；`lintDebug` 单独跑 **0 issue**；detekt **0**；APK **5,572,961 B**（`compileSdk/targetSdk 36`，16 KB 页对齐，正式证书 `38ca80a6…d7d` 未变）。CI [run 44920260740](https://github.com/weante/ashkb/actions/runs/44920260740) success。⚠️ 本地**不要**把 lint / 单测 / 打包塞进同一次 Gradle 调用并开 `org.gradle.parallel=true`——KSP 生成的 release Java 会被并发重写导致 `FileNotFoundException`；CI 三条独立 job 不受影响。
+- **可靠性测试已全部结清，不要重复实现**：`RestoreRollbackTest` 4 条（恢复失败必回滚：篡改 / 更高 schema / 未知表均零写入）、`MigrationPathProofTest` 15 条（v8 旧行回填 + 源码守卫，真实变异探针删回填后 2 fail）；三处零覆盖分支：`AttachmentCascadeDeleteTest` 4 条、`BackupWebdavConfigMigrationTest` 7 条（注入假加解密，生产不传参）、`DateProviderTest` 8 条；`DateProvider` 广播、`BackupRepository` 凭据迁移此前均零测试，现已覆盖。上次提交 `cb645dc`，CI [run 44907506938](https://github.com/weante/ashkb/actions/runs/44907506938) success。
+- **Robolectric / Room 教训**：legacy SQLite 影子把连接绑定线程；多线程 Room 执行器会报 `Illegal connection pointer`。附件测试使用 `Room.databaseBuilder(...).setQueryExecutor(singleThread).setTransactionExecutor(sameSingleThread).allowMainThreadQueries()`。**不要回退到 `@SQLiteMode(NATIVE)`**（全量会 `UnsatisfiedLinkError: SQLiteConnectionNatives.nativePrepareStatement`）。Room 2.8 的 `SupportSQLiteDriver` 要求库名与 `createDatabase(name, version)` 完全一致，`MigrationPathProofTest` 已统一改用 `getDatabasePath(name).absolutePath`。
+- **工程变化（不要当成未发布内容重复开工）**：Android Lint 从 169 warning 清到 **0**（57 条改代码 + 仓库根 `lint.xml` 7 类豁免）；CI 从单 job 288~461 s 拆成 `unit-tests` / `lint` / `package` 三条并行 job（缓存 Robolectric jar、`maxParallelForks=2`、`org.gradle.caching/parallel`）；依赖四阶段全部完成——androidx.test → Gradle 8.13 / AGP 8.13.2 / compileSdk+targetSdk 36 / JDK 21 → Compose BOM 2026.06.01（2026.08+ 要 compileSdk 37，止于此）→ Kotlin 2.2.20 / KSP 2.2.20-2.0.4 / Room 2.8.5。新增 `app/src/test/resources/robolectric.properties`（sdk=34）以兼容 Robolectric 4.13；detekt 1.23.7 实测兼容 Kotlin 2.2，暂不升级。
+- **仍需真机**（手机返修后一次走完，见 `docs/v1215-acceptance/SUMMARY.md` 与 `HANDOFF-STATUS.md` §7-B）：① targetSdk 36 的 predictive back / 三键与手势返回、edge-to-edge 系统栏避让；② Compose 1.11 的滚动 / 弹层 / 焦点；③ 通知权限与全屏提醒（Android 16）；④ v1.2.15 九条验收里四项未取证（报表 Error 态、2× 待服药折行、输入弹层键盘遮挡、20 MB 附件取回侧），已统一标注「待手机返修后」；⑤ 未发布改动**不要发版**直到真机回归通过。
+- **可公开核验的凭据**：CI 六道门与正式签名见 `https://github.com/weante/ashkb/actions`；main 全绿 run [44564676217](https://github.com/weante/ashkb/actions/runs/44564676217)、最新四阶段升级 run [44920260740](https://github.com/weante/ashkb/actions/runs/44920260740)。`docs/v1219-dependency-r8-size-audit.md` 的体积数字是**升级前 v1.2.19 基线 5,431,160 B**，不是当前 5,572,961 B，读时别混。
+- **不要运行 `E:\ASHKB\.probe-mig.py`**：负向证明已用真实变异探针完成；该脚本有第二个 companion / 缺 import / 并未真删回填，不是续作入口。
+- **不要重新处理 Devin 邀约**：背景噪声；不向第三方发送患者数据，不写第四份申诉。
+- **仍需拍板（不要自行开工）**：R16 批量导入、趋势页方案 B；均为独立需求。
 
 ---
 
