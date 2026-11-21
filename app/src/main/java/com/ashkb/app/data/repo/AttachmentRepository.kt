@@ -22,9 +22,17 @@ import kotlinx.coroutines.withContext
  * ⚠️ **附件不随数据库备份**：`BackupEngine` 导出的是各表 JSON，不含二进制文件。
  * 换机恢复后附件需重新导入。这是为保住备份轻量（WebDAV 上传 120s 超时）的取舍。
  */
-class AttachmentRepository(private val context: Context) {
+class AttachmentRepository(
+    private val context: Context,
+    /**
+     * v1.2.20：可注入数据库，仅为单测。`AppDatabase.get(context)` 是进程级单例，
+     * 而 Robolectric 的 legacy SQLite 影子把连接绑定到线程，多线程 Executor 下无法测
+     * 级联删除的磁盘分支；测试注入一个单线程 Executor 的库即可复现真实语义。
+     * 生产调用点（AshkbApplication）不传参，行为完全不变。
+     */
+    private val db: AppDatabase = AppDatabase.get(context),
+) {
 
-    private val db = AppDatabase.get(context)
     private val dao = db.checkupAttachmentDao()
 
     private val syncPrefs: SharedPreferences =

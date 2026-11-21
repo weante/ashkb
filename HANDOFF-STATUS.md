@@ -286,8 +286,8 @@ gh release edit v1.0.70 --prerelease=false --latest
 2. `MedEditScreen` 保存路径、`WellnessScreen` 下半屏、`KeyValueRow` 新对齐（UI 2.0 批次 B–E 的三处未验点）。
 3. `restoreMutex` 真机双击（并发恢复互斥）。
 4. WebDAV 真实网络 20 MB 附件往返。
-5. `DateProvider` 的 `start` / `stop` **广播注册**分支（纯 JVM 部分已有 `DateProviderTest.kt` 5 条，广播注册需要 `Context`）。
-6. 级联删除的附件分支。
+5. ~~`DateProvider` 的 `start` / `stop` **广播注册**分支~~ —— **2026-11-21 已补 JVM 覆盖**（`app/src/test/java/com/ashkb/app/domain/DateProviderTest.kt` 8 条，Robolectric 挂在真 `Context` 上：构造取时钟 / `start` 立即对齐 / `ACTION_DATE_CHANGED`、`ACTION_TIME_CHANGED`、`ACTION_TIMEZONE_CHANGED` 三条广播推进 / 同值广播空操作 / `stop` 后不推进 / `stop` 重复安全 / 监听器可反注册）。仍需真机跨零点的只剩「深睡后醒来是否漏跨日」的体感，功能分支本身已有证据。
+6. ~~级联删除的附件分支~~ —— **2026-11-21 已补 JVM 覆盖**（`app/src/test/java/com/ashkb/app/data/repo/AttachmentCascadeDeleteTest.kt` 4 条：同步关 → 物理删行、删行阶段不动磁盘、提交后删字节 / 有远端副本且同步开 → 只置墓碑（`deleted_at` 非空、`listByCheckup` 为空）且本地字节仍删 / 混合状态各走各分支 / 文件不存在不抛）。
 7. 批次 B 的四个小看点：64 MiB 上限提示 / 档案 JSON 7 字段往返 / 用药史 90 天窗 / 运动反馈去代号。
 
 **C. 可自行开工（无需外部输入）**
@@ -902,7 +902,7 @@ java.lang.NullPointerException: Attempt to invoke virtual method
 | 3 | Android 目标 ROM 上 `HttpURLConnection` 跨主机重定向是否转发 `Authorization`（S-8 因此标记为待验证） | **跨主机重定向不转发 `Authorization`**：本机双 loopback 端口实验（8091 → 302 → 8092 回显请求头）证明 `HttpURLConnection` 默认 follow 重定向但**丢弃** `Authorization`；且 `WebDavClient.kt:68-83` 从未调用 `setInstanceFollowRedirects` ⇒ S-8 的「重定向后凭据丢失」成立（**同主机**重定向不受影响） | 宿主双端口 HTTP 回显实验（可复用；Android 侧 dex 因设备掉线未补跑，见下方未完成项） |
 | 4 | Keystore 密钥是否硬件背书 / 是否可证明（无 attestation） | **无 attestation、无 StrongBox 请求**：`KeystoreCipher.kt` 只 `setBlockModes(GCM)` / `setKeySize(256)` / `setRandomizedEncryptionRequired`；而设备 `pm list features` 同时具备 `hardware_keystore=300` 与 `strongbox_keystore=300` ⇒ **硬件能力具备，但代码不可证明**（要证明须加 `setIsStrongBoxBacked(true)` + attestation 链校验） | 读 `KeystoreCipher.kt`；真机 `pm list features` |
 | 5 | 120k 次 PBKDF2 在目标 SoC 上的真实耗时（影响是否敢继续提高迭代数） | **实测 136 ms**（SM8750 真机，120k 迭代）；200k = 226 ms、600k = 687 ms；宿主 x86 为 46 ms ⇒ **迭代数有充足余量可提高**，远未逼近 `BackupRepository.kt:193` 的 `withTimeout(120_000)` | 一次性 Java 基准 dex：`javac --release 17` → `d8.bat --lib <android.jar> --min-api 31` → push → `dalvikvm -cp /data/local/tmp/x/classes.dex <Main>`（⚠️ 用 `dalvikvm`，`app_process` 会崩） |
-| 6 | `webdav_config` 历史明文凭据的迁移是否曾对真实用户跑过（缺文件） | **迁移代码存在但零测试覆盖**：`BackupRepository.kt:62-81` 从旧键 `url`/`user`/`pass` 迁移（**仅 https 才迁移**，随后删旧键）；全仓无任何测试触及该分支；release 包不可调试 ⇒ 真机 prefs 读不到 ⇒ **与报告「缺文件」的判定一致**，属于「有代码、无证据」 | 读 `BackupRepository.kt:62-81`；grep 测试目录无命中；真机 `run-as` 不可用（release） |
+| 6 | `webdav_config` 历史明文凭据的迁移是否曾对真实用户跑过（缺文件） | **2026-11-21 更新：迁移代码已有 JVM 覆盖，不再零测试**——`app/src/test/java/com/ashkb/app/data/repo/BackupWebdavConfigMigrationTest.kt` 7 条（https 迁移并删旧键、落盘是密文 / http、ftp、畸形 scheme 一律丢弃 / 仅残留部分键也清理 / 已加密往返与覆盖 / 坏密文读空不抛 / 保存 http 被 HTTPS 白名单拦下）。为能在 JVM 上跑，`BackupRepository` 构造器注入 `encryptCredential` / `decryptCredential`（默认 `KeystoreCipher`，生产调用点不传参、行为不变）。**仍缺**：真实用户 `webdav_config` 历史键的真机取证（需 debug 包 + `run-as` 或 root） | 读 `BackupRepository.kt:82-101`；跑 `BackupWebdavConfigMigrationTest`；真机 `run-as` 不可用（release） |
 | 7 | 是否存在应用锁 / 生物解锁（代码中未找到） | **不存在**：全仓 grep `BiometricPrompt` / `KeyguardManager` / `setUserAuthenticationRequired` **零命中**；`SecureWindow.kt` 只用 `FLAG_SECURE` 禁截屏，**那是防泄露不是身份认证** ⇒ 报告判定成立 | 全仓 grep |
 
 **未完成的两条尾巴**（设备侧链路断，非代码问题）：

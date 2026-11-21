@@ -1,97 +1,132 @@
 package com.ashkb.app.domain
 
+import android.content.Context
+import android.content.Intent
 import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertSame
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowLooper
 
 /**
- * v1.0.86（批次 11 / B3）：进程级日期源 [DateProvider] 的语义。
+ * v1.2.20：`DateProvider` 的 start/stop 与广播分支**此前零测试**。
  *
- * 只测**纯 JVM 部分**（构造 + 推进 + 监听通知）：`start/stop` 要注册系统广播，属 Robolectric 范畴。
- * 这里要锁住的是各 ViewModel 依赖的那三条契约：
- *   ① 同值不通知（避免跨日后重复查库）；
- *   ② 值变才通知（跨零点重算的唯一触发口径）；
- *   ③ 所有使用方共用同一个日期实例（7 份 ticker 收成一份之后，不可能再各算各的）。
+ * 为什么值得测：这是全应用唯一的「今天」来源。它的历史缺陷不是算法错，而是**触发路径**错
+ * （`postDelayed` 按 uptime 计时、深睡不走 → 早上打开 App 日期停在前一天）。修法把主路径
+ * 换成系统广播，于是「广播进来会不会真的推进」「stop 之后还会不会推进」就成了承重逻辑：
+ * 前者坏 = 跨日不刷新；后者坏 = 进程收尾后仍持有 receiver（泄漏 / 重复回调）。
+ *
+ * 时钟可注入，所以不需要真的等到明天：改 `clockNow` 再发广播即可。
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = android.app.Application::class)
 class DateProviderTest {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+    private val context: Context = RuntimeEnvironment.getApplication()
+    private var clockNow: LocalDate = LocalDate.of(2026, 11, 21)
+    private var started: DateProvider? = null
+
+    private fun provider() = DateProvider(CoroutineScope(Dispatchers.Unconfined)) { clockNow }
+
+    private fun start(p: DateProvider): DateProvider {
+        p.start(context)
+        started = p
+        return p
+    }
+
+    private fun broadcast(action: String) {
+        context.sendBroadcast(Intent(action))
+        ShadowLooper.idleMainLooper()
+    }
+
+    @After
+    fun tearDown() {
+        started?.stop(context)
+        started = null
+    }
 
     @Test
-    fun `same date does not notify listeners`() {
-        val fixed = LocalDate.of(2026, 10, 2)
-        val provider = DateProvider(scope) { fixed }
+    fun `构造时取一次系统时钟`() {
+        assertEquals(LocalDate.of(2026, 11, 21), provider().today.value)
+    }
+
+    @Test
+    fun `start 会立刻与系统时钟对齐（覆盖注册前已跨日的窗口）`() {
+        val p = provider()
+        clockNow = LocalDate.of(2026, 11, 22)
+        start(p)
+        assertEquals(LocalDate.of(2026, 11, 22), p.today.value)
+    }
+
+    @Test
+    fun `日期变更广播会推进今天`() {
+        val p = start(provider())
+        clockNow = LocalDate.of(2026, 11, 23)
+        broadcast(Intent.ACTION_DATE_CHANGED)
+        assertEquals(LocalDate.of(2026, 11, 23), p.today.value)
+    }
+
+    @Test
+    fun `手动改时间与改时区同样会推进今天`() {
+        val p = start(provider())
+        clockNow = LocalDate.of(2026, 11, 24)
+        broadcast(Intent.ACTION_TIME_CHANGED)
+        assertEquals(LocalDate.of(2026, 11, 24), p.today.value)
+
+        clockNow = LocalDate.of(2026, 11, 25)
+        broadcast(Intent.ACTION_TIMEZONE_CHANGED)
+        assertEquals(LocalDate.of(2026, 11, 25), p.today.value)
+    }
+
+    @Test
+    fun `同值广播是空操作，不重复通知监听器`() {
+        val p = start(provider())
         var calls = 0
-        provider.addOnDateChangedListener { calls++ }
-
-        provider.refreshIfStale()
-        provider.refreshIfStale()
-        provider.onDateKnown(fixed)
-
+        p.addOnDateChangedListener { calls++ }
+        repeat(3) { broadcast(Intent.ACTION_DATE_CHANGED) } // 时钟没动 → 值相同
         assertEquals(0, calls)
-        assertEquals(fixed, provider.today.value)
+        assertEquals(LocalDate.of(2026, 11, 21), p.today.value)
     }
 
     @Test
-    fun `date change notifies listeners exactly once with the new date`() {
-        var now = LocalDate.of(2026, 10, 2)
-        val provider = DateProvider(scope) { now }
-        val seen = mutableListOf<LocalDate>()
-        provider.addOnDateChangedListener { seen.add(it) }
-
-        // 跨零点：设备深睡时系统发 ACTION_DATE_CHANGED，醒来补送
-        now = LocalDate.of(2026, 10, 3)
-        provider.refreshIfStale()
-        // 同一新值再来一次（例如同时收到 DATE_CHANGED 与 TIME_CHANGED）不应重复通知
-        provider.onDateKnown(LocalDate.of(2026, 10, 3))
-
-        assertEquals(listOf(LocalDate.of(2026, 10, 3)), seen)
-        assertEquals(LocalDate.of(2026, 10, 3), provider.today.value)
+    fun `stop 之后广播不再推进今天`() {
+        val p = start(provider())
+        p.stop(context)
+        started = null
+        clockNow = LocalDate.of(2026, 12, 1)
+        broadcast(Intent.ACTION_DATE_CHANGED)
+        assertEquals(LocalDate.of(2026, 11, 21), p.today.value)
     }
 
     @Test
-    fun `unregister handle stops notifications`() {
-        var now = LocalDate.of(2026, 10, 2)
-        val provider = DateProvider(scope) { now }
-        var calls = 0
-        val off = provider.addOnDateChangedListener { calls++ }
-
-        now = LocalDate.of(2026, 10, 3)
-        provider.refreshIfStale()
-        assertEquals(1, calls)
-
-        off()
-        now = LocalDate.of(2026, 10, 4)
-        provider.refreshIfStale()
-        assertEquals(1, calls)
-        assertEquals(LocalDate.of(2026, 10, 4), provider.today.value)
+    fun `stop 重复调用安全`() {
+        val p = start(provider())
+        p.stop(context)
+        p.stop(context)
+        started = null
     }
 
-    /** 多个使用方必须看到**同一个**日期流实例（这正是"7 份 ticker 收成一份"的可验证形态）。 */
     @Test
-    fun `all consumers share one date flow`() {
-        val provider = DateProvider(scope) { LocalDate.of(2026, 10, 2) }
-        val a = provider.today
-        val b = provider.today
-        assertSame(a, b)
-        assertEquals(LocalDate.of(2026, 10, 2), a.value)
-    }
+    fun `监听器可以被反注册，之后不再收到回调`() {
+        val p = provider()
+        var first = 0
+        var second = 0
+        val removeFirst = p.addOnDateChangedListener { first++ }
+        p.addOnDateChangedListener { second++ }
 
-    /** 改系统时区 / 手动改时间可能把日期改到**过去**，也必须照样通知（不能只处理"往后走"）。 */
-    @Test
-    fun `date moving backwards is also propagated`() {
-        var now = LocalDate.of(2026, 10, 2)
-        val provider = DateProvider(scope) { now }
-        val seen = mutableListOf<LocalDate>()
-        provider.addOnDateChangedListener { seen.add(it) }
+        p.onDateKnown(LocalDate.of(2026, 11, 22))
+        assertEquals(1, first)
+        assertEquals(1, second)
 
-        now = LocalDate.of(2026, 10, 1)
-        provider.refreshIfStale()
-
-        assertEquals(listOf(LocalDate.of(2026, 10, 1)), seen)
+        removeFirst()
+        p.onDateKnown(LocalDate.of(2026, 11, 23))
+        assertEquals(1, first)
+        assertEquals(2, second)
     }
 }

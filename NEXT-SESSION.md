@@ -1,4 +1,4 @@
-# 下次接手从这里开始（v1.2.19 已发布 · 2026-11-18 更新）
+# 下次接手从这里开始（v1.2.19 已发布 · 2026-11-21 测试补强待提交）
 
 > **本文件是仓库内唯一权威的接手文档**，随仓库一起分发。
 > `E:\ASHKB\NEXT-SESSION.md`（仓库根之外、**不被 git 跟踪**）是会话工作日志，记的是过程细节与踩坑现场；两者内容会有出入，**以本文件为准**。
@@ -6,7 +6,22 @@
 
 ---
 
-**当前状态**：`v1.2.19`（versionCode **131**）已发布为 GitHub **Latest**（2026-11-18），**工作树干净、已推送**。本版是**首页「今日用药」空态文案修正**：非用药日（如依那西普 BIW 的周三）当日无剂量时，卡片不再说「当前没有在用药品」（与药单页「在用 1 种」矛盾），改为「今天没有需要服用的药」+「按当前用药方案，今天不是用药日」，出口换成「查看用药方案」；判据抽成 `domain/TodayMedsEmpty.kt` 三态纯函数并加 5 条 JVM 单测，`TodayViewModel` 新增 `activeMedCount`（只在空态卡内收集），中英各新增 3 条 strings，**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）。上一版 `v1.2.18`（versionCode **130**，2026-11-18）是 **Compose 性能收尾 + 知识库导入去重**：三屏深层 Flow 下沉（`CheckupScreen` 8→1 / `SymptomScreen` 6→2 / `ExerciseScreen` 5→1）、`verticalScroll` **26 处 / 18 文件**清点并用 `VerticalScrollInventoryTest` 钉住分布、「多路 `StateFlow` 合并」论证后**判定不做**（`ReportScreen` 已按 tab 收集），知识库导入按「分类 + 标题 + 正文」去重；**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）、无新增 strings；论证见 `docs/v1218-perf-audit.md`。上一版 `v1.2.15`（versionCode **127**，2026-11-05）是**一份外部 UI 审查报告的完整落地**（报告 `ASHKB-UI修改建议-v1.2.14.md`，基线 `ab0b622`，作者环境无 JDK/Gradle/ADB、未构建未真机），四批改动 + 一个此前只补了测试没进发布产物的 HIGH-4 提交，**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）：① **批次 1 P0-1 / P0-2 / P0-3**（`5f98023`）；② **批次 2 P1-4 / P1-5 / P1-6**（`3c9b1e0`）；③ **批次 3 U-1～U-5**（`38c106d`）；④ **批次 4 V-1 / V-3**（`a8bdff9`）；⑤ **HIGH-4 恢复互斥补测试**（`061473f`，落在 v1.2.14 发布提交 `0be35d8` 之后，故随本版首次交付）。报告的 18 项主张里 **14 项成立已修、V-2 与 V-4 经核实不成立未改**、U-5 与 P0-1 描述有偏差但缺陷真实。详细改动见下方各条。上一版 `v1.2.14`（versionCode **126**）是两个已提交但漏在 v1.2.13 发布提交之外的补丁的补发（① S-6 系统云备份整域排除 `43043d1`；② 补记卡不随药单刷新 `86579d4`），**该安全修复已交付**。⚠️ 自 v1.2.13 起两条破坏性提示仍有效：① 备份 KDF 换成 Argon2id，**旧版 App 打不开新备份**（旧备份在新版仍可打开）；② 库结构 **20 → 21**（`supplements` 加一列可空 `daily_max_unit`），首次启动跑 `MIGRATION_20_21`，**从 v1.2.13 之前的版本直接升上来请先做备份**。更早：`v1.2.13`（125）三批合并发出；`v1.2.12`（124）口令标签修正；`v1.2.11`（123）库结构 19→20，**已于 2026-10-27/28/30 真机覆盖安装并复验通过**。
+**当前状态（2026-11-21）**：已发布基线是 `v1.2.19`（versionCode **131**）、提交 `eea5705`，GitHub Latest；此后已有两次测试补强提交：`ceef94f`（恢复失败必回滚 + 迁移回填负向断言）与本日最新一条（三处零覆盖分支：附件级联删除 / WebDAV 凭据迁移 / DateProvider 广播），**工作树干净、已推送**。用户手机送修，无真机 / 无 emulator，只做 JVM 验证。
+
+### 续作线索（2026-11-21 · 先读这段）
+
+- **已完成并跑绿**：附件级联删除磁盘分支测试 4 条（`app/src/test/java/com/ashkb/app/data/repo/AttachmentCascadeDeleteTest.kt`）、WebDAV 明文凭据迁移测试 7 条（`app/src/test/java/com/ashkb/app/data/repo/BackupWebdavConfigMigrationTest.kt`）、`DateProvider` 广播与 start/stop 测试 8 条（`app/src/test/java/com/ashkb/app/domain/DateProviderTest.kt`）。恢复回滚与迁移回填负向断言已在 `ceef94f` 提交，**不要重复实现**。
+- **生产代码只有两处可测性注入**：`AttachmentRepository(context, db = AppDatabase.get(context))`、`BackupRepository(context, encryptCredential = KeystoreCipher::encryptToB64, decryptCredential = KeystoreCipher::decryptFromB64)`；生产调用点不传参，行为不变。
+- **Robolectric / Room 教训**：legacy SQLite 影子把连接绑定线程；多线程 Room 执行器会报 `Illegal connection pointer`。附件测试使用 `Room.databaseBuilder(...).setQueryExecutor(singleThread).setTransactionExecutor(sameSingleThread).allowMainThreadQueries()`。曾试 `@SQLiteMode(NATIVE)`，全量套件会 `UnsatisfiedLinkError: SQLiteConnectionNatives.nativePrepareStatement`，**不要回退到 NATIVE**。
+- **本次提交内容（2026-11-21）**：`M CHANGELOG.md`、`M HANDOFF-STATUS.md`、`M NEXT-SESSION.md`、`M app/src/main/java/com/ashkb/app/data/repo/AttachmentRepository.kt`、`M app/src/main/java/com/ashkb/app/data/repo/BackupRepository.kt`、`M app/src/test/java/com/ashkb/app/domain/DateProviderTest.kt`；新增 `AttachmentCascadeDeleteTest.kt`、`BackupWebdavConfigMigrationTest.kt`。本地构建目录与截图不入库。
+- **门禁结果**：`testDebugUnitTest detekt lintDebug verifySpecSync` → BUILD SUCCESSFUL in 2m38s；163 类 / 1341 条 / 0 失败 / 0 错误 / 1 跳过；lint 0 error / 169 warning；detekt 0。文档已补记；**未 bump 版本号、未发版**。
+- **不要运行 `E:\ASHKB\.probe-mig.py`**：它曾是为迁移负向证明准备的探针，但会追加第二个 companion、缺 `assertNotNull` import，且并未真正删除迁移里的回填。负向证明已经通过真实变异探针完成并记录在 `CHANGELOG.md`；该脚本不是续作入口。
+- **不要重新处理 Devin 邀约**：它是背景噪声；不向第三方发送患者数据，不写第四份申诉。若用户后续只要求项目开发，直接看上面的测试补强线索。
+- **仍需真机或另行拍板的事**：真实用户 `webdav_config` 历史键取证（需 debug 包 + `run-as` 或 root）；R16 批量导入与趋势页方案 B 仍是独立需求，不因本轮测试自动开工。
+
+---
+
+**发布基线摘要**：`v1.2.19`（versionCode **131**）已发布为 GitHub **Latest**（2026-11-18）。本版是**首页「今日用药」空态文案修正**：非用药日（如依那西普 BIW 的周三）当日无剂量时，卡片不再说「当前没有在用药品」（与药单页「在用 1 种」矛盾），改为「今天没有需要服用的药」+「按当前用药方案，今天不是用药日」，出口换成「查看用药方案」；判据抽成 `domain/TodayMedsEmpty.kt` 三态纯函数并加 5 条 JVM 单测，`TodayViewModel` 新增 `activeMedCount`（只在空态卡内收集），中英各新增 3 条 strings，**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）。上一版 `v1.2.18`（versionCode **130**，2026-11-18）是 **Compose 性能收尾 + 知识库导入去重**：三屏深层 Flow 下沉（`CheckupScreen` 8→1 / `SymptomScreen` 6→2 / `ExerciseScreen` 5→1）、`verticalScroll` **26 处 / 18 文件**清点并用 `VerticalScrollInventoryTest` 钉住分布、「多路 `StateFlow` 合并」论证后**判定不做**（`ReportScreen` 已按 tab 收集），知识库导入按「分类 + 标题 + 正文」去重；**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）、无新增 strings；论证见 `docs/v1218-perf-audit.md`。
 
 - **v1.2.19（2026-11-18）首页「今日用药」空态文案修正**：`TodayMedsEmpty.kindOf(profileMissing, activeMedCount)` 三态（缺档案 / 无在用药品 / 有药但今天不排），新增 `med_empty_nothing_today`、`med_empty_nothing_today_body`、`med_view_regimen` 三条中英文案。
 - **v1.2.18（2026-11-18）Compose 性能收尾 + 知识库导入去重**：三屏 Flow 下沉（8→1 / 6→2 / 5→1）、`verticalScroll` 26 处 / 18 文件清点（`VerticalScrollInventoryTest` 钉住）、多流合并判定不做、导入按「分类+标题+正文」去重；新增 `docs/v1218-perf-audit.md`。

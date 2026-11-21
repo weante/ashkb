@@ -1,3 +1,42 @@
+## [未发布] — 2026-11-21 · 测试补强：恢复回滚 / 迁移回填 / 三处零覆盖分支
+
+`HANDOFF-STATUS.md` 里记着的几条「有代码、无证据」这次一并补上。**只加测试与可测性注入，不改任何业务行为**；无库结构变更（`ASHKB_DB_VERSION` 仍 **21**）、无版本号变更、无新增 strings。
+
+### 1. 恢复失败必回滚（`RestoreRollbackTest`，4 条）
+
+`BackupEngine.restore(...)` 的失败语义此前只有代码没有证据。新增 `app/src/test/java/com/ashkb/app/data/backup/RestoreRollbackTest.kt`：
+
+| 用例 | 断言 |
+|---|---|
+| 未篡改的备份 | 恢复成功，`rowsOk` / `shaOk` 均为真 |
+| 某表首行字段被改（SHA 不符） | `rowsOk=false`，**逐表行数不变**，canary 行仍是原值（事务整体回滚的证据） |
+| 备份 schema 版本更高 | 抛 `BackupException`（`backup_err_engine_schema_newer`），**零写入** |
+| 备份里带未知表 `evil_table` | 抛 `BackupException`，**零写入** |
+
+### 2. 迁移回填的负向断言（`MigrationPathProofTest` 13 → 15 条）
+
+- 新增真迁移用例 `upgrade from v8 backfills search_text for pre-existing rows`：用 v8 真建库、插一行，升到当前版本后断言 `search_text` 恰等于 `KbSearch.searchText(title, summary, payload)`——这是 v9 起全文检索的唯一依据，回填漏了会让老条目**永久搜不到**；
+- 新增源码守卫 `MIGRATION_8_9 still backfills search_text`（空白压缩后断言 `ADD COLUMN search_text`、`UPDATE kb_entries SET search_text`、`title || char(10) || summary || char(10) || payload` 三段都在）；
+- **变异探针实测**：临时删掉 `AppDatabase.kt` 里 `MIGRATION_8_9` 的 `UPDATE` → `15 tests completed, 2 failed`（报 `expected:<旧条目标题\n旧条目摘要\n{"content":"旧正文"}> but was:<null>`）；改回后全绿，`git diff` 无残留。
+
+### 3. 三处零覆盖分支
+
+| 分支 | 新测试 | 为什么值得钉 |
+|---|---|---|
+| `DateProvider` 的 `start`/`stop` 广播注册 | `app/src/test/java/com/ashkb/app/domain/DateProviderTest.kt`（8 条） | 跨日靠 `ACTION_DATE_CHANGED` / `TIME_CHANGED` / `TIMEZONE_CHANGED` 三条广播推进（`postDelayed` 深睡不计时，夜里会漏跨日）；含「同值广播不通知」「stop 后不推进」「stop 重复安全」「监听器可反注册」 |
+| `webdav_config` 历史明文凭据迁移 | `app/src/test/java/com/ashkb/app/data/repo/BackupWebdavConfigMigrationTest.kt`（7 条） | https 旧键 → 加密写 `*_v2` **并删旧键**（不删等于没加密）；`http` / `ftp` / 畸形 scheme **一律丢弃**；坏密文读空不抛 |
+| 附件级联删除的磁盘分支 | `app/src/test/java/com/ashkb/app/data/repo/AttachmentCascadeDeleteTest.kt`（4 条） | 「事务内删行 → 提交后删字节」的顺序：先删行就再也找不到文件名，留下永久孤儿；有远端副本且同步开 → **只置墓碑不物理删** |
+
+### 4. 两处可测性注入（行为不变）
+
+- `data/repo/BackupRepository.kt`：构造器新增 `encryptCredential` / `decryptCredential`，默认仍是 `KeystoreCipher::encryptToB64` / `decryptFromB64`。理由：`AndroidKeyStore` 在 JVM 上直接抛 `KeyStoreException: AndroidKeyStore not found`，迁移分支此前**根本跑不起来**。生产调用点（`AshkbApplication.kt:56`）不传参。
+- `data/repo/AttachmentRepository.kt`：构造器新增 `db: AppDatabase = AppDatabase.get(context)`。理由：Robolectric 的 legacy SQLite 影子把连接绑定到线程，而 Room 默认查询执行器是多线程池，跨线程 prepare/execute 会报 `Illegal connection pointer`；测试注入单线程执行器的库即可复现真实语义（Room 在真机上也是串行访问）。
+
+### 5. 门禁
+
+`testDebugUnitTest detekt lintDebug verifySpecSync` → **BUILD SUCCESSFUL in 2m38s**；单测 **163 类 / 1341 条 / 0 失败 / 0 错误 / 1 跳过**；lint **0 error / 169 warning**；detekt **0**（`detekt.xml` 79 字节）；`verifySpecSync` 通过。
+
+⚠️ 本轮未 bump 版本号、未发版（暂无用户可见变更）；真机侧仍缺 `webdav_config` 历史键取证（需 debug 包 + `run-as`）。
 ## [v1.2.19] — 2026-11-18 · 首页「今日用药」空态文案：今天不排药 ≠ 没有药品
 
 真机走查 v1.2.18 时发现的**既有文案缺陷**（非本版引入）：非用药日（依那西普 BIW 的周三）首页「今日用药」卡写「当前没有在用药品」，而「我的 → 药单管理」显示「在用 1 种 · 依那西普」，两句话自相矛盾。**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）。

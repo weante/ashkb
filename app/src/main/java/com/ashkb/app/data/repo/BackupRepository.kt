@@ -36,7 +36,21 @@ import java.time.format.DateTimeFormatter
  * P4 备份仓库（R20）：编排 BackupEngine + VaultCipher + WebDavClient + 备份台账。
  * 全量备份文件名遵循协议：本机导出 ashkb-YYYYMMDD.ashkb，WebDAV ashkb-backup-YYYY-MM-DD-HHmmss.ashkb（X2 带时间戳，同天多份不覆盖）。
  */
-class BackupRepository(private val context: Context) {
+class BackupRepository(
+    private val context: Context,
+    /**
+     * 凭据加解密**可注入**，只为可测性（行为与默认值完全不变）。
+     *
+     * 为什么要留这两个口子：`KeystoreCipher` 走的是 AndroidKeyStore，
+     * 在 JVM / Robolectric 上直接抛 `KeyStoreException: AndroidKeyStore not found`，
+     * 于是 [`webdavConfig`] 里那段「v1.0.5 及以前明文凭据 → 加密后删旧键」的迁移
+     * 一直是**零测试**（与 v1.2.15 把 RestoreGate 抽到 domain 的理由同源）。
+     * 注入一个可逆的假实现后，迁移的三条分支（https 迁移成功 / http、畸形 scheme 丢弃 /
+     * 旧键必须删除）才第一次能在单测里被断言。生产路径不传参数，仍走 KeystoreCipher。
+     */
+    private val encryptCredential: (String) -> String = KeystoreCipher::encryptToB64,
+    private val decryptCredential: (String) -> String = KeystoreCipher::decryptFromB64,
+) {
     private val db = AppDatabase.get(context)
     private val ledgerDao = db.backupLedgerDao()
 
@@ -95,7 +109,7 @@ class BackupRepository(private val context: Context) {
         }
         fun readEnc(key: String): String {
             val v = prefs.getString(key, null) ?: return ""
-            return runCatching { KeystoreCipher.decryptFromB64(v) }.getOrDefault("")
+            return runCatching { decryptCredential(v) }.getOrDefault("")
         }
         return Triple(readEnc("url_v2"), readEnc("user_v2"), readEnc("pass_v2"))
     }
@@ -112,9 +126,9 @@ class BackupRepository(private val context: Context) {
     fun saveWebdavConfig(url: String, user: String, pass: String) {
         requireHttps(url) // R3：http:// 配置不入库
         prefs.edit()
-            .putString("url_v2", KeystoreCipher.encryptToB64(url))
-            .putString("user_v2", KeystoreCipher.encryptToB64(user))
-            .putString("pass_v2", KeystoreCipher.encryptToB64(pass))
+            .putString("url_v2", encryptCredential(url))
+            .putString("user_v2", encryptCredential(user))
+            .putString("pass_v2", encryptCredential(pass))
             .apply()
     }
 
