@@ -27,8 +27,8 @@ kotlinxSerialization = "1.7.3"
 junit = "4.13.2"
 json = "20240303"
 robolectric = "4.13"
-androidxTestExtJunit = "1.1.5"
-androidxTestRunner = "1.5.0"
+androidxTestExtJunit = "1.3.0"
+androidxTestRunner = "1.7.0"
 detekt = "1.23.7"
 
 [libraries]

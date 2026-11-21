@@ -1,3 +1,16 @@
+## [未发布] — 2026-11-21 · 依赖升级第 1 步：androidx.test 两个包（仅测试侧）
+
+按 `docs/v1219-dependency-r8-size-audit.md` §7 的四阶段排期，先做风险最低的第 1 步——只动 instrumented 测试的两个依赖，**产品代码、`compileSdk`、版本号、库结构全部不变**。
+
+| 依赖 | 旧版 | 新版 |
+|---|---|---|
+| `androidx.test.ext:junit` | 1.1.5 | **1.3.0** |
+| `androidx.test:runner` | 1.5.0 | **1.7.0** |
+
+- 传递依赖自动对齐到 `androidx.test:core 1.7.0` / `monitor 1.8.0` / `services:storage 1.6.0`，无需额外声明。
+- 验证：`testDebugUnitTest detekt lintDebug verifySpecSync assembleDebugAndroidTest` → BUILD SUCCESSFUL；单测 **163 类 / 1342 条 / 0 失败 / 0 错误 / 1 跳过**；lint 0 issue；detekt 0；instrumented 测试 APK 能正常编译打包（`assembleDebugAndroidTest` 通过，说明新版 AAR 不要求 compileSdk 36）。
+- 未做真机 instrumented 运行（当前手机在维修）；后续真机可用时建议补跑一次 `connectedDebugAndroidTest`。
+
 ## [未发布] — 2026-11-21 · CI 提速：一条串行流水线拆成三条并行 job
 
 原 `.github/workflows/ci.yml` 只有一条 `build-and-test`，把 `assembleDebug`、`assembleRelease`、`testDebugUnitTest`、`detekt`、`lint` 全塞进同一个 job 串行跑，**单线程排队**是主要成本。本轮按依赖关系拆成三条互不依赖的并行 job，并去掉两处重复劳动。**无产品代码变更**、**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）、**无版本号变更**。
