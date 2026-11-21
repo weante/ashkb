@@ -33,8 +33,11 @@ class MigrationPathProofTest {
         AppDatabase::class.java,
     )
 
+    private fun dbPath(name: String): String =
+        InstrumentationRegistry.getInstrumentation().targetContext.getDatabasePath(name).absolutePath
+
     private fun upgradeFrom(startVersion: Int) {
-        val name = "backfill-proof-$startVersion.db"
+        val name = dbPath("backfill-proof-$startVersion.db")
         helper.createDatabase(name, startVersion).close()
         helper.runMigrationsAndValidate(
             name,
@@ -64,7 +67,7 @@ class MigrationPathProofTest {
      */
     @Test
     fun `upgrade from v8 backfills search_text for pre-existing rows`() {
-        val name = "backfill-content-8.db"
+        val name = dbPath("backfill-content-8.db")
         val id = "itx-legacy-row"
         val title = "旧条目标题"
         val summary = "旧条目摘要"

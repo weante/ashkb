@@ -1,3 +1,30 @@
+## [未发布] — 2026-11-21 · 依赖升级第 4 步：Room 2.8.5 + Kotlin 2.2.20 + KSP2
+
+四阶段依赖升级的最后一步。三处版本同时上调，只动构建配置与一处测试适配，产品代码未改。
+
+| 依赖 | 旧 | 新 |
+|---|---|---|
+| Kotlin（含 Compose 编译器 / serialization 插件） | 2.0.20 | **2.2.20** |
+| KSP | 2.0.20-1.0.25 | **2.2.20-2.0.4** |
+| Room（runtime / ktx / compiler / testing） | 2.6.1 | **2.8.5** |
+
+### 配套修复
+
+- `MigrationPathProofTest` 在 Room 2.8 下 14 条迁移用例报 `IllegalArgumentException: This driver is configured to open a database named ... but ... was requested`：Room 2.8 的 `SupportSQLiteDriver` 要求**库名与传给 `createDatabase` 的字符串完全一致**，而旧代码传的是相对名，helper 实际打开的是绝对路径。改成统一用 `targetContext.getDatabasePath(name).absolutePath` 后全绿；生产迁移本身没问题。
+- `detekt` 仍是 1.23.7（Maven Central 上 1.23.8 是最后一版），实测与 Kotlin 2.2.20 兼容，暂不换 detekt 2.x。
+- Kotlin 2.2 新增 `KT-73255`（注解默认目标将来会同时应用到字段）等编译告警，均为警告不影响构建；未逐个加 `@param:`，避免机械改写。
+- 本地把 lint、单测、打包放在**同一次 Gradle 调用**且 `org.gradle.parallel=true` 时，`lintAnalyzeDebugUnitTest` 会因 KSP 生成的 release Java 文件被并发重写而 `FileNotFoundException`。CI 已把三条检查拆成独立 job，不受影响；本地验证请分开跑或加 `--no-parallel`。
+
+### 验证
+
+- `testDebugUnitTest`：163 类 / **1342 条 / 0 失败 / 0 错误 / 1 跳过**；`detekt`：0（79 字节空报告）；`verifySpecSync` 通过（版本仍 1.2.19 / 131，库仍 21，schema 目录零改动）。
+- `lintDebug`（单独跑、`--no-parallel`）**0 issue**；`assembleRelease` + `assembleDebugAndroidTest` BUILD SUCCESSFUL。
+- release APK **5,572,961 B**（升级前 5,568,309 B，+4,652 B ≈ +0.08%）。
+
+### 未做
+
+- 真机回归（手机维修中）：Kotlin 2.2 编译器与 Room 2.8 运行时行为、Compose 1.11 滚动/弹层/焦点仍需实机确认；未 bump 版本号、未发版。
+
 ## [未发布] — 2026-11-21 · 依赖升级第 3 步：Compose BOM 2024.09.03 → 2026.06.01
 
 按四阶段排期做第 3 步：Compose 全家桶升到当前工具链能承载的最新稳定 BOM。
