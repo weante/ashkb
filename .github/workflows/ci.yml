@@ -36,8 +36,53 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-test:
-    # 分支/PR 冒烟：**不**在 tag 上跑（tag 走下面那条强制正式签名的 release 流水线）
+  # 2026-11-21（CI 提速）：原先是「一个 job 串行跑 assembleDebug + assembleRelease + 单测 + detekt + lint」，
+  # 6~7 分钟里大段时间是单线程排队。现在按依赖关系拆成两条 **并行** 的 job：
+  #   · unit-tests      —— 单测（最长的单项）+ detekt + 版本号门（detekt 复用同一份编译产物）
+  #   · lint-and-package —— lintDebug + assembleRelease + 验签（lint 与 R8 各自吃 CPU，放一起不抢单测）
+  # 三条纪律不变：① 不再跑 `assembleDebug`（CI 从不使用 debug APK，单测只需编译 debug 类）；
+  # ② `lint` → `lintDebug`（原命令会把 release 变体也分析一遍，等于双份）；③ release 构建里的
+  # `lintVitalRelease` 关闭——`lintDebug` 已经覆盖全部 issue（含 fatal），再跑一遍纯属重复。
+  unit-tests:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    env:
+      ASHKB_ALLOW_DEBUG_SIGNING: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Robolectric 首次运行会下载约 140 MB 的 android-all-instrumented jar 到 ~/.m2；
+      # 不缓存的话每次 CI 都要重下（冷启动 380s vs 热缓存 288s 的差距主要来自这里）。
+      - name: Cache Robolectric android-all
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ runner.os }}-4.13-i6
+
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Unit tests + detekt + spec sync
+        run: gradle testDebugUnitTest detekt verifySpecSync --console=plain --build-cache
+
+      - name: Schema drift gate (commit app/schemas when entities change)
+        run: |
+          if ! git diff --exit-code -- app/schemas; then
+            echo "::error::app/schemas 下的导出 schema 与代码不一致——请提交该 diff（库结构变更必须入库）"
+            exit 1
+          fi
+          echo "app/schemas 无漂移。"
+
+  lint-and-package:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     env:
@@ -57,19 +102,11 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build + unit tests + detekt + lint
-        run: gradle assembleDebug assembleRelease testDebugUnitTest detekt lint --console=plain
+      - name: Lint (debug variant, full issue set)
+        run: gradle lintDebug --console=plain --build-cache
 
-      - name: Spec sync gate (version + schema across docs)
-        run: gradle verifySpecSync --console=plain
-
-      - name: Schema drift gate (commit app/schemas when entities change)
-        run: |
-          if ! git diff --exit-code -- app/schemas; then
-            echo "::error::app/schemas 下的导出 schema 与代码不一致——请提交该 diff（库结构变更必须入库）"
-            exit 1
-          fi
-          echo "app/schemas 无漂移。"
+      - name: Assemble release (smoke build)
+        run: gradle assembleRelease --console=plain --build-cache
 
       - name: Verify APK signature (smoke only)
         run: |

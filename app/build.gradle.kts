@@ -65,7 +65,18 @@ android {
             isReturnDefaultValues = true
             // S1（v1.0.53）：Robolectric 需要真实资源（androidx.test:monitor 等已随其传递依赖引入）
             isIncludeAndroidResources = true
+            // 2026-11-21（CI 提速）：单测按 JVM 分叉并行。fork 之间互不共享静态状态（各自独立
+            // 进程），对 Room / DateProvider 这类有进程级单例的测试是安全的；CI 4 核机器上
+            // 2 个 fork 约把 1341 条测试的墙钟时间压掉三成。
+            all { it.maxParallelForks = 2 }
         }
+    }
+
+    lint {
+        // 2026-11-21（CI 提速）：release 构建默认内嵌 lintVitalRelease（fatal 子集），
+        // 而 CI 已单独跑 lintDebug（完整 issue 集，含 fatal）——两者重复分析同一批源码。
+        // 关闭 release 内嵌检查，全量 lint 仍由 lintDebug 门把守；本地 assembleRelease 也不再重复跑。
+        checkReleaseBuilds = false
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

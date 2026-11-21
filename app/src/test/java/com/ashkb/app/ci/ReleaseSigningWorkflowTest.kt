@@ -21,7 +21,8 @@ import org.junit.Test
  * 1. 存在一个只在 `refs/tags/` 上触发的发布 job（其 `if:` 是正向 `startsWith`，不是取反）；
  * 2. 该 job **不设置** `ASHKB_ALLOW_DEBUG_SIGNING`（否则 debug 签名会被放行）；
  * 3. 该 job 里 `ASHKB_EXPECTED_CERT_SHA256` 是**必需**的（缺失即失败），而不是 `if [ -n ]`；
- * 4. 普通 main CI 仍设置 `ASHKB_ALLOW_DEBUG_SIGNING=1`（工单：「普通 main CI 不得因此变红」）；
+ * 4. 每个普通 main CI job 仍设置 `ASHKB_ALLOW_DEBUG_SIGNING=1`（工单：「普通 main CI 不得因此变红」）；
+ *    （2026-11-21 CI 提速后拆成 unit-tests / lint-and-package 两条并行 job，本测试按集合校验）
  * 5. 文档写明「CI 冒烟 APK 不得发布」。
  *
  * 静态扫文件，不依赖 GitHub API；并按本仓惯例**断言确实读到了文件**：路径写错时大声失败，
@@ -130,23 +131,50 @@ class ReleaseSigningWorkflowTest {
         )
     }
 
+    /** 所有「非 tag 才跑」的 job（if 取反 + 命中 refs/tags/）。 */
+    private fun nonTagJobs(): List<Map.Entry<String, String>> =
+        jobs().entries.filter { (_, body) ->
+            val e = ifExpr(body)
+            e.contains("!") && e.contains("refs/tags/")
+        }
+
     @Test
     fun `普通 main CI 仍用 debug 签名冒烟且不因此变红`() {
-        val mainJob = job("build-and-test")
-        assertTrue(
-            "main CI 必须保留 ASHKB_ALLOW_DEBUG_SIGNING=1（工单：普通 main CI 不得因此变红）",
-            mainJob.contains("ASHKB_ALLOW_DEBUG_SIGNING"),
-        )
-        // main job 的 if 是取反的，即"非 tag 才跑"——不能是正向 tag 触发
-        assertTrue(
-            "main job 必须显式排除 tag（if 里出现 !startsWith(...refs/tags/)），实际：${ifExpr(mainJob).trim()}",
-            ifExpr(mainJob).contains("!") && ifExpr(mainJob).contains("refs/tags/"),
-        )
-        // 可选的严格比对可以留在 main，但必须是「配了才比」而不是「没配就红」
+        val mainJobs = nonTagJobs()
+        assertTrue("至少要有 1 个非 tag 的 CI job，现有：${jobs().keys}", mainJobs.isNotEmpty())
+        mainJobs.forEach { (name, body) ->
+            assertTrue(
+                "main CI job「$name」必须保留 ASHKB_ALLOW_DEBUG_SIGNING=1（工单：普通 main CI 不得因此变红）",
+                body.contains("ASHKB_ALLOW_DEBUG_SIGNING"),
+            )
+            assertTrue(
+                "main CI job「$name」必须显式排除 tag（if 里出现 !startsWith(...refs/tags/)），实际：${ifExpr(body).trim()}",
+                ifExpr(body).contains("!") && ifExpr(body).contains("refs/tags/"),
+            )
+        }
+        // 可选的严格比对可以留在 main，但必须是「配了才比」而不是「没配就红」。
+        // 2026-11-21：CI 拆成 unit-tests / lint-and-package 两条并行 job 后，验签只在后者。
+        val verifyJob = job("lint-and-package")
         assertTrue(
             "main job 里的摘要比对必须保留可选语义（[ -n \"\$ASHKB_EXPECTED_CERT_SHA256\" ]）",
-            mainJob.contains("[ -n \"\$ASHKB_EXPECTED_CERT_SHA256\" ]"),
+            verifyJob.contains("[ -n \"\$ASHKB_EXPECTED_CERT_SHA256\" ]"),
         )
+    }
+
+    @Test
+    fun `CI 拆分后仍覆盖全部六道门`() {
+        // 2026-11-21（CI 提速）：job 拆分是结构变化，不能顺手把某道门弄丢。
+        val src = text()
+        listOf(
+            "testDebugUnitTest",   // 单测
+            "detekt",              // 静态分析
+            "lintDebug",           // Android Lint（原 `lint` 会把 release 变体重复分析一遍）
+            "verifySpecSync",      // 版本号 + schema 文档一致
+            "git diff --exit-code -- app/schemas", // schema 漂移
+            "apksigner",           // 验签
+        ).forEach { gate ->
+            assertTrue("CI 拆分后缺少门：$gate", src.contains(gate))
+        }
     }
 
     @Test
