@@ -1283,6 +1283,7 @@
     <string name="notif_med_strong_title">Please take your medication now: %1$s %2$s</string>
     <string name="notif_med_strong_text">Several reminders were not confirmed, so this has been escalated to a full-screen strong reminder. Please log your dose or explain why you skipped it.</string>
     <string name="notif_med_strong_degraded_text">Several reminders were not confirmed. Full-screen notification permission was not granted, so a persistent reminder is used instead. Please log your dose or explain why you skipped it (you can enable full screen under Me → Reminder reliability check).</string>
+    <string name="notif_med_strong_title_masked">Please take your medication now</string>
     <string name="reminder_fullscreen">Strong reminder (full screen)</string>
     <string name="reminder_fullscreen_ok">Allowed; the final-level reminder can use full screen</string>
     <string name="reminder_fullscreen_no">Not allowed; the final-level reminder is banner only</string>
@@ -1291,6 +1292,8 @@
     <string name="strong_reminder_taken">Taken</string>
     <string name="strong_reminder_later">Handle later</string>
     <string name="strong_reminder_time_hint">Scheduled time %1$s</string>
+    <string name="reminder_strong_privacy_switch">Show medication name in strong reminders</string>
+    <string name="reminder_strong_privacy_subtitle">When off, the lock-screen strong reminder only says it is time for medication, without the drug name or dose. Logging is unaffected.</string>
     <string name="reminder_battery">Battery whitelist</string>
     <string name="reminder_battery_ok">Added; background activity is not restricted</string>
     <string name="reminder_battery_no">Not added; some devices may delay or block reminders</string>

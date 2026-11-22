@@ -2,6 +2,8 @@ package com.ashkb.app
 
 import android.content.Context
 import android.util.Log
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -63,8 +65,30 @@ object CrashLogger {
      *
      * 用独立 scope 而非 `AshkbApplication.appScope`：本文件在 `install()` **之前**就可能被触碰
      * （留档自身不能依赖 Application 的其余初始化），且这块 IO 与业务生命周期无关。
+     *
+     * v1.2.22（F5）：这里必须是**单线程**，不能是 `Dispatchers.IO` 的多线程池。
+     * 原实现里 `recordNonFatal` 每次调用都 `ioScope.launch` 一个独立协程，落到
+     * `appendBounded` 的「读 → 拼 → 写」三步上——两个失败同时发生时，
+     * 两个协程会读到**同一份旧内容**，各自写回，后写的覆盖先写的（丢记录），
+     * 或交错追加（内容半截）。现在改用单线程 dispatcher，同一时刻只有一个写盘在跑，
+     * 读-改-写天然串行。
      */
-    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
+
+    /**
+     * v1.2.22（F5）：非致命留档的**写盘互斥**。
+     *
+     * 单线程 dispatcher 已经让「本进程内的后台写入」串行，但还有两处会撞上：
+     *  1. `install()` 装的是**全局未捕获异常处理器**——崩溃线程上写 `last_crash.txt`
+     *     与后台协程写 `last_nonfatal.txt` 是两个文件，但都走 `filesDir`；
+     *  2. `takeLast()`（冷启动读日志并删除）与后台追加可能同时进行——前者「读 → 删」，
+     *     后者「读 → 拼 → 写」，若后者在删除之后写回，同一条记录会被读到两次。
+     *
+     * 用 `ReentrantLock`（而不是协程的 `Mutex`）：致命日志那条路是**非挂起**的崩溃线程，
+     * `Mutex` 的 `withLock` 是挂起函数，在那里用不了；而这里持有的时间只是一次文件读写，
+     * 且所有调用点都已经在 IO 线程或即将退出的崩溃线程上，阻塞等待是可接受的。
+     */
+    private val writeLock = ReentrantLock()
 
     /** 安装全局未捕获异常处理器；记录后仍交还原处理器（保持原有崩溃行为）。 */
     fun install(context: Context) {
@@ -103,13 +127,17 @@ object CrashLogger {
      * 先读现有内容（这两个文件都在几十 KB 量级，读一次比维护额外的长度状态更不容易出错——
      * 长度状态会被外部删除文件、进程被杀等情况弄脏），拼上新内容，超限则只保留**最新**的一段，
      * 并从行首切起（不留半行，否则 `summary` 的第一行会是垃圾）。
+     *
+     * v1.2.22（F5）：整体加写盘互斥。原来的「读 → 拼 → 写」是**非原子的**三步：
+     * 两次失败同时进来时，后写的会用**旧内容**覆盖先写的（记录丢失），
+     * 或两次 `appendText` 交错（内容半截）。现在用 [writeLock] 把这段临界区串起来。
      */
-    private fun appendBounded(file: File, text: String) {
+    private fun appendBounded(file: File, text: String) = writeLock.withLock {
         val existing = if (file.exists()) runCatching { file.readText() }.getOrDefault("") else ""
         val merged = existing + text
         if (merged.length <= MAX_NONFATAL_CHARS) {
             file.appendText(text)
-            return
+            return@withLock
         }
         val tail = merged.takeLast(KEEP_NONFATAL_CHARS)
         val aligned = tail.substringAfter('\n', tail)
@@ -122,7 +150,11 @@ object CrashLogger {
             append("thread=").append(thread.name).append('\n')
             append(scrubCredentials(Log.getStackTraceString(error)))
         }
-        File(context.filesDir, name).writeText(text)
+        // v1.2.22（F5）：致命日志与后台的非致命追加共用一把锁——崩溃线程上的写盘
+        // 可能与后台协程的写盘撞在一起（虽然文件名不同，但都在 filesDir）。
+        writeLock.withLock {
+            File(context.filesDir, name).writeText(text)
+        }
     }
 
     /**
@@ -143,12 +175,19 @@ object CrashLogger {
         }
     }
 
-    private fun readAndClear(context: Context, name: String): String? {
+    /**
+     * v1.2.22（F5）：读并清空也要与写入互斥。
+     *
+     * 原实现里 `takeLast`（冷启动读日志）与后台 `recordNonFatal`（追加日志）可能同时进行：
+     * 前者「读 → 删」，后者「读 → 拼 → 写」——后者可能在删除之后把内容写回，
+     * 于是下一次启动又读到同一条记录。现在两者共用 [writeLock]，互斥执行。
+     */
+    private fun readAndClear(context: Context, name: String): String? = writeLock.withLock {
         val f = File(context.filesDir, name)
-        if (!f.exists()) return null
+        if (!f.exists()) return@withLock null
         val text = runCatching { f.readText() }.getOrNull()
         runCatching { f.delete() }
-        return text?.takeIf { it.isNotBlank() }
+        text?.takeIf { it.isNotBlank() }
     }
 
     /**

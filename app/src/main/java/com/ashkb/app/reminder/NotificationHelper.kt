@@ -270,7 +270,13 @@ object NotificationHelper {
         )
         // v1.0.61 B9：末级升级 → 强提醒（全屏 Intent 唤醒锁屏）；免打扰时段内不升级全屏
         val effectiveStrong = strong && !silent
+        // v1.2.22（F2）：药名隐私——用户在「我的 → 提醒设置」里关掉后，末级强提醒的通知标题
+        // 也不再写药名与剂量（这条通知是全屏页的「降级形态」，会直接落在锁屏上）。
+        // 注意：普通/升级提醒的通知标题仍带药名——那是通知栏路径，不在本次范围内（见 CHANGELOG 边界说明）。
+        val strongShowMedication = ReminderConfigRepository(context).strongReminderShowMedication()
         val title = when {
+            effectiveStrong && !strongShowMedication ->
+                context.getString(R.string.notif_med_strong_title_masked)
             effectiveStrong -> context.getString(R.string.notif_med_strong_title, medName, dose)
             escalation > 0 -> context.getString(R.string.notif_med_escalated_title, medName, dose)
             else -> context.getString(R.string.notif_med_title, medName, dose)

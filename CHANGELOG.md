@@ -1,3 +1,12 @@
+## [未发布] — 2026-11-22 · 独立审查修复（续）：锁屏强提醒药名隐私 + 崩溃日志写盘串行化
+
+代码改动，不动版本号与库结构（仍 1.2.19 / 131、`ASHKB_DB_VERSION` 21）。来源：`ASHKB-独立审查报告-2026-11-22.md`（基线 `18b35e0`）的 F2 与 F5。
+
+- **F2（中）锁屏全屏强提醒直接显示药名与剂量，无隐私开关**：末级强提醒用 `fullScreenIntent` 拉起全屏页盖在锁屏上，原实现把「药名 + 剂量」明文画在最显眼处——生物制剂等对 AS 患者等于自曝病情。现在新增「我的 → 提醒设置 → 锁屏强提醒显示药名」开关（`ReminderConfigRepository.strongReminderShowMedication()`，prefs `reminder_config` / `strong_reminder_show_medication`）。**默认显示**（保持末级强提醒「是哪种药漏服了」的即时信息，不擅自改变既有行为），由用户按自身暴露风险显式关闭；关闭后全屏页只写「该服药了」，强提醒通知标题也换成不带药名的「请立即处理用药」。口径与「锁屏紧急信息卡」刻意不同（后者默认关，因为那是「要不要出现卡片」）。打卡不受影响：全屏页与通知的动作按钮都按 Intent 里的 `med_id` 写回，不依赖文案。
+- **F5（低）非致命留档并发写竞态**：`CrashLogger.recordNonFatal` 每次调用都在 `Dispatchers.IO` 多线程池上起独立协程，落盘是「读现有内容 → 拼接 → 写回」三步；两个失败同时发生会读到同一份旧内容各自写回（**丢记录**），或两次 `appendText` 交错（内容半截）。现在 `ioScope` 改为 `Dispatchers.IO.limitedParallelism(1)`，并加一把 `ReentrantLock` 覆盖三处写盘：后台追加、`takeLast` 的读并清空、崩溃线程上的致命日志写入（用 `ReentrantLock` 而非协程 `Mutex`，因为崩溃线程那条路是非挂起的）。
+- 测试：新增 `StrongReminderPrivacyTest`（6 条，纯函数口径）、`ReminderConfigStrongPrivacyTest`（4 条，默认值与往返）、`CrashLoggerConcurrencyTest`（2 条，8 线程 × 5 条并发不丢不重、`takeLast` 读走并清空）。门禁 `testDebugUnitTest detekt lintDebug verifySpecSync --no-parallel` → BUILD SUCCESSFUL，**167 类 / 1366 条 / 0 失败 / 0 错误 / 1 跳过**，lint 0 issue、detekt 0（79 B）、verifySpecSync 通过。
+- 本轮边界：普通与升级提醒的**通知栏**标题仍带药名（不在锁屏路径上）；F7 Argon2id 读侧上界、S1 WebDAV 重定向与 Basic 凭据跨主机、S2 真机回归仍未做。
+
 ## [未发布] — 2026-11-22 · 独立审查修复：附件路径约束、恢复密钥回滚、WebDAV 上限对齐与文档漂移
 
 代码与文档改动，不动版本号与库结构（仍 1.2.19 / 131、`ASHKB_DB_VERSION` 21）。来源：`ASHKB-独立审查报告-2026-11-22.md`（基线 `18b35e0`），按项目自身威胁模型「诱导用户导入攻击者提供、口令已知的备份」评级。

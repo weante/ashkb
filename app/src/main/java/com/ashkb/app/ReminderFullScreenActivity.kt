@@ -116,6 +116,11 @@ private fun StrongReminderScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     var medName by remember { mutableStateOf("") }
     var medDose by remember { mutableStateOf("") }
+    // v1.2.22（F2）：药名隐私——用户在「我的 → 提醒设置」里关掉后，锁屏上不再出现药名与剂量。
+    // 读一次配置即可（开关变了下次提醒生效），不订阅 prefs 变化。
+    val showMedication = remember {
+        com.ashkb.app.data.repo.ReminderConfigRepository(context).strongReminderShowMedication()
+    }
 
     LaunchedEffect(medId) {
         if (medId == null) return@LaunchedEffect
@@ -143,11 +148,19 @@ private fun StrongReminderScreen(
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(Spacing.xl))
-            Text(
-                listOf(medName, medDose).filter { it.isNotBlank() }.joinToString(" "),
-                style = MaterialTheme.typography.headlineSmall,
-                textAlign = TextAlign.Center,
-            )
+            // v1.2.22（F2）：掩码时只写「该服药了」，不写药名与剂量。
+            val medLine = if (com.ashkb.app.domain.StrongReminderPrivacy.maskMedication(showMedication)) {
+                ""
+            } else {
+                com.ashkb.app.domain.StrongReminderPrivacy.medicationLine(medName, medDose)
+            }
+            if (medLine.isNotBlank()) {
+                Text(
+                    medLine,
+                    style = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Center,
+                )
+            }
             if (!slotTime.isNullOrBlank()) {
                 Spacer(Modifier.height(Spacing.sm))
                 Text(

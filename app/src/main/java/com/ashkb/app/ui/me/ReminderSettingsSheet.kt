@@ -77,6 +77,8 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
     // v1.0.68 C8a：久坐起身提醒
     var sedentary by remember { mutableStateOf(cfg.sedentaryEnabled()) }
     var sedentaryInterval by remember { mutableIntStateOf(cfg.sedentaryIntervalMin()) }
+    // v1.2.22（F2）：末级强提醒（全屏）的药名隐私开关
+    var strongShowMedication by remember { mutableStateOf(cfg.strongReminderShowMedication()) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         // v1.2.15（外部审查 §U-2）：原先没有滚动。这一页在小屏 + 大字号下会把最底下的
@@ -228,6 +230,20 @@ fun ReminderSettingsSheet(onDismiss: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+
+            // ---- v1.2.22（F2）：末级强提醒的锁屏隐私 ----
+            // 放在 BASDAI 周期之前、久坐之后：它属于「强提醒」这一组，和锁屏/全屏相关，
+            // 不跟「复诊/运动/DND/久坐」这些普通提醒开关混在一起读。
+            SettingSwitchRow(
+                title = stringResource(R.string.reminder_strong_privacy_switch),
+                subtitle = stringResource(R.string.reminder_strong_privacy_subtitle),
+                checked = strongShowMedication,
+                onCheckedChange = { v ->
+                    strongShowMedication = v
+                    cfg.setStrongReminderShowMedication(v)
+                    // 只改 prefs，无需重排闹钟——强提醒是否带药名在投递那一刻读配置
+                },
+            )
 
             // ---- BASDAI 评估周期 ----
             Text(

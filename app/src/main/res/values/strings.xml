@@ -1342,6 +1342,7 @@
     <string name="notif_med_strong_title">请立即处理用药：%1$s %2$s</string>
     <string name="notif_med_strong_text">多次提醒未确认，已升级为全屏强提醒。请完成打卡或说明跳过原因</string>
     <string name="notif_med_strong_degraded_text">多次提醒未确认；系统未授予「全屏通知」权限，已用常驻提醒代替。请完成打卡或说明跳过原因（可在「我的 → 提醒可靠性自检」里开启全屏）</string>
+    <string name="notif_med_strong_title_masked">请立即处理用药</string>
     <string name="reminder_fullscreen">强提醒（全屏）</string>
     <string name="reminder_fullscreen_ok">已允许，末级提醒可全屏</string>
     <string name="reminder_fullscreen_no">未允许，末级提醒仅横幅</string>
@@ -1350,6 +1351,8 @@
     <string name="strong_reminder_taken">已服用</string>
     <string name="strong_reminder_later">稍后处理</string>
     <string name="strong_reminder_time_hint">计划时间 %1$s</string>
+    <string name="reminder_strong_privacy_switch">锁屏强提醒显示药名</string>
+    <string name="reminder_strong_privacy_subtitle">关闭后锁屏上的强提醒只写「该服药了」，不出现药名与剂量；打卡不受影响</string>
     <!-- v1.0.62 C11：电池白名单 / 自启动引导 / 测试提醒 -->
     <string name="reminder_battery">电池白名单</string>
     <string name="reminder_battery_ok">已加入，后台不被限制</string>

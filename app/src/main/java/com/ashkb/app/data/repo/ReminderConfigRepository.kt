@@ -79,6 +79,25 @@ class ReminderConfigRepository(context: Context) {
         prefs.getInt(KEY_SEDENTARY_END, SedentaryReminder.DEFAULT_END_HOUR)
     fun setSedentaryEndHour(hour: Int) = prefs.edit().putInt(KEY_SEDENTARY_END, hour).apply()
 
+    // ---- v1.2.22（F2）：强提醒的锁屏隐私 ----
+
+    /**
+     * 末级强提醒（全屏）是否显示**药名与剂量**。
+     *
+     * 默认 **true**（显示）——保持既有功能不变；用户可显式关闭，关闭后锁屏上的全屏页
+     * 只写「该服药了」，不出现药名与剂量。
+     *
+     * 独立审查 F2 的取舍：药名属敏感信息（生物制剂等于自曝病情），但**默认关**会让
+     * 「末级强提醒」失去「是哪种药漏服了」的即时信息、降低用药依从性，故默认显示、
+     * 由用户按自己的暴露风险决定；紧急信息卡的既有口径（默认关闭）不在此照搬。
+     *
+     * 与 `EmergencyLockscreenStore`（锁屏紧急信息，默认关）**不是同一件事**：
+     * 那是「要不要在锁屏上出现卡片」，这里是「已经要出现了，要不要写出药名」。
+     */
+    fun strongReminderShowMedication(): Boolean = prefs.getBoolean(KEY_STRONG_SHOW_MEDICATION, true)
+    fun setStrongReminderShowMedication(on: Boolean) =
+        prefs.edit().putBoolean(KEY_STRONG_SHOW_MEDICATION, on).apply()
+
     // ---- v1.0.77（批次 3b）：漏服补发的「已提醒过的日期」----
 
     /**
@@ -130,6 +149,9 @@ class ReminderConfigRepository(context: Context) {
 
         // v1.0.77（批次 3b）：漏服补发的去重标记（存「已提醒过的归属日」）
         const val KEY_MISSED_ALERT_DATE = "missed_dose_alert_date"
+
+        // v1.2.22（F2）：末级强提醒是否显示药名与剂量（默认显示）
+        const val KEY_STRONG_SHOW_MEDICATION = "strong_reminder_show_medication"
 
         /**
          * 候选周期清单（天）：每日 / 每周 / 每月。
