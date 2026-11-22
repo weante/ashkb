@@ -136,6 +136,68 @@ class VaultKdfMigrationTest {
         }
     }
 
+    // ======================= F7：读侧参数上界收紧（v1.2.22） =======================
+
+    /**
+     * 上界必须是**生产者值的有限倍数**，而不是原来那个「大到没边」的 256 MiB / t≤16 / p≤8。
+     * 这条断言钉住「倍数」这个设计决定本身：谁把上界放宽回去，这里就红。
+     */
+    @Test
+    fun `argon2id 读侧上界是生产者参数的两倍`() {
+        assertEquals(VaultCipher.ARGON2_MEMORY_KIB * 2, VaultCipher.ARGON2_MAX_MEMORY_KIB)
+        assertEquals(VaultCipher.ARGON2_ITERATIONS * 2, VaultCipher.ARGON2_MAX_ITERATIONS)
+        assertEquals(VaultCipher.ARGON2_PARALLELISM * 2, VaultCipher.ARGON2_MAX_PARALLELISM)
+    }
+
+    /** 上界一旦收紧，紧贴边界的值必须仍被拒绝——宁可拒绝一个怪备份，也不申请 76 MiB。 */
+    @Test
+    fun `内存刚超过上界即被拒绝`() {
+        val file = forgedFileBeforeDerivation(
+            kdf = KDF_ARGON2ID,
+            memory = VaultCipher.ARGON2_MAX_MEMORY_KIB + 1,
+            lanes = 1,
+        )
+        try {
+            VaultCipher.decrypt(pass, file)
+            fail("超过上界的内存参数不应进入派生")
+        } catch (e: VaultCipher.VaultException) {
+            assertEquals(R.string.backup_err_vault_slot_corrupt, e.resId)
+        }
+    }
+
+    /** 并行度同理：p=3（生产者 p=1 的三倍）也必须被挡下。 */
+    @Test
+    fun `并行度刚超过上界即被拒绝`() {
+        val file = forgedFileBeforeDerivation(
+            kdf = KDF_ARGON2ID,
+            memory = DEFAULT_MEMORY_KIB,
+            lanes = VaultCipher.ARGON2_MAX_PARALLELISM + 1,
+        )
+        try {
+            VaultCipher.decrypt(pass, file)
+            fail("超过上界的并行度不应进入派生")
+        } catch (e: VaultCipher.VaultException) {
+            assertEquals(R.string.backup_err_vault_slot_corrupt, e.resId)
+        }
+    }
+
+    /** 遍数同理：t=5（生产者 t=2 的两倍多）必须报「迭代次数越界」。 */
+    @Test
+    fun `遍数刚超过上界即被拒绝`() {
+        val file = forgedFileBeforeDerivation(
+            kdf = KDF_ARGON2ID,
+            memory = DEFAULT_MEMORY_KIB,
+            lanes = 1,
+            iterations = VaultCipher.ARGON2_MAX_ITERATIONS + 1,
+        )
+        try {
+            VaultCipher.decrypt(pass, file)
+            fail("超过上界的遍数不应进入派生")
+        } catch (e: VaultCipher.VaultException) {
+            assertEquals(R.string.backup_err_vault_kdf_iter, e.resId)
+        }
+    }
+
     // ======================= 信封装配helper =======================
 
     /**

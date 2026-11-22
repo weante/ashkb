@@ -1,3 +1,13 @@
+## [未发布] — 2026-11-22 · 独立审查修复（收官）：Argon2id 读侧上界收紧 + WebDAV 禁止跟随重定向
+
+代码改动，不动版本号与库结构（仍 1.2.19 / 131、`ASHKB_DB_VERSION` 21）。来源：`ASHKB-独立审查报告-2026-11-22.md`（基线 `18b35e0`）的 F7 与 S1 —— 报告里标为「待验证」的两项，本轮都落了实现。
+
+- **F7（中低）Argon2id 读侧参数上界偏宽**：备份密钥槽头的 `m` / `t` / `p` 由文件自带，读取侧原先允许 `m ≤ 256 MiB`、`t ≤ 16`、`p ≤ 8`，远宽于本机写出的 `m=19,456 KiB / t=2 / p=1`。恶意或畸形槽头能让一次恢复申请 256 MiB 内存并跑 16 遍派生，低端机直接 OOM；更糟的是 Argon2id 工作区分配超限抛的是 `OutOfMemoryError` 而不是可读的 `VaultException`，等于闪退而不是「提示文件损坏」。现在上界改为**生产者参数的两倍**（`ARGON2_PARAM_MAX_MULTIPLIER = 2` → `m ≤ 38,912 KiB`、`t ≤ 4`、`p ≤ 2`），下界 `m ≥ 8,192 KiB` 不变。校验点本来就在分配内存之前（`argon2ParametersOrThrow`），所以只改上界即生效；真实备份（v1.2.13 之后写出的）永远落在区间内，兼容性不受影响。
+- **S1（待验证）WebDAV 重定向与 Basic 凭据跨主机**：`HttpURLConnection` 默认 `instanceFollowRedirects = true`，而请求发出前就已经把 `Authorization: Basic` 挂到头上；服务器回一个 302，客户端就自己带着凭据去访问 `Location`。跨主机时 JDK/Android 会剥掉该头，但**同一主机的路径跳转仍带着凭据**——而 WebDAV 基址是用户手填的，不能假设「跳过去的地方」就是他填的地方。现在 `WebDavClient` 显式 `instanceFollowRedirects = false`，并把 `mkcol` / `propfind` / `put` / `get` / `delete` 五条读响应码的路径统一过 `rejectRedirect()` 闸门，3xx 一律报错并复用既有文案 `backup_err_dav_3xx`（提示改填最终地址），不再静默跟随。
+- 测试：`VaultKdfMigrationTest` +4 条（把「上界 = 生产者值的两倍」这个设计决定钉死，以及内存 / 并行度 / 遍数各「刚超过上界即被拒绝」）；新增 `WebDavRedirectGuardTest` 3 条（3xx 边界分类不摇摆、源码里确实关掉了自动跟随、每个读响应码的方法都过闸门）。守卫测试用源码断言（与本仓 `KbTierLabelGuardTest` / `VerticalScrollInventoryTest` 同风格），**不能替代真机联调**：真实跳转服务器上的端到端行为仍待验证。
+- 门禁 `testDebugUnitTest detekt lintDebug verifySpecSync --no-parallel` → BUILD SUCCESSFUL；**168 类 / 1373 条 / 0 失败 / 0 错误 / 1 跳过**；lint 0 issue、detekt 0（79 B）、verifySpecSync 通过；版本与库结构均未动（仍 1.2.19 / 131、`ASHKB_DB_VERSION` 21）。
+- 至此独立审查报告的 **F1 / F4 / F3 / F6 / F2 / F5 / F7 / S1 八项全部落地**；报告里剩下的只有 **S2 真机回归**（targetSdk 36 / Compose 1.11 / Kotlin 2.2 的行为变化），需等手机返修。
+
 ## [未发布] — 2026-11-22 · 独立审查修复（续）：锁屏强提醒药名隐私 + 崩溃日志写盘串行化
 
 代码改动，不动版本号与库结构（仍 1.2.19 / 131、`ASHKB_DB_VERSION` 21）。来源：`ASHKB-独立审查报告-2026-11-22.md`（基线 `18b35e0`）的 F2 与 F5。

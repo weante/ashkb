@@ -64,19 +64,29 @@ object VaultCipher {
      * `pbkdf2-sha256` 解。
      */
     private const val KDF_ARGON2ID = "argon2id"
-    private const val ARGON2_MEMORY_KIB = 19_456
-    private const val ARGON2_ITERATIONS = 2
-    private const val ARGON2_PARALLELISM = 1
+    /** 生产者写出的 Argon2id 参数（v1.2.13 起）。读侧上界以它为基准。 */
+    internal const val ARGON2_MEMORY_KIB = 19_456
+    internal const val ARGON2_ITERATIONS = 2
+    internal const val ARGON2_PARALLELISM = 1
     /**
      * Argon2id 参数的**可接受区间**。与 [MIN_ITER]/[MAX_ITER] 同理：备份是外部输入，
      * 槽头的 `m` 直接决定要分配多少内存、跑多少轮——一个 `m=4 GiB` 的恶意备份能让恢复
-     * 过程 OOM，`m=8` 又能把算法降级成几乎不设防。下界取 RFC 9106 对 p=1 的最低要求再留余量，
-     * 上界取 256 MiB（远超生产者写的 19 MiB，但不至于把手机拖死）。
+     * 过程 OOM，`m=8` 又能把算法降级成几乎不设防。下界取 RFC 9106 对 p=1 的最低要求再留余量。
+     *
+     * v1.2.22（独立审查 F7）：**上界收紧为生产者值的两倍**。原上界是
+     * `m ≤ 256 MiB / t ≤ 16 / p ≤ 8`——那意味着一个（口令已知的）恶意备份可以让恢复过程
+     * 一次申请 256 MiB 内存并跑 16 遍，在中低端机上就是一次 OOM 或一次「看起来卡死」。
+     * 生产者自己只写 `m=19,456 KiB / t=2 / p=1`，读侧最多接受它的两倍
+     * （m ≤ 38,912 KiB ≈ 38 MiB、t ≤ 4、p ≤ 2）：真实备份永远落在区间内
+     * （v1.2.13 之后写出的备份全部不受影响），两倍只给「参数被微调过的历史备份」留余量，
+     * 伪造头最多也只能放大这么多——而 Argon2id 的工作区分配一旦超过系统可用堆，
+     * 抛的是 `OutOfMemoryError` 而不是可读的 `VaultException`，那就不是「报错」而是「闪退」。
      */
+    private const val ARGON2_PARAM_MAX_MULTIPLIER = 2
     private const val ARGON2_MIN_MEMORY_KIB = 8_192
-    private const val ARGON2_MAX_MEMORY_KIB = 262_144
-    private const val ARGON2_MAX_ITERATIONS = 16
-    private const val ARGON2_MAX_PARALLELISM = 8
+    internal const val ARGON2_MAX_MEMORY_KIB = ARGON2_MEMORY_KIB * ARGON2_PARAM_MAX_MULTIPLIER
+    internal const val ARGON2_MAX_ITERATIONS = ARGON2_ITERATIONS * ARGON2_PARAM_MAX_MULTIPLIER
+    internal const val ARGON2_MAX_PARALLELISM = ARGON2_PARALLELISM * ARGON2_PARAM_MAX_MULTIPLIER
     /**
      * v1.0.43：KDF 迭代次数的可接受区间。备份文件是**外部输入**，其头部的 `iter` 直接进 PBKDF2——
      * 一个 `iter = Int.MAX_VALUE` 的（口令已知的）恶意备份可让恢复过程长时间挂起（DoS）。

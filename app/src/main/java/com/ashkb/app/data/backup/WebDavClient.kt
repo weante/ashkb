@@ -69,6 +69,13 @@ class WebDavClient(
         val conn = url(path).openConnection() as HttpURLConnection
         conn.connectTimeout = 10_000
         conn.readTimeout = 20_000
+        // v1.2.22（独立审查 S1）：**禁止自动跟随重定向**。
+        // HttpURLConnection 默认 instanceFollowRedirects = true：服务器回 302，客户端就自己
+        // 带着同一个 `Authorization: Basic` 头去访问 Location。跨主机时 JDK/Android 的实现会
+        // 剥掉这个头，但**同主机的路径跳转仍会带着凭据**；而「用户填的基址」与「服务器实际要去的
+        // 地址」可能根本不是一回事——这正是凭据外发的经典入口。关掉自动跟随，3xx 交给
+        // rejectRedirect 变成一条可读错误（见其 KDoc），由用户自己决定用哪个地址。
+        conn.instanceFollowRedirects = false
         val auth = Base64.getEncoder().encodeToString("$username:$password".toByteArray(Charsets.UTF_8))
         conn.setRequestProperty("Authorization", "Basic $auth")
         conn.setRequestProperty("User-Agent", "ASHKB-Backup/1.0")
@@ -80,6 +87,20 @@ class WebDavClient(
         }
         if (conn is HttpsURLConnection) runCatching { conn.sslSocketFactory } // 触发默认 SSL 初始化
         return conn
+    }
+
+    /**
+     * v1.2.22（独立审查 S1）：3xx 一律不跟，转成一条可读错误。
+     *
+     * 为什么不是「跟过去看看」：Basic 凭据在 [open] 里就已挂到请求头上，跟随重定向等于替用户
+     * 把「用户名:口令」发给 Location 指向的地址。同主机同路径的跳转甚至会带着凭据继续走，
+     * 而 WebDAV 基址是用户手填的——不能假设两者必然是同一处。所以策略是「不猜」：
+     * 让用户改用跳转后的最终地址（文案 `backup_err_dav_3xx` 已这么写）。
+     */
+    private fun rejectRedirect(code: Int) {
+        if (isRedirectCode(code)) {
+            throw DavException(context.getString(R.string.backup_err_dav_3xx, code))
+        }
     }
 
     /**
@@ -159,6 +180,7 @@ class WebDavClient(
         val conn = open(path, "MKCOL")
         try {
             val code = conn.responseCode
+            rejectRedirect(code)
             if (code !in 200..299 && code != 405)
                 throw DavException(context.getString(R.string.backup_err_dav_mkcol, code, url(path)))
         } finally { conn.disconnect() }
@@ -278,6 +300,7 @@ class WebDavClient(
         val conn = open(path, "PROPFIND", depth = 1)
         return try {
             val code = conn.responseCode
+            rejectRedirect(code)
             when {
                 code == 404 -> null
                 code !in 200..299 -> throw DavException(context.getString(R.string.backup_err_dav_list_denied_attach, code))
@@ -293,6 +316,7 @@ class WebDavClient(
             conn.setFixedLengthStreamingMode(data.size)
             conn.outputStream.use { it.write(data) }
             val code = conn.responseCode
+            rejectRedirect(code)
             if (code !in 200..299 && code != 201 && code != 204)
                 throw DavException(context.getString(R.string.backup_err_dav_put, code, conn.responseMessage))
         } finally { conn.disconnect() }
@@ -302,6 +326,7 @@ class WebDavClient(
         val conn = open(path, "GET")
         try {
             val code = conn.responseCode
+            rejectRedirect(code)
             if (code !in 200..299) throw DavException(context.getString(R.string.backup_err_dav_get, code))
             // v1.0.86（批次 11 / D6）：二进制读路径统一走上限——备份下载、附件懒下载、
             // 上传后的回读校验（upload 内部也是 get）全在这里收口。
@@ -316,6 +341,7 @@ class WebDavClient(
         val conn = open(path, "DELETE")
         try {
             val code = conn.responseCode
+            rejectRedirect(code)
             if (code !in 200..299 && code != 404) throw DavException(context.getString(R.string.backup_err_dav_delete, code))
         } finally { conn.disconnect() }
     }
@@ -500,6 +526,19 @@ class WebDavClient(
          * 原样拼进 URL。附件远端路径早就靠 `SEGMENT_PATTERN` 做了同样的事，备份轮换这边一直缺这道。
          */
         fun isSafeBackupName(name: String): Boolean = BACKUP_NAME_PATTERN.matches(name)
+
+        /**
+         * v1.2.22（独立审查 S1）：3xx 状态码判定。
+         *
+         * 单独抽出来是为了让 [rejectRedirect] 的策略能纯 JVM 单测——重定向处理最容易在
+         * 「看起来没问题」的情况下回归（比如有人为了兼容某台服务器把 `instanceFollowRedirects`
+         * 改回 true），而真机/服务器很难在单测里复现一个会跳转的 WebDAV。
+         */
+        internal fun isRedirectCode(code: Int): Boolean = code >= REDIRECT_MIN && code <= REDIRECT_MAX
+
+        /** HTTP 3xx 的区间端点（S1 的重定向闸门用）。 */
+        private const val REDIRECT_MIN = 300
+        private const val REDIRECT_MAX = 399
 
         /** 从 PROPFIND 多状态响应中提取本应用的备份文件名（纯 JVM 可单测）。 */
         fun parseBackupFileNames(xml: String): List<String> =
