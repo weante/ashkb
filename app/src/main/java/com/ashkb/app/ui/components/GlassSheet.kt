@@ -8,9 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 /**
- * v1.1.6：弹层包装——**只加一件事**：在弹层顶边画一道高光。
+ * v1.1.6：弹层包装——**当前是纯透传**（不含任何自绘装饰）。
  *
- * ### 为什么最终收敛成"几乎什么都不做"
+ * ### 为什么最终收敛成"什么都不做"
  * 我在这上面连改了四版，每一版都动得更多、也更错：
  *   ① 换 `Glass.surfaceLight`（52% 玻璃）→ 表单与背后文字重叠，**不可读**；
  *   ② 传 `scrimColor = Color.Unspecified` → 完全不画遮罩，像直接叠在页面上；
@@ -21,14 +21,15 @@ import androidx.compose.ui.Modifier
  * 结论：**原生的 `ModalBottomSheet` 本来就是对的**（维护者截图那张"修改化验结果"就是原生，
  * 压暗、不透明、圆角、拖拽条全都对）。我不该去重做它的容器与遮罩。
  *
- * 所以现在这个包装**只保留高光**，其余一律交给系统默认：
+ * 所以现在这个包装**什么都不加**，一律交给系统默认：
  *  · 不传 `scrimColor`（用 M3 默认的 ~32% 黑）；
  *  · 不传 `containerColor`（用 M3 默认的 surfaceContainerLow）；
  *  · 不用自绘 Box 铺底（那会破坏圆角与拖拽条区域）；
- *  · 高光画在**系统容器的内容之上**，且用 `drawWithContent` 而非额外布局层。
+ *  · **也不画高光**：第 ④ 版教训说明任何叠加层都会与系统容器错位，保留它只剩"看起来像
+ *    改过"的心理安慰。此处曾有的"只保留高光 + drawWithContent"已随该结论一并删除。
  *
  * ⚠️ 安全类弹层（删除确认、发热/漏服/相互作用警告）**不要**用本包装：
- * 高光会让边缘变得更"轻"，而危险操作需要更实的视觉重量。
+ * 危险操作需要更实的视觉重量，任何"轻盈化"都不合适。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

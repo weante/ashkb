@@ -66,6 +66,20 @@ class BackupPickLimitTest {
     }
 
     @Test
+    fun `备份下载上限必须与本机选中上限对齐`() {
+        // v1.2.21（独立审查 F3）：两者原本不对称（64 MiB 选得上、6 MiB 取不下），
+        // 6–64 MiB 的备份会「传上去、取不下来」，云端恢复必然失败。
+        assertEquals(
+            "备份读上限必须等于本机选中上限，否则会出现传得上去取不下来的备份",
+            BackupEngine.PICK_LIMIT_BYTES, WebDavClient.BACKUP_RESPONSE_LIMIT,
+        )
+        assertTrue(
+            "备份读上限应当大于通用的二进制读上限（6 MiB）",
+            WebDavClient.BACKUP_RESPONSE_LIMIT > WebDavClient.BINARY_RESPONSE_LIMIT,
+        )
+    }
+
+    @Test
     fun `恰好等于上限算通过`() {
         assertTrue(BackupEngine.withinPickLimit(BackupEngine.PICK_LIMIT_BYTES))
         assertTrue(BackupEngine.withinPickLimit(0))

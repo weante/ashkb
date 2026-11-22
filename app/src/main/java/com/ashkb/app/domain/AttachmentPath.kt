@@ -78,6 +78,63 @@ object AttachmentPath {
         orphans = remote.filterTo(mutableSetOf()) { isManagedRemotePath(it) && it !in expected },
     )
 
+    // ---- v1.2.21（独立审查 F1）：本地附件的文件名校验 ----
+    //
+    // 背景：`checkup_attachments.file_name` 是**备份里的外部输入**。攻击者可以给用户一份
+    // 口令已知的备份，把某条附件的 `file_name` 写成 `../../databases/app.db`——恢复后该值
+    // 原样落库，`AttachmentRepository.fileOf()` 一拼就跑到附件目录之外，删除 / 读取 / 写入
+    // / 分享四条路径全部越界。威胁模型与 `isValidRemotePath` 的注释里写的是同一个。
+    //
+    // 分两道闸：
+    //  · [isValidLocalFileName]：**严格形状**，用在恢复侧。本机只会生成 `catt-<毫秒>.<扩展名>`，
+    //    所以「不是这个形状」就整批拒绝——宁可拒绝一份畸形备份，也不让脏值进库。
+    //  · [isSafeLocalSegment]：**最小安全约束**（只能是单个路径段），用在拼接侧做纵深防御。
+    //    即便某条脏数据漏过了恢复侧，`fileOf()` 也拼不出目录之外的路径。
+
+    /** 本应用生成的本地附件名主干前缀（相机与导入都是 `catt-<毫秒时间戳>.<扩展名>`）。 */
+    private const val LOCAL_FILE_PREFIX = "catt-"
+
+    /** 本地文件名长度上限：正常形状约 20 字符，留足余量但拒绝超长垃圾。 */
+    private const val MAX_LOCAL_FILE_NAME_LEN = 120
+
+    /** 扩展名长度上限——与 `AttachmentRepository.importFromUri` 的 `take(5)` 保持一致。 */
+    private const val MAX_LOCAL_EXT_LEN = 5
+
+    /**
+     * 本地附件文件名是否为本应用可生成的形状（恢复侧的**形状白名单**）。
+     *
+     * 形状：`catt-<纯数字主干>.<1–5 字符扩展名>`，扩展名不含 `/` `\` `:` `.` 与控制字符。
+     * 用白名单而不是「过滤危险字符」，是因为黑名单永远漏（`%2f`、Unicode 分隔符、
+     * Windows 盘符前缀……）；而本机生成的名字形状是固定的，白名单没有误伤面。
+     *
+     * 扩展名刻意允许非 ASCII（老版本曾把中文文件名的末段当作扩展名），
+     * 只要不含路径分隔符就无法越界。
+     */
+    fun isValidLocalFileName(name: String): Boolean {
+        if (name.length > MAX_LOCAL_FILE_NAME_LEN) return false
+        if (!name.startsWith(LOCAL_FILE_PREFIX)) return false
+        val dot = name.lastIndexOf('.')
+        if (dot <= LOCAL_FILE_PREFIX.length) return false          // 必须存在 `catt-<数字>` 主干
+        val stem = name.substring(LOCAL_FILE_PREFIX.length, dot)
+        if (stem.isEmpty() || !stem.all { it in '0'..'9' }) return false
+        val ext = name.substring(dot + 1)
+        if (ext.length !in 1..MAX_LOCAL_EXT_LEN) return false
+        return ext.none { it == '/' || it == '\\' || it == ':' || it == '.' || it.isISOControl() }
+    }
+
+    /**
+     * 本地文件名是否只能解析成附件目录下的**单个路径段**（拼接侧的纵深防御）。
+     *
+     * 比 [isValidLocalFileName] 宽松：不要求 `catt-` 前缀与纯数字主干，只为兼容历史数据与
+     * 单测夹具；但只要含分隔符 / 盘符冒号 / 控制字符，或本身是 `.` / `..`，就一律拒绝——
+     * 这几条足以保证 `File(dir, name)` 不可能落在 `dir` 之外。
+     */
+    fun isSafeLocalSegment(name: String): Boolean {
+        if (name.isEmpty() || name.length > MAX_LOCAL_FILE_NAME_LEN) return false
+        if (name == "." || name == "..") return false
+        return name.none { it == '/' || it == '\\' || it == ':' || it.isISOControl() }
+    }
+
     private const val FALLBACK_FOLDER = "0000-00-00"
     private val DATE_PATTERN = Regex("\\d{4}-\\d{2}-\\d{2}")
 

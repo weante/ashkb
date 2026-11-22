@@ -380,27 +380,31 @@ class BackupRepository(
                 // ADOPT / PROCEED 都继续走下面的 adoptIfAbsent（本机无 key 时它会采纳备份 key）
                 VaultKeyDomain.Decision.ADOPT, VaultKeyDomain.Decision.PROCEED -> Unit
             }
-            decrypted.vaultKey?.let { vaultKeys.adoptIfAbsent(it) }
-            // 1. pre-restore 快照（退路）
-            val snapshot = BackupEngine.export(supportDb(), nowIso())
-            // 快照同样带恢复码槽——用户用恢复码完成恢复时，快照仍可用同一恢复码解开
-            val snapBytes = VaultCipher.encryptV3(
-                vaultKeyOrThrow(), snapshotPassword, recoverySlot(), snapshot.payload,
-                BackupEngine.schemaVersion(supportDb()), nowIso())
-            val dir = File(context.filesDir, "backups").apply { mkdirs() }
-            // v1.2.11（缺陷工单 B07）：**同名绝不覆盖**。
-            //
-            // 文件名原本只有到秒的时间戳。两次恢复落在同一秒时（撤销紧接着恢复、脚本化演练、
-            // 秒级时钟回拨），第二份快照会静默覆盖第一份——而被覆盖的那份恰好是用户唯一的退路，
-            // 工单第 6 条正是「快照轮换/清理不得把唯一退路静默删掉」。碰撞时加 `-2`/`-3` 后缀。
-            val stamp = LocalDateTime.now().format(PRE_RESTORE_STAMP)
-            val snapFile = dir.resolve(uniquePreRestoreName(stamp) { dir.resolve(it).exists() })
-            snapFile.writeBytes(snapBytes)
-            val modeNote = when (mode) {
-                BackupEngine.RestoreMode.FULL_ROLLBACK -> context.getString(R.string.backup_restore_full_rollback)
-                BackupEngine.RestoreMode.MERGE_TABLES -> context.getString(R.string.backup_restore_table_merge)
-            }
+            // v1.2.21（独立审查 F4）：记住这次是否真的采纳了备份密钥。采纳发生在写库之前
+            // （见上面的顺序约束），所以万一后面任何一步失败，必须把它退回去——否则本机被锁进
+            // 备份那把 key 的密钥域：本机后续备份/附件全用新 key，原设备的备份进来一律判 MISMATCH
+            // 被拒，generate() 又拒绝覆盖，用户只能清应用数据。
+            val adoptedVaultKey = decrypted.vaultKey?.takeIf { vaultKeys.adoptIfAbsent(it) }
             try {
+                // 1. pre-restore 快照（退路）
+                val snapshot = BackupEngine.export(supportDb(), nowIso())
+                // 快照同样带恢复码槽——用户用恢复码完成恢复时，快照仍可用同一恢复码解开
+                val snapBytes = VaultCipher.encryptV3(
+                    vaultKeyOrThrow(), snapshotPassword, recoverySlot(), snapshot.payload,
+                    BackupEngine.schemaVersion(supportDb()), nowIso())
+                val dir = File(context.filesDir, "backups").apply { mkdirs() }
+                // v1.2.11（缺陷工单 B07）：**同名绝不覆盖**。
+                //
+                // 文件名原本只有到秒的时间戳。两次恢复落在同一秒时（撤销紧接着恢复、脚本化演练、
+                // 秒级时钟回拨），第二份快照会静默覆盖第一份——而被覆盖的那份恰好是用户唯一的退路，
+                // 工单第 6 条正是「快照轮换/清理不得把唯一退路静默删掉」。碰撞时加 `-2`/`-3` 后缀。
+                val stamp = LocalDateTime.now().format(PRE_RESTORE_STAMP)
+                val snapFile = dir.resolve(uniquePreRestoreName(stamp) { dir.resolve(it).exists() })
+                snapFile.writeBytes(snapBytes)
+                val modeNote = when (mode) {
+                    BackupEngine.RestoreMode.FULL_ROLLBACK -> context.getString(R.string.backup_restore_full_rollback)
+                    BackupEngine.RestoreMode.MERGE_TABLES -> context.getString(R.string.backup_restore_table_merge)
+                }
                 // 2. 覆盖写入 + 3. 双校验（事务内：失败即整体回滚，库保持恢复前状态）
                 val verify = BackupEngine.restore(supportDb(), decrypted.payload, mode)
                 log(LedgerType.RESTORE, verify.rowsOk, "restore", snapFile.name, verify.totalRows,
@@ -410,7 +414,11 @@ class BackupRepository(
                         else context.getString(R.string.backup_verify_result_fail_rollback)))
                 verify
             } catch (e: Exception) {
-                log(LedgerType.RESTORE, false, "restore", snapFile.name, null, false, e.message)
+                // 库已回滚，密钥也要跟着回滚——两者必须同生共死（F4）
+                if (adoptedVaultKey != null) {
+                    runCatching { vaultKeys.rollbackAdoptionIfCurrent(adoptedVaultKey) }
+                }
+                log(LedgerType.RESTORE, false, "restore", null, null, false, e.message)
                 // v1.2.11（R5 残留）：用户文案里已不再出现原始异常文本（见 `BackupEngine` 的
                 // `backup_err_engine_write_failed`），排查信息必须另找地方落地，否则真出问题时
                 // 只剩一句「已回滚」，连堆栈都没有。这里在**抛给 UI 之前**留一份完整堆栈：

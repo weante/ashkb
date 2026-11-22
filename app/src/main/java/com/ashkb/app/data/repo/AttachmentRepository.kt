@@ -8,6 +8,7 @@ import com.ashkb.app.data.db.AppDatabase
 import com.ashkb.app.data.db.AttachmentSyncCounts
 import com.ashkb.app.data.db.Ids
 import com.ashkb.app.data.entity.CheckupAttachment
+import com.ashkb.app.domain.AttachmentPath
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -54,6 +55,18 @@ class AttachmentRepository(
         private const val PREF_SYNC_ENABLED = "attachment_sync_enabled"
 
         /**
+         * v1.2.21（F1）：文件名不合法时 `fileOf()` 返回的占位文件。
+         *
+         * 以 `.` 开头且从不被创建：`exists()` 恒为 false、`delete()` 无副作用、`readBytes()`
+         * 返回 null——四条越界路径全部退化成「没有这个文件」。刻意用一个显眼的名字，
+         * 排查脏数据时能一眼看出是哪条记录被挡下了。
+         */
+        private const val INVALID_LOCAL_NAME = ".invalid-attachment-name"
+
+        /** 落盘文件名的扩展名长度上限（与 `AttachmentPath` 的校验口径一致）。 */
+        private const val MAX_EXT_LEN = 5
+
+        /**
          * v1.2.11（缺陷工单 C03）：**有界复制**——最多读 `MAX_BYTES + 1` 字节就停手。
          *
          * 为什么不能沿用 `input.copyTo(out)`：它会把整个文件**先完整落盘**，之后才检查大小。
@@ -94,8 +107,27 @@ class AttachmentRepository(
     /** 附件目录（懒创建）。 */
     private fun dir(): File = File(context.filesDir, DIR).apply { if (!exists()) mkdirs() }
 
-    /** 附件在磁盘上的绝对路径。 */
-    fun fileOf(attachment: CheckupAttachment): File = File(dir(), attachment.fileName)
+    /**
+     * 附件在磁盘上的绝对路径。
+     *
+     * v1.2.21（独立审查 F1）：`fileName` 是**数据库里的值**，而数据库可能来自一份攻击者提供的
+     * 备份。旧实现 `File(dir(), fileName)` 直接拼接，`fileName = "../../databases/app.db"` 就能让
+     * 删除 / 读取 / 写入 / 分享四条路径全部越出附件目录（删任意私有文件、把任意私有文件加密上传）。
+     *
+     * 现在：① 名字必须是安全单段（见 [AttachmentPath.isSafeLocalSegment]）；
+     * ② 再用 canonical 父目录复核一次，防止平台把某个字符当分隔符。
+     * 任一不满足就退化成附件目录内一个**永不创建**的占位文件——于是上层的
+     * `runCatching` 自然得到「没有这个文件」，既不会越界，也不会抛异常炸掉界面。
+     */
+    fun fileOf(attachment: CheckupAttachment): File {
+        val base = dir()
+        val placeholder = File(base, INVALID_LOCAL_NAME)
+        if (!AttachmentPath.isSafeLocalSegment(attachment.fileName)) return placeholder
+        val file = File(base, attachment.fileName)
+        val baseCanonical = runCatching { base.canonicalFile }.getOrNull() ?: return placeholder
+        val parentCanonical = runCatching { file.canonicalFile.parentFile }.getOrNull() ?: return placeholder
+        return if (parentCanonical == baseCanonical) file else placeholder
+    }
 
     /** 供分享 / 外部查看的 content:// URI（FileProvider，路径见 res/xml/file_paths.xml）。 */
     fun uriOf(attachment: CheckupAttachment): Uri =
@@ -151,9 +183,15 @@ class AttachmentRepository(
         note: String? = null,
     ): CheckupAttachment? = withContext(Dispatchers.IO) {
         runCatching {
+            // v1.2.21（F1）：扩展名来自用户选择的**外部文件名**，必须过滤成纯字母数字——
+            // 否则 `x/../../evil` 这种名字能把分隔符带进落盘文件名，绕开后面的单段校验。
             val ext = when {
                 kind == "PDF" -> "pdf"
-                displayName?.contains('.') == true -> displayName.substringAfterLast('.').take(5)
+                displayName?.contains('.') == true ->
+                    displayName.substringAfterLast('.')
+                        .take(MAX_EXT_LEN)
+                        .filter { it.isLetterOrDigit() }
+                        .ifEmpty { "jpg" }
                 else -> "jpg"
             }
             val target = File(dir(), "catt-${System.currentTimeMillis()}.$ext")

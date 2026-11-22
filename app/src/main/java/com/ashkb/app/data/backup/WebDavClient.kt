@@ -164,10 +164,28 @@ class WebDavClient(
         } finally { conn.disconnect() }
     }
 
+    /** 回读失败时清掉刚传上去的孤儿；清理本身再失败也不该盖掉原始异常。 */
+    private fun cleanupFailedUpload(name: String) {
+        runCatching { delete("ashkb/backup/$name") }
+    }
+
     fun upload(name: String, data: ByteArray): String {
         put("ashkb/backup/$name", data)
         // 写入即验证：回读比对 SHA-256（协议 §4）
-        val back = get("ashkb/backup/$name")
+        //
+        // v1.2.21（独立审查 F3）：回读**任何**失败（超限 / 网络抖动 / 返回体被换掉）都要先清掉
+        // 刚才传上去的那份，再抛出。旧实现只在 SHA 不匹配时 delete：若远端文件大到超过读上限，
+        // get() 抛 DavResponseTooLarge 直接冒出去，delete 根本走不到 —— 远端留下一个孤儿备份，
+        // 而本地台账记的是「上传失败」，用户下次看到的就是一个自己都解释不了的远端文件。
+        var readBackOk = false
+        val back = try {
+            get("ashkb/backup/$name").also { readBackOk = true }
+        } finally {
+            // 用 finally 而不是逐个 catch：回读可能抛超限（DavResponseTooLarge）/
+            // 协议错误（DavException）/ 网络（IOException），逐个 catch 既可读性差，
+            // 又会撞上 detekt 的 ThrowsCount 上限；这里只关心"是否成功读过"。
+            if (!readBackOk) cleanupFailedUpload(name)
+        }
         val shaUp = BackupEngine.sha256Hex(data)
         val shaBack = BackupEngine.sha256Hex(back)
         if (shaUp != shaBack) {
@@ -177,7 +195,15 @@ class WebDavClient(
         return context.getString(R.string.backup_dav_upload_ok, shaUp.take(SHA_PREFIX_CHARS))
     }
 
-    fun download(name: String): ByteArray = get("ashkb/backup/$name")
+    /**
+     * 下载备份文件。
+     *
+     * v1.2.21（独立审查 F3）：用 [BACKUP_RESPONSE_LIMIT]（= 本机 `BackupEngine.PICK_LIMIT_BYTES`）
+     * 而不是旧的 6 MiB。两个上限原本不对称——本机选择器放行 64 MiB，WebDAV 读却卡 6 MiB，
+     * 于是 6–64 MiB 的备份「传得上去、取不下来」：上传时回读当场抛超限（远端还留孤儿），
+     * 云端恢复也必然失败。现在读侧与写侧同一条线。
+     */
+    fun download(name: String): ByteArray = get("ashkb/backup/$name", BACKUP_RESPONSE_LIMIT)
 
     // ======================= v12（v1.0.35）附件同步 =======================
     //
@@ -390,6 +416,19 @@ class WebDavClient(
          * 会是几百倍的异常增长，届时应当报警而不是默默继续读。
          */
         const val BINARY_RESPONSE_LIMIT: Long = 6L * BYTES_PER_MB
+
+        /**
+         * v1.2.21（独立审查 F3）：**备份文件**（GET 单个 `.ashkb`）的上限，与写入侧同一条线。
+         *
+         * 为什么不再用 6 MiB：本机选择器（[BackupEngine.PICK_LIMIT_BYTES]）放行 64 MiB，而读侧
+         * 卡 6 MiB——6–64 MiB 的备份就会「传得上去、取不下来」：上传后回读当场抛超限（且旧实现
+         * 不清理，远端留孤儿），云端恢复也必失败。两个不同用途的上限被合并成一条，是死路。
+         *
+         * 保持 [BINARY_RESPONSE_LIMIT] 不变，是因为它还被别处当作「正常响应体量级」的基线
+         * （附件上限 > 它、备份上限 > 它，多个测试按此断言）；这里只在读**备份**时显式抬到
+         * 与本机同值，改动面最小。
+         */
+        const val BACKUP_RESPONSE_LIMIT: Long = BackupEngine.PICK_LIMIT_BYTES
 
         /**
          * v1.1.1：**附件**（GET 单个附件密文）的上限——与备份上限分开，因为两者的尺寸带不同。

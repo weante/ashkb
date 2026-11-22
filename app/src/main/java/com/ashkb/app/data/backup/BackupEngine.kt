@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import org.json.JSONArray
 import org.json.JSONObject
 import com.ashkb.app.R
+import com.ashkb.app.domain.AttachmentPath
 import java.security.MessageDigest
 
 /**
@@ -61,6 +62,30 @@ object BackupEngine {
      */
     fun unknownTables(tablesJson: JSONObject, knownTables: Set<String>): List<String> =
         tablesJson.keys().asSequence().filter { it !in knownTables }.sorted().toList()
+
+    /**
+     * v1.2.21（独立审查 F1）：列出 `checkup_attachments.file_name` 里**不符合本应用生成形状**的值。
+     *
+     * 为什么必须在恢复侧拦：`file_name` 会原样落库，之后 `AttachmentRepository.fileOf()` 拿它
+     * 拼磁盘路径。一份口令已知的恶意备份只要把某条附件命名成 `../../databases/app.db`，
+     * 恢复后「删除附件」就会删掉数据库、「打开附件」就会读到它、「同步附件」就会把它加密上传。
+     *
+     * 形状校验是纯函数（[AttachmentPath.isValidLocalFileName]），本方法只负责从备份里取出来比对。
+     * 返回去重后的前若干个名字，用于错误文案——没有这一层，用户只会看到一句「恢复失败」。
+     */
+    private fun badAttachmentFileNames(tablesJson: JSONObject): List<String> {
+        val rows = tablesJson.optJSONArray("checkup_attachments") ?: return emptyList()
+        return buildList {
+            for (i in 0 until rows.length()) {
+                val row = rows.optJSONObject(i) ?: continue
+                val name = row.optString("file_name", "")
+                if (!AttachmentPath.isValidLocalFileName(name)) add(name)
+            }
+        }.distinct().take(MAX_REPORTED_BAD_NAMES)
+    }
+
+    /** 错误文案里最多列几个非法文件名（避免一份畸形备份撑爆提示条）。 */
+    private const val MAX_REPORTED_BAD_NAMES = 5
 
     fun sha256Hex(data: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(data).joinToString("") { "%02x".format(it) }
@@ -253,6 +278,14 @@ object BackupEngine {
         if (unknown.isNotEmpty()) throw BackupException(
             "备份包含当前数据库不存在的表，已整体拒绝：${unknown.joinToString("、")}",
             resId = R.string.backup_err_engine_unknown_tables, resArgs = listOf(unknown))
+        // v1.2.21（独立审查 F1）：附件文件名的形状预检——与上面的表名白名单同一位置、同一强度：
+        // 事务开始前校验，任一条非法即整体拒绝，保证拒绝时零写入。
+        // `checkup_attachments.file_name` 会被 AttachmentRepository.fileOf() 直接拼进文件路径，
+        // 若来自攻击者备份的 `../../databases/app.db`，恢复后即可删除 / 读取 / 上传任意私有文件。
+        val badNames = badAttachmentFileNames(tables)
+        if (badNames.isNotEmpty()) throw BackupException(
+            "备份包含非法附件文件名，已整体拒绝：${badNames.joinToString("、")}",
+            resId = R.string.backup_err_engine_bad_attachment_name, resArgs = listOf(badNames))
         db.beginTransaction()
         try {
             if (mode == RestoreMode.FULL_ROLLBACK) {

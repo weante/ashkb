@@ -135,4 +135,48 @@ class AttachmentPathTest {
         assertTrue(r.missing.isEmpty())
         assertTrue(r.orphans.isEmpty())
     }
+
+    // ---- v1.2.21（独立审查 F1）：本地附件文件名 ----
+
+    @Test
+    fun `generated local names are accepted`() {
+        assertTrue(AttachmentPath.isValidLocalFileName("catt-1732180800000.jpg"))
+        assertTrue(AttachmentPath.isValidLocalFileName("catt-1732180800000.pdf"))
+        assertTrue(AttachmentPath.isValidLocalFileName("catt-1732180800000.ab12"))
+    }
+
+    /**
+     * `checkup_attachments.file_name` 来自备份文件，是**外部输入**。
+     * 一份口令已知的恶意备份把某条附件命名成 `../../databases/app.db`，就能在恢复后
+     * 让「删除附件」删掉数据库、「打开附件」读到它、「同步附件」把它加密上传。
+     * 所以这里用**形状白名单**：不是 `catt-<数字>.<扩展名>` 就整批拒绝。
+     */
+    @Test
+    fun `local name whitelist rejects traversal and foreign shapes`() {
+        assertFalse(AttachmentPath.isValidLocalFileName("../../databases/app.db"))
+        assertFalse(AttachmentPath.isValidLocalFileName("/data/data/x/files/a.jpg"))
+        assertFalse(AttachmentPath.isValidLocalFileName(".."))
+        assertFalse(AttachmentPath.isValidLocalFileName("a.jpg"))              // 非本应用生成
+        assertFalse(AttachmentPath.isValidLocalFileName("catt-abc.jpg"))       // 主干非纯数字
+        assertFalse(AttachmentPath.isValidLocalFileName("catt-123"))           // 无扩展名
+        assertFalse(AttachmentPath.isValidLocalFileName("catt-123."))          // 扩展名为空
+        assertFalse(AttachmentPath.isValidLocalFileName("catt-123.toolong"))   // 扩展名超过 5
+        assertFalse(AttachmentPath.isValidLocalFileName("catt-123.jp/g"))      // 分隔符
+        assertFalse(AttachmentPath.isValidLocalFileName("catt-123.jp\\g"))     // 反斜杠
+        assertFalse(AttachmentPath.isValidLocalFileName(""))
+    }
+
+    /** 拼接侧的最小约束：不要求 `catt-` 形状（兼容历史数据），但必须只能是单个路径段。 */
+    @Test
+    fun `safe segment blocks escapes but keeps legacy plain names`() {
+        assertTrue(AttachmentPath.isSafeLocalSegment("a.jpg"))
+        assertTrue(AttachmentPath.isSafeLocalSegment("catt-1732180800000.jpg"))
+        assertFalse(AttachmentPath.isSafeLocalSegment("."))
+        assertFalse(AttachmentPath.isSafeLocalSegment(".."))
+        assertFalse(AttachmentPath.isSafeLocalSegment("../x.jpg"))
+        assertFalse(AttachmentPath.isSafeLocalSegment("a/b.jpg"))
+        assertFalse(AttachmentPath.isSafeLocalSegment("a\\b.jpg"))
+        assertFalse(AttachmentPath.isSafeLocalSegment("C:x.jpg"))
+        assertFalse(AttachmentPath.isSafeLocalSegment(""))
+    }
 }

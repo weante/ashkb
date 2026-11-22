@@ -108,6 +108,65 @@ class RestoreRollbackTest {
         }
     }
 
+    /**
+     * v1.2.21（独立审查 F1）：`checkup_attachments.file_name` 来自备份（外部输入），
+     * 恢复侧必须做形状白名单——越界的名字会让 `fileOf()` 拼出附件目录之外的路径。
+     */
+    @Test
+    fun `备份携带越界附件文件名时整体拒绝且零写入`() {
+        withDb("restore-bad-attachment-name.db") { db ->
+            insertCanary(db, "原始标题")
+            val raw = db.openHelper.writableDatabase
+            val before = counts(db)
+            val payload = JSONObject(BackupEngine.export(raw, stamp).payload).apply {
+                getJSONObject("tables").put(
+                    "checkup_attachments",
+                    org.json.JSONArray().put(
+                        JSONObject().put("id", "catt-evil").put("file_name", "../../databases/app.db"),
+                    ),
+                )
+            }.toString()
+
+            val error = runCatching {
+                BackupEngine.restore(raw, payload, BackupEngine.RestoreMode.FULL_ROLLBACK)
+            }.exceptionOrNull()
+
+            assertTrue("必须是 BackupException", error is BackupEngine.BackupException)
+            assertEquals(
+                "保留可解释的 resId",
+                com.ashkb.app.R.string.backup_err_engine_bad_attachment_name,
+                (error as BackupEngine.BackupException).resId,
+            )
+            assertEquals("拒绝发生在事务之前：零写入", before, counts(db))
+            assertEquals("canary 行必须仍在", "原始标题", titleOf(db, CANARY_ID))
+        }
+    }
+
+    /** 合法文件名不能被误杀——这是上一条的对照组，避免把白名单写成过严的「一律拒绝」。 */
+    @Test
+    fun `合法附件文件名不会因附件名校验被拒绝`() {
+        withDb("restore-good-attachment-name.db") { db ->
+            val raw = db.openHelper.writableDatabase
+            val payload = JSONObject(BackupEngine.export(raw, stamp).payload).apply {
+                getJSONObject("tables").put(
+                    "checkup_attachments",
+                    org.json.JSONArray().put(
+                        JSONObject().put("id", "catt-1").put("file_name", "catt-1732180800000.jpg"),
+                    ),
+                )
+            }.toString()
+
+            val error = runCatching {
+                BackupEngine.restore(raw, payload, BackupEngine.RestoreMode.FULL_ROLLBACK)
+            }.exceptionOrNull()
+            val resId = (error as? BackupEngine.BackupException)?.resId
+            assertTrue(
+                "合法文件名不应被附件名校验拒绝（实际 resId=$resId）",
+                resId != com.ashkb.app.R.string.backup_err_engine_bad_attachment_name,
+            )
+        }
+    }
+
     // ---------------- 测试基建 ----------------
 
     private fun withDb(name: String, body: (AppDatabase) -> Unit) {

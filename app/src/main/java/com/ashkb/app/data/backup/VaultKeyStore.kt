@@ -18,7 +18,18 @@ import java.util.Base64
  * 随备份携带：v3 备份文件的密钥槽包装的就是这把 key（口令槽 / 恢复码槽各一份），
  * 换机恢复时 [adoptIfAbsent] 把它收回本机。
  */
-class VaultKeyStore(context: Context) {
+class VaultKeyStore(
+    context: Context,
+    /**
+     * v1.2.21（独立审查 F4）：加解密函数可注入，**仅为单测**。
+     *
+     * [KeystoreCipher] 依赖 AndroidKeyStore，JVM 上直接调用会抛 `KeyStoreException:
+     * AndroidKeyStore not found`，于是 adopt / rollback 这两个真正需要验证的语义此前零覆盖。
+     * 生产调用点（`BackupRepository`、`AshkbApplication`）都不传参，行为完全不变。
+     */
+    private val encrypt: (String) -> String = KeystoreCipher::encryptToB64,
+    private val decrypt: (String) -> String = KeystoreCipher::decryptFromB64,
+) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("vault_config", Context.MODE_PRIVATE)
@@ -41,7 +52,7 @@ class VaultKeyStore(context: Context) {
     }
 
     private fun decode(raw: String): ByteArray? =
-        runCatching { KeystoreCipher.decryptFromB64(raw) }.getOrNull()
+        runCatching { decrypt(raw) }.getOrNull()
             ?.let { runCatching { Base64.getDecoder().decode(it) }.getOrNull() }
             ?.takeIf { it.size == KEY_LEN }
 
@@ -84,7 +95,7 @@ class VaultKeyStore(context: Context) {
         }
         val key = ByteArray(KEY_LEN).also { SecureRandom().nextBytes(it) }
         prefs.edit()
-            .putString(PREF_KEY, KeystoreCipher.encryptToB64(Base64.getEncoder().encodeToString(key)))
+            .putString(PREF_KEY, encrypt(Base64.getEncoder().encodeToString(key)))
             .apply()
         return key
     }
@@ -105,8 +116,29 @@ class VaultKeyStore(context: Context) {
         if (key.size != KEY_LEN) return false
         if (current() != null) return false
         prefs.edit()
-            .putString(PREF_KEY, KeystoreCipher.encryptToB64(Base64.getEncoder().encodeToString(key)))
+            .putString(PREF_KEY, encrypt(Base64.getEncoder().encodeToString(key)))
             .apply()
+        return true
+    }
+
+    /**
+     * v1.2.21（独立审查 F4）：撤销一次**本次恢复采纳的**密钥。
+     *
+     * 为什么需要：换机恢复时 [adoptIfAbsent] 会在写库**之前**把备份的密钥收进本机（顺序不能反，
+     * 否则 pre-restore 快照没密钥可加密）。可一旦随后的写库失败，数据库整体回滚、密钥却留下了：
+     * 本机从此被锁进「备份那把 key」的密钥域，此后本机自己备的份、本机附件全用新 key，
+     * 而原设备的备份进来一律判 [VaultKeyDomain.Decision.MISMATCH] 被拒，[generate] 又拒绝覆盖，
+     * App 内没有任何清除出口 —— 用户只能清应用数据。
+     *
+     * 所以「采纳」必须与「恢复成功」同生共死：失败时把这次采纳的密钥退回去。
+     *
+     * @param key 本次采纳的那把密钥（必须与调用 [adoptIfAbsent] 时传入的同一实例）
+     * @return true = 已撤销；false = 未撤销（本机当前密钥不是它，说明期间被别处改过，不能动）
+     */
+    fun rollbackAdoptionIfCurrent(key: ByteArray): Boolean {
+        val now = current() ?: return false
+        if (!now.contentEquals(key)) return false
+        prefs.edit().remove(PREF_KEY).apply()
         return true
     }
 }

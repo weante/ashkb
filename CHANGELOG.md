@@ -1,3 +1,13 @@
+## [未发布] — 2026-11-22 · 独立审查修复：附件路径约束、恢复密钥回滚、WebDAV 上限对齐与文档漂移
+
+代码与文档改动，不动版本号与库结构（仍 1.2.19 / 131、`ASHKB_DB_VERSION` 21）。来源：`ASHKB-独立审查报告-2026-11-22.md`（基线 `18b35e0`），按项目自身威胁模型「诱导用户导入攻击者提供、口令已知的备份」评级。
+
+- **F1（高·条件触发）附件本地文件名无路径约束**：`checkup_attachments.file_name` 来自备份属外部输入，此前只有远端路径校验、本地零校验，`File(dir, fileName)` 可被 `../../databases/ashkb.db` 拼出附件目录之外——v2 备份（`backupKey == null` 直接放行）可删任意私有文件，新机采纳攻击者密钥后可读+写+删。现在恢复侧在 `beginTransaction` 之前按 `catt-<纯数字>.<1–5 位字母数字>` 白名单整体拒绝（`backup_err_engine_bad_attachment_name`，零写入）；`AttachmentRepository.fileOf()` 增加安全单段校验与 canonical 父目录复核，不合法退化为永不创建的占位文件；`importFromUri` 扩展名过滤为非字母数字。
+- **F4（低中）恢复失败不回滚新采纳的 vault key**：在写库前采纳备份密钥是必要的（否则 pre-restore 快照无密钥可加密），但旧实现丢弃 `adoptIfAbsent` 返回值，写库失败后库回滚、密钥留下 → 本机被锁进错误密钥域，后续恢复一律 MISMATCH 被拒、`generate()` 拒绝覆盖且 App 内无清除出口。现在记录本次采纳的 key，失败时 `VaultKeyStore.rollbackAdoptionIfCurrent()` 精确回滚；pre-restore 快照的导出/加密/写盘一并纳入同一 `try`。
+- **F3（中低）本机 64 MiB 与 WebDAV 6 MiB 上限不对称**：6–64 MiB 备份「传得上去、取不下来」，且回读超限时 `upload()` 只覆盖 SHA 不匹配分支 → 远端留孤儿。现在新增 `WebDavClient.BACKUP_RESPONSE_LIMIT = BackupEngine.PICK_LIMIT_BYTES`，`download()` 与上传回读都用它；回读任何失败先清远端再抛。`BINARY_RESPONSE_LIMIT` 保持 6 MiB。
+- **F6（低）文档-代码漂移六处**：`AppDatabase` 版本史补 20→21（`supplements.daily_max_unit`）；README 的 PBKDF2→Argon2id、Room v20→v21、单测「近 900 条」→「1300+ 条」；`Color.kt` 的 `minSdk = 26`→31 并改写理由；`GlassSheet` KDoc 与纯透传实现对齐；`BackupPasswordRules` 改 Argon2id 口径、删「136 ms」。
+- 测试：`AttachmentPathTest` +3（18 条）、`RestoreRollbackTest` +2（6 条）、新增 `VaultKeyStoreTest`（6 条）、`BackupPickLimitTest` +1。门禁 `testDebugUnitTest detekt lintDebug verifySpecSync --no-parallel` → BUILD SUCCESSFUL，**164 类 / 1354 条 / 0 失败 / 0 错误 / 1 跳过**，lint 0、detekt 0、verifySpecSync 通过。
+
 ## [未发布] — 2026-11-22 · 文档快照去自引用、体积报告回写与旧候选销账
 
 纯文档改动，不动代码、不改版本号与库结构。

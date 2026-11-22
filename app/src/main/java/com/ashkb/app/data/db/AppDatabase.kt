@@ -48,6 +48,7 @@ import com.ashkb.app.data.entity.WeightLog
  * v1.2.11（缺陷工单 A06 / B01）：19 → 20，`lab_results` 新增 `ref_low_inclusive` /
  *   `ref_high_inclusive`（参考边界是否包含，区分 `<5` 与 `≤5`），并新增
  *   `report_import_batches`（AI 报告导入批次指纹，挡重复导入）。
+ * v1.2.13：20 → 21，`supplements` 新增 `daily_max_unit`（可空 TEXT，与 schemas/21.json 一致）。
  */
 internal const val ASHKB_DB_VERSION = 21
 
