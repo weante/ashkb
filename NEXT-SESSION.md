@@ -1,4 +1,4 @@
-# 下次接手从这里开始（发布基线 v1.2.19 · 工程 HEAD 5fafca9 · 2026-11-22）
+# 下次接手从这里开始（发布基线 v1.2.19 · 代码基线 2a2934b · 2026-11-22）
 
 > **本文件是仓库内唯一权威的接手文档**，随仓库一起分发。
 > `E:\ASHKB\NEXT-SESSION.md`（仓库根之外、**不被 git 跟踪**）是会话工作日志，记的是过程细节与踩坑现场；两者内容会有出入，**以本文件为准**。
@@ -6,19 +6,20 @@
 
 ---
 
-**当前状态（2026-11-21 晚）**：发布基线仍是 `v1.2.19`（versionCode **131**）、提交 `eea5705`，GitHub **Latest**；工程 HEAD 已推进到 **`5fafca9`**（文档卫生；代码与 `2a2934b` 四阶段升级收官一致），**未 bump 版本号、未发版**。HEAD 与发布版之间依次有：`ceef94f`/`cb645dc`（可靠性测试补强）、`c156872`（lint 169→0）、CI 提速（拆三条并行 job，实测 62~137 s）、`5df39fd`（R8/体积只读评估）、`09a2553`→`d3d7b24`→`53e9d55`→`2a2934b`（四阶段依赖升级）。工作树干净；手机自 2026-11-21 起送修，本机无 emulator / system image，**只做 JVM 与静态门禁**。
+**当前状态（2026-11-21 晚）**：发布基线仍是 `v1.2.19`（versionCode **131**）、提交 `eea5705`，GitHub **Latest**；工程代码基线为 **`2a2934b`**（四阶段依赖升级收官，其后仅有文档提交；**HEAD 以 `git log -1 --oneline` 现查为准**，不要在本文件写死提交号），**未 bump 版本号、未发版**。代码基线之后依次有：`ceef94f`/`cb645dc`（可靠性测试补强）、`c156872`（lint 169→0）、CI 提速（拆三条并行 job，实测 62~137 s）、`5df39fd`（R8/体积只读评估）、`09a2553`→`d3d7b24`→`53e9d55`→`2a2934b`（四阶段依赖升级）。工作树干净；手机自 2026-11-21 起送修，本机无 emulator / system image，**只做 JVM 与静态门禁**。
 
 ### 续作线索（2026-11-21 · 先看这里，旧线索仅是历史）
 
-- **门禁基线（HEAD `2a2934b`/`5fafca9` 代码相同）**：`testDebugUnitTest detekt verifySpecSync assembleRelease assembleDebugAndroidTest --no-parallel` BUILD SUCCESSFUL；**163 类 / 1342 条 / 0 失败 / 0 错误 / 1 跳过**；`lintDebug` 单独跑 **0 issue**；detekt **0**；APK **5,572,961 B**（`compileSdk/targetSdk 36`，16 KB 页对齐，正式证书 `38ca80a6…d7d` 未变）。CI [run 44920260740](https://github.com/weante/ashkb/actions/runs/44920260740) success。⚠️ 本地**不要**把 lint / 单测 / 打包塞进同一次 Gradle 调用并开 `org.gradle.parallel=true`——KSP 生成的 release Java 会被并发重写导致 `FileNotFoundException`；CI 三条独立 job 不受影响。
+- **门禁基线（代码基线 `2a2934b`，其后仅文档差异）**：`testDebugUnitTest detekt verifySpecSync assembleRelease assembleDebugAndroidTest --no-parallel` BUILD SUCCESSFUL；**163 类 / 1342 条 / 0 失败 / 0 错误 / 1 跳过**；`lintDebug` 单独跑 **0 issue**；detekt **0**；APK **5,572,961 B**（`compileSdk/targetSdk 36`，16 KB 页对齐，正式证书 `38ca80a6…d7d` 未变）。CI [run 44920260740](https://github.com/weante/ashkb/actions/runs/44920260740) success。⚠️ 本地**不要**把 lint / 单测 / 打包塞进同一次 Gradle 调用并开 `org.gradle.parallel=true`——KSP 生成的 release Java 会被并发重写导致 `FileNotFoundException`；CI 三条独立 job 不受影响。
 - **可靠性测试已全部结清，不要重复实现**：`RestoreRollbackTest` 4 条（恢复失败必回滚：篡改 / 更高 schema / 未知表均零写入）、`MigrationPathProofTest` 15 条（v8 旧行回填 + 源码守卫，真实变异探针删回填后 2 fail）；三处零覆盖分支：`AttachmentCascadeDeleteTest` 4 条、`BackupWebdavConfigMigrationTest` 7 条（注入假加解密，生产不传参）、`DateProviderTest` 8 条；`DateProvider` 广播、`BackupRepository` 凭据迁移此前均零测试，现已覆盖。上次提交 `cb645dc`，CI [run 44907506938](https://github.com/weante/ashkb/actions/runs/44907506938) success。
 - **Robolectric / Room 教训**：legacy SQLite 影子把连接绑定线程；多线程 Room 执行器会报 `Illegal connection pointer`。附件测试使用 `Room.databaseBuilder(...).setQueryExecutor(singleThread).setTransactionExecutor(sameSingleThread).allowMainThreadQueries()`。**不要回退到 `@SQLiteMode(NATIVE)`**（全量会 `UnsatisfiedLinkError: SQLiteConnectionNatives.nativePrepareStatement`）。Room 2.8 的 `SupportSQLiteDriver` 要求库名与 `createDatabase(name, version)` 完全一致，`MigrationPathProofTest` 已统一改用 `getDatabasePath(name).absolutePath`。
 - **工程变化（不要当成未发布内容重复开工）**：Android Lint 从 169 warning 清到 **0**（57 条改代码 + 仓库根 `lint.xml` 7 类豁免）；CI 从单 job 288~461 s 拆成 `unit-tests` / `lint` / `package` 三条并行 job（缓存 Robolectric jar、`maxParallelForks=2`、`org.gradle.caching/parallel`）；依赖四阶段全部完成——androidx.test → Gradle 8.13 / AGP 8.13.2 / compileSdk+targetSdk 36 / JDK 21 → Compose BOM 2026.06.01（2026.08+ 要 compileSdk 37，止于此）→ Kotlin 2.2.20 / KSP 2.2.20-2.0.4 / Room 2.8.5。新增 `app/src/test/resources/robolectric.properties`（sdk=34）以兼容 Robolectric 4.13；detekt 1.23.7 实测兼容 Kotlin 2.2，暂不升级。
 - **仍需真机**（手机返修后一次走完，见 `docs/v1215-acceptance/SUMMARY.md` 与 `HANDOFF-STATUS.md` §7-B）：① targetSdk 36 的 predictive back / 三键与手势返回、edge-to-edge 系统栏避让；② Compose 1.11 的滚动 / 弹层 / 焦点；③ 通知权限与全屏提醒（Android 16）；④ v1.2.15 九条验收里四项未取证（报表 Error 态、2× 待服药折行、输入弹层键盘遮挡、20 MB 附件取回侧），已统一标注「待手机返修后」；⑤ 未发布改动**不要发版**直到真机回归通过。
-- **可公开核验的凭据**：CI 六道门与正式签名见 `https://github.com/weante/ashkb/actions`；main 全绿 run [44564676217](https://github.com/weante/ashkb/actions/runs/44564676217)、最新四阶段升级 run [44920260740](https://github.com/weante/ashkb/actions/runs/44920260740)。`docs/v1219-dependency-r8-size-audit.md` 的体积数字为升级前基线 5,431,160 B，报告 §0 已补记升级后的 5,572,961 B；当前以补记为准。
+- **可公开核验的凭据**：CI 六道门与正式签名见 `https://github.com/weante/ashkb/actions`；main 全绿 run [44564676217](https://github.com/weante/ashkb/actions/runs/44564676217)、最新四阶段升级 run [44920260740](https://github.com/weante/ashkb/actions/runs/44920260740)。`docs/v1219-dependency-r8-size-audit.md` 已按当前 release APK 5,572,961 B 重写正文（dex / arsc / assets / R8 / 资源计数全部为本基线实测），不再是升级前数字。
 - **不要运行 `E:\ASHKB\.probe-mig.py`**：负向证明已用真实变异探针完成；该脚本有第二个 companion / 缺 import / 并未真删回填，不是续作入口。
 - **不要重新处理 Devin 邀约**：背景噪声；不向第三方发送患者数据，不写第四份申诉。
 - **已拍板关闭（不要自行开工）**：R16 批量导入 = **不做**（v3 未继承，正式关闭）；趋势页方案 B = **不做**（保持方案 C 点格展开大图现状）；见 `HANDOFF-STATUS.md` §3.2 / §7-A。
+- **旧候选已逐条销账（勿按旧聊天记录开工）**：药单 `endDate` UI = 不做；提醒时钟回拨 / 跨时区 = 代码侧已覆盖、真机待验（§7-B 第 8 条）；通知点击深链 = 不做；R5 不同 vault key 换机恢复 = 不做（设计边界）；detekt 基线收缩 = 不做。详见 `HANDOFF-STATUS.md` §7-D 第 10 条。
 
 ---
 

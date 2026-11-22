@@ -1,18 +1,26 @@
+## [未发布] — 2026-11-22 · 文档快照去自引用、体积报告回写与旧候选销账
+
+纯文档改动，不动代码、不改版本号与库结构。
+
+- `HANDOFF-STATUS.md` / `NEXT-SESSION.md`：当前状态不再写死工程 HEAD（避免文档提交本身让 HEAD 落后一个提交），改为「代码基线 `2a2934b`，HEAD 以 `git log -1 --oneline` 现查为准；发布基线 v1.2.19 / `eea5705`」；§7-B 补入时钟回拨 / 跨时区提醒重放的真机待验项。
+- `docs/v1219-dependency-r8-size-audit.md`：正文数字全部回写为四阶段升级后的 release 构建：APK 5,572,961 B、`classes.dex` 4,153,824 B（74.54%）、`resources.arsc` 1,099,088 B（19.72%）、R8 映射 4,940 类、aapt2 资源 2,095 项（`string` 1,886）；升级前数字不再作为当前值出现。
+- `HANDOFF-STATUS.md` §7-D 第 10 条：药单 `endDate` UI、通知点击深链、R5 不同 vault key 换机恢复、detekt 基线收缩逐条写明「不做 / 已覆盖 / 重开条件」，旧候选不再挂账。
+
 ## [未发布] — 2026-11-22 · 旧候选销账与文档对齐
 
 纯文档改动，不动代码、不改版本号与库结构。
 
-- `HANDOFF-STATUS.md`：维护者拍板 R16 批量 CSV/JSON 导入「不做、正式关闭」（v3 需求表未继承）、趋势页方案 B「不做、保持方案 C 现状」；§3.2 与 §7-A 同步，§7-B 的 restoreMutex 标为已通过、WebDAV 20 MB 标为仅剩取回侧待验，§0 时点快照 / 工作树 / 单测 / 构建 / GitHub Latest 五行更新到 HEAD `5fafca9`。
+- `HANDOFF-STATUS.md`：维护者拍板 R16 批量 CSV/JSON 导入「不做、正式关闭」（v3 需求表未继承）、趋势页方案 B「不做、保持方案 C 现状」；§3.2 与 §7-A 同步，§7-B 的 restoreMutex 标为已通过、WebDAV 20 MB 标为仅剩取回侧待验，§0 时点快照 / 工作树 / 单测 / 构建 / GitHub Latest 五行更新到当时的工程 HEAD `5fafca9`（后续文档提交不再写死 HEAD）。
 - `docs/v1219-dependency-r8-size-audit.md`：§0 补记四阶段升级后的 APK 5,572,961 B 与三次中间值，旧数保留为基线方法学示例。
-- `NEXT-SESSION.md`：标题 / 当前状态 / 门禁基线与「已拍板关闭」同步到 `5fafca9` 与两项裁决。
+- `NEXT-SESSION.md`：标题 / 当前状态 / 门禁基线与「已拍板关闭」同步到当时的工程 HEAD `5fafca9` 与两项裁决。
 
 ## [未发布] — 2026-11-21 · 文档卫生：可靠性证明归档、未取证标注与接手状态更新
 
 纯文档改动，不动代码、不改版本号与库结构。
 
-- `HANDOFF-STATUS.md`：在 §7-D 补记原 M0 两条已结清——`RestoreRollbackTest` 4 条（恢复失败必回滚、篡改 / 更高 schema / 未知表均零写入）与 `MigrationPathProofTest` 15 条（v8 旧行回填 + 源码守卫；真实变异探针删除回填后 2 fail），提交 `ceef94f`、CI [run 44564676217](https://github.com/weante/ashkb/actions/runs/44564676217) success；同时把 §0 时点快照、工作树、单测、构建、GitHub Latest 五行从 v1.2.13/v1.2.15 的旧口径更新到「发布基线 v1.2.19 / 工程 HEAD `2a2934b`（未发版）」。
+- `HANDOFF-STATUS.md`：在 §7-D 补记原 M0 两条已结清——`RestoreRollbackTest` 4 条（恢复失败必回滚、篡改 / 更高 schema / 未知表均零写入）与 `MigrationPathProofTest` 15 条（v8 旧行回填 + 源码守卫；真实变异探针删除回填后 2 fail），提交 `ceef94f`、CI [run 44564676217](https://github.com/weante/ashkb/actions/runs/44564676217) success；同时把 §0 时点快照、工作树、单测、构建、GitHub Latest 五行从 v1.2.13/v1.2.15 的旧口径更新到「发布基线 v1.2.19 / 当时的工程 HEAD `2a2934b`（未发版）」。
 - `docs/v1215-acceptance/results.md` 与 `SUMMARY.md`：把报表 Error 态、2× 待服药折行、输入弹层键盘遮挡、20 MB 附件取回侧、演练文案取证五项逐一标注「**待手机返修后**」；设备自 2026-11-21 起送修，本机无 emulator / system image，不把「无法判定」写成「通过」。
-- `NEXT-SESSION.md`：标题、当前状态与「续作线索」重写到工程 HEAD `2a2934b`，补齐 lint 清零、CI 提速、四阶段依赖升级、可靠性测试与真机遗留项；保留旧探针 `.probe-mig.py` 与 Devin 邀约的「不要重做」提醒。
+- `NEXT-SESSION.md`：标题、当前状态与「续作线索」重写到当时的工程 HEAD `2a2934b`，补齐 lint 清零、CI 提速、四阶段依赖升级、可靠性测试与真机遗留项；保留旧探针 `.probe-mig.py` 与 Devin 邀约的「不要重做」提醒。
 
 ## [未发布] — 2026-11-21 · 依赖升级第 4 步：Room 2.8.5 + Kotlin 2.2.20 + KSP2
 
