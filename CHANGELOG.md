@@ -1,4 +1,10 @@
-## [未发布] — 2026-11-22 · 独立审查修复（收官）：Argon2id 读侧上界收紧 + WebDAV 禁止跟随重定向
+## [v1.2.20] — 2026-11-22 · 工程健康合集：独立审查八项修复 + 四阶段依赖升级 + Lint 清零 + CI 提速
+
+> 本版不含新功能，全部是工程质量与安全加固。**未真机验证**：手机自 2026-11-21 起送修，本版只有 JVM 单测、lint、detekt 与静态门禁（168 类 / 1373 条 / 0 失败 / 0 错误 / 1 跳过）。真机回归（targetSdk 36 / Compose 1.11 / Kotlin 2.2 的行为变化、锁屏强提醒观感、WebDAV 跳转服务器端到端）留到手机返修后。版本号 131 → 132，库结构不变（`ASHKB_DB_VERSION` 仍 21）。
+
+下面各节按开发顺序逆序排列，每节独立成条：
+
+### 2026-11-22 · 独立审查修复（收官）：Argon2id 读侧上界收紧 + WebDAV 禁止跟随重定向
 
 代码改动，不动版本号与库结构（仍 1.2.19 / 131、`ASHKB_DB_VERSION` 21）。来源：`ASHKB-独立审查报告-2026-11-22.md`（基线 `18b35e0`）的 F7 与 S1 —— 报告里标为「待验证」的两项，本轮都落了实现。
 
@@ -8,7 +14,7 @@
 - 门禁 `testDebugUnitTest detekt lintDebug verifySpecSync --no-parallel` → BUILD SUCCESSFUL；**168 类 / 1373 条 / 0 失败 / 0 错误 / 1 跳过**；lint 0 issue、detekt 0（79 B）、verifySpecSync 通过；版本与库结构均未动（仍 1.2.19 / 131、`ASHKB_DB_VERSION` 21）。
 - 至此独立审查报告的 **F1 / F4 / F3 / F6 / F2 / F5 / F7 / S1 八项全部落地**；报告里剩下的只有 **S2 真机回归**（targetSdk 36 / Compose 1.11 / Kotlin 2.2 的行为变化），需等手机返修。
 
-## [未发布] — 2026-11-22 · 独立审查修复（续）：锁屏强提醒药名隐私 + 崩溃日志写盘串行化
+### 2026-11-22 · 独立审查修复（续）：锁屏强提醒药名隐私 + 崩溃日志写盘串行化
 
 代码改动，不动版本号与库结构（仍 1.2.19 / 131、`ASHKB_DB_VERSION` 21）。来源：`ASHKB-独立审查报告-2026-11-22.md`（基线 `18b35e0`）的 F2 与 F5。
 
@@ -17,7 +23,7 @@
 - 测试：新增 `StrongReminderPrivacyTest`（6 条，纯函数口径）、`ReminderConfigStrongPrivacyTest`（4 条，默认值与往返）、`CrashLoggerConcurrencyTest`（2 条，8 线程 × 5 条并发不丢不重、`takeLast` 读走并清空）。门禁 `testDebugUnitTest detekt lintDebug verifySpecSync --no-parallel` → BUILD SUCCESSFUL，**167 类 / 1366 条 / 0 失败 / 0 错误 / 1 跳过**，lint 0 issue、detekt 0（79 B）、verifySpecSync 通过。
 - 本轮边界：普通与升级提醒的**通知栏**标题仍带药名（不在锁屏路径上）；F7 Argon2id 读侧上界、S1 WebDAV 重定向与 Basic 凭据跨主机、S2 真机回归仍未做。
 
-## [未发布] — 2026-11-22 · 独立审查修复：附件路径约束、恢复密钥回滚、WebDAV 上限对齐与文档漂移
+### 2026-11-22 · 独立审查修复：附件路径约束、恢复密钥回滚、WebDAV 上限对齐与文档漂移
 
 代码与文档改动，不动版本号与库结构（仍 1.2.19 / 131、`ASHKB_DB_VERSION` 21）。来源：`ASHKB-独立审查报告-2026-11-22.md`（基线 `18b35e0`），按项目自身威胁模型「诱导用户导入攻击者提供、口令已知的备份」评级。
 
@@ -27,7 +33,7 @@
 - **F6（低）文档-代码漂移六处**：`AppDatabase` 版本史补 20→21（`supplements.daily_max_unit`）；README 的 PBKDF2→Argon2id、Room v20→v21、单测「近 900 条」→「1300+ 条」；`Color.kt` 的 `minSdk = 26`→31 并改写理由；`GlassSheet` KDoc 与纯透传实现对齐；`BackupPasswordRules` 改 Argon2id 口径、删「136 ms」。
 - 测试：`AttachmentPathTest` +3（18 条）、`RestoreRollbackTest` +2（6 条）、新增 `VaultKeyStoreTest`（6 条）、`BackupPickLimitTest` +1。门禁 `testDebugUnitTest detekt lintDebug verifySpecSync --no-parallel` → BUILD SUCCESSFUL，**164 类 / 1354 条 / 0 失败 / 0 错误 / 1 跳过**，lint 0、detekt 0、verifySpecSync 通过。
 
-## [未发布] — 2026-11-22 · 文档快照去自引用、体积报告回写与旧候选销账
+### 2026-11-22 · 文档快照去自引用、体积报告回写与旧候选销账
 
 纯文档改动，不动代码、不改版本号与库结构。
 
@@ -35,7 +41,7 @@
 - `docs/v1219-dependency-r8-size-audit.md`：正文数字全部回写为四阶段升级后的 release 构建：APK 5,572,961 B、`classes.dex` 4,153,824 B（74.54%）、`resources.arsc` 1,099,088 B（19.72%）、R8 映射 4,940 类、aapt2 资源 2,095 项（`string` 1,886）；升级前数字不再作为当前值出现。
 - `HANDOFF-STATUS.md` §7-D 第 10 条：药单 `endDate` UI、通知点击深链、R5 不同 vault key 换机恢复、detekt 基线收缩逐条写明「不做 / 已覆盖 / 重开条件」，旧候选不再挂账。
 
-## [未发布] — 2026-11-22 · 旧候选销账与文档对齐
+### 2026-11-22 · 旧候选销账与文档对齐
 
 纯文档改动，不动代码、不改版本号与库结构。
 
@@ -43,7 +49,7 @@
 - `docs/v1219-dependency-r8-size-audit.md`：§0 补记四阶段升级后的 APK 5,572,961 B 与三次中间值，旧数保留为基线方法学示例。
 - `NEXT-SESSION.md`：标题 / 当前状态 / 门禁基线与「已拍板关闭」同步到当时的工程 HEAD `5fafca9` 与两项裁决。
 
-## [未发布] — 2026-11-21 · 文档卫生：可靠性证明归档、未取证标注与接手状态更新
+### 2026-11-21 · 文档卫生：可靠性证明归档、未取证标注与接手状态更新
 
 纯文档改动，不动代码、不改版本号与库结构。
 
@@ -51,7 +57,7 @@
 - `docs/v1215-acceptance/results.md` 与 `SUMMARY.md`：把报表 Error 态、2× 待服药折行、输入弹层键盘遮挡、20 MB 附件取回侧、演练文案取证五项逐一标注「**待手机返修后**」；设备自 2026-11-21 起送修，本机无 emulator / system image，不把「无法判定」写成「通过」。
 - `NEXT-SESSION.md`：标题、当前状态与「续作线索」重写到当时的工程 HEAD `2a2934b`，补齐 lint 清零、CI 提速、四阶段依赖升级、可靠性测试与真机遗留项；保留旧探针 `.probe-mig.py` 与 Devin 邀约的「不要重做」提醒。
 
-## [未发布] — 2026-11-21 · 依赖升级第 4 步：Room 2.8.5 + Kotlin 2.2.20 + KSP2
+### 2026-11-21 · 依赖升级第 4 步：Room 2.8.5 + Kotlin 2.2.20 + KSP2
 
 四阶段依赖升级的最后一步。三处版本同时上调，只动构建配置与一处测试适配，产品代码未改。
 
@@ -78,7 +84,7 @@
 
 - 真机回归（手机维修中）：Kotlin 2.2 编译器与 Room 2.8 运行时行为、Compose 1.11 滚动/弹层/焦点仍需实机确认；未 bump 版本号、未发版。
 
-## [未发布] — 2026-11-21 · 依赖升级第 3 步：Compose BOM 2024.09.03 → 2026.06.01
+### 2026-11-21 · 依赖升级第 3 步：Compose BOM 2024.09.03 → 2026.06.01
 
 按四阶段排期做第 3 步：Compose 全家桶升到当前工具链能承载的最新稳定 BOM。
 
@@ -100,7 +106,7 @@
 
 **未做**：真机回归（手机维修中）——Compose 1.11 的滚动、弹层与焦点行为可能有差异，建议装机走查知识库编辑弹层、备份页、提醒自检、长列表滚动；未 bump 版本号、未发版。
 
-## [未发布] — 2026-11-21 · 依赖升级第 2 步：工具链 Gradle 8.13 + AGP 8.13.2 + compileSdk/targetSdk 36
+### 2026-11-21 · 依赖升级第 2 步：工具链 Gradle 8.13 + AGP 8.13.2 + compileSdk/targetSdk 36
 
 按 `docs/v1219-dependency-r8-size-audit.md` §7 的四阶段排期，第 2 步把编译工具链提到 Android 16（API 36）。
 
@@ -127,7 +133,7 @@
 
 **行为风险（未真机验证）**：targetSdk 36 意味着 Android 16 的强制 edge-to-edge（App 已在 `MainActivity` 调 `enableEdgeToEdge()`，主题已是透明系统栏）、predictive back 默认开启、16 KB 页大小支持（已通过 zipalign 校验）。需真机回归：三键/手势返回、状态栏与导航栏避让、通知权限与全屏提醒。
 
-## [未发布] — 2026-11-21 · 依赖升级第 1 步：androidx.test 两个包（仅测试侧）
+### 2026-11-21 · 依赖升级第 1 步：androidx.test 两个包（仅测试侧）
 
 按 `docs/v1219-dependency-r8-size-audit.md` §7 的四阶段排期，先做风险最低的第 1 步——只动 instrumented 测试的两个依赖，**产品代码、`compileSdk`、版本号、库结构全部不变**。
 
@@ -140,7 +146,7 @@
 - 验证：`testDebugUnitTest detekt lintDebug verifySpecSync assembleDebugAndroidTest` → BUILD SUCCESSFUL；单测 **163 类 / 1342 条 / 0 失败 / 0 错误 / 1 跳过**；lint 0 issue；detekt 0；instrumented 测试 APK 能正常编译打包（`assembleDebugAndroidTest` 通过，说明新版 AAR 不要求 compileSdk 36）。
 - 未做真机 instrumented 运行（当前手机在维修）；后续真机可用时建议补跑一次 `connectedDebugAndroidTest`。
 
-## [未发布] — 2026-11-21 · CI 提速：一条串行流水线拆成三条并行 job
+### 2026-11-21 · CI 提速：一条串行流水线拆成三条并行 job
 
 原 `.github/workflows/ci.yml` 只有一条 `build-and-test`，把 `assembleDebug`、`assembleRelease`、`testDebugUnitTest`、`detekt`、`lint` 全塞进同一个 job 串行跑，**单线程排队**是主要成本。本轮按依赖关系拆成三条互不依赖的并行 job，并去掉两处重复劳动。**无产品代码变更**、**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）、**无版本号变更**。
 
@@ -178,7 +184,7 @@
 - 未引入远程构建缓存（Gradle Develocity 之类）：三条 job 各自下载依赖仍有约 20 s 固定开销，若以后要压到 1 分半再考虑。
 - 首跑仍慢于热跑（要建立 `setup-gradle` 与 Robolectric 缓存）；对 PR 首次触发，预计 3~4 分钟。
 
-## [未发布] — 2026-11-21 · Lint 全清零：169 warning → 0（57 条改代码，7 类写明理由豁免）
+### 2026-11-21 · Lint 全清零：169 warning → 0（57 条改代码，7 类写明理由豁免）
 
 `app/build/reports/lint-results-debug.xml` 原有 **169 warning + 8 information**，本轮全部结清：**57 条真改代码**，**7 类共 151 条**写进新建的 `lint.xml` 并逐条注明理由。**无库结构变更**（`ASHKB_DB_VERSION` 仍 **21**）、**无版本号变更**、**无用户可见行为变更**。
 
@@ -213,7 +219,7 @@
 
 ⚠️ 未 bump 版本号、未发版、未上真机：本轮只动版本守卫、参数顺序、状态容器与资源清理，理论上无行为变更，但仍建议装机冒烟一次——提醒可靠性自检、药单编辑器、趋势图、知识库、备份/紧急/报表四页各点一遍。
 
-## [未发布] — 2026-11-21 · 测试补强：恢复回滚 / 迁移回填 / 三处零覆盖分支
+### 2026-11-21 · 测试补强：恢复回滚 / 迁移回填 / 三处零覆盖分支
 
 `HANDOFF-STATUS.md` 里记着的几条「有代码、无证据」这次一并补上。**只加测试与可测性注入，不改任何业务行为**；无库结构变更（`ASHKB_DB_VERSION` 仍 **21**）、无版本号变更、无新增 strings。
 

@@ -32,8 +32,8 @@ android {
         applicationId = "com.ashkb.app"
         minSdk = 31
         targetSdk = 36
-        versionCode = 131
-        versionName = "1.2.19"
+        versionCode = 132
+        versionName = "1.2.20"
         // 批次 2（测试安全网）：instrumented 测试（Room schema 漂移校验）需要 runner
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
