@@ -163,6 +163,11 @@ jobs:
         with:
           gradle-version: '8.13'
 
+      # 审核卡 C1-05：tag 构建必须自己跑完全部门禁。unit-tests / lint 两个 job 在 tag 上一律跳过，
+      # 被打 tag 的那个提交可能从未过门，正式签名包不能建立在未验证的代码上。
+      - name: Gates (unit tests + detekt + lint + spec sync)
+        run: gradle testDebugUnitTest detekt lintDebug verifySpecSync --console=plain
+
       # ---- 先验外部依赖，缺一个就失败（绝不伪造"已配置"）----
       - name: Require release signing material
         env:
