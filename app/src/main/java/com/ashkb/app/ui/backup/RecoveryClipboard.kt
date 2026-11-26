@@ -54,6 +54,44 @@ internal object RecoveryClipboard {
     }
 
     /**
+     * 审核卡 C1-04：60 秒定时清除在 App 退到后台后必然失效——Android 10+ 只允许**持有输入焦点**的
+     * 前台应用读写剪贴板，后台里 `primaryClip` 恒为 null，[clearIfStillTheCode] 直接 return。
+     * 这里补一道：复制满 [CLEAR_DELAY_MS] 之后，本应用任一 Activity 回到前台并拿到窗口焦点时再清一次
+     * （仍只清「仍是这段码」的剪贴板）。触发一次即注销。用户始终不回到本应用时，本函数无能为力。
+     */
+    internal fun scheduleClearOnReturn(context: Context, manager: ClipboardManager, code: String) {
+        val app = context.applicationContext as? android.app.Application ?: return
+        val deadline = android.os.SystemClock.elapsedRealtime() + CLEAR_DELAY_MS
+        app.registerActivityLifecycleCallbacks(object : android.app.Application.ActivityLifecycleCallbacks {
+            override fun onActivityResumed(activity: android.app.Activity) {
+                if (android.os.SystemClock.elapsedRealtime() < deadline) return
+                app.unregisterActivityLifecycleCallbacks(this)
+                val decor = activity.window?.decorView ?: return
+                if (decor.hasWindowFocus()) {
+                    clearIfStillTheCode(manager, code)
+                    return
+                }
+                decor.viewTreeObserver.addOnWindowFocusChangeListener(
+                    object : android.view.ViewTreeObserver.OnWindowFocusChangeListener {
+                        override fun onWindowFocusChanged(hasFocus: Boolean) {
+                            if (!hasFocus) return
+                            decor.viewTreeObserver.removeOnWindowFocusChangeListener(this)
+                            clearIfStillTheCode(manager, code)
+                        }
+                    },
+                )
+            }
+
+            override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) = Unit
+            override fun onActivityStarted(activity: android.app.Activity) = Unit
+            override fun onActivityPaused(activity: android.app.Activity) = Unit
+            override fun onActivityStopped(activity: android.app.Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) = Unit
+            override fun onActivityDestroyed(activity: android.app.Activity) = Unit
+        })
+    }
+
+    /**
      * 60 秒后的清理动作：只有剪贴板内容仍是这段恢复码才清空。
      *
      * 单独抽成 `internal` 函数是为了能在**不等待 60 秒**的前提下测它——
