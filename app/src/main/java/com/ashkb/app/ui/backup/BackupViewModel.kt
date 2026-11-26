@@ -561,14 +561,15 @@ class BackupViewModel(
         viewModelScope.launch {
             _busy.value = true
             try {
-                val (name, meds) = repo.importProfileJson(String(bytes, Charsets.UTF_8))
-                // v1.2.11（缺陷工单 A04）：导入成功后**按新药单重建计划槽位并重排提醒**。
-                //
-                // 缺陷原状：导入只写 profile 与 medications 两张表就报「导入完成」。用户回到
-                // 首页看到的仍是导入前的今日用药与提醒——因为 `planned_slots` 是另一张表，
-                // 而 `ReminderScheduler` 的闹钟也是导入前按旧药单排的。用户以为导入失败了。
-                // 工单要求「提示成功前按新药单重建计划槽位并取消/重排提醒」，故放在 info() 之前。
-                rematerializeAfterImport()
+                // 审核卡 C1-02：导入写库与「重建计划槽位 + 重排提醒」必须一起跑完——页面返回导致
+                // viewModelScope 取消时，旧写法会在写库之后、重排之前被打断，药单换了而提醒还是旧的。
+                val (name, meds) = withContext(kotlinx.coroutines.NonCancellable) {
+                    val imported = repo.importProfileJson(String(bytes, Charsets.UTF_8))
+                    // v1.2.11（缺陷工单 A04）：导入成功后**按新药单重建计划槽位并重排提醒**。
+                    // 工单要求「提示成功前按新药单重建计划槽位并取消/重排提醒」，故放在 info() 之前。
+                    rematerializeAfterImport()
+                    imported
+                }
                 info(app.getString(R.string.vm_profile_import_done, name, meds))
             } catch (e: Exception) {
                 fail(app.getString(R.string.vm_profile_import_failed, errText(e)))
