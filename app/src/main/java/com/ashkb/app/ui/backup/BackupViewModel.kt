@@ -440,21 +440,19 @@ class BackupViewModel(
                 val modeNote = if (mode == BackupEngine.RestoreMode.FULL_ROLLBACK)
                     app.getString(R.string.vm_restore_mode_full)
                 else app.getString(R.string.vm_restore_mode_merge)
-                val v = repo.restore(d, pass, mode)
-                wipeRestorePassword()
-                _restoreResult.value = v
-                // v1.2.11（缺陷工单 B05）：**报成功之前**把运行态刷成恢复后的库。
-                //
-                // 缺陷原状：恢复把整库换成了另一份数据，但闹钟、`planned_slots`、锁屏急救卡
-                // 全是恢复前按旧库排的，而刷新只在冷启动跑。用户看到「恢复成功」回到首页，
-                // 药单与提醒仍是旧的，直到下次冷启动才对齐（锁屏急救卡同理——那是急救场景，
-                // 显示恢复前的诊断/联系人后果最重）。
-                //
-                // 顺序与理由见 `AshkbApplication.rescheduleAllChains`：与启动期同一份实现，
-                // 不复制第二份调度。只在 `rowsOk` 时刷新——校验没过的事务已整体回滚，
-                // 库还是恢复前的样子，重排一遍纯属多余（工单：「恢复失败/回滚路径不得触发
-                // 不必要的重排」）。
-                if (v.rowsOk) refreshRuntimeAfterRestore()
+                // 审核卡 C1-01：「写库 + 运行态刷新」必须作为一个不可取消的整体跑完。
+                // 本 VM 挂在 Backup 路由的 NavBackStackEntry 上，用户中途返回 ⇒ viewModelScope 取消；
+                // repo.restore() 的阻塞写库照样提交，但回到这里会抛 CancellationException，
+                // refreshRuntimeAfterRestore() 被跳过——库已换、闹钟 / 计划槽位 / 锁屏急救卡仍是旧的。
+                val v = withContext(kotlinx.coroutines.NonCancellable) {
+                    val result = repo.restore(d, pass, mode)
+                    wipeRestorePassword()
+                    _restoreResult.value = result
+                    // v1.2.11（缺陷工单 B05）：**报成功之前**把运行态刷成恢复后的库。
+                    // 只在 `rowsOk` 时刷新——校验没过的事务已整体回滚，库还是恢复前的样子。
+                    if (result.rowsOk) refreshRuntimeAfterRestore()
+                    result
+                }
                 if (v.rowsOk) info(app.getString(R.string.vm_restore_done, modeNote, v.totalRows))
                 else info(app.getString(R.string.vm_restore_incomplete, verifyIssues(v)))
             } catch (e: Exception) {
