@@ -371,9 +371,13 @@ class BackupViewModel(
         _restoreResult.value = null
         wipeRestorePassword()
         restorePassword = password.toCharArray()
-        val payload = org.json.JSONObject(d.payload)
-        val rows = payload.getJSONObject("manifest").keys().asSequence().map { k ->
-            payload.getJSONObject("tables").getJSONArray(k).length() }.sum()
+        // 审核卡 C1-03：本函数在 viewModelScope（Main.immediate）里被调用；整库明文最大 64 MiB，
+        // 在主线程上重新解析一遍会直接 ANR。行数统计改到 Default 线程。
+        val rows = withContext(Dispatchers.Default) {
+            val payload = org.json.JSONObject(d.payload)
+            payload.getJSONObject("manifest").keys().asSequence().map { k ->
+                payload.getJSONObject("tables").getJSONArray(k).length() }.sum()
+        }
         info(app.getString(
             R.string.vm_restore_verify_ok,
             d.schemaVersion, d.createdAt.take(19), rows,
