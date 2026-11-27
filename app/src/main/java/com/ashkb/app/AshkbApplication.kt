@@ -213,6 +213,8 @@ class AshkbApplication : Application() {
             Log.w("ASHKB", "materialize planned slots failed", it)
         }
         // v1.0.59 B5：三源提醒——各自 runCatching 兜底，互不影响（与 BootReceiver 对称）
+        // 审核卡 C1-11：关闭分支的 cancelAllFuture 同样要兜底——它也查库、也走 AlarmManager binder，
+        // 一旦抛出，下面的 BASDAI / 补剂 / 锁屏急救卡 / 久坐链全部跳过，异常还会冒到恢复流程报「恢复失败」。
         val cfg = ReminderConfigRepository(this)
         if (cfg.checkupEnabled()) {
             runCatching {
@@ -221,7 +223,7 @@ class AshkbApplication : Application() {
                 )
             }
         } else {
-            CheckupReminderScheduler.cancelAllFuture(this, db.checkupRecordDao().listAll())
+            runCatching { CheckupReminderScheduler.cancelAllFuture(this, db.checkupRecordDao().listAll()) }
         }
         runCatching {
             BasdaiReminderScheduler.rescheduleAll(
@@ -235,7 +237,7 @@ class AshkbApplication : Application() {
                 ExerciseReminderScheduler.rescheduleAll(this, activePlan, hasLogged, today, now)
             }
         } else {
-            ExerciseReminderScheduler.cancelAllFuture(this, today)
+            runCatching { ExerciseReminderScheduler.cancelAllFuture(this, today) }
         }
         // v1.2.4：补剂提醒——与用药/复诊/BASDAI/运动同批重排。
         // 补剂没有独立开关：频次是「每日」且填了时刻才排得出闹钟，没填时刻自然一条也不排
