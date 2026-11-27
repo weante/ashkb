@@ -174,9 +174,10 @@ private fun OverviewTab(vm: ReportViewModel) {
         if (failure != null) {
             StatsErrorBlock(message = failure, onRetry = vm::refresh, modifier = Modifier.fillMaxSize())
         } else {
-            Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(Modifier.height(48.dp))
-                Text(stringResource(R.string.report_stats_loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // 审核卡 C2-03：首次加载与趋势 / 周月报两页同一形态（骨架屏占住版式），
+            // 不再是一行居中文字 + 硬编码 24dp / 48dp。文案仍用 report_stats_loading，不新增资源。
+            Box(Modifier.fillMaxSize().padding(horizontal = Spacing.lg)) {
+                LoadingBlock(minHeight = 240.dp, label = stringResource(R.string.report_stats_loading))
             }
         }
         return
