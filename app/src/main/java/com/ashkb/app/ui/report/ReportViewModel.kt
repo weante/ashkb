@@ -176,9 +176,14 @@ class ReportViewModel(
                 if (_periodDays.value == days) {
                     _periodic.value = fresh
                     loadedPeriodDays = days
+                    _periodicFailed.value = null
                 }
             } catch (e: Exception) {
-                _message.value = app.getString(R.string.vm_report_stats_failed, e.message)
+                // 审核卡 C2-10：除一次性 Snackbar 外，把失败留在页面可读的状态里（见 [periodicFailed]）。
+                // 同样只认当前窗口：旧窗口的失败晚到时不该给新窗口挂上错误。
+                val text = app.getString(R.string.vm_report_stats_failed, e.message)
+                _message.value = text
+                if (_periodDays.value == days) _periodicFailed.value = text
             } finally {
                 _busy.value = false
             }
