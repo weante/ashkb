@@ -321,11 +321,15 @@ class BackupViewModel(
 
     /** 查看已存恢复码（自用 App 可再查看：Keystore 解密后经 recoveryReveal 展示）。 */
     fun revealRecoveryCode() {
-        val code = repo.recoveryCode() ?: run {
-            fail(app.getString(R.string.vm_recovery_not_set))
-            return
+        // 审核卡 C1-07：recoveryCode() 是一次 AndroidKeyStore 解密，不在主线程（点击回调）上做。
+        viewModelScope.launch {
+            val code = withContext(Dispatchers.IO) { repo.recoveryCode() }
+            if (code == null) {
+                fail(app.getString(R.string.vm_recovery_not_set))
+                return@launch
+            }
+            _recoveryReveal.value = code
         }
-        _recoveryReveal.value = code
     }
 
     fun consumeRecoveryReveal() { _recoveryReveal.value = null }
