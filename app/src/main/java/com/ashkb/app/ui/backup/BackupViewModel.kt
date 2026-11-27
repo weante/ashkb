@@ -94,9 +94,16 @@ class BackupViewModel(
     val recoveryReveal: StateFlow<String?> = _recoveryReveal
 
     init {
-        val (u, usr) = repo.webdavConfig()
-        _davUrl.value = u
-        _davUser.value = usr
+        // 审核卡 C1-06：webdavConfig() 是 3 次 AndroidKeyStore 解密，hasRecoveryCode() 再 1 次——
+        // 都是 binder 调用 + 磁盘读，不能在 VM 构造（主线程）上同步做。挪到 IO，回主线程再写 StateFlow。
+        viewModelScope.launch {
+            val (cfg, hasCode) = withContext(Dispatchers.IO) {
+                repo.webdavConfig() to repo.hasRecoveryCode()
+            }
+            _davUrl.value = cfg.first
+            _davUser.value = cfg.second
+            _recoveryCodeSet.value = hasCode
+        }
         // 附件统计不在这里拉：页面用 LaunchedEffect 拉，既满足"进页面就有数"，
         // 又能在每次回到该页时刷新，避免 init 只跑一次的陈旧快照
         // v1.2.11（缺陷工单 B07）：撤销入口的快照同样交给页面的 LaunchedEffect 刷新，
