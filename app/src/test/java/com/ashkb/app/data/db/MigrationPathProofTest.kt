@@ -60,6 +60,10 @@ class MigrationPathProofTest {
     @Test fun `upgrade from v14`() = upgradeFrom(14)
     @Test fun `upgrade from v15`() = upgradeFrom(15)
     @Test fun `upgrade from v16`() = upgradeFrom(16)
+    @Test fun `upgrade from v17`() = upgradeFrom(17)
+    @Test fun `upgrade from v18`() = upgradeFrom(18)
+    @Test fun `upgrade from v19`() = upgradeFrom(19)
+    @Test fun `upgrade from v20`() = upgradeFrom(20)
 
     /**
      * 行为面：v8 时代就存在的行，升级后必须被回填成与 KbSearch.searchText 完全相同的字符串。
