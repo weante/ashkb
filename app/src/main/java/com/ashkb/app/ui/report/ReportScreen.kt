@@ -232,10 +232,10 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
     // 而本批的约束是不新增基线。三态（无数据/失败/过期）已上移到 [OverviewTab] 处理。
     if (o == null) return
     LazyColumn(
-        Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        item { Spacer(Modifier.height(12.dp)) }
+        item { Spacer(Modifier.height(Spacing.md)) }
 
         item {
             // v1.0.77（批次 3b）：这张卡片的主指标改为**计划剂量口径**（分母 = 已到点的计划剂量数）——
@@ -311,7 +311,7 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
 
         item {
             SectionCard(title = stringResource(R.string.report_exercise_section)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                     Box(Modifier.weight(1f)) {
                         StatTile(stringResource(R.string.report_completed_count), "${o.exercise.doneCount}")
                     }
@@ -330,7 +330,7 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
 
         item {
             SectionCard(title = stringResource(R.string.symptom_overview_title)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                     Box(Modifier.weight(1f)) {
                         StatTile(stringResource(R.string.report_record_days), "${o.symptom.daysRecorded}/30")
                     }
@@ -348,8 +348,8 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
                         StatTile(stringResource(R.string.report_avg_stiffness), stiffness)
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Spacer(Modifier.height(Spacing.sm))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                     Box(Modifier.weight(1f)) {
                         StatTile(stringResource(R.string.symptom_night_pain_days), "${o.symptom.nightPainDays}")
                     }
@@ -395,7 +395,7 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
                 if (o.basdaiLatest == null) {
                     Text(stringResource(R.string.report_no_basdai), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                         // v1.2.10（UI 2.0 批次 D「换图」）：环比从「另一格数字」收进「最新」的增量行。
                         // 拆成两格时，环比那格只有一个孤立差值，看不出它相对谁；收成增量行后
                         // 「最新 4.2/10 ▼ 环比 0.4」一眼就是一句话。方向着色遵循医学语义：
@@ -435,7 +435,7 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
 
         item {
             SectionCard(title = stringResource(R.string.report_flare_weight_section)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                     Box(Modifier.weight(1f)) {
                         StatTile(
                             stringResource(R.string.report_flare_count),
@@ -459,7 +459,7 @@ private fun OverviewPage(o: ReportRepository.Overview?) {
             }
         }
 
-        item { Spacer(Modifier.height(20.dp)) }
+        item { Spacer(Modifier.height(Spacing.xl)) }
     }
 }
 
