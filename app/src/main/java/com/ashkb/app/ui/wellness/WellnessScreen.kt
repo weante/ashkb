@@ -796,7 +796,12 @@ private fun SupplementCardRow(
             // 按钮全部消失）。weight(1f) 既保留"点整行开详情"的触达区，又给按钮留下自己的宽度。
             // v1.0.89（批次 14）：根改成 Column 后，本列是这一行唯一的子项，fillMaxWidth() 不再
             // 与任何兄弟争宽——它只吃自己这一行，顺带把「点整行开详情」的触达区还给了整行。
-            Modifier.fillMaxWidth().clickable { actions.onOpenDetail() },
+            // 审核卡 C2-08：补 onClickLabel——读屏原先只念出补剂名称，不说明「双击会打开详情」；
+            // 同时补 48dp 最小触控高度（名称 + 类别两行在小字号下不足 48dp）。
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Size.touchMin)
+                .clickable(onClickLabel = stringResource(R.string.common_view_details)) { actions.onOpenDetail() },
             verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
         ) {
             Text("${sup.name} ${sup.dose}", style = MaterialTheme.typography.bodyMedium)
