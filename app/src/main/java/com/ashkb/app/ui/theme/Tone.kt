@@ -15,7 +15,10 @@ fun StatusTone.colors(): Pair<Color, Color> {
     val cs = MaterialTheme.colorScheme
     val cl = Clinical.colors
     return when (this) {
-        StatusTone.Neutral -> cs.surfaceContainerHighest to cs.onSurfaceVariant
+        // 审核卡 C2-09：中性胶囊原为 onSurfaceVariant（5A6B78）压在 surfaceContainerHighest（E2E8ED）上，
+        // 浅色主题对比度 4.46:1，低于 WCAG AA 小字号 4.5:1（verify-palette-contrast.ps1 只校验 M3 的
+        // on*/container 标准配对，这一对不在其中）。底色降一档到 surfaceContainerHigh：浅色 4.85:1、深色 6.67:1。
+        StatusTone.Neutral -> cs.surfaceContainerHigh to cs.onSurfaceVariant
         StatusTone.Brand -> cs.tertiaryContainer to cs.onTertiaryContainer
         StatusTone.Info -> cs.primaryContainer to cs.onPrimaryContainer
         StatusTone.Success -> cl.successContainer to cl.onSuccessContainer
