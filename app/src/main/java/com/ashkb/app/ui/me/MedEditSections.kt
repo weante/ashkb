@@ -182,12 +182,16 @@ internal fun MedBasicsSection(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clickable {
+                            // 审核卡 C2-06：原先整行只有一行 bodySmall 文字高（约 18dp），远低于 48dp 触控下限，
+                            // 且没有 role，读屏不报「按钮」。补触控高度 + Role.Button（全限定名，不新增 import）。
+                            .heightIn(min = Size.touchMin)
+                            .clickable(role = androidx.compose.ui.semantics.Role.Button) {
                                 nameKey.value = s.key
                                 if (name.value.isBlank()) name.value = s.display
                                 if (brand.value.isBlank() && !s.brand.isNullOrBlank()) brand.value = s.brand
                                 if (medClass.value == MedClass.OTHER) medClass.value = s.medClass
                             },
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
                             "${s.key} · ${s.display}" +
