@@ -368,14 +368,19 @@ class MedicationRepository(private val context: Context) {
         date: LocalDate = LocalDate.now(),
     ) {
         val date = date.toString()
-        val existing = slotKey?.let { logDao.find(med.id, date, it) }
-        val now = nowIso()
-        val log = (existing ?: MedicationLog(
-            id = Ids.new("mlog"), date = date, recordedAt = now, backfill = false,
-            medId = med.id, medKey = med.nameKey, medName = med.name, doseSnapshot = med.dose,
-            scheduledTime = slotTime, slotKey = slotKey, status = "skipped", reason = reason,
-        )).copy(status = "skipped", reason = reason, notes = note, recordedAt = now, takenAt = null)
-        logDao.upsert(log)
+        // 审核卡 C1-10：与 [checkIn]（缺陷工单 B04）同一条规则——查找 → 建/改日志必须同事务。
+        // 否则通知栏「已服」与界面「跳过」并发时两边都 find 到 null、各自新建一行；后到的那行撞
+        // (date, med_id, slot_key) 唯一索引，@Upsert 转为按新主键 UPDATE、命中 0 行，这次跳过被静默丢掉。
+        db.withTransaction {
+            val existing = slotKey?.let { logDao.find(med.id, date, it) }
+            val now = nowIso()
+            val log = (existing ?: MedicationLog(
+                id = Ids.new("mlog"), date = date, recordedAt = now, backfill = false,
+                medId = med.id, medKey = med.nameKey, medName = med.name, doseSnapshot = med.dose,
+                scheduledTime = slotTime, slotKey = slotKey, status = "skipped", reason = reason,
+            )).copy(status = "skipped", reason = reason, notes = note, recordedAt = now, takenAt = null)
+            logDao.upsert(log)
+        }
     }
 
     /**
