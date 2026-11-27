@@ -542,6 +542,26 @@ private fun StatsStaleNote(onRetry: () -> Unit) {
     }
 }
 
+/**
+ * 审核卡 C2-11R1：周月报页的「无数据 / 失败 / 过期」三态，从 [PeriodicPage] 抽出。
+ *
+ * 为什么单独成函数：[PeriodicPage] 的圈复杂度在改动前已是 14（detekt 阈值 15，且不在基线里），
+ * 把两处「是否失败」的判断直接写进去会顶到 16；本项目约定新代码不进基线，所以分支放在这里。
+ * 三态与概览 / 趋势页同口径（外部审查 §U-3）：无数据 + 失败 → 错误块；无数据 → 骨架屏；
+ * 有数据 + 失败 → 保留数据并标注可能过期；有数据且没失败 → 什么都不画（不占任何间距）。
+ *
+ * 用 `internal` 而不是 `private`：本卡提交时它还没有调用方（C2-11R2 才接线），
+ * `private` 会让 detekt 的 UnusedPrivateMember 挡住这次中间提交。
+ */
+@Composable
+internal fun PeriodicStatusBlock(hasData: Boolean, failed: String?, onRetry: () -> Unit) {
+    when {
+        !hasData && failed != null -> StatsErrorBlock(message = failed, onRetry = onRetry)
+        !hasData -> LoadingBlock(minHeight = 240.dp, label = stringResource(R.string.report_stats_loading_dots))
+        failed != null -> StatsStaleNote(onRetry = onRetry)
+    }
+}
+
 // ======================= 趋势 =======================
 
 @Composable
