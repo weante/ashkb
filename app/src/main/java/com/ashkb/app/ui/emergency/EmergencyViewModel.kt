@@ -87,6 +87,17 @@ class EmergencyViewModel(
 
     suspend fun emergencyCards(): List<KbEntry> = repo.kbByCategory("emergency")
 
+    /**
+     * 审核卡 C2-02：五张应急场景卡的**可观察**数据源（`null` = 尚未拿到首个结果，即加载中）。
+     *
+     * 旧入口 [emergencyCards] 是一次性查询，页面在 `LaunchedEffect(Unit)` 里只取一次。首装后立刻打开
+     * 紧急卡页时，启动期的知识库种子导入（`AshkbApplication.onCreate` 里 `appScope.launch` 的
+     * `importKbSeedIfNeeded`）可能还没写完，页面拿到空列表后不会再取——五张场景卡要退出重进才出现。
+     * 改为 Room Flow 后种子一写入就自动重发。排序与旧查询同一条 SQL（`KbEntryDao.observeByCategory`）。
+     */
+    val emergencyCardsFlow: StateFlow<List<KbEntry>?> = repo.observeKbByCategory("emergency")
+        .stateIn<List<KbEntry>?>(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     /** M7 紧急卡打印版 PDF（供急救人员参考，白底打印友好）。 */
     fun exportCardPdf(onReady: (Intent) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
