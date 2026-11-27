@@ -74,6 +74,16 @@ class ReportViewModel(
     val loadFailed: StateFlow<String?> = _loadFailed
 
     /**
+     * 审核卡 C2-01：周月报页**加载失败**的持久状态（null = 本次没失败）。
+     *
+     * 与 [loadFailed] 同一条理由（外部审查 §U-3）：[loadPeriodic] 失败时只写一次性的 [_message]，
+     * Snackbar 一消失，周月报页首次进入时就永远停在骨架屏上。单独一条而不复用 [loadFailed]：
+     * 后者驱动的是概览页 / 趋势页的「可能不是最新的」提示，周月报失败不该让那两页挂上过期标记。
+     */
+    private val _periodicFailed = MutableStateFlow<String?>(null)
+    val periodicFailed: StateFlow<String?> = _periodicFailed
+
+    /**
      * v1.0.86（批次 11）：**进入报表页时才首次取数**（此前是 `init { refresh() }`，而 `AppShell`
      * 在应用启动时就创建本 VM → 哪怕从不看报表，冷启动也要查一次库）。
      *
