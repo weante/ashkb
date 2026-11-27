@@ -178,23 +178,33 @@ private fun EmergencyCallBar() {
  */
 @Composable
 private fun EmergencySceneCards(vm: EmergencyViewModel) {
-    var cards by remember { mutableStateOf<List<KbEntry>>(emptyList()) }
+    // 审核卡 C2-12：改为订阅 [EmergencyViewModel.emergencyCardsFlow]（C2-02）。旧写法
+    // `LaunchedEffect(Unit) { cards = vm.emergencyCards() }` 有两个问题：① 只取一次，首装时种子还没写完
+    // 就拿到空列表且不再重取；② 查询抛异常会直接冒出 LaunchedEffect 让整个应用崩溃。
+    // 同时补齐加载中 / 空两种状态——原先两种情况下这里都是一片空白，急救时分不清是没有还是没加载出来。
+    val cards by vm.emergencyCardsFlow.collectAsStateWithLifecycle()
     var selectedCard by remember { mutableStateOf<KbEntry?>(null) }
     val today by vm.date.collectAsStateWithLifecycle()
 
-    LaunchedEffect(Unit) { cards = vm.emergencyCards() }
-
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        cards.forEach { card ->
-            AlertBanner(
-                tone = StatusTone.Danger,
-                icon = Icons.Rounded.WarningAmber,
-                title = card.title,
-                body = card.summary,
-                actionLabel = stringResource(R.string.common_view_details),
-                onAction = { selectedCard = card },
-                titleStyle = MaterialTheme.typography.titleLarge,
-            )
+    val loaded = cards
+    when {
+        loaded == null -> com.ashkb.app.ui.components.LoadingBlock(bars = 2)
+        loaded.isEmpty() -> EmptyState(
+            icon = Icons.Rounded.WarningAmber,
+            title = stringResource(R.string.common_no_data),
+        )
+        else -> Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            loaded.forEach { card ->
+                AlertBanner(
+                    tone = StatusTone.Danger,
+                    icon = Icons.Rounded.WarningAmber,
+                    title = card.title,
+                    body = card.summary,
+                    actionLabel = stringResource(R.string.common_view_details),
+                    onAction = { selectedCard = card },
+                    titleStyle = MaterialTheme.typography.titleLarge,
+                )
+            }
         }
     }
 
