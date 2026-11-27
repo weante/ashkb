@@ -272,10 +272,15 @@ class BackupViewModel(
 
     /** W4：拉取远程备份列表（sheet 打开与手动刷新时调用）。 */
     fun loadDavBackups() {
-        if (!repo.webdavConfigured()) { fail(app.getString(R.string.vm_dav_not_configured)); return }
+        if (_busy.value) return
         viewModelScope.launch {
             _busy.value = true
             try {
+                // 审核卡 C1-09：webdavConfigured() 内部是 3 次 Keystore 解密，挪出主线程。
+                if (!withContext(Dispatchers.IO) { repo.webdavConfigured() }) {
+                    fail(app.getString(R.string.vm_dav_not_configured))
+                    return@launch
+                }
                 _davBackups.value = repo.listWebdavBackups()
             } catch (e: WebDavClient.DavResponseTooLargeException) {
                 // v1.0.86（批次 11 / D6）：目录列表超限与"拉取失败"分开报——正常目录列表
