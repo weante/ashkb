@@ -246,11 +246,20 @@ class BackupViewModel(
     }
 
     fun backupWebdav(password: String) {
-        if (!repo.webdavConfigured()) { fail(app.getString(R.string.vm_dav_not_configured)); return }
-        if (!BackupPasswordRules.newBackupOk(password)) { fail(app.getString(R.string.vm_backup_password_min)); return }
+        if (_busy.value) return
         viewModelScope.launch {
             _busy.value = true
             try {
+                // 审核卡 C1-08：webdavConfigured() 内部是 3 次 Keystore 解密，挪出主线程；
+                // 两条前置检查的先后顺序与旧实现一致（先查配置、再查口令）。
+                if (!withContext(Dispatchers.IO) { repo.webdavConfigured() }) {
+                    fail(app.getString(R.string.vm_dav_not_configured))
+                    return@launch
+                }
+                if (!BackupPasswordRules.newBackupOk(password)) {
+                    fail(app.getString(R.string.vm_backup_password_min))
+                    return@launch
+                }
                 info(repo.backupWebdav(password.toCharArray()) { stage -> _stage.value = stage })
             } catch (e: Exception) {
                 fail(app.getString(R.string.vm_dav_backup_failed, errText(e)))
