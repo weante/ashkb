@@ -893,38 +893,44 @@ private fun PeriodicPage(
     // v1.0.86（批次 11）：重复触发已在 VM 侧按"参数"去重（loadPeriodic），这里保持不变——
     // 页签滑出视口被 pager 释放后重新进入仍会走这一行，但窗口没变就是空操作。
     LaunchedEffect(Unit) { vm.loadPeriodic(days) }
+    // 审核卡 C2-11R2：周月报自己的失败态（C2-01 / C2-10）。委派属性无法智能转型，先取成局部值。
+    val periodicFailed = vm.periodicFailed.collectAsStateWithLifecycle().value
 
     LazyColumn(
-        Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        item { Spacer(Modifier.height(12.dp)) }
+        item { Spacer(Modifier.height(Spacing.md)) }
 
         item {
-            // 窗口切换：沿用项目既有 FilterChip 形态（SymptomScreen 今天 / 昨天），并满足 48dp 触摸下限
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                FilterChip(
-                    selected = days == 7,
-                    onClick = { vm.setPeriodDays(7) },
-                    label = { Text(stringResource(R.string.report_periodic_week)) },
-                    modifier = Modifier.heightIn(min = Size.touchMin),
-                )
-                FilterChip(
-                    selected = days == 30,
-                    onClick = { vm.setPeriodDays(30) },
-                    label = { Text(stringResource(R.string.report_periodic_month)) },
-                    modifier = Modifier.heightIn(min = Size.touchMin),
-                )
+            // 审核卡 C2-11R2：加载 / 失败 / 过期提示与窗口切换同在一个 item 里，紧贴 chips 下方。
+            // 不单独占一个 item：LazyColumn 会给每个 item 之间加 spacedBy 间距，有数据且没失败时
+            // PeriodicStatusBlock 什么都不画，单独成 item 会凭空多出一道 12dp 空隙。
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                // 窗口切换：沿用项目既有 FilterChip 形态（SymptomScreen 今天 / 昨天），并满足 48dp 触摸下限
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FilterChip(
+                        selected = days == 7,
+                        onClick = { vm.setPeriodDays(7) },
+                        label = { Text(stringResource(R.string.report_periodic_week)) },
+                        modifier = Modifier.heightIn(min = Size.touchMin),
+                    )
+                    FilterChip(
+                        selected = days == 30,
+                        onClick = { vm.setPeriodDays(30) },
+                        label = { Text(stringResource(R.string.report_periodic_month)) },
+                        modifier = Modifier.heightIn(min = Size.touchMin),
+                    )
+                }
+                PeriodicStatusBlock(hasData = p != null, failed = periodicFailed, onRetry = { vm.loadPeriodic(days) })
             }
         }
 
-        if (p == null) {
-            item { LoadingBlock(minHeight = 240.dp, label = stringResource(R.string.report_stats_loading_dots)) }
-        } else {
+        if (p != null) {
             item {
                 // 副标题回显"这份数据是哪一段"，与上方 chips 互为确认（取 p.days，反映真实取数窗口）
                 SectionCard(
@@ -1030,7 +1036,7 @@ private fun PeriodicPage(
             }
         }
 
-        item { Spacer(Modifier.height(20.dp)) }
+        item { Spacer(Modifier.height(Spacing.xl)) }
     }
 }
 
