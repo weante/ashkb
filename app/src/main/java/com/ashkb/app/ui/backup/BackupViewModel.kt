@@ -86,7 +86,7 @@ class BackupViewModel(
     val davPicked: StateFlow<Pair<String, ByteArray>?> = _davPicked
 
     // ---- A2：备份恢复码（v1.0.27）----
-    private val _recoveryCodeSet = MutableStateFlow(repo.hasRecoveryCode())
+    private val _recoveryCodeSet = MutableStateFlow(false) // 审核卡 C1-15：真值由 init 在 IO 上解密后写入（C1-06）
     val recoveryCodeSet: StateFlow<Boolean> = _recoveryCodeSet
 
     /** 一次性事件：恢复码明文待展示（生成 / 查看后，Screen 弹窗展示并消费）。 */
