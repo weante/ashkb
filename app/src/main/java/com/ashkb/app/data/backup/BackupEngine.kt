@@ -382,6 +382,15 @@ object BackupEngine {
                 issues.add(RowIssue(R.string.backup_verify_sha_mismatch, listOf(t)))
             }
         }
+        // 审核卡 C1-12（修订版）：manifest 列了、tables 却没有的表——FULL_ROLLBACK 已把它清空。
+        // 必须过滤掉不在当前库白名单（tableNames）中的键，防止恶意备份里的注入键污染报错文案。
+        if (tablesJson != null) {
+            val knownTables = tableNames(db).toHashSet()
+            for (t in manifest.keys().asSequence().filter { !tablesJson.has(it) && it in knownTables }.toList()) {
+                rowsBad.add("$t: 期望 ${m_rows(manifest, t)} 实际 0")
+                issues.add(RowIssue(R.string.backup_verify_rows_mismatch, listOf(t, m_rows(manifest, t), 0)))
+            }
+        }
         return VerifyResult(
             rowsOk = rowsBad.isEmpty() && shaBad.isEmpty(),
             shaOk = shaBad.isEmpty(),
