@@ -51,6 +51,8 @@ internal object RecoveryClipboard {
         markSensitive(clip)
         runCatching { manager.setPrimaryClip(clip) }
         handler.postDelayed({ clearIfStillTheCode(manager, code) }, CLEAR_DELAY_MS)
+        // 审核卡 C1-14：上面这条在 App 处于后台时必然清不掉（见 scheduleClearOnReturn），回前台补清一次
+        scheduleClearOnReturn(context, manager, code)
     }
 
     /**
