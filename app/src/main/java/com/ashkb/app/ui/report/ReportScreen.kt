@@ -556,7 +556,7 @@ private fun TrendsPage(
         // v1.0.45：时间范围切换**钉在顶部**，不随 6 张图滚走
         //（FilterChip 形态与 48dp 触摸下限沿用项目既有约定）
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = Spacing.xs),
+            Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.xs),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
