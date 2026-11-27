@@ -105,4 +105,24 @@ class BackupVerifyWhitelistTest {
         assertTrue("表与 manifest 一一对应时不该误伤：${result.rowDetails}", result.rowsOk)
         assertTrue(result.shaOk)
     }
+
+    /**
+     * 审核卡 C1-12T（为 C1-12 修订版补测）：manifest 列了、tables 却缺失的**已知表**必须判为不通过——
+     * FULL_ROLLBACK 会先清空全部用户表，这张表在备份里有数据却没被写回，旧实现照报通过。
+     */
+    @Test
+    fun `manifest 里有而 tables 里缺的已知表判为未通过`() {
+        val sdb = db.openHelper.writableDatabase
+        val real = BackupEngine.tableNames(sdb)
+        val missing = real.first()
+        val tables = JSONObject().apply { real.drop(1).forEach { put(it, JSONArray()) } }
+        val manifest = emptyManifestFor(real).apply {
+            put(missing, JSONObject().put("rows", 1).put("sha256", "deadbeef"))
+        }
+
+        val result = BackupEngine.verifyAgainst(sdb, manifest, tables)
+
+        assertFalse("manifest 有、tables 缺的已知表必须判为不通过", result.rowsOk)
+        assertTrue("并且要能看出是哪张表：${result.rowDetails}", result.rowDetails.any { it.contains(missing) })
+    }
 }
